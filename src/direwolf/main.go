@@ -1,9 +1,16 @@
+// Copyright 2015 toor@titansof.tv
+//
+// A (currently) stateless torrent tracker using Redis as a backing store
+//
+//
+
 package main
 
 import (
 	"bytes"
 	"errors"
 	"flag"
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/jackpal/bencode-go"
 	"github.com/labstack/echo"
@@ -17,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"fmt"
 )
 
 type (
@@ -43,30 +49,32 @@ type (
 		SpeedDN       float64 `redis:"speed_dj"`
 		Uploaded      uint64  `redis:"uploaded"`
 		Downloaded    uint64  `redis:"downloaded"`
+		Corrupt       uint64  `redis:"corrupt"`
 		IP            string  `redis:"ip"`
 		Port          uint64  `redis:"port"`
 		Left          uint64  `redis:"left"`
-		Announces     string  `redis:"announces"`
+		Announces     uint64  `redis:"announces"`
 		TotalTime     uint64  `redis:"total_time"`
-		AnnounceLast  uint64  `redis:"last_announce"`
-		AnnounceFirst uint64  `redis:"first_announce"`
+		AnnounceLast  int32   `redis:"last_announce"`
+		AnnounceFirst int32   `redis:"first_announce"`
 		New           bool    `redis:"new"`
 		Active        bool    `redis:"active"`
 		UserID        uint64  `redis:"user_id"`
 	}
 
 	AnnounceRequest struct {
-		Compact    bool   `json:"compact"`
-		Downloaded uint64 `json:"downloaded"`
-		Event      string `json:"event"`
-		IPv4       net.IP `json:"ipv4"`
-		Infohash   string `json:"infohash"`
-		Left       uint64 `json:"left"`
-		NumWant    int    `json:"numwant"`
-		Passkey    string `json:"passkey"`
-		PeerID     string `json:"peer_id"`
-		Port       uint64 `json:"port"`
-		Uploaded   uint64 `json:"uploaded"`
+		Compact    bool
+		Downloaded uint64
+		Corrupt    uint64
+		Event      string
+		IPv4       net.IP
+		InfoHash   string
+		Left       uint64
+		NumWant    int
+		Passkey    string
+		PeerID     string
+		Port       uint64
+		Uploaded   uint64
 	}
 
 	ScrapeRequest struct {
@@ -81,19 +89,21 @@ type (
 )
 
 const (
-	MSG_OK                      int = 0
-	MSG_INVALID_REQ_TYPE        int = 100
-	MSG_MISSING_INFO_HASH       int = 101
-	MSG_MISSING_PEER_ID         int = 102
-	MSG_MISSING_PORT            int = 103
-	MSG_INVALID_PORT            int = 104
-	MSG_INVALID_INFO_HASH       int = 150
-	MSG_INVALID_PEER_ID         int = 151
-	MSG_INVALID_NUM_WANT        int = 152
-	MSG_INFO_HASH_NOT_FOUND     int = 200
-	MSG_CLIENT_REQUEST_TOO_FAST int = 500
-	MSG_MALFORMED_REQUEST       int = 901
-	MSG_GENERIC_ERROR           int = 900
+	MSG_OK                      int     = 0
+	MSG_INVALID_REQ_TYPE        int     = 100
+	MSG_MISSING_INFO_HASH       int     = 101
+	MSG_MISSING_PEER_ID         int     = 102
+	MSG_MISSING_PORT            int     = 103
+	MSG_INVALID_PORT            int     = 104
+	MSG_INVALID_INFO_HASH       int     = 150
+	MSG_INVALID_PEER_ID         int     = 151
+	MSG_INVALID_NUM_WANT        int     = 152
+	MSG_INFO_HASH_NOT_FOUND     int     = 200
+	MSG_CLIENT_REQUEST_TOO_FAST int     = 500
+	MSG_MALFORMED_REQUEST       int     = 901
+	MSG_GENERIC_ERROR           int     = 900
+	ANNOUNCE_INTERVAL           int     = 600
+	PEER_EXPIRY                 float32 = float32(ANNOUNCE_INTERVAL) * 1.25
 )
 
 var (
@@ -123,6 +133,9 @@ var (
 	debug       = flag.Bool("debug", false, "Enable debugging output")
 )
 
+// Fetch the stores torrent_id that corresponds to the info_hash supplied
+// as a GET value. If the info_hash doesnt return an id we consider the torrent
+// either soft-deleted or non-existant
 func GetTorrentID(r redis.Conn, info_hash string) uint64 {
 	torrent_id_reply, err := r.Do("GET", fmt.Sprintf("t:info_hash:%x", info_hash))
 	if err != nil {
@@ -141,6 +154,9 @@ func GetTorrentID(r redis.Conn, info_hash string) uint64 {
 	return torrent_id
 }
 
+// Fetch a torrents data from the database and return a Torrent struct.
+// If the torrent doesnt exist in the database a new skeleton Torrent
+// instance will be returned.
 func GetTorrent(r redis.Conn, torrent_id uint64) map[string]string {
 	torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d", torrent_id))
 	if err != nil {
@@ -159,6 +175,8 @@ func GetTorrent(r redis.Conn, torrent_id uint64) map[string]string {
 	}
 }
 
+// Fetch a user_id from the supplied passkey. A return value
+// of 0 denotes a non-existing or disabled user_id
 func GetUserID(r redis.Conn, passkey string) uint64 {
 	log.Println("Fetching passkey", passkey)
 	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
@@ -174,6 +192,8 @@ func GetUserID(r redis.Conn, passkey string) uint64 {
 	return user_id
 }
 
+// Checked if the clients peer_id prefix matches the client prefixes
+// stored in the white lists
 func IsValidClient(r redis.Conn, peer_id string) bool {
 	a, err := r.Do("HKEYS", "t:whitelist")
 
@@ -190,34 +210,95 @@ func IsValidClient(r redis.Conn, peer_id string) bool {
 	return false
 }
 
+// Get an array of peers for a supplied torrent_id
 func GetPeers(r *redis.Conn, torrent_id uint) {
 	//"t:t:{}:peers"
 	// hgetall("t:t:{}:{}
 }
 
-func GetPeer(r redis.Conn, torrent_id uint64, peer_id string) map[string]string {
+// Fetch an existing peers data if it exists, other wise generate a
+// new peer with default data values. The data is persed into a Peer
+// struct and returned.
+func GetPeer(r redis.Conn, torrent_id uint64, peer_id string) Peer {
 	peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id))
 	if err != nil {
 		log.Println("Error executing peer fetch query: ", err)
 	}
+
+	values, err := redis.Values(peer_reply, nil)
+	if err != nil {
+		log.Panicln("Failed to parse peer reply")
+	}
+
+	peer := Peer{
+		Active:        false,
+		Announces:     0,
+		SpeedUP:       0,
+		SpeedDN:       0,
+		Uploaded:      0,
+		Downloaded:    0,
+		Left:          0,
+		Corrupt:       0,
+		IP:            "",
+		Port:          0,
+		AnnounceFirst: unixtime(),
+		AnnounceLast:  unixtime(),
+		TotalTime:     0,
+		UserID:        0,
+		New:           true,
+	}
+
 	if peer_reply == nil {
 		log.Println("Making new peer struct")
-		peer := make(map[string]string)
-		return peer
 	} else {
-		peer, err := redis.StringMap(peer_reply, nil)
+		err := redis.ScanStruct(values, &peer)
 		if err != nil {
 			log.Println("Failed to fetch peer: ", err)
+		} else {
+			peer.Announces += 1
+			ann_diff := uint64(unixtime() - peer.AnnounceLast)
+			if ann_diff < 1500 {
+				peer.TotalTime += ann_diff
+			}
 		}
-		return peer
 	}
+	log.Println("Test:", peer.Announces)
+	return peer
 }
 
-func GentlyTouchPeer(r *redis.Conn, torrent_id uint, peer_id string) {
-
+// Add a peer to a torrents active peer_id list
+func AddPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
+	_, err := r.Do("SADD", fmt.Sprintf("t:t:%d:peers", torrent_id), peer_id)
+	if err != nil {
+		log.Println("Error executing peer fetch query: ", err)
+		return false
+	}
+	return true
 }
 
-// New parses a raw url query.
+// Remove a peer from a torrents active peer_id list
+func DelPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
+	_, err := r.Do("SREM", fmt.Sprintf("t:t:%d:peers", torrent_id), peer_id)
+	if err != nil {
+		log.Println("Error executing peer fetch query: ", err)
+		return false
+	}
+	return true
+}
+
+// Flag a peer as being alive by setting a key with a expiry. If the key expires
+// before the peer refreshes it, the peer is marked as inactive and no longer sent
+// to peers in announces
+func GentlyTouchPeer(r redis.Conn, torrent_id uint, peer_id string) bool {
+	_, err := r.Do("SETEX", fmt.Sprintf("t:t:%d:peers:%s", torrent_id, peer_id))
+	if err != nil {
+		log.Println("Error touching peer: ", err)
+		return false
+	}
+	return true
+}
+
+// Parses a raw url query into a Query struct
 func QueryStringParser(query string) (*Query, error) {
 	var (
 		keyStart, keyEnd int
@@ -298,13 +379,16 @@ func (q *Query) Uint64(key string) (uint64, error) {
 	return val, nil
 }
 
+// math.Max for uint64
 func UMax(a, b uint64) uint64 {
 	if a > b {
 		return a
+	} else {
+		return b
 	}
-	return b
 }
 
+// Parse the query string into an AnnounceRequest struct
 func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	log.Println(c.Request.RequestURI)
 	q, err := QueryStringParser(c.Request.RequestURI)
@@ -320,7 +404,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	numWant := getNumWant(q, 30)
 
-	infohash, exists := q.Params["info_hash"]
+	info_hash, exists := q.Params["info_hash"]
 	if !exists {
 		return nil, errors.New("Invalid info hash")
 	}
@@ -366,12 +450,21 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 		uploaded = UMax(0, uploaded)
 	}
 
+	corrupt, err := q.Uint64("corrupt")
+	if err != nil {
+		// Assume we just don't have the param
+		corrupt = 0
+	} else {
+		corrupt = UMax(0, corrupt)
+	}
+
 	return &AnnounceRequest{
 		Compact:    compact,
+		Corrupt:    corrupt,
 		Downloaded: downloaded,
 		Event:      event,
 		IPv4:       ipv4,
-		Infohash:   infohash,
+		InfoHash:   info_hash,
 		Left:       left,
 		NumWant:    numWant,
 		PeerID:     peerID,
@@ -380,8 +473,8 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	}, nil
 }
 
+// Parse and return a IP from a string
 func getIP(ip_str string) (net.IP, error) {
-
 	ip := net.ParseIP(ip_str)
 	if ip != nil {
 		return ip.To4(), nil
@@ -389,6 +482,8 @@ func getIP(ip_str string) (net.IP, error) {
 	return nil, errors.New("Failed to parse ip")
 }
 
+// Parse the num want from the announce request, replacing with our
+// own default value if the supplied value is missing or deemed invalid
 func getNumWant(q *Query, fallback int) int {
 	if numWantStr, exists := q.Params["numwant"]; exists {
 		numWant, err := strconv.Atoi(numWantStr)
@@ -401,6 +496,7 @@ func getNumWant(q *Query, fallback int) int {
 	return fallback
 }
 
+// Create a new redis pool
 func newPool(server, password string, max_idle int) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     max_idle,
@@ -421,10 +517,14 @@ func newPool(server, password string, max_idle int) *redis.Pool {
 	}
 }
 
+// Output a bencoded error code to the torrent client using
+// a preset message code constant
 func oops(c *echo.Context, msg_code int) {
 	c.String(msg_code, responseError(resp_msg[msg_code]))
 }
 
+// Generate a bencoded error response for the torrent client to
+// parse and display to the user
 func responseError(message string) string {
 	var out_bytes bytes.Buffer
 	var er_msg = ErrorResponse{FailReason: message}
@@ -435,15 +535,29 @@ func responseError(message string) string {
 	return out_bytes.String()
 }
 
-func handleAnnounce(c *echo.Context) {
+// Estimate a peers speed using downloaded amount over time
+func estSpeed(start_time int32, last_time int32, bytes_sent uint64) float64 {
+	if last_time < start_time {
+		return 0.0
+	}
+	return float64(bytes_sent) / (float64(last_time) - float64(start_time))
+}
 
+// Generate a 32bit unix timestamp
+func unixtime() int32 {
+	return int32(time.Now().Unix())
+}
+
+// Route handler for the /announce endpoint
+// Here be dragons
+func handleAnnounce(c *echo.Context) {
+	cur_time := unixtime()
 	r := pool.Get()
 	defer r.Close()
 
 	ann, err := NewAnnounce(c)
-
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
@@ -463,7 +577,7 @@ func handleAnnounce(c *echo.Context) {
 		return
 	}
 
-	var torrent_id = GetTorrentID(r, ann.Infohash)
+	var torrent_id = GetTorrentID(r, ann.InfoHash)
 	if torrent_id <= 0 {
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		return
@@ -476,15 +590,31 @@ func handleAnnounce(c *echo.Context) {
 	torrent := GetTorrent(r, torrent_id)
 	log.Println(torrent)
 
+	peer.IP = ann.IPv4.String()
+	peer.Corrupt += ann.Corrupt
+	peer.Left = ann.Left
+	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, ann.Uploaded)
+	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, ann.Downloaded)
+
+	if ann.Event == "stopped" {
+		peer.Active = false
+		DelPeer(r, torrent_id, ann.PeerID)
+	} else {
+		peer.Active = true
+		AddPeer(r, torrent_id, ann.PeerID)
+	}
+
 	resp := responseError("hello!")
 	log.Println(resp)
 	c.String(http.StatusOK, resp)
 }
 
+// Route handler for the /scrape requests
 func handleScrape(c *echo.Context) {
 	c.String(http.StatusOK, "I like to scrape my ass")
 }
 
+// Do it
 func main() {
 	// Parse CLI args
 	flag.Parse()

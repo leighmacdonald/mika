@@ -17,6 +17,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -25,96 +26,110 @@ import (
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"github.com/thoas/stats"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
 type (
-	ScrapeResponse struct{}
 
-	ErrorResponse struct {
-		FailReason string `bencode:"failure reason"`
-	}
+Config struct {
+	Debug      bool
+	ListenHost string
+	RedisHost string
+	RedisPass string
+	RedisMaxIdle int
+}
 
-	AnnounceResponse struct {
-		MinInterval int    `bencode:"min interval"`
-		Complete    int    `bencode:"complete"`
-		Incomplete  int    `bencode:"incomplete"`
-		Interval    int    `bencode:"interval"`
-		Peers       string `bencode:"peers"`
-	}
+ScrapeResponse struct {}
 
-	// Peers
-	Peer struct {
-		SpeedUP       float64 `redis:"speed_up"`
-		SpeedDN       float64 `redis:"speed_dj"`
-		Uploaded      uint64  `redis:"uploaded"`
-		Downloaded    uint64  `redis:"downloaded"`
-		Corrupt       uint64  `redis:"corrupt"`
-		IP            net.IP  `redis:"ip"`
-		Port          uint64  `redis:"port"`
-		Left          uint64  `redis:"left"`
-		Announces     uint64  `redis:"announces"`
-		TotalTime     uint64  `redis:"total_time"`
-		AnnounceLast  int32   `redis:"last_announce"`
-		AnnounceFirst int32   `redis:"first_announce"`
-		New           bool    `redis:"new"`
-		Active        bool    `redis:"active"`
-		UserID        uint64  `redis:"user_id"`
-	}
+ErrorResponse struct {
+	FailReason string `bencode:"failure reason"`
+}
 
-	AnnounceRequest struct {
-		Compact    bool
-		Downloaded uint64
-		Corrupt    uint64
-		Event      string
-		IPv4       net.IP
-		InfoHash   string
-		Left       uint64
-		NumWant    int
-		Passkey    string
-		PeerID     string
-		Port       uint64
-		Uploaded   uint64
-	}
+AnnounceResponse struct {
+	MinInterval int    `bencode:"min interval"`
+	Complete    int    `bencode:"complete"`
+	Incomplete  int    `bencode:"incomplete"`
+	Interval    int    `bencode:"interval"`
+	Peers       string `bencode:"peers"`
+}
 
-	ScrapeRequest struct {
-		InfoHashes []string
-	}
+// Peers
+Peer struct {
+	SpeedUP       float64 `redis:"speed_up"`
+	SpeedDN       float64 `redis:"speed_dj"`
+	Uploaded      uint64  `redis:"uploaded"`
+	Downloaded    uint64  `redis:"downloaded"`
+	Corrupt       uint64  `redis:"corrupt"`
+	IP            net.IP  `redis:"ip"`
+	Port          uint64  `redis:"port"`
+	Left          uint64  `redis:"left"`
+	Announces     uint64  `redis:"announces"`
+	TotalTime     uint64  `redis:"total_time"`
+	AnnounceLast  int32   `redis:"last_announce"`
+	AnnounceFirst int32   `redis:"first_announce"`
+	New           bool    `redis:"new"`
+	Active        bool    `redis:"active"`
+	UserID        uint64  `redis:"user_id"`
+}
 
-	Query struct {
-		InfoHashes []string
-		Params     map[string]string
-	}
+AnnounceRequest struct {
+	Compact    bool
+	Downloaded uint64
+	Corrupt    uint64
+	Event      string
+	IPv4       net.IP
+	InfoHash   string
+	Left       uint64
+	NumWant    int
+	Passkey    string
+	PeerID     string
+	Port       uint64
+	Uploaded   uint64
+}
+
+ScrapeRequest struct {
+	InfoHashes []string
+}
+
+Query struct {
+	InfoHashes []string
+	Params     map[string]string
+}
 )
 
 const (
-	MSG_OK                      int     = 0
-	MSG_INVALID_REQ_TYPE        int     = 100
-	MSG_MISSING_INFO_HASH       int     = 101
-	MSG_MISSING_PEER_ID         int     = 102
-	MSG_MISSING_PORT            int     = 103
-	MSG_INVALID_PORT            int     = 104
-	MSG_INVALID_INFO_HASH       int     = 150
-	MSG_INVALID_PEER_ID         int     = 151
-	MSG_INVALID_NUM_WANT        int     = 152
-	MSG_INFO_HASH_NOT_FOUND     int     = 200
-	MSG_CLIENT_REQUEST_TOO_FAST int     = 500
-	MSG_MALFORMED_REQUEST       int     = 901
-	MSG_GENERIC_ERROR           int     = 900
-	ANNOUNCE_INTERVAL           int     = 600
+	MSG_OK                      int = 0
+	MSG_INVALID_REQ_TYPE        int = 100
+	MSG_MISSING_INFO_HASH       int = 101
+	MSG_MISSING_PEER_ID         int = 102
+	MSG_MISSING_PORT            int = 103
+	MSG_INVALID_PORT            int = 104
+	MSG_INVALID_INFO_HASH       int = 150
+	MSG_INVALID_PEER_ID         int = 151
+	MSG_INVALID_NUM_WANT        int = 152
+	MSG_INFO_HASH_NOT_FOUND     int = 200
+	MSG_CLIENT_REQUEST_TOO_FAST int = 500
+	MSG_MALFORMED_REQUEST       int = 901
+	MSG_GENERIC_ERROR           int = 900
+	ANNOUNCE_INTERVAL           int = 600
 	PEER_EXPIRY                 float32 = float32(ANNOUNCE_INTERVAL) * 1.25
 )
 
 var (
 
-	// Error code to message mappings
+// Error code to message mappings
 	resp_msg = map[int]string{
 		MSG_INVALID_REQ_TYPE:        "Invalid request type",
 		MSG_MISSING_INFO_HASH:       "info_hash missing from request",
@@ -131,17 +146,43 @@ var (
 	}
 
 	err_parse_reply = errors.New("Failed to parse reply")
-	err_cast_reply  = errors.New("Failed to cast reply into type")
+	err_cast_reply = errors.New("Failed to cast reply into type")
+
+	config     *Config
+	configLock = new(sync.RWMutex)
 
 	pool *redis.Pool
 
-	listen_host = flag.String("listen", ":34000", "Host/port to bind to")
-	redis_host  = flag.String("redis", "localhost:6379", "Redis endpoint")
-	redis_pass  = flag.String("rpass", "", "Redis pasword")
-	max_idle    = flag.Int("max_idle", 500, "Max idle redis connections")
-	num_procs   = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
-	debug       = flag.Bool("debug", false, "Enable debugging output")
+	config_file = flag.String("config", "./config.json", "Config file path")
+	num_procs = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
 )
+
+func loadConfig(fail bool) {
+	file, err := ioutil.ReadFile(*config_file)
+	if err != nil {
+		log.Println("open config: ", err)
+		if fail {
+			os.Exit(1)
+		}
+	}
+
+	temp := new(Config)
+	if err = json.Unmarshal(file, temp); err != nil {
+		log.Println("! Parse config error: ", err)
+		if fail {
+			os.Exit(1)
+		}
+	}
+	configLock.Lock()
+	config = temp
+	configLock.Unlock()
+}
+
+func GetConfig() *Config {
+	configLock.RLock()
+	defer configLock.RUnlock()
+	return config
+}
 
 // Fetch the stores torrent_id that corresponds to the info_hash supplied
 // as a GET value. If the info_hash doesnt return an id we consider the torrent
@@ -167,7 +208,7 @@ func GetTorrentID(r redis.Conn, info_hash string) uint64 {
 func makeCompactPeers(peers []Peer) string {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {
-		out_buf.Write(peer.IP)
+		out_buf.Write(peer.IP.To4())
 		out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
 	}
 	return string(out_buf.Bytes()[:])
@@ -197,9 +238,7 @@ func GetTorrent(r redis.Conn, torrent_id uint64) map[string]string {
 // Fetch a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
 func GetUserID(r redis.Conn, passkey string) uint64 {
-	if *debug {
-		log.Println("Fetching passkey", passkey)
-	}
+	Debug(fmt.Println("Fetching passkey", passkey))
 	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
 	if err != nil {
 		log.Println(err)
@@ -233,7 +272,7 @@ func IsValidClient(r redis.Conn, peer_id string) bool {
 
 // Get an array of peers for a supplied torrent_id
 func GetPeers(r redis.Conn, torrent_id uint64, max_peers int) []Peer {
-	peers_reply, err := r.Do("SMEMBERS", fmt.Sprintf("t:t:%d:peers", torrent_id))
+	peers_reply, err := r.Do("SMEMBERS", fmt.Sprintf("t:t:%d:p", torrent_id))
 	if err != nil || peers_reply == nil {
 		log.Println("Error fetching peers_resply", err)
 		return nil
@@ -302,9 +341,7 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 			peer.New = false
 		}
 	}
-	if *debug {
-		log.Println("Peer: ", peer)
-	}
+	Debug("Peer: ", peer)
 	return peer, nil
 
 }
@@ -350,9 +387,9 @@ func QueryStringParser(query string) (*Query, error) {
 	var (
 		keyStart, keyEnd int
 		valStart, valEnd int
-		firstInfoHash    string
+		firstInfoHash string
 
-		onKey       = true
+		onKey = true
 		hasInfoHash = false
 
 		q = &Query{
@@ -446,9 +483,6 @@ func Min(a, b int) int {
 
 // Parse the query string into an AnnounceRequest struct
 func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
-	if *debug {
-		log.Println(c.Request.RequestURI)
-	}
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		return nil, err
@@ -607,7 +641,7 @@ func unixtime() int32 {
 }
 
 func Debug(msg ...interface{}) {
-	if *debug {
+	if config.Debug {
 		log.Println(msg...)
 	}
 }
@@ -633,9 +667,7 @@ func handleAnnounce(c *echo.Context) {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
-	if *debug {
-		log.Println(fmt.Sprint("UserID: ", user_id))
-	}
+	Debug("UserID: ", user_id)
 
 	if !IsValidClient(r, ann.PeerID) {
 		oops(c, MSG_INVALID_PEER_ID)
@@ -647,9 +679,8 @@ func handleAnnounce(c *echo.Context) {
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		return
 	}
-	if *debug {
-		log.Println(fmt.Sprint("TorrentID: ", torrent_id))
-	}
+	Debug("TorrentID: ", torrent_id)
+
 
 	peer, err := GetPeer(r, torrent_id, ann.PeerID)
 	if err != nil {
@@ -658,12 +689,8 @@ func handleAnnounce(c *echo.Context) {
 	}
 	peer.UserID = user_id
 
-	// log.Println(peer)
-
 	torrent := GetTorrent(r, torrent_id)
-	if *debug {
-		log.Println(torrent)
-	}
+	Debug(torrent)
 
 	peer.IP = ann.IPv4
 	peer.Corrupt += ann.Corrupt
@@ -680,12 +707,9 @@ func handleAnnounce(c *echo.Context) {
 	}
 	peers := GetPeers(r, torrent_id, ann.NumWant)
 	for _, p := range peers {
-		if *debug {
-			log.Println(p)
-		}
+		Debug(p)
 	}
-	compact_peers := makeCompactPeers(peers)
-	log.Println(compact_peers)
+	// compact_peers := makeCompactPeers(peers)
 
 	// Define our keys
 	// TODO memoization function?
@@ -815,9 +839,7 @@ func handleAnnounce(c *echo.Context) {
 func reapPeer(torrent_id, peer_id string) {
 	r := pool.Get()
 	defer r.Close()
-	if *debug {
-		log.Println("Reaping peer:", torrent_id, peer_id)
-	}
+	Debug("Reaping peer:", torrent_id, peer_id)
 
 	torrent_id_uint, err := strconv.ParseUint(torrent_id, 10, 64)
 	if err != nil {
@@ -849,9 +871,7 @@ func reapPeer(torrent_id, peer_id string) {
 		log.Println("Tried to remove non-existant peer: ", torrent_id, peer_id)
 	}
 	if v == "1" {
-		if *debug {
-			log.Println("Reaped peer successfully: ", peer_id)
-		}
+		Debug("Reaped peer successfully: ", peer_id)
 	}
 
 	// all needed i think, must match r.Send count?
@@ -871,13 +891,13 @@ func peer_stalker() {
 	psc.Subscribe("__keyevent@0__:expired")
 	for {
 		switch v := psc.Receive().(type) {
-		case redis.Message:
+			case redis.Message:
 			Debug(fmt.Sprintf("Key Expiry: %s\n", v.Data))
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
 			reapPeer(p[2], p[3])
-		case redis.Subscription:
+			case redis.Subscription:
 			log.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
-		case error:
+			case error:
 			log.Println("Subscriber error: ", v.Error())
 		}
 	}
@@ -890,21 +910,20 @@ func handleScrape(c *echo.Context) {
 
 // Do it
 func main() {
-	// Parse CLI args
-	flag.Parse()
+
 
 	// Set max number of CPU cores to use
 	log.Println("Num procs(s):", *num_procs)
 	runtime.GOMAXPROCS(*num_procs)
 
 	// Initialize the redis pool
-	pool = newPool(*redis_host, *redis_pass, *max_idle)
+	pool = newPool(config.RedisHost, config.RedisPass, config.RedisMaxIdle)
 
 	// Initialize the router + middlewares
 	e := echo.New()
 	e.MaxParam(1)
 
-	if *debug {
+	if config.Debug {
 		e.Use(mw.Logger)
 	}
 
@@ -924,5 +943,22 @@ func main() {
 	go peer_stalker()
 
 	// Start server
-	e.Run(*listen_host)
+	log.Println(config)
+	e.Run(config.ListenHost)
+}
+
+func init() {
+	// Parse CLI args
+	flag.Parse()
+
+	loadConfig(true)
+	s := make(chan os.Signal, 1)
+	signal.Notify(s, syscall.SIGUSR2)
+	go func() {
+		for {
+			<-s
+			loadConfig(false)
+			log.Println("> Reloaded config")
+		}
+	}()
 }

@@ -1,0 +1,7 @@
+{
+  "Debug": false,
+  "ListenHost": ":34000",
+  "RedisHost": "localhost:6379",
+  "RedisPass": "",
+  "RedisMaxIdle": 500
+}

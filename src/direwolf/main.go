@@ -123,6 +123,10 @@ var (
 		MSG_MALFORMED_REQUEST:       "Malformed request",
 		MSG_GENERIC_ERROR:           "Generic Error :(",
 	}
+
+	err_parse_reply = errors.New("Failed to parse reply")
+	err_cast_reply  = errors.New("Failed to cast reply into type")
+
 	pool *redis.Pool
 
 	listen_host = flag.String("listen", ":34000", "Host/port to bind to")
@@ -178,7 +182,9 @@ func GetTorrent(r redis.Conn, torrent_id uint64) map[string]string {
 // Fetch a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
 func GetUserID(r redis.Conn, passkey string) uint64 {
-	log.Println("Fetching passkey", passkey)
+    if *debug {
+        log.Println("Fetching passkey", passkey)
+    }
 	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
 	if err != nil {
 		log.Println(err)
@@ -211,25 +217,41 @@ func IsValidClient(r redis.Conn, peer_id string) bool {
 }
 
 // Get an array of peers for a supplied torrent_id
-func GetPeers(r *redis.Conn, torrent_id uint) {
-	//"t:t:{}:peers"
-	// hgetall("t:t:{}:{}
+func GetPeers(r redis.Conn, torrent_id uint64, max_peers int) []Peer {
+	peers_reply, err := r.Do("SMEMBERS", fmt.Sprintf("t:t:%d:peers", torrent_id))
+	if err != nil || peers_reply == nil {
+		log.Println("Error fetching peers_resply", err)
+		return nil
+	}
+	peer_ids, err := redis.Strings(peers_reply, nil)
+	if err != nil {
+		log.Println("Error parsing peers_resply", err)
+		return nil
+	}
+	var peer_size = Min(len(peer_ids), max_peers)
+	for _, peer_id := range peer_ids[0:peer_size] {
+		r.Send("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id))
+	}
+	r.Flush()
+	peers := make([]Peer, peer_size)
+
+	for range peers[0:peer_size] {
+		peer_reply, err := r.Receive()
+		if err != nil {
+			log.Println(err)
+		} else {
+			peer, err := makePeer(peer_reply)
+			if err != nil {
+
+			} else {
+				peers = append(peers, peer)
+			}
+		}
+	}
+	return peers
 }
 
-// Fetch an existing peers data if it exists, other wise generate a
-// new peer with default data values. The data is persed into a Peer
-// struct and returned.
-func GetPeer(r redis.Conn, torrent_id uint64, peer_id string) Peer {
-	peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id))
-	if err != nil {
-		log.Println("Error executing peer fetch query: ", err)
-	}
-
-	values, err := redis.Values(peer_reply, nil)
-	if err != nil {
-		log.Panicln("Failed to parse peer reply")
-	}
-
+func makePeer(redis_reply interface{}) (Peer, error) {
 	peer := Peer{
 		Active:        false,
 		Announces:     0,
@@ -248,12 +270,18 @@ func GetPeer(r redis.Conn, torrent_id uint64, peer_id string) Peer {
 		New:           true,
 	}
 
-	if peer_reply == nil {
+	values, err := redis.Values(redis_reply, nil)
+	if err != nil {
+		log.Println("Failed to parse peer reply: ", err)
+		return peer, err_parse_reply
+	}
+	if values == nil {
 		log.Println("Making new peer struct")
 	} else {
 		err := redis.ScanStruct(values, &peer)
 		if err != nil {
 			log.Println("Failed to fetch peer: ", err)
+			return peer, err_cast_reply
 		} else {
 			peer.Announces += 1
 			ann_diff := uint64(unixtime() - peer.AnnounceLast)
@@ -262,35 +290,55 @@ func GetPeer(r redis.Conn, torrent_id uint64, peer_id string) Peer {
 			}
 		}
 	}
-	log.Println("Test:", peer.Announces)
-	return peer
+    if *debug {
+        log.Println("Peer: ", peer)
+    }
+	return peer, nil
+
+}
+
+// Fetch an existing peers data if it exists, other wise generate a
+// new peer with default data values. The data is persed into a Peer
+// struct and returned.
+func GetPeer(r redis.Conn, torrent_id uint64, peer_id string) (Peer, error) {
+	peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id))
+	if err != nil {
+		log.Println("Error executing peer fetch query: ", err)
+	}
+	return makePeer(peer_reply)
 }
 
 // Add a peer to a torrents active peer_id list
 func AddPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
-	_, err := r.Do("SADD", fmt.Sprintf("t:t:%d:peers", torrent_id), peer_id)
+	v, err := r.Do("SADD", fmt.Sprintf("t:t:%d:p", torrent_id), peer_id)
 	if err != nil {
 		log.Println("Error executing peer fetch query: ", err)
 		return false
 	}
+    if v == "0" {
+        log.Println("Tried to add peer to set with existing element")
+    }
+    GentlyTouchPeer(r, torrent_id, peer_id)
 	return true
 }
 
 // Remove a peer from a torrents active peer_id list
 func DelPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
-	_, err := r.Do("SREM", fmt.Sprintf("t:t:%d:peers", torrent_id), peer_id)
+	_, err := r.Do("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)
 	if err != nil {
 		log.Println("Error executing peer fetch query: ", err)
 		return false
 	}
+    // Mark inactive?
+    //r.Do("DEL", fmt.Sprintf("t:t:%d:p:%s", torrent_id, peer_id))
 	return true
 }
 
 // Flag a peer as being alive by setting a key with a expiry. If the key expires
 // before the peer refreshes it, the peer is marked as inactive and no longer sent
 // to peers in announces
-func GentlyTouchPeer(r redis.Conn, torrent_id uint, peer_id string) bool {
-	_, err := r.Do("SETEX", fmt.Sprintf("t:t:%d:peers:%s", torrent_id, peer_id))
+func GentlyTouchPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
+	_, err := r.Do("SETEX", fmt.Sprintf("t:t:%d:p:%s:exp", torrent_id, peer_id), 4, 1)
 	if err != nil {
 		log.Println("Error touching peer: ", err)
 		return false
@@ -388,9 +436,20 @@ func UMax(a, b uint64) uint64 {
 	}
 }
 
+// math.Max for uint64
+func Min(a, b int) int {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
 // Parse the query string into an AnnounceRequest struct
 func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
-	log.Println(c.Request.RequestURI)
+    if *debug {
+        log.Println(c.Request.RequestURI)
+    }
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		return nil, err
@@ -584,7 +643,11 @@ func handleAnnounce(c *echo.Context) {
 	}
 	log.Println(fmt.Sprint("TorrentID: ", torrent_id))
 
-	peer := GetPeer(r, torrent_id, ann.PeerID)
+	peer, err := GetPeer(r, torrent_id, ann.PeerID)
+	if err != nil {
+		oops(c, MSG_GENERIC_ERROR)
+		return
+	}
 	log.Println(peer)
 
 	torrent := GetTorrent(r, torrent_id)
@@ -603,10 +666,78 @@ func handleAnnounce(c *echo.Context) {
 		peer.Active = true
 		AddPeer(r, torrent_id, ann.PeerID)
 	}
-
+	peers := GetPeers(r, torrent_id, ann.NumWant)
+	for _, p := range peers {
+		log.Println(p)
+	}
 	resp := responseError("hello!")
 	log.Println(resp)
 	c.String(http.StatusOK, resp)
+}
+
+func reapPeer(torrent_id, peer_id string) {
+    r := pool.Get()
+    defer r.Close()
+	log.Println("Reaping peer:", torrent_id, peer_id)
+
+    torrent_id_uint, err := strconv.ParseUint(torrent_id, 10, 64)
+    if err != nil {
+        log.Println("Failed to parse torrent id into uint64", err)
+        return
+    }
+
+    // Fetch before we set active to 0
+    peer, err := GetPeer(r, torrent_id_uint, peer_id)
+    if err != nil {
+        log.Println("Failed to fetch peer while reaping")
+    }
+
+    r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)
+    r.Send("HSET", fmt.Sprintf("t:t:%s:p:%s", torrent_id, peer_id), "active", 0)
+    if peer.Active {
+        if peer.Left > 0 {
+            r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "leechers", -1)
+        } else {
+            r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "seeders", -1)
+        }
+    }
+
+    r.Flush()
+    v, err := r.Receive()
+    if err != nil {
+        log.Println("Tried to remove non-existant peer: ", torrent_id, peer_id)
+    }
+    if v == "1" {
+        if *debug {
+            log.Println("Reaped peer successfully: ", peer_id)
+        }
+    }
+    // all needed i think, must match r.Send count?
+    r.Receive()
+    r.Receive()
+
+}
+
+func peer_necro() {
+	r := pool.Get()
+	defer r.Close()
+
+	psc := redis.PubSubConn{r}
+	psc.Subscribe("__keyevent@0__:expired")
+	for {
+		switch v := psc.Receive().(type) {
+		case redis.Message:
+			if *debug {
+				log.Printf("Key Expiry: %s\n", v.Data)
+			}
+            p := strings.SplitN(string(v.Data[:]), ":", 6)
+			reapPeer(p[2], p[4])
+		case redis.Subscription:
+			log.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
+		case error:
+			log.Println("Subscriber error: ", v.Error())
+		}
+	}
 }
 
 // Route handler for the /scrape requests
@@ -645,6 +776,8 @@ func main() {
 	// Tracker routes
 	e.Get("/:passkey/announce", handleAnnounce)
 	e.Get("/:passkey/scrape", handleScrape)
+
+	go peer_necro()
 
 	// Start server
 	e.Run(*listen_host)

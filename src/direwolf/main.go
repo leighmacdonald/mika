@@ -182,9 +182,9 @@ func GetTorrent(r redis.Conn, torrent_id uint64) map[string]string {
 // Fetch a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
 func GetUserID(r redis.Conn, passkey string) uint64 {
-    if *debug {
-        log.Println("Fetching passkey", passkey)
-    }
+	if *debug {
+		log.Println("Fetching passkey", passkey)
+	}
 	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
 	if err != nil {
 		log.Println(err)
@@ -290,9 +290,9 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 			}
 		}
 	}
-    if *debug {
-        log.Println("Peer: ", peer)
-    }
+	if *debug {
+		log.Println("Peer: ", peer)
+	}
 	return peer, nil
 
 }
@@ -315,10 +315,10 @@ func AddPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
 		log.Println("Error executing peer fetch query: ", err)
 		return false
 	}
-    if v == "0" {
-        log.Println("Tried to add peer to set with existing element")
-    }
-    GentlyTouchPeer(r, torrent_id, peer_id)
+	if v == "0" {
+		log.Println("Tried to add peer to set with existing element")
+	}
+	GentlyTouchPeer(r, torrent_id, peer_id)
 	return true
 }
 
@@ -329,8 +329,8 @@ func DelPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
 		log.Println("Error executing peer fetch query: ", err)
 		return false
 	}
-    // Mark inactive?
-    //r.Do("DEL", fmt.Sprintf("t:t:%d:p:%s", torrent_id, peer_id))
+	// Mark inactive?
+	//r.Do("DEL", fmt.Sprintf("t:t:%d:p:%s", torrent_id, peer_id))
 	return true
 }
 
@@ -447,9 +447,9 @@ func Min(a, b int) int {
 
 // Parse the query string into an AnnounceRequest struct
 func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
-    if *debug {
-        log.Println(c.Request.RequestURI)
-    }
+	if *debug {
+		log.Println(c.Request.RequestURI)
+	}
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		return nil, err
@@ -676,45 +676,45 @@ func handleAnnounce(c *echo.Context) {
 }
 
 func reapPeer(torrent_id, peer_id string) {
-    r := pool.Get()
-    defer r.Close()
+	r := pool.Get()
+	defer r.Close()
 	log.Println("Reaping peer:", torrent_id, peer_id)
 
-    torrent_id_uint, err := strconv.ParseUint(torrent_id, 10, 64)
-    if err != nil {
-        log.Println("Failed to parse torrent id into uint64", err)
-        return
-    }
+	torrent_id_uint, err := strconv.ParseUint(torrent_id, 10, 64)
+	if err != nil {
+		log.Println("Failed to parse torrent id into uint64", err)
+		return
+	}
 
-    // Fetch before we set active to 0
-    peer, err := GetPeer(r, torrent_id_uint, peer_id)
-    if err != nil {
-        log.Println("Failed to fetch peer while reaping")
-    }
+	// Fetch before we set active to 0
+	peer, err := GetPeer(r, torrent_id_uint, peer_id)
+	if err != nil {
+		log.Println("Failed to fetch peer while reaping")
+	}
 
-    r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)
-    r.Send("HSET", fmt.Sprintf("t:t:%s:p:%s", torrent_id, peer_id), "active", 0)
-    if peer.Active {
-        if peer.Left > 0 {
-            r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "leechers", -1)
-        } else {
-            r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "seeders", -1)
-        }
-    }
+	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)
+	r.Send("HSET", fmt.Sprintf("t:t:%s:p:%s", torrent_id, peer_id), "active", 0)
+	if peer.Active {
+		if peer.Left > 0 {
+			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "leechers", -1)
+		} else {
+			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "seeders", -1)
+		}
+	}
 
-    r.Flush()
-    v, err := r.Receive()
-    if err != nil {
-        log.Println("Tried to remove non-existant peer: ", torrent_id, peer_id)
-    }
-    if v == "1" {
-        if *debug {
-            log.Println("Reaped peer successfully: ", peer_id)
-        }
-    }
-    // all needed i think, must match r.Send count?
-    r.Receive()
-    r.Receive()
+	r.Flush()
+	v, err := r.Receive()
+	if err != nil {
+		log.Println("Tried to remove non-existant peer: ", torrent_id, peer_id)
+	}
+	if v == "1" {
+		if *debug {
+			log.Println("Reaped peer successfully: ", peer_id)
+		}
+	}
+	// all needed i think, must match r.Send count?
+	r.Receive()
+	r.Receive()
 
 }
 
@@ -730,7 +730,7 @@ func peer_necro() {
 			if *debug {
 				log.Printf("Key Expiry: %s\n", v.Data)
 			}
-            p := strings.SplitN(string(v.Data[:]), ":", 6)
+			p := strings.SplitN(string(v.Data[:]), ":", 6)
 			reapPeer(p[2], p[4])
 		case redis.Subscription:
 			log.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)

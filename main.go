@@ -74,7 +74,7 @@ type (
 		Uploaded      uint64  `redis:"uploaded"`
 		Downloaded    uint64  `redis:"downloaded"`
 		Corrupt       uint64  `redis:"corrupt"`
-		IP            net.IP  `redis:"ip"`
+		IP            string  `redis:"ip"`
 		Port          uint64  `redis:"port"`
 		Left          uint64  `redis:"left"`
 		Announces     uint64  `redis:"announces"`
@@ -241,8 +241,13 @@ func GetTorrentID(r redis.Conn, info_hash string) uint64 {
 func makeCompactPeers(peers []Peer) []byte {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {
-		log.Println("Making peer:", peer.IP.String(), peer.Port)
-		out_buf.Write(peer.IP.To4())
+		log.Println("Making peer:", peer.IP, peer.Port)
+		if peer.Port <= 0 {
+			continue
+		}
+		log.Println("x", peer)
+
+		out_buf.Write(net.ParseIP(peer.IP).To4())
 		out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
 	}
 	return out_buf.Bytes()
@@ -341,14 +346,19 @@ func GetPeers(r redis.Conn, torrent_id uint64, max_peers int) []Peer {
 		log.Println("Error parsing peers_resply", err)
 		return nil
 	}
-	var peer_size = Min(len(peer_ids), max_peers)
-	for _, peer_id := range peer_ids[0:peer_size] {
+
+	known_peers := len(peer_ids)
+	if known_peers > max_peers {
+		known_peers = max_peers
+	}
+
+	for _, peer_id := range peer_ids[0:known_peers] {
 		r.Send("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id))
 	}
 	r.Flush()
-	peers := make([]Peer, peer_size)
+	peers := make([]Peer, known_peers)
 
-	for range peers[0:peer_size] {
+	for i := 1; i <= known_peers; i++ {
 		peer_reply, err := r.Receive()
 		if err != nil {
 			log.Println(err)
@@ -361,9 +371,12 @@ func GetPeers(r redis.Conn, torrent_id uint64, max_peers int) []Peer {
 			}
 		}
 	}
+
 	return peers
 }
 
+// Generate a new instance of a peer from the redis reply if data is contained
+// within, otherwise just return a default value peer
 func makePeer(redis_reply interface{}) (Peer, error) {
 	peer := Peer{
 		Active:        false,
@@ -374,7 +387,7 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 		Downloaded:    0,
 		Left:          0,
 		Corrupt:       0,
-		IP:            net.ParseIP("127.0.0.1"),
+		IP:            "127.0.0.1",
 		Port:          0,
 		AnnounceFirst: unixtime(),
 		AnnounceLast:  unixtime(),
@@ -398,7 +411,7 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 			peer.New = false
 		}
 	}
-	Debug("Peer: ", peer)
+	Debug("Peer: ", peer.IP)
 	return peer, nil
 
 }
@@ -756,7 +769,7 @@ func handleAnnounce(c *echo.Context) {
 	}
 	Debug(torrent)
 
-	peer.IP = ann.IPv4
+	peer.IP = ann.IPv4.String()
 	peer.Corrupt += ann.Corrupt
 	peer.Left = ann.Left
 	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, ann.Uploaded)
@@ -900,7 +913,7 @@ func handleAnnounce(c *echo.Context) {
 		return
 	}
 	encoded := out_bytes.String()
-	log.Println(encoded)
+	//log.Println(encoded)
 	c.String(http.StatusOK, encoded)
 }
 

@@ -21,8 +21,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/chihaya/bencode"
 	"github.com/garyburd/redigo/redis"
-	"github.com/jackpal/bencode-go"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"github.com/thoas/stats"
@@ -42,71 +42,88 @@ import (
 )
 
 type (
+	Config struct {
+		Debug          bool
+		ListenHost     string
+		RedisHost      string
+		RedisPass      string
+		RedisMaxIdle   int
+		AnnInterval    int
+		AnnIntervalMin int
+		ReapInterval   int
+	}
 
-Config struct {
-	Debug      bool
-	ListenHost string
-	RedisHost string
-	RedisPass string
-	RedisMaxIdle int
-}
+	ScrapeResponse struct{}
 
-ScrapeResponse struct {}
+	ErrorResponse struct {
+		FailReason string `bencode:"failure reason"`
+	}
 
-ErrorResponse struct {
-	FailReason string `bencode:"failure reason"`
-}
+	AnnounceResponse struct {
+		MinInterval int    `bencode:"min interval"`
+		Complete    int    `bencode:"complete"`
+		Incomplete  int    `bencode:"incomplete"`
+		Interval    int    `bencode:"interval"`
+		Peers       string `bencode:"peers"`
+	}
 
-AnnounceResponse struct {
-	MinInterval int    `bencode:"min interval"`
-	Complete    int    `bencode:"complete"`
-	Incomplete  int    `bencode:"incomplete"`
-	Interval    int    `bencode:"interval"`
-	Peers       string `bencode:"peers"`
-}
+	// Peers
+	Peer struct {
+		SpeedUP       float64 `redis:"speed_up"`
+		SpeedDN       float64 `redis:"speed_dj"`
+		Uploaded      uint64  `redis:"uploaded"`
+		Downloaded    uint64  `redis:"downloaded"`
+		Corrupt       uint64  `redis:"corrupt"`
+		IP            net.IP  `redis:"ip"`
+		Port          uint64  `redis:"port"`
+		Left          uint64  `redis:"left"`
+		Announces     uint64  `redis:"announces"`
+		TotalTime     uint64  `redis:"total_time"`
+		AnnounceLast  int32   `redis:"last_announce"`
+		AnnounceFirst int32   `redis:"first_announce"`
+		New           bool    `redis:"new"`
+		Active        bool    `redis:"active"`
+		UserID        uint64  `redis:"user_id"`
+	}
 
-// Peers
-Peer struct {
-	SpeedUP       float64 `redis:"speed_up"`
-	SpeedDN       float64 `redis:"speed_dj"`
-	Uploaded      uint64  `redis:"uploaded"`
-	Downloaded    uint64  `redis:"downloaded"`
-	Corrupt       uint64  `redis:"corrupt"`
-	IP            net.IP  `redis:"ip"`
-	Port          uint64  `redis:"port"`
-	Left          uint64  `redis:"left"`
-	Announces     uint64  `redis:"announces"`
-	TotalTime     uint64  `redis:"total_time"`
-	AnnounceLast  int32   `redis:"last_announce"`
-	AnnounceFirst int32   `redis:"first_announce"`
-	New           bool    `redis:"new"`
-	Active        bool    `redis:"active"`
-	UserID        uint64  `redis:"user_id"`
-}
+	AnnounceRequest struct {
+		Compact    bool
+		Downloaded uint64
+		Corrupt    uint64
+		Event      string
+		IPv4       net.IP
+		InfoHash   string
+		Left       uint64
+		NumWant    int
+		Passkey    string
+		PeerID     string
+		Port       uint64
+		Uploaded   uint64
+	}
 
-AnnounceRequest struct {
-	Compact    bool
-	Downloaded uint64
-	Corrupt    uint64
-	Event      string
-	IPv4       net.IP
-	InfoHash   string
-	Left       uint64
-	NumWant    int
-	Passkey    string
-	PeerID     string
-	Port       uint64
-	Uploaded   uint64
-}
+	ScrapeRequest struct {
+		InfoHashes []string
+	}
 
-ScrapeRequest struct {
-	InfoHashes []string
-}
+	Query struct {
+		InfoHashes []string
+		Params     map[string]string
+	}
 
-Query struct {
-	InfoHashes []string
-	Params     map[string]string
-}
+	Tracker struct {
+		sync.RWMutex
+		Torrents map[uint64]*Torrent
+	}
+
+	Torrent struct {
+		Seeders    int16  `redis:"seeders"`
+		Leechers   int16  `redis:"leechers"`
+		Snatches   int16  `redis:"snatches"`
+		Announces  uint64 `redis:"announces"`
+		Uploaded   uint64 `redis:"uploaded"`
+		Downloaded uint64 `redis:"downloaded"`
+		Peers      []Peer `redis:"-"`
+	}
 )
 
 const (
@@ -123,13 +140,27 @@ const (
 	MSG_CLIENT_REQUEST_TOO_FAST int = 500
 	MSG_MALFORMED_REQUEST       int = 901
 	MSG_GENERIC_ERROR           int = 900
-	ANNOUNCE_INTERVAL           int = 600
-	PEER_EXPIRY                 float32 = float32(ANNOUNCE_INTERVAL) * 1.25
 )
 
 var (
-
-// Error code to message mappings
+	cheese = `
+                               ____________
+                            __/ ///////// /|
+                           /              ¯/|
+                          /_______________/ |
+    ________________      |  __________  |  |
+   /               /|     | |          | |  |
+  /               / |     | |  Mika    | |  |
+ /_______________/  |/\   | |  v1.0    | |  |
+(_______________(   |  \  | |__________| | /
+(_______________(   |   \ |______________|/ ___/\
+(_______________(  /     |____>______<_____/     \
+(_______________( /     / = ==== ==== ==== /|    _|_
+(   RISC PC 600 (/     / ========= === == / /   ////
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯      / ========= === == / /   ////
+                     <__________________<_/    ¯¯¯
+`
+	// Error code to message mappings
 	resp_msg = map[int]string{
 		MSG_INVALID_REQ_TYPE:        "Invalid request type",
 		MSG_MISSING_INFO_HASH:       "info_hash missing from request",
@@ -145,8 +176,10 @@ var (
 		MSG_GENERIC_ERROR:           "Generic Error :(",
 	}
 
+	mika *Tracker
+
 	err_parse_reply = errors.New("Failed to parse reply")
-	err_cast_reply = errors.New("Failed to cast reply into type")
+	err_cast_reply  = errors.New("Failed to cast reply into type")
 
 	config     *Config
 	configLock = new(sync.RWMutex)
@@ -154,7 +187,7 @@ var (
 	pool *redis.Pool
 
 	config_file = flag.String("config", "./config.json", "Config file path")
-	num_procs = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
+	num_procs   = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
 )
 
 func loadConfig(fail bool) {
@@ -205,40 +238,66 @@ func GetTorrentID(r redis.Conn, info_hash string) uint64 {
 	return torrent_id
 }
 
-func makeCompactPeers(peers []Peer) string {
+func makeCompactPeers(peers []Peer) []byte {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {
+		log.Println("Making peer:", peer.IP.String(), peer.Port)
 		out_buf.Write(peer.IP.To4())
 		out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
 	}
-	return string(out_buf.Bytes()[:])
+	return out_buf.Bytes()
 }
 
 // Fetch a torrents data from the database and return a Torrent struct.
 // If the torrent doesnt exist in the database a new skeleton Torrent
 // instance will be returned.
-func GetTorrent(r redis.Conn, torrent_id uint64) map[string]string {
-	torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d", torrent_id))
-	if err != nil {
-		log.Println("Error executing torrent fetch query: ", err)
-	}
-	if torrent_reply == nil {
-		log.Println("Making new torrent struct")
-		torrent := make(map[string]string)
-		return torrent
-	} else {
-		torrent, err := redis.StringMap(torrent_reply, nil)
-		if err != nil {
-			log.Println("Failed to fetch torrent: ", err)
+func GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) {
+	mika.RLock()
+	torrent, cached := mika.Torrents[torrent_id]
+	mika.RUnlock()
+	if !cached || torrent == nil {
+		// Make new struct to use for cache
+		torrent := Torrent{
+			Seeders:    0,
+			Leechers:   0,
+			Snatches:   0,
+			Announces:  0,
+			Uploaded:   0,
+			Downloaded: 0,
+			Peers:      []Peer{},
 		}
-		return torrent
+
+		torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d", torrent_id))
+		if err != nil {
+			return nil, err
+		}
+
+		values, err := redis.Values(torrent_reply, nil)
+		if err != nil {
+			log.Println("Failed to parse peer reply: ", err)
+			return nil, err
+		}
+
+		Debug("Added new torrent to in-memory cache: ", torrent_id)
+
+		err = redis.ScanStruct(values, &torrent)
+		if err != nil {
+			return nil, err
+		}
+
+		mika.Lock()
+		mika.Torrents[torrent_id] = &torrent
+		mika.Unlock()
 	}
+
+	return torrent, nil
+
 }
 
 // Fetch a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
 func GetUserID(r redis.Conn, passkey string) uint64 {
-	Debug(fmt.Println("Fetching passkey", passkey))
+	Debug("Fetching passkey", passkey)
 	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
 	if err != nil {
 		log.Println(err)
@@ -296,7 +355,7 @@ func GetPeers(r redis.Conn, torrent_id uint64, max_peers int) []Peer {
 		} else {
 			peer, err := makePeer(peer_reply)
 			if err != nil {
-
+				log.Println("Error trying to make new peer", err)
 			} else {
 				peers = append(peers, peer)
 			}
@@ -329,9 +388,7 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 		log.Println("Failed to parse peer reply: ", err)
 		return peer, err_parse_reply
 	}
-	if values == nil {
-		log.Println("Making new peer struct")
-	} else {
+	if values != nil {
 		err := redis.ScanStruct(values, &peer)
 		if err != nil {
 			log.Println("Failed to fetch peer: ", err)
@@ -387,9 +444,9 @@ func QueryStringParser(query string) (*Query, error) {
 	var (
 		keyStart, keyEnd int
 		valStart, valEnd int
-		firstInfoHash string
+		firstInfoHash    string
 
-		onKey = true
+		onKey       = true
 		hasInfoHash = false
 
 		q = &Query{
@@ -619,11 +676,15 @@ func oops(c *echo.Context, msg_code int) {
 // parse and display to the user
 func responseError(message string) string {
 	var out_bytes bytes.Buffer
-	var er_msg = ErrorResponse{FailReason: message}
-	er_msg_encoded := bencode.Marshal(&out_bytes, er_msg)
-	if er_msg_encoded != nil {
-		return "."
-	}
+	//	var er_msg = ErrorResponse{FailReason: message}
+	//	er_msg_encoded := bencode.Marshal(&out_bytes)
+	//	if er_msg_encoded != nil {
+	//		return "."
+	//	}
+	bencoder := bencode.NewEncoder(&out_bytes)
+	bencoder.Encode(bencode.Dict{
+		"failure reason": message,
+	})
 	return out_bytes.String()
 }
 
@@ -681,7 +742,6 @@ func handleAnnounce(c *echo.Context) {
 	}
 	Debug("TorrentID: ", torrent_id)
 
-
 	peer, err := GetPeer(r, torrent_id, ann.PeerID)
 	if err != nil {
 		oops(c, MSG_GENERIC_ERROR)
@@ -689,7 +749,11 @@ func handleAnnounce(c *echo.Context) {
 	}
 	peer.UserID = user_id
 
-	torrent := GetTorrent(r, torrent_id)
+	torrent, err := GetTorrent(r, torrent_id)
+	if err != nil {
+		oops(c, MSG_GENERIC_ERROR)
+		return
+	}
 	Debug(torrent)
 
 	peer.IP = ann.IPv4
@@ -792,7 +856,9 @@ func handleAnnounce(c *echo.Context) {
 		r.Send("SADD", users_active_key, torrent_id)
 
 		// Refresh the peers expiration timer
-		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent_id, ann.PeerID), 4, 1)
+		// If this expires, the peer reaper takes over and removes the
+		// peer from torrents in the case of a non-clean client shutdown
+		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent_id, ann.PeerID), config.ReapInterval, 1)
 	}
 
 	// Update tracker totals
@@ -815,18 +881,22 @@ func handleAnnounce(c *echo.Context) {
 
 	r.Send("HMSET", peer_key, "ip", ann.IPv4.String(), "port", ann.Port, "left", ann.Left, "first_announce", peer.AnnounceFirst, "last_announce", peer.AnnounceLast, "speed_up", peer.SpeedUP, "speed_dn", peer.SpeedDN)
 	r.Flush()
-	resp := AnnounceResponse{
-		Complete:    1,
-		Incomplete:  1,
-		Interval:    900,
-		MinInterval: 300,
-		Peers:       makeCompactPeers(peers),
+
+	dict := bencode.Dict{
+		"complete":     1,
+		"incomplete":   1,
+		"interval":     config.AnnInterval,
+		"min interval": config.AnnIntervalMin,
+		"peers":        makeCompactPeers(peers),
 	}
+	Debug(dict)
+
 	var out_bytes bytes.Buffer
-	er_msg_encoded := bencode.Marshal(&out_bytes, resp)
+	encoder := bencode.NewEncoder(&out_bytes)
+
+	er_msg_encoded := encoder.Encode(dict)
 	if er_msg_encoded != nil {
 		oops(c, MSG_GENERIC_ERROR)
-		log.Println(er_msg_encoded)
 		return
 	}
 	encoded := out_bytes.String()
@@ -891,13 +961,16 @@ func peer_stalker() {
 	psc.Subscribe("__keyevent@0__:expired")
 	for {
 		switch v := psc.Receive().(type) {
-			case redis.Message:
+
+		case redis.Message:
 			Debug(fmt.Sprintf("Key Expiry: %s\n", v.Data))
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
 			reapPeer(p[2], p[3])
-			case redis.Subscription:
+
+		case redis.Subscription:
 			log.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
-			case error:
+
+		case error:
 			log.Println("Subscriber error: ", v.Error())
 		}
 	}
@@ -910,8 +983,7 @@ func handleScrape(c *echo.Context) {
 
 // Do it
 func main() {
-
-
+	log.Println(cheese)
 	// Set max number of CPU cores to use
 	log.Println("Num procs(s):", *num_procs)
 	runtime.GOMAXPROCS(*num_procs)
@@ -950,6 +1022,8 @@ func main() {
 func init() {
 	// Parse CLI args
 	flag.Parse()
+
+	mika = &Tracker{Torrents: make(map[uint64]*Torrent)}
 
 	loadConfig(true)
 	s := make(chan os.Signal, 1)

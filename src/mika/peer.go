@@ -28,6 +28,8 @@ type Peer struct {
 	UserID        uint64  `redis:"user_id"`
 }
 
+// Generate a compact peer field array containing the byte representations
+// of a peers IP+Port appended to each other
 func makeCompactPeers(peers []Peer, skip_id string) []byte {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {

@@ -19,18 +19,15 @@ import (
 	"bytes"
 	"errors"
 	"flag"
-	"fmt"
 	"github.com/chihaya/bencode"
 	"github.com/garyburd/redigo/redis"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"github.com/thoas/stats"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"runtime"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -109,41 +106,6 @@ var (
 	num_procs   = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
 )
 
-// Fetch a user_id from the supplied passkey. A return value
-// of 0 denotes a non-existing or disabled user_id
-func GetUserID(r redis.Conn, passkey string) uint64 {
-	Debug("Fetching passkey", passkey)
-	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
-	if err != nil {
-		log.Println(err)
-		return 0
-	}
-	user_id, err_b := redis.Uint64(user_id_reply, nil)
-	if err_b != nil {
-		log.Println("Failed to find user", err_b)
-		return 0
-	}
-	return user_id
-}
-
-// Checked if the clients peer_id prefix matches the client prefixes
-// stored in the white lists
-func IsValidClient(r redis.Conn, peer_id string) bool {
-	a, err := r.Do("HKEYS", "t:whitelist")
-
-	if err != nil {
-		log.Println(err)
-		return false
-	}
-	clients, err := redis.Strings(a, nil)
-	for _, client_prefix := range clients {
-		if strings.HasPrefix(peer_id, client_prefix) {
-			return true
-		}
-	}
-	return false
-}
-
 // math.Max for uint64
 func UMax(a, b uint64) uint64 {
 	if a > b {
@@ -152,16 +114,6 @@ func UMax(a, b uint64) uint64 {
 		return b
 	}
 }
-
-// Parse and return a IP from a string
-func getIP(ip_str string) (net.IP, error) {
-	ip := net.ParseIP(ip_str)
-	if ip != nil {
-		return ip.To4(), nil
-	}
-	return nil, errors.New("Failed to parse ip")
-}
-
 
 // Create a new redis pool
 func newPool(server, password string, max_idle int) *redis.Pool {
@@ -262,7 +214,6 @@ func main() {
 	go PeerStalker()
 
 	// Start server
-	log.Println(config)
 	e.Run(config.ListenHost)
 }
 

@@ -67,12 +67,12 @@ func PeerStalker() {
 		switch v := psc.Receive().(type) {
 
 		case redis.Message:
-			Debug(fmt.Sprintf("Key Expiry: %s\n", v.Data))
+			Debug("Key Expiry:", v.Data)
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
 			ReapPeer(p[2], p[3])
 
 		case redis.Subscription:
-			log.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
+			Debug("Subscribed to channel:", v.Channel)
 
 		case error:
 			log.Println("Subscriber error: ", v.Error())

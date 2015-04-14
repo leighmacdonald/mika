@@ -35,6 +35,15 @@ type AnnounceResponse struct {
 	Peers       string `bencode:"peers"`
 }
 
+// Parse and return a IP from a string
+func getIP(ip_str string) (net.IP, error) {
+	ip := net.ParseIP(ip_str)
+	if ip != nil {
+		return ip.To4(), nil
+	}
+	return nil, errors.New("Failed to parse ip")
+}
+
 // Route handler for the /announce endpoint
 // Here be dragons
 func HandleAnnounce(c *echo.Context) {
@@ -82,6 +91,7 @@ func HandleAnnounce(c *echo.Context) {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
+	torrent.Announces++
 
 	peer.IP = ann.IPv4.String()
 	peer.Corrupt += ann.Corrupt
@@ -97,10 +107,6 @@ func HandleAnnounce(c *echo.Context) {
 		AddPeer(r, torrent_id, ann.PeerID)
 	}
 	peers := GetPeers(r, torrent_id, ann.NumWant)
-	for _, p := range peers {
-		Debug(p)
-	}
-	// compact_peers := makeCompactPeers(peers)
 
 	// Define our keys
 	// TODO memoization function?
@@ -142,7 +148,7 @@ func HandleAnnounce(c *echo.Context) {
 				// If the user was previously an active peer and has data left
 				// we assume he was leeching so we decrement it now
 				r.Send("HINCRBY", torrent_key, "leechers", -1)
-				Debug("Torrent Leecher -1")
+				Debug("Torrent Leechers -1")
 			}
 		}
 		// Should we disallow peers being able to trigger this twice?
@@ -216,7 +222,6 @@ func HandleAnnounce(c *echo.Context) {
 		"min interval": config.AnnIntervalMin,
 		"peers":        makeCompactPeers(peers),
 	}
-	Debug(dict)
 
 	var out_bytes bytes.Buffer
 	encoder := bencode.NewEncoder(&out_bytes)
@@ -227,7 +232,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 	encoded := out_bytes.String()
-	//log.Println(encoded)
+	Debug(dict)
 	c.String(http.StatusOK, encoded)
 }
 

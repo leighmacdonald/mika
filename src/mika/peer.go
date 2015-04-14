@@ -6,6 +6,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"log"
 	"net"
+	"strings"
 )
 
 type Peer struct {
@@ -22,18 +23,21 @@ type Peer struct {
 	AnnounceLast  int32   `redis:"last_announce"`
 	AnnounceFirst int32   `redis:"first_announce"`
 	New           bool    `redis:"new"`
+	PeerID        string  `redis:"peer_id"`
 	Active        bool    `redis:"active"`
 	UserID        uint64  `redis:"user_id"`
 }
 
-func makeCompactPeers(peers []Peer) []byte {
+func makeCompactPeers(peers []Peer, skip_id string) []byte {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {
-		log.Println("Making peer:", peer.IP, peer.Port)
 		if peer.Port <= 0 {
+			// FIXME Why does empty peer exist with 0 port??
 			continue
 		}
-		log.Println("x", peer)
+		if peer.PeerID == skip_id {
+			continue
+		}
 
 		out_buf.Write(net.ParseIP(peer.IP).To4())
 		out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
@@ -118,7 +122,6 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 			peer.New = false
 		}
 	}
-	Debug("Peer: ", peer.IP)
 	return peer, nil
 
 }
@@ -157,4 +160,39 @@ func DelPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
 	// Mark inactive?
 	//r.Do("DEL", fmt.Sprintf("t:t:%d:p:%s", torrent_id, peer_id))
 	return true
+}
+
+// Fetch a user_id from the supplied passkey. A return value
+// of 0 denotes a non-existing or disabled user_id
+func GetUserID(r redis.Conn, passkey string) uint64 {
+	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
+	if err != nil {
+		log.Println(err)
+		return 0
+	}
+	user_id, err_b := redis.Uint64(user_id_reply, nil)
+	if err_b != nil {
+		log.Println("Failed to find user", err_b)
+		return 0
+	}
+	return user_id
+}
+
+// Checked if the clients peer_id prefix matches the client prefixes
+// stored in the white lists
+func IsValidClient(r redis.Conn, peer_id string) bool {
+	a, err := r.Do("HKEYS", "t:whitelist")
+
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	clients, err := redis.Strings(a, nil)
+	for _, client_prefix := range clients {
+		if strings.HasPrefix(peer_id, client_prefix) {
+			return true
+		}
+	}
+	log.Println("Got non-whitelisted client:", peer_id)
+	return false
 }

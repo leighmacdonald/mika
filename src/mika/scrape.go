@@ -14,5 +14,6 @@ type ScrapeResponse struct {
 
 // Route handler for the /scrape requests
 func HandleScrape(c *echo.Context) {
+	Debug("Got scrape")
 	c.String(http.StatusOK, "I like to scrape my ass")
 }

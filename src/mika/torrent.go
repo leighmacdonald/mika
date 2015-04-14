@@ -46,8 +46,6 @@ func GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) {
 			return nil, err
 		}
 
-		Debug("Added new torrent to in-memory cache: ", torrent_id)
-
 		err = redis.ScanStruct(values, &torrent)
 		if err != nil {
 			return nil, err
@@ -56,6 +54,7 @@ func GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) {
 		mika.Lock()
 		mika.Torrents[torrent_id] = &torrent
 		mika.Unlock()
+		Debug("Added new torrent to in-memory cache: ", torrent_id)
 		return &torrent, nil
 	}
 

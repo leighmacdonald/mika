@@ -85,7 +85,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 	peer.UserID = user_id
-
+	peer.PeerID = ann.PeerID
 	torrent, err := GetTorrent(r, torrent_id)
 	if err != nil {
 		oops(c, MSG_GENERIC_ERROR)
@@ -211,8 +211,19 @@ func HandleAnnounce(c *echo.Context) {
 			r.Send("HINCRBY", peer_key, "total_time", ann_diff)
 		}
 	}
-
-	r.Send("HMSET", peer_key, "ip", ann.IPv4.String(), "port", ann.Port, "left", ann.Left, "first_announce", peer.AnnounceFirst, "last_announce", peer.AnnounceLast, "speed_up", peer.SpeedUP, "speed_dn", peer.SpeedDN)
+	// Sync peer to db
+	r.Send(
+		"HMSET", peer_key,
+		"ip", ann.IPv4.String(),
+		"port", ann.Port,
+		"left", ann.Left,
+		"first_announce", peer.AnnounceFirst,
+		"last_announce", peer.AnnounceLast,
+		"speed_up", peer.SpeedUP,
+		"speed_dn", peer.SpeedDN,
+		"peer_id", peer.PeerID,
+		"active", peer.Active,
+	)
 	r.Flush()
 
 	dict := bencode.Dict{
@@ -220,7 +231,7 @@ func HandleAnnounce(c *echo.Context) {
 		"incomplete":   1,
 		"interval":     config.AnnInterval,
 		"min interval": config.AnnIntervalMin,
-		"peers":        makeCompactPeers(peers),
+		"peers":        makeCompactPeers(peers, ann.PeerID),
 	}
 
 	var out_bytes bytes.Buffer

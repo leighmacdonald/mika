@@ -56,6 +56,7 @@ func GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) {
 		mika.Lock()
 		mika.Torrents[torrent_id] = &torrent
 		mika.Unlock()
+		return &torrent, nil
 	}
 
 	return torrent, nil

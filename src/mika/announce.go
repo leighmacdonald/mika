@@ -82,7 +82,6 @@ func HandleAnnounce(c *echo.Context) {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
-	Debug(torrent)
 
 	peer.IP = ann.IPv4.String()
 	peer.Corrupt += ann.Corrupt

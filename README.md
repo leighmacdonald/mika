@@ -10,6 +10,10 @@ Makes cake
 
 ## Usage
 
+### Requirements
+
+If building a binary from source you will need a Go 1.4+ SDK installed.
+
 
 ### Compiling
     
@@ -29,5 +33,6 @@ to lower this if there is other contentious services running too.
 
 ### Signals
 
-* `SIGHUP` - Reload config
-* `SIGUSR1` - Reload torrent list, user list and client whitelist
+* `SIGUSR2` - Reload config
+
+

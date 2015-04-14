@@ -26,4 +26,5 @@ _testmain.go
 *.prof
 
 config.json
-mika
+/mika
+/src/github.com

@@ -24,7 +24,7 @@ _testmain.go
 *.exe
 *.test
 *.prof
-
+virt*
 config.json
 /mika
 /src/github.com

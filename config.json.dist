@@ -3,5 +3,13 @@
   "ListenHost": ":34000",
   "RedisHost": "localhost:6379",
   "RedisPass": "",
-  "RedisMaxIdle": 500
+  "RedisMaxIdle": 500,
+  "AnnInterval": 300,
+  "AnnIntervalMin": 10,
+  "ReapInterval": 400,
+  "SQLHost": "localhost",
+  "SQLPort": 3306,
+  "SQLDB": "dbname",
+  "SQLUser": "",
+  "SQLPass": ""
 }

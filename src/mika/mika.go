@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -102,6 +103,7 @@ var (
 
 	pool *redis.Pool
 
+	profile     = flag.String("profile", "", "write cpu profile to file")
 	config_file = flag.String("config", "./config.json", "Config file path")
 	num_procs   = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
 )
@@ -180,9 +182,21 @@ func Debug(msg ...interface{}) {
 // Do it
 func main() {
 	log.Println(cheese)
+
+	log.Println("Process ID:", os.Getpid())
+
 	// Set max number of CPU cores to use
 	log.Println("Num procs(s):", *num_procs)
 	runtime.GOMAXPROCS(*num_procs)
+
+	if *profile != "" {
+		f, err := os.Create(*profile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		// defer pprof.StopCPUProfile()
+	}
 
 	// Initialize the redis pool
 	pool = newPool(config.RedisHost, config.RedisPass, config.RedisMaxIdle)
@@ -225,12 +239,24 @@ func init() {
 
 	loadConfig(true)
 	s := make(chan os.Signal, 1)
-	signal.Notify(s, syscall.SIGUSR2)
+	signal.Notify(s, syscall.SIGUSR2, syscall.SIGINT)
 	go func() {
-		for {
-			<-s
-			loadConfig(false)
-			log.Println("> Reloaded config")
+		for received_signal := range s {
+			switch received_signal {
+			case syscall.SIGINT:
+				log.Println("\nShutting down!")
+				if *profile != "" {
+					log.Println("Writing out profile info")
+					pprof.StopCPUProfile()
+				}
+				os.Exit(0)
+			case syscall.SIGUSR2:
+				log.Println("SIGUSR2")
+				<-s
+				loadConfig(false)
+				log.Println("> Reloaded config")
+			}
+
 		}
 	}()
 }

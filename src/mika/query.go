@@ -2,10 +2,10 @@ package main
 
 import (
 	"errors"
+	"log"
 	"net/url"
 	"strconv"
 	"strings"
-	"log"
 )
 
 type Query struct {
@@ -19,9 +19,9 @@ func QueryStringParser(query string) (*Query, error) {
 	var (
 		keyStart, keyEnd int
 		valStart, valEnd int
-		firstInfoHash string
+		firstInfoHash    string
 
-		onKey = true
+		onKey       = true
 		hasInfoHash = false
 
 		q = &Query{

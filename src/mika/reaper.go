@@ -37,6 +37,10 @@ func ReapPeer(torrent_id, peer_id string) {
 		}
 		queued += 1
 	}
+	if peer.TotalTime < config.HNRThreshold {
+		r.Send("SADD", fmt.Sprintf("t:u:%d:hnr", peer.UserID), torrent_id)
+		Debug("Added HnR:", torrent_id, peer.UserID)
+	}
 
 	r.Flush()
 	v, err := r.Receive()
@@ -66,15 +70,15 @@ func PeerStalker() {
 	for {
 		switch v := psc.Receive().(type) {
 
-		case redis.Message:
+			case redis.Message:
 			Debug("Key Expiry:", v.Data)
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
 			ReapPeer(p[2], p[3])
 
-		case redis.Subscription:
+			case redis.Subscription:
 			Debug("Subscribed to channel:", v.Channel)
 
-		case error:
+			case error:
 			log.Println("Subscriber error: ", v.Error())
 		}
 	}

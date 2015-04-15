@@ -19,7 +19,7 @@ type Peer struct {
 	Port          uint64  `redis:"port"`
 	Left          uint64  `redis:"left"`
 	Announces     uint64  `redis:"announces"`
-	TotalTime     uint64  `redis:"total_time"`
+	TotalTime     uint32  `redis:"total_time"`
 	AnnounceLast  int32   `redis:"last_announce"`
 	AnnounceFirst int32   `redis:"first_announce"`
 	New           bool    `redis:"new"`

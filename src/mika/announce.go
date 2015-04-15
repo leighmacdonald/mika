@@ -72,25 +72,27 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 
-	var torrent_id = GetTorrentID(r, ann.InfoHash)
+	var torrent_id = mika.GetTorrentID(r, ann.InfoHash)
 	if torrent_id <= 0 {
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		return
 	}
+	torrent, err := mika.GetTorrent(r, torrent_id)
+	if err != nil {
+		oops(c, MSG_GENERIC_ERROR)
+		return
+	}
+
 	Debug("TorrentID: ", torrent_id)
 
-	peer, err := GetPeer(r, torrent_id, ann.PeerID)
+	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
 	peer.UserID = user_id
 	peer.PeerID = ann.PeerID
-	torrent, err := GetTorrent(r, torrent_id)
-	if err != nil {
-		oops(c, MSG_GENERIC_ERROR)
-		return
-	}
+
 	torrent.Announces++
 
 	peer.IP = ann.IPv4.String()
@@ -101,12 +103,12 @@ func HandleAnnounce(c *echo.Context) {
 
 	if ann.Event == "stopped" {
 		peer.Active = false
-		DelPeer(r, torrent_id, ann.PeerID)
+		torrent.DelPeer(r, torrent_id, ann.PeerID)
 	} else {
 		peer.Active = true
-		AddPeer(r, torrent_id, ann.PeerID)
+		torrent.AddPeer(r, torrent_id, ann.PeerID)
 	}
-	peers := GetPeers(r, torrent_id, ann.NumWant)
+	peers := torrent.GetPeers(r, torrent_id, ann.NumWant)
 
 	// Define our keys
 	// TODO memoization function?

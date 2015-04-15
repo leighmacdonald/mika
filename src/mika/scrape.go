@@ -38,10 +38,10 @@ func HandleScrape(c *echo.Context) {
 	resp := make(bencode.Dict, len(q.InfoHashes))
 
 	for _, info_hash := range q.InfoHashes {
-		torrent_id := GetTorrentID(r, info_hash)
+		torrent_id := mika.GetTorrentID(r, info_hash)
 		if torrent_id > 0 {
 			log.Println("Got torrent_id:", torrent_id)
-			torrent, err := GetTorrent(r, torrent_id)
+			torrent, err := mika.GetTorrent(r, torrent_id)
 			if err != nil {
 				log.Println("Failed to load torrent (scrape):", err)
 			} else {

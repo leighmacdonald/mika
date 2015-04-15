@@ -21,10 +21,17 @@ func ReapPeer(torrent_id, peer_id string) {
 		return
 	}
 
+	torrent, err := mika.GetTorrent(r, torrent_id_uint)
+	if err != nil {
+		log.Println("Failed to fetch torrent while reaping")
+		return
+	}
+
 	// Fetch before we set active to 0
-	peer, err := GetPeer(r, torrent_id_uint, peer_id)
+	peer, err := torrent.GetPeer(r, peer_id)
 	if err != nil {
 		log.Println("Failed to fetch peer while reaping")
+		return
 	}
 	queued := 2
 	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)

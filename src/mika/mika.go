@@ -38,11 +38,6 @@ type ErrorResponse struct {
 	FailReason string `bencode:"failure reason"`
 }
 
-type Tracker struct {
-	sync.RWMutex
-	Torrents map[uint64]*Torrent
-}
-
 const (
 	MSG_OK                      int = 0
 	MSG_INVALID_REQ_TYPE        int = 100
@@ -195,7 +190,7 @@ func main() {
 			log.Fatal(err)
 		}
 		pprof.StartCPUProfile(f)
-		// defer pprof.StopCPUProfile()
+		defer pprof.StopCPUProfile()
 	}
 
 	// Initialize the redis pool

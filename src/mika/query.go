@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"log"
 )
 
 type Query struct {
@@ -13,13 +14,14 @@ type Query struct {
 }
 
 // Parses a raw url query into a Query struct
+// Taken from Chihaya
 func QueryStringParser(query string) (*Query, error) {
 	var (
 		keyStart, keyEnd int
 		valStart, valEnd int
-		firstInfoHash    string
+		firstInfoHash string
 
-		onKey       = true
+		onKey = true
 		hasInfoHash = false
 
 		q = &Query{
@@ -57,11 +59,13 @@ func QueryStringParser(query string) (*Query, error) {
 					if q.InfoHashes == nil {
 						q.InfoHashes = []string{firstInfoHash}
 					}
+
 					q.InfoHashes = append(q.InfoHashes, valStr)
 				} else {
 					firstInfoHash = valStr
 					hasInfoHash = true
 				}
+				log.Printf("%x", valStr)
 			}
 			onKey = true
 			keyStart = i + 1

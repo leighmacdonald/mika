@@ -55,7 +55,7 @@ func (t *Tracker) GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) 
 		mika.Lock()
 		mika.Torrents[torrent_id] = &torrent
 		mika.Unlock()
-		Debug("Added new torrent to in-memory cache: ", torrent_id)
+		Debug("Added new torrent to in-memory cache:", torrent_id)
 		return &torrent, nil
 	}
 

@@ -10,24 +10,28 @@ import (
 )
 
 type Peer struct {
-	SpeedUP       float64 `redis:"speed_up"`
-	SpeedDN       float64 `redis:"speed_dj"`
-	Uploaded      uint64  `redis:"uploaded"`
-	Downloaded    uint64  `redis:"downloaded"`
-	Corrupt       uint64  `redis:"corrupt"`
-	IP            string  `redis:"ip"`
-	Port          uint64  `redis:"port"`
-	Left          uint64  `redis:"left"`
-	Announces     uint64  `redis:"announces"`
-	TotalTime     uint32  `redis:"total_time"`
-	AnnounceLast  int32   `redis:"last_announce"`
-	AnnounceFirst int32   `redis:"first_announce"`
-	New           bool    `redis:"new"`
-	PeerID        string  `redis:"peer_id"`
-	Active        bool    `redis:"active"`
-	UserID        uint64  `redis:"user_id"`
-	TorrentID     uint64  `redis:"torrent_id"`
-	KeyPeer       string  `redis:"-"`
+	SpeedUP           float64 `redis:"speed_up"`
+	SpeedDN           float64 `redis:"speed_dj"`
+	Uploaded          uint64  `redis:"uploaded"`
+	Downloaded        uint64  `redis:"downloaded"`
+	Corrupt           uint64  `redis:"corrupt"`
+	IP                string  `redis:"ip"`
+	Port              uint64  `redis:"port"`
+	Left              uint64  `redis:"left"`
+	Announces         uint64  `redis:"announces"`
+	TotalTime         uint32  `redis:"total_time"`
+	AnnounceLast      int32   `redis:"last_announce"`
+	AnnounceFirst     int32   `redis:"first_announce"`
+	New               bool    `redis:"new"`
+	PeerID            string  `redis:"peer_id"`
+	Active            bool    `redis:"active"`
+	UserID            uint64  `redis:"user_id"`
+	TorrentID         uint64  `redis:"torrent_id"`
+	KeyPeer           string  `redis:"-"`
+	KeyUserActive     string  `redis:"-"`
+	KeyUserIncomplete string  `redis:"-"`
+	KeyUserComplete   string  `redis:"-"`
+	KeyUserHNR        string  `redis:"-"`
 }
 
 // Update the stored values with the data from an announce
@@ -56,6 +60,14 @@ func (peer *Peer) Update(announce *AnnounceRequest) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
+}
+
+func (peer *Peer) SetUserID(user_id uint64) {
+	peer.UserID = user_id
+	peer.KeyUserActive = fmt.Sprintf("t:u:%d:active", user_id)
+	peer.KeyUserIncomplete = fmt.Sprintf("t:u:%d:incomplete", user_id)
+	peer.KeyUserComplete = fmt.Sprintf("t:u:%d:complete", user_id)
+	peer.KeyUserHNR = fmt.Sprintf("t:u:%d:hnr", user_id)
 }
 
 func (peer *Peer) Sync(r redis.Conn) {

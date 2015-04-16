@@ -42,7 +42,7 @@ type AnnounceResponse struct {
 	Peers       string `bencode:"peers"`
 }
 
-// Parse and return a IP from a string
+// Parse and return a IP from a string?hkey=be4f5a96-c76a-42b6-90b3-5ac7686ff719&WebsiteKey=927055e8-ec5d-4b51-96ef-5dbe0a133439
 func getIP(ip_str string) (net.IP, error) {
 	ip := net.ParseIP(ip_str)
 	if ip != nil {
@@ -96,10 +96,8 @@ func HandleAnnounce(c *echo.Context) {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
-
+	peer.SetUserID(user_id) //where to put this/handle this cleaner?
 	peer.Update(ann)
-	peer.UserID = user_id //where to put this?
-
 	torrent.Update(ann)
 
 	if ann.Event == STOPPED {
@@ -110,10 +108,10 @@ func HandleAnnounce(c *echo.Context) {
 	peers := torrent.GetPeers(r, ann.NumWant)
 
 	// Define our keys
-	users_active_key := fmt.Sprintf("t:u:%d:active", peer.UserID)
-	users_incomplete_key := fmt.Sprintf("t:u:%d:incomplete", peer.UserID)
-	users_complete_key := fmt.Sprintf("t:u:%d:complete", peer.UserID)
-	users_hnr_key := fmt.Sprintf("t:u:%d:hnr", peer.UserID)
+	//	users_active_key := fmt.Sprintf("t:u:%d:active", peer.UserID)
+	//	users_incomplete_key := fmt.Sprintf("t:u:%d:incomplete", peer.UserID)
+	//	users_complete_key := fmt.Sprintf("t:u:%d:complete", peer.UserID)
+	//	users_hnr_key := fmt.Sprintf("t:u:%d:hnr", peer.UserID)
 
 	// pipe.hset(peer_key, "completed", 0) ?"stopped"?
 
@@ -121,7 +119,7 @@ func HandleAnnounce(c *echo.Context) {
 		// Remove from torrents active peer set
 		r.Send("SREM", torrent.TorrentPeersKey, ann.PeerID)
 
-		r.Send("SREM", users_active_key, torrent_id)
+		r.Send("SREM", peer.KeyUserActive, torrent_id)
 
 		// Mark the peer as inactive
 		r.Send("HSET", peer.KeyPeer, "active", 0)
@@ -152,19 +150,19 @@ func HandleAnnounce(c *echo.Context) {
 		Debug("Torrent Seeders  +1")
 
 		// Remove the torrent from the users incomplete set
-		r.Send("SREM", users_incomplete_key, torrent_id)
+		r.Send("SREM", peer.KeyUserIncomplete, torrent_id)
 
 		// Remove the torrent from the users incomplete set
-		r.Send("SADD", users_complete_key, torrent_id)
+		r.Send("SADD", peer.KeyUserComplete, torrent_id)
 
 		// Remove from the users hnr list if it exists
-		r.Send("SREM", users_hnr_key, torrent_id)
+		r.Send("SREM", peer.KeyUserHNR, torrent_id)
 
 	} else if ann.Event == STARTED {
 
 		if ann.Left > 0 {
 			// Add the torrent to the users incomplete set
-			r.Send("SREM", users_incomplete_key, torrent_id)
+			r.Send("SREM", peer.KeyUserIncomplete, torrent_id)
 
 			torrent.Leechers++
 			Debug("Torrent Leechers +1")
@@ -178,7 +176,7 @@ func HandleAnnounce(c *echo.Context) {
 		r.Send("SADD", torrent.TorrentPeersKey, ann.PeerID)
 
 		// Add to users active torrent set
-		r.Send("SADD", users_active_key, torrent_id)
+		r.Send("SADD", peer.KeyUserActive, torrent_id)
 
 		// Refresh the peers expiration timer
 		// If this expires, the peer reaper takes over and removes the

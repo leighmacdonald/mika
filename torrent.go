@@ -14,7 +14,7 @@ type Torrent struct {
 	Announces  uint64 `redis:"announces"`
 	Uploaded   uint64 `redis:"uploaded"`
 	Downloaded uint64 `redis:"downloaded"`
-	Peers      []Peer `redis:"-"`
+	Peers      []*Peer `redis:"-"`
 }
 
 // Fetch an existing peers data if it exists, other wise generate a

@@ -209,22 +209,22 @@ func HandleAnnounce(c *echo.Context) {
 	if peer.Active {
 		ann_diff := uint64(unixtime() - peer.AnnounceLast)
 		// Ignore long periods of inactivity
-		if ann_diff < 1500 {
+		if ann_diff < (uint64(config.AnnInterval) * 4) {
 			r.Send("HINCRBY", peer_key, "total_time", ann_diff)
 		}
 	}
 	// Sync peer to db
 	r.Send(
-		"HMSET", peer_key,
-		"ip", ann.IPv4.String(),
-		"port", ann.Port,
-		"left", ann.Left,
-		"first_announce", peer.AnnounceFirst,
-		"last_announce", peer.AnnounceLast,
-		"speed_up", peer.SpeedUP,
-		"speed_dn", peer.SpeedDN,
-		"peer_id", peer.PeerID,
-		"active", peer.Active,
+	"HMSET", peer_key,
+	"ip", ann.IPv4.String(),
+	"port", ann.Port,
+	"left", ann.Left,
+	"first_announce", peer.AnnounceFirst,
+	"last_announce", peer.AnnounceLast,
+	"speed_up", peer.SpeedUP,
+	"speed_dn", peer.SpeedDN,
+	"peer_id", peer.PeerID,
+	"active", peer.Active,
 	)
 	r.Flush()
 

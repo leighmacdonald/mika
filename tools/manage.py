@@ -13,7 +13,7 @@ def bin2hex(bin_info_hash):
 
 
 def load_torrents(db_conn, redis_conn, force=True):
-    print("> Loading torrents..."),
+    print("> Loading torrents...")
     with db_conn.cursor() as cur:
         cur.execute("SELECT info_hash, id  FROM torrents where info_hash <> ''")
         hashes = cur.fetchall()
@@ -31,7 +31,6 @@ def load_torrents(db_conn, redis_conn, force=True):
             })
         # Set info_hash -> torrent_id mapping
         redis_conn.set("t:info_hash:{}".format(bin2hex(info_hash).decode("utf8")), torrent_id)
-    print("   {}".format(len(hashes)))
 
 
 def load_stats(redis_conn):
@@ -42,17 +41,16 @@ def load_stats(redis_conn):
 
 
 def load_passkeys(db_conn, redis_conn):
-    print("> Loading passkeys... "),
+    print("> Loading passkeys... ")
     with db_conn.cursor() as cur:
         cur.execute("SELECT passkey, id FROM users")
         passkeys = cur.fetchall()
     for passkey, user_id in passkeys:
         redis_conn.set("t:user:{}".format(passkey), user_id)
-    print("  {}".format(len(passkeys)))
 
 
 def load_whitelist(db_conn, redis_conn):
-    print("> Loading whitelist... "),
+    print("> Loading whitelist... ")
     key = "t:whitelist"
     redis_conn.delete(key)
     with db_conn.cursor() as cur:
@@ -60,7 +58,6 @@ def load_whitelist(db_conn, redis_conn):
         clients = cur.fetchall()
     for peer_id, client in clients:
         redis_conn.hset(key, peer_id, client)
-    print(" {}".format(len(clients)))
 
 
 def make_db():

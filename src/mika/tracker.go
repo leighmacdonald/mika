@@ -22,6 +22,7 @@ func (t *Tracker) GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) 
 	if !cached || torrent == nil {
 		// Make new struct to use for cache
 		torrent := Torrent{
+			TorrentID:  0,
 			Seeders:    0,
 			Leechers:   0,
 			Snatches:   0,

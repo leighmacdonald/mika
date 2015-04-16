@@ -26,6 +26,62 @@ type Peer struct {
 	PeerID        string  `redis:"peer_id"`
 	Active        bool    `redis:"active"`
 	UserID        uint64  `redis:"user_id"`
+	TorrentID     uint64  `redis:"torrent_id"`
+	KeyPeer       string  `redis:"-"`
+}
+
+// Update the stored values with the data from an announce
+func (peer *Peer) Update(announce *AnnounceRequest) {
+	cur_time := unixtime()
+	peer.PeerID = announce.PeerID
+	peer.Announces++
+	// Change to int or byte?
+	peer.Uploaded += announce.Uploaded
+	peer.Downloaded += announce.Downloaded
+	peer.IP = announce.IPv4.String()
+	peer.Corrupt += announce.Corrupt
+	peer.Left = announce.Left
+	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, announce.Uploaded)
+	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, announce.Downloaded)
+	if announce.Event == STOPPED {
+		peer.Active = false
+	} else {
+		peer.Active = true
+	}
+	// Must be active to have a real time delta
+	if peer.Active && peer.AnnounceLast > 0 {
+		time_diff := uint64(unixtime() - peer.AnnounceLast)
+		// Ignore long periods of inactivity
+		if time_diff < (uint64(config.AnnInterval) * 4) {
+			peer.TotalTime += uint32(time_diff)
+		}
+	}
+}
+
+func (peer *Peer) Sync(r redis.Conn) {
+	r.Send(
+		"HMSET", peer.KeyPeer,
+		"ip", peer.IP,
+		"port", peer.Port,
+		"left", peer.Left,
+		"first_announce", peer.AnnounceFirst,
+		"last_announce", peer.AnnounceLast,
+		"total_time", peer.TotalTime,
+		"speed_up", peer.SpeedUP,
+		"speed_dn", peer.SpeedDN,
+		"active", peer.Active,
+		"uploaded", peer.Uploaded,
+		"downloaded", peer.Downloaded,
+		"corrupt", peer.Corrupt,
+		"user_id", peer.UserID, // Shouldn't need to be here
+		"peer_id", peer.PeerID, // Shouldn't need to be here
+		"torrent_id", peer.TorrentID, // Shouldn't need to be here
+	)
+
+}
+
+func (peer *Peer) IsSeeder() bool {
+	return peer.Left > 0
 }
 
 // Generate a compact peer field array containing the byte representations
@@ -49,7 +105,7 @@ func makeCompactPeers(peers []Peer, skip_id string) []byte {
 
 // Generate a new instance of a peer from the redis reply if data is contained
 // within, otherwise just return a default value peer
-func makePeer(redis_reply interface{}) (Peer, error) {
+func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (Peer, error) {
 	peer := Peer{
 		Active:        false,
 		Announces:     0,
@@ -66,6 +122,8 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 		TotalTime:     0,
 		UserID:        0,
 		New:           true,
+		TorrentID:     torrent_id,
+		KeyPeer:       fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id),
 	}
 
 	values, err := redis.Values(redis_reply, nil)
@@ -79,12 +137,10 @@ func makePeer(redis_reply interface{}) (Peer, error) {
 			log.Println("Failed to fetch peer: ", err)
 			return peer, err_cast_reply
 		} else {
-			peer.Announces += 1
 			peer.New = false
 		}
 	}
 	return peer, nil
-
 }
 
 // Fetch a user_id from the supplied passkey. A return value

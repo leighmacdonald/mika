@@ -38,6 +38,10 @@ type ErrorResponse struct {
 	FailReason string `bencode:"failure reason"`
 }
 
+type DBEntity interface {
+	Sync(r redis.Conn) bool
+}
+
 const (
 	MSG_OK                      int = 0
 	MSG_INVALID_REQ_TYPE        int = 100

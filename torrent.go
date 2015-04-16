@@ -7,14 +7,35 @@ import (
 )
 
 type Torrent struct {
-	TorrentID  uint64 `redis:"torrent_id"`
-	Seeders    int16  `redis:"seeders"`
-	Leechers   int16  `redis:"leechers"`
-	Snatches   int16  `redis:"snatches"`
-	Announces  uint64 `redis:"announces"`
-	Uploaded   uint64 `redis:"uploaded"`
-	Downloaded uint64 `redis:"downloaded"`
-	Peers      []*Peer `redis:"-"`
+	TorrentID       uint64  `redis:"torrent_id"`
+	Seeders         int16   `redis:"seeders"`
+	Leechers        int16   `redis:"leechers"`
+	Snatches        int16   `redis:"snatches"`
+	Announces       uint64  `redis:"announces"`
+	Uploaded        uint64  `redis:"uploaded"`
+	Downloaded      uint64  `redis:"downloaded"`
+	TorrentKey      string  `redis:"-"`
+	TorrentPeersKey string  `redis:"-"`
+	Peers           []*Peer `redis:"-"`
+}
+
+func (torrent *Torrent) Update(announce *AnnounceRequest) {
+	torrent.Announces++
+	torrent.Uploaded += announce.Uploaded
+	torrent.Downloaded += announce.Downloaded
+}
+
+func (torrent *Torrent) Sync(r redis.Conn) {
+	r.Send(
+		"HMSET", torrent.TorrentKey,
+		"torrent_id", torrent.TorrentID,
+		"seeders", torrent.Seeders,
+		"leechers", torrent.Leechers,
+		"snatches", torrent.Snatches,
+		"announces", torrent.Announces,
+		"uploaded", torrent.Uploaded,
+		"downloaded", torrent.Downloaded,
+	)
 }
 
 // Fetch an existing peers data if it exists, other wise generate a
@@ -25,12 +46,12 @@ func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (Peer, error) {
 	if err != nil {
 		log.Println("Error executing peer fetch query: ", err)
 	}
-	return makePeer(peer_reply)
+	return makePeer(peer_reply, torrent.TorrentID, peer_id)
 }
 
 // Add a peer to a torrents active peer_id list
-func (torrent *Torrent) AddPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
-	v, err := r.Do("SADD", fmt.Sprintf("t:t:%d:p", torrent_id), peer_id)
+func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
+	v, err := r.Do("SADD", fmt.Sprintf("t:t:%d:p", torrent.TorrentID), peer.PeerID)
 	if err != nil {
 		log.Println("Error executing peer fetch query: ", err)
 		return false
@@ -42,20 +63,18 @@ func (torrent *Torrent) AddPeer(r redis.Conn, torrent_id uint64, peer_id string)
 }
 
 // Remove a peer from a torrents active peer_id list
-func (torrent *Torrent) DelPeer(r redis.Conn, torrent_id uint64, peer_id string) bool {
-	_, err := r.Do("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)
-	if err != nil {
-		log.Println("Error executing peer fetch query: ", err)
-		return false
-	}
-	// Mark inactive?
-	//r.Do("DEL", fmt.Sprintf("t:t:%d:p:%s", torrent_id, peer_id))
+func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
+
+	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent.TorrentID), peer.PeerID)
+
+	r.Send("HSET", peer.KeyPeer, "active", 0)
+
 	return true
 }
 
 // Get an array of peers for a supplied torrent_id
-func (torrent *Torrent) GetPeers(r redis.Conn, torrent_id uint64, max_peers int) []Peer {
-	peers_reply, err := r.Do("SMEMBERS", fmt.Sprintf("t:t:%d:p", torrent_id))
+func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []Peer {
+	peers_reply, err := r.Do("SMEMBERS", fmt.Sprintf("t:t:%d:p", torrent.TorrentID))
 	if err != nil || peers_reply == nil {
 		log.Println("Error fetching peers_resply", err)
 		return nil
@@ -72,7 +91,7 @@ func (torrent *Torrent) GetPeers(r redis.Conn, torrent_id uint64, max_peers int)
 	}
 
 	for _, peer_id := range peer_ids[0:known_peers] {
-		r.Send("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id))
+		r.Send("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent.TorrentID, peer_id))
 	}
 	r.Flush()
 	peers := make([]Peer, known_peers)
@@ -82,7 +101,7 @@ func (torrent *Torrent) GetPeers(r redis.Conn, torrent_id uint64, max_peers int)
 		if err != nil {
 			log.Println(err)
 		} else {
-			peer, err := makePeer(peer_reply)
+			peer, err := makePeer(peer_reply, torrent.TorrentID, peer_ids[i-1])
 			if err != nil {
 				log.Println("Error trying to make new peer", err)
 			} else {
@@ -90,6 +109,5 @@ func (torrent *Torrent) GetPeers(r redis.Conn, torrent_id uint64, max_peers int)
 			}
 		}
 	}
-
 	return peers
 }

@@ -12,11 +12,18 @@ import (
 	"strings"
 )
 
+const (
+	STOPPED   = iota
+	STARTED   = iota
+	COMPLETED = iota
+	ANNOUNCE  = iota
+)
+
 type AnnounceRequest struct {
 	Compact    bool
 	Downloaded uint64
 	Corrupt    uint64
-	Event      string
+	Event      int
 	IPv4       net.IP
 	InfoHash   string
 	Left       uint64
@@ -47,7 +54,6 @@ func getIP(ip_str string) (net.IP, error) {
 // Route handler for the /announce endpoint
 // Here be dragons
 func HandleAnnounce(c *echo.Context) {
-	cur_time := unixtime()
 	r := pool.Get()
 	defer r.Close()
 
@@ -90,75 +96,60 @@ func HandleAnnounce(c *echo.Context) {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
-	peer.UserID = user_id
-	peer.PeerID = ann.PeerID
 
-	torrent.Announces++
+	peer.Update(ann)
+	peer.UserID = user_id //where to put this?
 
-	peer.IP = ann.IPv4.String()
-	peer.Corrupt += ann.Corrupt
-	peer.Left = ann.Left
-	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, ann.Uploaded)
-	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, ann.Downloaded)
+	torrent.Update(ann)
 
-	if ann.Event == "stopped" {
-		peer.Active = false
-		torrent.DelPeer(r, torrent_id, ann.PeerID)
+	if ann.Event == STOPPED {
+		torrent.DelPeer(r, &peer)
 	} else {
-		peer.Active = true
-		torrent.AddPeer(r, torrent_id, ann.PeerID)
+		torrent.AddPeer(r, &peer)
 	}
-	peers := torrent.GetPeers(r, torrent_id, ann.NumWant)
+	peers := torrent.GetPeers(r, ann.NumWant)
 
 	// Define our keys
-	// TODO memoization function?
-	torrent_key := fmt.Sprintf("t:t:%d", torrent_id)
-	peer_key := fmt.Sprintf("t:t:%d:%s", torrent_id, ann.PeerID)
-	torrent_peers_set := fmt.Sprintf("t:t:%d:p", torrent_id)
 	users_active_key := fmt.Sprintf("t:u:%d:active", peer.UserID)
 	users_incomplete_key := fmt.Sprintf("t:u:%d:incomplete", peer.UserID)
 	users_complete_key := fmt.Sprintf("t:u:%d:complete", peer.UserID)
 	users_hnr_key := fmt.Sprintf("t:u:%d:hnr", peer.UserID)
 
-	r.Send("HINCRBY", torrent_key, "announces", 1)
-	r.Send("HINCRBY", peer_key, "announces", 1)
+	// pipe.hset(peer_key, "completed", 0) ?"stopped"?
 
-	// pipe.hset(peer_key, "completed", 0) ??
-
-	if ann.Event == "stopped" {
+	if ann.Event == STOPPED {
 		// Remove from torrents active peer set
-		r.Send("SREM", torrent_peers_set, ann.PeerID)
+		r.Send("SREM", torrent.TorrentPeersKey, ann.PeerID)
+
+		r.Send("SREM", users_active_key, torrent_id)
 
 		// Mark the peer as inactive
-		r.Send("HSET", peer_key, "active", 0)
+		r.Send("HSET", peer.KeyPeer, "active", 0)
 
-		// Handle total changes if we were previously an active peer
-		if peer.Active {
-			if peer.Left > 0 {
-				r.Send("HINCRBY", torrent_key, "leechers", -1)
-			} else {
-				// For sanity, maybe probably removable once stable
-				r.Send("HSET", peer_key, "completed", 1)
+		// Handle total changes if we were previously an active peer?
 
-				// Remove active seeder
-				r.Send("HINCRBY", torrent_key, "seeders", -1)
-			}
-		}
-	} else if ann.Event == "completed" {
 		if peer.Left > 0 {
-			if !peer.New && peer.Active {
-				// If the user was previously an active peer and has data left
-				// we assume he was leeching so we decrement it now
-				r.Send("HINCRBY", torrent_key, "leechers", -1)
-				Debug("Torrent Leechers -1")
-			}
+			Debug("Torrent Leechers -1")
+			torrent.Leechers--
+		} else {
+			Debug("Torrent Seeders  +1")
+			torrent.Seeders--
+		}
+
+	} else if ann.Event == COMPLETED {
+		if peer.Active {
+			// If the user was previously an active peer and has data left
+			// we assume he was leeching so we decrement it now
+			torrent.Leechers--
+			Debug("Torrent Leechers -1")
+
 		}
 		// Should we disallow peers being able to trigger this twice?
 		// Forcing only 1 for now
-		r.Send("HSET", peer_key, "completed", 1)
 
 		// Increment active seeders for the torrent
-		r.Send("HINCRBY", torrent_key, "seeders", 1)
+		torrent.Seeders++
+		Debug("Torrent Seeders  +1")
 
 		// Remove the torrent from the users incomplete set
 		r.Send("SREM", users_incomplete_key, torrent_id)
@@ -169,23 +160,22 @@ func HandleAnnounce(c *echo.Context) {
 		// Remove from the users hnr list if it exists
 		r.Send("SREM", users_hnr_key, torrent_id)
 
-	} else if ann.Event == "started" {
+	} else if ann.Event == STARTED {
 
 		if ann.Left > 0 {
 			// Add the torrent to the users incomplete set
 			r.Send("SREM", users_incomplete_key, torrent_id)
 
-			r.Send("HINCRBY", torrent_key, "leechers", 1)
+			torrent.Leechers++
+			Debug("Torrent Leechers +1")
 		} else {
-			r.Send("HINCRBY", torrent_key, "seeders", 1)
+			torrent.Seeders++
+			Debug("Torrent Seeders  +1")
 		}
 	}
-	if ann.Event == "stopped" {
-		// Remove from the users active torrents set
-		r.Send("SREM", users_active_key, torrent_id)
-	} else {
+	if ann.Event != STOPPED {
 		// Add peer to torrent active peers
-		r.Send("SADD", torrent_peers_set, ann.PeerID)
+		r.Send("SADD", torrent.TorrentPeersKey, ann.PeerID)
 
 		// Add to users active torrent set
 		r.Send("SADD", users_active_key, torrent_id)
@@ -196,41 +186,14 @@ func HandleAnnounce(c *echo.Context) {
 		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent_id, ann.PeerID), config.ReapInterval, 1)
 	}
 
-	// Update tracker totals
-	r.Send("HINCRBY", torrent_key, "uploaded", ann.Uploaded)
-	r.Send("HINCRBY", torrent_key, "downloaded", ann.Downloaded)
-
-	// Update peer transfer stats
-	r.Send("HINCRBY", peer_key, "uploaded", ann.Uploaded)
-	r.Send("HINCRBY", peer_key, "downloaded", ann.Downloaded)
-	r.Send("HINCRBY", peer_key, "corrupt", ann.Corrupt)
-
-	// Must be active to have a real time delta
-	if peer.Active {
-		ann_diff := uint64(unixtime() - peer.AnnounceLast)
-		// Ignore long periods of inactivity
-		if ann_diff < (uint64(config.AnnInterval) * 4) {
-			r.Send("HINCRBY", peer_key, "total_time", ann_diff)
-		}
-	}
-	// Sync peer to db
-	r.Send(
-	"HMSET", peer_key,
-	"ip", ann.IPv4.String(),
-	"port", ann.Port,
-	"left", ann.Left,
-	"first_announce", peer.AnnounceFirst,
-	"last_announce", peer.AnnounceLast,
-	"speed_up", peer.SpeedUP,
-	"speed_dn", peer.SpeedDN,
-	"peer_id", peer.PeerID,
-	"active", peer.Active,
-	)
+	peer.AnnounceLast = unixtime()
+	peer.Sync(r)
+	torrent.Sync(r)
 	r.Flush()
 
 	dict := bencode.Dict{
-		"complete":     1,
-		"incomplete":   1,
+		"complete":     torrent.Seeders,
+		"incomplete":   torrent.Leechers,
 		"interval":     config.AnnInterval,
 		"min interval": config.AnnIntervalMin,
 		"peers":        makeCompactPeers(peers, ann.PeerID),
@@ -244,9 +207,9 @@ func HandleAnnounce(c *echo.Context) {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
-	encoded := out_bytes.String()
-	Debug(dict)
-	c.String(http.StatusOK, encoded)
+
+	c.String(http.StatusOK, out_bytes.String())
+
 }
 
 // Parse the query string into an AnnounceRequest struct
@@ -260,7 +223,17 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	ip_req, _ := s[0], s[1]
 
 	compact := q.Params["compact"] != "0"
-	event, _ := q.Params["event"]
+
+	event := ANNOUNCE
+	event_name, _ := q.Params["event"]
+	switch event_name {
+	case "started":
+		event = STARTED
+	case "stopped":
+		event = STOPPED
+	case "complete":
+		event = COMPLETED
+	}
 
 	numWant := getNumWant(q, 30)
 

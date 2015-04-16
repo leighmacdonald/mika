@@ -22,7 +22,7 @@ func (t *Tracker) GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) 
 	if !cached || torrent == nil {
 		// Make new struct to use for cache
 		torrent := Torrent{
-			TorrentID:  0,
+			TorrentID:  torrent_id,
 			Seeders:    0,
 			Leechers:   0,
 			Snatches:   0,
@@ -47,6 +47,10 @@ func (t *Tracker) GetTorrent(r redis.Conn, torrent_id uint64) (*Torrent, error) 
 		if err != nil {
 			return nil, err
 		}
+
+		// Make these once and save the results in mem
+		torrent.TorrentKey = fmt.Sprintf("t:t:%d", torrent_id)
+		torrent.TorrentPeersKey = fmt.Sprintf("t:t:%d:p", torrent_id)
 
 		mika.Lock()
 		mika.Torrents[torrent_id] = &torrent

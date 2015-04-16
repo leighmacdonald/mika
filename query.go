@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"log"
 	"net/url"
 	"strconv"
 	"strings"
@@ -65,7 +64,6 @@ func QueryStringParser(query string) (*Query, error) {
 					firstInfoHash = valStr
 					hasInfoHash = true
 				}
-				log.Printf("%x", valStr)
 			}
 			onKey = true
 			keyStart = i + 1

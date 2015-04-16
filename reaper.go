@@ -33,6 +33,9 @@ func ReapPeer(torrent_id, peer_id string) {
 		log.Println("Failed to fetch peer while reaping")
 		return
 	}
+
+	torrent.DelPeer(r, &peer)
+
 	queued := 2
 	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)
 	r.Send("HSET", fmt.Sprintf("t:t:%s:p:%s", torrent_id, peer_id), "active", 0)

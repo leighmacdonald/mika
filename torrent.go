@@ -7,16 +7,16 @@ import (
 )
 
 type Torrent struct {
-	TorrentID       uint64  `redis:"torrent_id"`
-	Seeders         int16   `redis:"seeders"`
-	Leechers        int16   `redis:"leechers"`
-	Snatches        int16   `redis:"snatches"`
-	Announces       uint64  `redis:"announces"`
-	Uploaded        uint64  `redis:"uploaded"`
-	Downloaded      uint64  `redis:"downloaded"`
-	TorrentKey      string  `redis:"-"`
-	TorrentPeersKey string  `redis:"-"`
-	Peers           []*Peer `redis:"-"`
+	TorrentID       uint64           `redis:"torrent_id"`
+	Seeders         int16            `redis:"seeders"`
+	Leechers        int16            `redis:"leechers"`
+	Snatches        int16            `redis:"snatches"`
+	Announces       uint64           `redis:"announces"`
+	Uploaded        uint64           `redis:"uploaded"`
+	Downloaded      uint64           `redis:"downloaded"`
+	TorrentKey      string           `redis:"-"`
+	TorrentPeersKey string           `redis:"-"`
+	Peers           map[string]*Peer `redis:"-"`
 }
 
 func (torrent *Torrent) Update(announce *AnnounceRequest) {
@@ -41,12 +41,26 @@ func (torrent *Torrent) Sync(r redis.Conn) {
 // Fetch an existing peers data if it exists, other wise generate a
 // new peer with default data values. The data is parsed into a Peer
 // struct and returned.
-func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (Peer, error) {
-	peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent.TorrentID, peer_id))
-	if err != nil {
-		log.Println("Error executing peer fetch query: ", err)
+func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
+	mika.RLock()
+	peer, cached := torrent.Peers[peer_id]
+	mika.RUnlock()
+	if !cached {
+		peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent.TorrentID, peer_id))
+		if err != nil {
+			log.Println("Error executing peer fetch query: ", err)
+			return nil, err
+		}
+		peer, err = makePeer(peer_reply, torrent.TorrentID, peer_id)
+		if err != nil {
+			return nil, err
+		}
+		mika.Lock()
+		torrent.Peers[peer_id] = peer
+		mika.Unlock()
+		Debug("New peer in memory:", peer_id)
 	}
-	return makePeer(peer_reply, torrent.TorrentID, peer_id)
+	return peer, nil
 }
 
 // Add a peer to a torrents active peer_id list
@@ -73,7 +87,7 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 }
 
 // Get an array of peers for a supplied torrent_id
-func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []Peer {
+func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
 	peers_reply, err := r.Do("SMEMBERS", fmt.Sprintf("t:t:%d:p", torrent.TorrentID))
 	if err != nil || peers_reply == nil {
 		log.Println("Error fetching peers_resply", err)
@@ -94,7 +108,7 @@ func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []Peer {
 		r.Send("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent.TorrentID, peer_id))
 	}
 	r.Flush()
-	peers := make([]Peer, known_peers)
+	peers := make([]*Peer, known_peers)
 
 	for i := 1; i <= known_peers; i++ {
 		peer_reply, err := r.Receive()

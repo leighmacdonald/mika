@@ -245,7 +245,7 @@ func init() {
 			case syscall.SIGINT:
 				log.Println("\nShutting down!")
 				if *profile != "" {
-					log.Println("Writing out profile info")
+					log.Println("> Writing out profile info")
 					pprof.StopCPUProfile()
 				}
 				os.Exit(0)

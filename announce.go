@@ -101,9 +101,9 @@ func HandleAnnounce(c *echo.Context) {
 	torrent.Update(ann)
 
 	if ann.Event == STOPPED {
-		torrent.DelPeer(r, &peer)
+		torrent.DelPeer(r, peer)
 	} else {
-		torrent.AddPeer(r, &peer)
+		torrent.AddPeer(r, peer)
 	}
 	peers := torrent.GetPeers(r, ann.NumWant)
 
@@ -194,9 +194,10 @@ func HandleAnnounce(c *echo.Context) {
 		"incomplete":   torrent.Leechers,
 		"interval":     config.AnnInterval,
 		"min interval": config.AnnIntervalMin,
-		"peers":        makeCompactPeers(peers, ann.PeerID),
 	}
-
+	if peers != nil {
+		dict["peers"] = makeCompactPeers(peers, ann.PeerID)
+	}
 	var out_bytes bytes.Buffer
 	encoder := bencode.NewEncoder(&out_bytes)
 

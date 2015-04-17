@@ -98,27 +98,31 @@ func (peer *Peer) IsSeeder() bool {
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(peers []Peer, skip_id string) []byte {
+func makeCompactPeers(peers []*Peer, skip_id string) []byte {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {
-		if peer.Port <= 0 {
-			// FIXME Why does empty peer exist with 0 port??
-			continue
-		}
-		if peer.PeerID == skip_id {
-			continue
-		}
+		if peer == nil {
+			log.Println("NIL PEER??")
+		} else {
+			if peer.Port <= 0 {
+				// FIXME Why does empty peer exist with 0 port??
+				continue
+			}
+			if peer.PeerID == skip_id {
+				continue
+			}
 
-		out_buf.Write(net.ParseIP(peer.IP).To4())
-		out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+			out_buf.Write(net.ParseIP(peer.IP).To4())
+			out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+		}
 	}
 	return out_buf.Bytes()
 }
 
 // Generate a new instance of a peer from the redis reply if data is contained
 // within, otherwise just return a default value peer
-func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (Peer, error) {
-	peer := Peer{
+func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer, error) {
+	peer := &Peer{
 		Active:        false,
 		Announces:     0,
 		SpeedUP:       0,
@@ -144,7 +148,7 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (Peer,
 		return peer, err_parse_reply
 	}
 	if values != nil {
-		err := redis.ScanStruct(values, &peer)
+		err := redis.ScanStruct(values, peer)
 		if err != nil {
 			log.Println("Failed to fetch peer: ", err)
 			return peer, err_cast_reply

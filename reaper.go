@@ -34,7 +34,7 @@ func ReapPeer(torrent_id, peer_id string) {
 		return
 	}
 
-	torrent.DelPeer(r, &peer)
+	torrent.DelPeer(r, peer)
 
 	queued := 2
 	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)

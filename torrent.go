@@ -88,7 +88,7 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 
 // Get an array of peers for a supplied torrent_id
 func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
-	peers_reply, err := r.Do("SMEMBERS", fmt.Sprintf("t:t:%d:p", torrent.TorrentID))
+	peers_reply, err := r.Do("SMEMBERS", torrent.TorrentPeersKey)
 	if err != nil || peers_reply == nil {
 		log.Println("Error fetching peers_resply", err)
 		return nil
@@ -103,6 +103,8 @@ func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
 	if known_peers > max_peers {
 		known_peers = max_peers
 	}
+
+	// TODO check in-memory peers.
 
 	for _, peer_id := range peer_ids[0:known_peers] {
 		r.Send("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent.TorrentID, peer_id))

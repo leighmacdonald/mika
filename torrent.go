@@ -79,7 +79,7 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 // Remove a peer from a torrents active peer_id list
 func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 
-	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent.TorrentID), peer.PeerID)
+	r.Send("SREM", fmt.Sprintf("t:t:%d:p", torrent.TorrentID), peer.PeerID)
 
 	r.Send("HSET", peer.KeyPeer, "active", 0)
 

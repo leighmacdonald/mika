@@ -48,7 +48,7 @@ func GetUser(r redis.Conn, passkey string) *User {
 		user = &User{
 			UserID:     user_id,
 			Announces:  0,
-			Corrupt: 0,
+			Corrupt:    0,
 			Uploaded:   0,
 			Downloaded: 0,
 			Snatches:   0,
@@ -92,13 +92,13 @@ func (user *User) Update(announce *AnnounceRequest) {
 
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
-	"HMSET", user.UserKey,
-	"user_id", user.UserID,
-	"uploaded", user.Uploaded,
-	"downloaded", user.Downloaded,
-	"corrupt", user.Corrupt,
-	"snatches", user.Snatches,
-	"announces", user.Announces,
+		"HMSET", user.UserKey,
+		"user_id", user.UserID,
+		"uploaded", user.Uploaded,
+		"downloaded", user.Downloaded,
+		"corrupt", user.Corrupt,
+		"snatches", user.Snatches,
+		"announces", user.Announces,
 	)
 }
 

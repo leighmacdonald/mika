@@ -159,22 +159,6 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 	return peer, nil
 }
 
-// Fetch a user_id from the supplied passkey. A return value
-// of 0 denotes a non-existing or disabled user_id
-func GetUserID(r redis.Conn, passkey string) uint64 {
-	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
-	if err != nil {
-		log.Println(err)
-		return 0
-	}
-	user_id, err_b := redis.Uint64(user_id_reply, nil)
-	if err_b != nil {
-		log.Println("Failed to find user", err_b)
-		return 0
-	}
-	return user_id
-}
-
 // Checked if the clients peer_id prefix matches the client prefixes
 // stored in the white lists
 func IsValidClient(r redis.Conn, peer_id string) bool {

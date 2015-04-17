@@ -38,18 +38,12 @@ func HandleScrape(c *echo.Context) {
 	resp := make(bencode.Dict, len(q.InfoHashes))
 
 	for _, info_hash := range q.InfoHashes {
-		torrent_id := mika.GetTorrentID(r, info_hash)
-		if torrent_id > 0 {
-			log.Println("Got torrent_id:", torrent_id)
-			torrent, err := mika.GetTorrent(r, torrent_id)
-			if err != nil {
-				log.Println("Failed to load torrent (scrape):", err)
-			} else {
-				resp[info_hash] = bencode.Dict{
-					"complete":   torrent.Seeders,
-					"downloaded": torrent.Snatches,
-					"incomplete": torrent.Leechers,
-				}
+		torrent := mika.GetTorrentByInfoHash(r, info_hash)
+		if torrent != nil {
+			resp[info_hash] = bencode.Dict{
+				"complete":   torrent.Seeders,
+				"downloaded": torrent.Snatches,
+				"incomplete": torrent.Leechers,
 			}
 		} else {
 			Debug("Unknown hash:", info_hash)

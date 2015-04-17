@@ -234,7 +234,10 @@ func init() {
 	// Parse CLI args
 	flag.Parse()
 
-	mika = &Tracker{Torrents: make(map[uint64]*Torrent)}
+	mika = &Tracker{
+		Torrents: make(map[uint64]*Torrent),
+		Users:    make(map[uint64]*User),
+	}
 
 	loadConfig(true)
 	s := make(chan os.Signal, 1)

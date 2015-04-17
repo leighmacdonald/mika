@@ -66,39 +66,35 @@ func HandleAnnounce(c *echo.Context) {
 
 	passkey := c.Param("passkey")
 
-	var user_id = GetUserID(r, passkey)
-	if user_id <= 0 {
+	user := GetUser(r, passkey)
+	if user == nil {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
-	Debug("UserID: ", user_id)
 
 	if !IsValidClient(r, ann.PeerID) {
 		oops(c, MSG_INVALID_PEER_ID)
 		return
 	}
 
-	var torrent_id = mika.GetTorrentID(r, ann.InfoHash)
-	if torrent_id <= 0 {
-		oops(c, MSG_INFO_HASH_NOT_FOUND)
-		return
-	}
-	torrent, err := mika.GetTorrent(r, torrent_id)
-	if err != nil {
+	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
+	if torrent == nil {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
 
-	Debug("TorrentID: ", torrent_id)
+	Debug("TorrentID: ", torrent)
 
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
-	peer.SetUserID(user_id) //where to put this/handle this cleaner?
+	peer.SetUserID(user.UserID) //where to put this/handle this cleaner?
+
 	peer.Update(ann)
 	torrent.Update(ann)
+	user.Update(ann)
 
 	if ann.Event == STOPPED {
 		torrent.DelPeer(r, peer)
@@ -107,30 +103,21 @@ func HandleAnnounce(c *echo.Context) {
 	}
 	peers := torrent.GetPeers(r, ann.NumWant)
 
-	// Define our keys
-	//	users_active_key := fmt.Sprintf("t:u:%d:active", peer.UserID)
-	//	users_incomplete_key := fmt.Sprintf("t:u:%d:incomplete", peer.UserID)
-	//	users_complete_key := fmt.Sprintf("t:u:%d:complete", peer.UserID)
-	//	users_hnr_key := fmt.Sprintf("t:u:%d:hnr", peer.UserID)
-
-	// pipe.hset(peer_key, "completed", 0) ?"stopped"?
-
 	if ann.Event == STOPPED {
 		// Remove from torrents active peer set
 		r.Send("SREM", torrent.TorrentPeersKey, ann.PeerID)
 
-		r.Send("SREM", peer.KeyUserActive, torrent_id)
+		r.Send("SREM", peer.KeyUserActive, torrent.TorrentID)
 
 		// Mark the peer as inactive
 		r.Send("HSET", peer.KeyPeer, "active", 0)
 
 		// Handle total changes if we were previously an active peer?
-
 		if peer.Left > 0 {
-			Debug("Torrent Leechers -1")
+			Debug("[STOPPED] Torrent Leechers -1")
 			torrent.Leechers--
 		} else {
-			Debug("Torrent Seeders  +1")
+			Debug("[STOPPED] Torrent Seeders  -1")
 			torrent.Seeders--
 		}
 
@@ -139,7 +126,7 @@ func HandleAnnounce(c *echo.Context) {
 			// If the user was previously an active peer and has data left
 			// we assume he was leeching so we decrement it now
 			torrent.Leechers--
-			Debug("Torrent Leechers -1")
+			Debug("[COMPLETED] Torrent Leechers -1")
 
 		}
 		// Should we disallow peers being able to trigger this twice?
@@ -147,22 +134,22 @@ func HandleAnnounce(c *echo.Context) {
 
 		// Increment active seeders for the torrent
 		torrent.Seeders++
-		Debug("Torrent Seeders  +1")
+		Debug("[COMPLETED] Torrent Seeders  +1")
 
 		// Remove the torrent from the users incomplete set
-		r.Send("SREM", peer.KeyUserIncomplete, torrent_id)
+		r.Send("SREM", peer.KeyUserIncomplete, torrent.TorrentID)
 
 		// Remove the torrent from the users incomplete set
-		r.Send("SADD", peer.KeyUserComplete, torrent_id)
+		r.Send("SADD", peer.KeyUserComplete, torrent.TorrentID)
 
 		// Remove from the users hnr list if it exists
-		r.Send("SREM", peer.KeyUserHNR, torrent_id)
+		r.Send("SREM", peer.KeyUserHNR, torrent.TorrentID)
 
 	} else if ann.Event == STARTED {
 
 		if ann.Left > 0 {
 			// Add the torrent to the users incomplete set
-			r.Send("SREM", peer.KeyUserIncomplete, torrent_id)
+			r.Send("SREM", peer.KeyUserIncomplete, torrent.TorrentID)
 
 			torrent.Leechers++
 			Debug("Torrent Leechers +1")
@@ -176,12 +163,12 @@ func HandleAnnounce(c *echo.Context) {
 		r.Send("SADD", torrent.TorrentPeersKey, ann.PeerID)
 
 		// Add to users active torrent set
-		r.Send("SADD", peer.KeyUserActive, torrent_id)
+		r.Send("SADD", peer.KeyUserActive, torrent.TorrentID)
 
 		// Refresh the peers expiration timer
 		// If this expires, the peer reaper takes over and removes the
 		// peer from torrents in the case of a non-clean client shutdown
-		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent_id, ann.PeerID), config.ReapInterval, 1)
+		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent.TorrentID, ann.PeerID), config.ReapInterval, 1)
 	}
 
 	peer.AnnounceLast = unixtime()

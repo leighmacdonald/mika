@@ -31,14 +31,14 @@ func (torrent *Torrent) Update(announce *AnnounceRequest) {
 
 func (torrent *Torrent) Sync(r redis.Conn) {
 	r.Send(
-	"HMSET", torrent.TorrentKey,
-	"torrent_id", torrent.TorrentID,
-	"seeders", torrent.Seeders,
-	"leechers", torrent.Leechers,
-	"snatches", torrent.Snatches,
-	"announces", torrent.Announces,
-	"uploaded", torrent.Uploaded,
-	"downloaded", torrent.Downloaded,
+		"HMSET", torrent.TorrentKey,
+		"torrent_id", torrent.TorrentID,
+		"seeders", torrent.Seeders,
+		"leechers", torrent.Leechers,
+		"snatches", torrent.Snatches,
+		"announces", torrent.Announces,
+		"uploaded", torrent.Uploaded,
+		"downloaded", torrent.Downloaded,
 	)
 }
 

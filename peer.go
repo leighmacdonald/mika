@@ -14,6 +14,8 @@ type Peer struct {
 	sync.RWMutex
 	SpeedUP           float64 `redis:"speed_up" json:"speed_up"`
 	SpeedDN           float64 `redis:"speed_dn" json:"speed_dn"`
+	SpeedUPMax        float64 `redis:"speed_up" json:"speed_up_max"`
+	SpeedDNMax        float64 `redis:"speed_dn" json:"speed_dn_max"`
 	Uploaded          uint64  `redis:"uploaded" json:"uploaded"`
 	Downloaded        uint64  `redis:"downloaded" json:"downloaded"`
 	Corrupt           uint64  `redis:"corrupt" json:"corrupt"`
@@ -52,6 +54,13 @@ func (peer *Peer) Update(announce *AnnounceRequest) {
 	peer.Left = announce.Left
 	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, announce.Uploaded)
 	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, announce.Downloaded)
+	if peer.SpeedUP > peer.SpeedUPMax {
+		peer.SpeedUPMax = peer.SpeedUP
+	}
+	if peer.SpeedDN > peer.SpeedDNMax {
+		peer.SpeedDNMax = peer.SpeedDN
+	}
+
 	// Must be active to have a real time delta
 	if peer.Active && peer.AnnounceLast > 0 {
 		time_diff := uint64(unixtime() - peer.AnnounceLast)
@@ -74,22 +83,24 @@ func (peer *Peer) SetUserID(user_id uint64) {
 
 func (peer *Peer) Sync(r redis.Conn) {
 	r.Send(
-	"HMSET", peer.KeyPeer,
-	"ip", peer.IP,
-	"port", peer.Port,
-	"left", peer.Left,
-	"first_announce", peer.AnnounceFirst,
-	"last_announce", peer.AnnounceLast,
-	"total_time", peer.TotalTime,
-	"speed_up", peer.SpeedUP,
-	"speed_dn", peer.SpeedDN,
-	"active", peer.Active,
-	"uploaded", peer.Uploaded,
-	"downloaded", peer.Downloaded,
-	"corrupt", peer.Corrupt,
-	"user_id", peer.UserID, // Shouldn't need to be here
-	"peer_id", peer.PeerID, // Shouldn't need to be here
-	"torrent_id", peer.TorrentID, // Shouldn't need to be here
+		"HMSET", peer.KeyPeer,
+		"ip", peer.IP,
+		"port", peer.Port,
+		"left", peer.Left,
+		"first_announce", peer.AnnounceFirst,
+		"last_announce", peer.AnnounceLast,
+		"total_time", peer.TotalTime,
+		"speed_up", peer.SpeedUP,
+		"speed_dn", peer.SpeedDN,
+		"speed_up_max", peer.SpeedUPMax,
+		"speed_dn_max", peer.SpeedDNMax,
+		"active", peer.Active,
+		"uploaded", peer.Uploaded,
+		"downloaded", peer.Downloaded,
+		"corrupt", peer.Corrupt,
+		"user_id", peer.UserID, // Shouldn't need to be here
+		"peer_id", peer.PeerID, // Shouldn't need to be here
+		"torrent_id", peer.TorrentID, // Shouldn't need to be here
 	)
 
 }
@@ -126,6 +137,8 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 		Announces:     0,
 		SpeedUP:       0,
 		SpeedDN:       0,
+		SpeedUPMax:    0,
+		SpeedDNMax:    0,
 		Uploaded:      0,
 		Downloaded:    0,
 		Left:          0,

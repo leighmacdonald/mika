@@ -25,10 +25,12 @@ import (
 	mw "github.com/labstack/echo/middleware"
 	"github.com/thoas/stats"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -187,6 +189,21 @@ func Debug(msg ...interface{}) {
 	}
 }
 
+func HandleTorrentInfo(c *echo.Context) {
+	r := pool.Get()
+	defer r.Close()
+
+	torrent_id_str := c.Param("torrent_id")
+	torrent_id, err := strconv.ParseUint(torrent_id_str, 10, 64)
+	if err != nil {
+		c.String(http.StatusNotFound, "")
+		return
+	}
+	torrent := mika.GetTorrentByID(r, torrent_id)
+	c.JSON(http.StatusOK, torrent)
+
+}
+
 // Do it
 func main() {
 	log.Println(cheese)
@@ -231,6 +248,8 @@ func main() {
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)
 	e.Get("/:passkey/scrape", HandleScrape)
+
+	e.Get("/torrent/:torrent_id", HandleTorrentInfo)
 
 	// Start watching for expiring peers
 	go PeerStalker()

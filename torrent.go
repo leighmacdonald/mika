@@ -7,16 +7,16 @@ import (
 )
 
 type Torrent struct {
-	TorrentID       uint64  `redis:"torrent_id"`
-	Seeders         int16   `redis:"seeders"`
-	Leechers        int16   `redis:"leechers"`
-	Snatches        int16   `redis:"snatches"`
-	Announces       uint64  `redis:"announces"`
-	Uploaded        uint64  `redis:"uploaded"`
-	Downloaded      uint64  `redis:"downloaded"`
-	TorrentKey      string  `redis:"-"`
-	TorrentPeersKey string  `redis:"-"`
-	Peers           []*Peer `redis:"-"`
+	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
+	Seeders         int16   `redis:"seeders" json:"seeders"`
+	Leechers        int16   `redis:"leechers" json:"leechers"`
+	Snatches        int16   `redis:"snatches" json:"snatches"`
+	Announces       uint64  `redis:"announces" json:"announces" `
+	Uploaded        uint64  `redis:"uploaded" json:"uploaded"`
+	Downloaded      uint64  `redis:"downloaded" json:"downloaded"`
+	TorrentKey      string  `redis:"-" json:"-"`
+	TorrentPeersKey string  `redis:"-" json:"-"`
+	Peers           []*Peer `redis:"-" json:"-"`
 }
 
 func (torrent *Torrent) Update(announce *AnnounceRequest) {

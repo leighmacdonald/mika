@@ -175,6 +175,7 @@ func HandleAnnounce(c *echo.Context) {
 	peer.AnnounceLast = unixtime()
 	peer.Sync(r)
 	torrent.Sync(r)
+	user.Sync(r)
 	r.Flush()
 
 	dict := bencode.Dict{

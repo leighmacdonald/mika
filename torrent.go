@@ -121,6 +121,18 @@ func (torrent *Torrent) HasPeer(peer *Peer) bool {
 	return false
 }
 
+func (torrent *Torrent) PeerCounts() (int16, int16) {
+	s, l := 0, 0
+	for _, p := range torrent.Peers {
+		if p.IsSeeder() {
+			s++
+		} else {
+			l++
+		}
+	}
+	return int16(s), int16(l)
+}
+
 // Get an array of peers for the torrent
 func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
 	return torrent.Peers[0:UMin(uint64(len(torrent.Peers)), uint64(max_peers))]

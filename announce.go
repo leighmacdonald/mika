@@ -113,31 +113,7 @@ func HandleAnnounce(c *echo.Context) {
 		// Mark the peer as inactive
 		r.Send("HSET", peer.KeyPeer, "active", 0)
 
-		if peer.Active {
-			// Handle total changes if we were previously an active peer?
-			if peer.Left > 0 {
-				Debug("[STOPPED] Torrent Leechers -1")
-				torrent.Leechers--
-			} else {
-				Debug("[STOPPED] Torrent Seeders  -1")
-				torrent.Seeders--
-			}
-		}
-
 	} else if ann.Event == COMPLETED {
-		if peer.Active {
-			// If the user was previously an active peer and has data left
-			// we assume he was leeching so we decrement it now
-			torrent.Leechers--
-			Debug("[COMPLETED] Torrent Leechers -1")
-
-		}
-		// Should we disallow peers being able to trigger this twice?
-		// Forcing only 1 for now
-
-		// Increment active seeders for the torrent
-		torrent.Seeders++
-		Debug("[COMPLETED] Torrent Seeders  +1")
 
 		// Remove the torrent from the users incomplete set
 		r.Send("SREM", peer.KeyUserIncomplete, torrent.TorrentID)
@@ -150,29 +126,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	} else if ann.Event == STARTED {
 		// Ignore start event from active peers to prevent stat skew potential
-		if !peer.Active {
-			if !peer.IsSeeder() {
-				// Add the torrent to the users incomplete set
-				r.Send("SREM", peer.KeyUserIncomplete, torrent.TorrentID)
-
-				torrent.Leechers++
-				Debug("[STARTED] Torrent Leechers +1")
-			} else {
-				torrent.Seeders++
-				Debug("[STARTED] Torrent Seeders  +1")
-			}
-		}
-	} else {
-		// If not active, this is a regula
-		if !peer.Active {
-			if peer.IsSeeder() {
-				Debug("[ANN] Torrent Seeders +1")
-				torrent.Seeders++
-			} else {
-				Debug("[ANN] Torrent Leechers +1")
-				torrent.Leechers++
-			}
-		}
+		r.Send("SADD", peer.KeyUserIncomplete, torrent.TorrentID)
 	}
 
 	if ann.Event != STOPPED {
@@ -191,6 +145,9 @@ func HandleAnnounce(c *echo.Context) {
 		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent.TorrentID, ann.PeerID), config.ReapInterval, 1)
 	}
 
+	seeders, leechers := torrent.PeerCounts()
+	torrent.Seeders = seeders
+	torrent.Leechers = leechers
 	peer.AnnounceLast = unixtime()
 	peer.Sync(r)
 	torrent.Sync(r)

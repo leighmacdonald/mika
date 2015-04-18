@@ -106,7 +106,7 @@ func (peer *Peer) Sync(r redis.Conn) {
 }
 
 func (peer *Peer) IsSeeder() bool {
-	return peer.Left > 0
+	return peer.Left == 0
 }
 
 // Generate a compact peer field array containing the byte representations

@@ -21,6 +21,7 @@ import (
 	"flag"
 	"github.com/chihaya/bencode"
 	"github.com/garyburd/redigo/redis"
+	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"github.com/thoas/stats"
@@ -98,6 +99,8 @@ var (
 
 	err_parse_reply = errors.New("Failed to parse reply")
 	err_cast_reply  = errors.New("Failed to cast reply into type")
+
+	raven_client *raven.Client
 
 	config     *Config
 	configLock = new(sync.RWMutex)
@@ -209,6 +212,18 @@ func HandleTorrentInfo(c *echo.Context) {
 
 }
 
+func CaptureMessage(message string) {
+	if config.SentryDSN == "" {
+		return
+	}
+
+	id, err := raven_client.CaptureMessage(message)
+	if err != nil {
+		log.Println(err)
+	}
+	Debug("Event Registered:", id)
+}
+
 // Do it
 func main() {
 	log.Println(cheese)
@@ -227,6 +242,12 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+	var err error
+	raven_client, err = raven.NewClient(config.SentryDSN)
+	if err != nil {
+		log.Println("Could not connect to sentry")
+	}
+	CaptureMessage("Started tracker")
 
 	// Initialize the redis pool
 	pool = newPool(config.RedisHost, config.RedisPass, config.RedisMaxIdle)
@@ -284,12 +305,14 @@ func init() {
 					log.Println("> Writing out profile info")
 					pprof.StopCPUProfile()
 				}
+				CaptureMessage("Stopped tracker")
 				os.Exit(0)
 			case syscall.SIGUSR2:
 				log.Println("SIGUSR2")
 				<-s
 				loadConfig(false)
 				log.Println("> Reloaded config")
+				CaptureMessage("Reloaded configuration")
 			}
 
 		}

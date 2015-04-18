@@ -12,5 +12,6 @@
   "SQLPort": 3306,
   "SQLDB": "dbname",
   "SQLUser": "",
-  "SQLPass": ""
+  "SQLPass": "",
+  "SentryDSN": "http://x:x@sentry-host.com/1"
 }

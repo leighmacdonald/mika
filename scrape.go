@@ -26,6 +26,7 @@ func HandleScrape(c *echo.Context) {
 
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
+		CaptureMessage(err.Error())
 		log.Println(err)
 		oops(c, MSG_GENERIC_ERROR)
 		return
@@ -54,7 +55,8 @@ func HandleScrape(c *echo.Context) {
 	encoder := bencode.NewEncoder(&out_bytes)
 	err = encoder.Encode(resp)
 	if err != nil {
-		log.Println("Failedto encode scrape response:", err)
+		CaptureMessage(err.Error())
+		log.Println("Failed to encode scrape response:", err)
 		oops(c, MSG_GENERIC_ERROR)
 	}
 	encoded := out_bytes.String()

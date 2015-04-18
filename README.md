@@ -39,9 +39,10 @@ To build, set your $GOPATH env var to $git_project_clone, install deps and go bu
     hacker@nsa:$ cd $git_project_clone
     hacker@nsa:$ export GOPATH=$git_project_clone
     hacker@nsa:$ go get github.com/garyburd/redigo/redis
-    hacker@nsa:$ go get github.com/jackpal/bencode-go
+    hacker@nsa:$ go get github.com/kisielk/raven-go/raven
     hacker@nsa:$ go get github.com/labstack/echo
     hacker@nsa:$ go get github.com/thoas/stats
+    hacker@nsa:$ go get github.com/chihaya/bencode
     hacker@nsa:$ cd src/mika
     hacker@nsa:$ go build -o ../../mika    
 

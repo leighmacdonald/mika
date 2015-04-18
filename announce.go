@@ -59,6 +59,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	ann, err := NewAnnounce(c)
 	if err != nil {
+		CaptureMessage(err.Error())
 		log.Println(err)
 		oops(c, MSG_GENERIC_ERROR)
 		return
@@ -68,17 +69,20 @@ func HandleAnnounce(c *echo.Context) {
 
 	user := GetUser(r, passkey)
 	if user == nil {
+		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
 
 	if !IsValidClient(r, ann.PeerID) {
+		CaptureMessage(err.Error())
 		oops(c, MSG_INVALID_PEER_ID)
 		return
 	}
 
 	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
 	if torrent == nil {
+		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
@@ -87,6 +91,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
+		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
@@ -145,13 +150,13 @@ func HandleAnnounce(c *echo.Context) {
 		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent.TorrentID, ann.PeerID), config.ReapInterval, 1)
 	}
 
-	seeders, leechers := torrent.PeerCounts()
-	torrent.Seeders = seeders
-	torrent.Leechers = leechers
+	torrent.Seeders, torrent.Leechers = torrent.PeerCounts()
 	peer.AnnounceLast = unixtime()
+
 	peer.Sync(r)
 	torrent.Sync(r)
 	user.Sync(r)
+
 	r.Flush()
 
 	dict := bencode.Dict{

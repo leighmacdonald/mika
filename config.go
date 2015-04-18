@@ -17,6 +17,7 @@ type Config struct {
 	AnnIntervalMin int
 	ReapInterval   int
 	HNRThreshold   uint32
+	SentryDSN      string
 }
 
 func loadConfig(fail bool) {

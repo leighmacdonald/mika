@@ -10,28 +10,28 @@ import (
 )
 
 type Peer struct {
-	SpeedUP           float64 `redis:"speed_up"`
-	SpeedDN           float64 `redis:"speed_dj"`
-	Uploaded          uint64  `redis:"uploaded"`
-	Downloaded        uint64  `redis:"downloaded"`
-	Corrupt           uint64  `redis:"corrupt"`
-	IP                string  `redis:"ip"`
-	Port              uint64  `redis:"port"`
-	Left              uint64  `redis:"left"`
-	Announces         uint64  `redis:"announces"`
-	TotalTime         uint32  `redis:"total_time"`
-	AnnounceLast      int32   `redis:"last_announce"`
-	AnnounceFirst     int32   `redis:"first_announce"`
-	New               bool    `redis:"new"`
-	PeerID            string  `redis:"peer_id"`
-	Active            bool    `redis:"active"`
-	UserID            uint64  `redis:"user_id"`
-	TorrentID         uint64  `redis:"torrent_id"`
-	KeyPeer           string  `redis:"-"`
-	KeyUserActive     string  `redis:"-"`
-	KeyUserIncomplete string  `redis:"-"`
-	KeyUserComplete   string  `redis:"-"`
-	KeyUserHNR        string  `redis:"-"`
+	SpeedUP           float64 `redis:"speed_up" json:"speed_up"`
+	SpeedDN           float64 `redis:"speed_dn" json:"speed_dn"`
+	Uploaded          uint64  `redis:"uploaded" json:"uploaded"`
+	Downloaded        uint64  `redis:"downloaded" json:"downloaded"`
+	Corrupt           uint64  `redis:"corrupt" json:"corrupt"`
+	IP                string  `redis:"ip" json:"-"`
+	Port              uint64  `redis:"port" json:"-"`
+	Left              uint64  `redis:"left" json:"left"`
+	Announces         uint64  `redis:"announces" json:"announces"`
+	TotalTime         uint32  `redis:"total_time" json:"total_time"`
+	AnnounceLast      int32   `redis:"last_announce" json:"last_announce"`
+	AnnounceFirst     int32   `redis:"first_announce" json:"first_announce"`
+	New               bool    `redis:"new" json:"-"`
+	PeerID            string  `redis:"peer_id" json:"peer_id"`
+	Active            bool    `redis:"active"  json:"active"`
+	UserID            uint64  `redis:"user_id"  json:"user_id"`
+	TorrentID         uint64  `redis:"torrent_id" json:"torrent_id"`
+	KeyPeer           string  `redis:"-" json:"-"`
+	KeyUserActive     string  `redis:"-" json:"-"`
+	KeyUserIncomplete string  `redis:"-" json:"-"`
+	KeyUserComplete   string  `redis:"-" json:"-"`
+	KeyUserHNR        string  `redis:"-" json:"-"`
 }
 
 // Update the stored values with the data from an announce

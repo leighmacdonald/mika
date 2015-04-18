@@ -78,7 +78,7 @@ var (
  ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯      / ========= === == / /   ////
                      <__________________<_/    ¯¯¯
 `
-// Error code to message mappings
+	// Error code to message mappings
 	resp_msg = map[int]string{
 		MSG_INVALID_REQ_TYPE:        "Invalid request type",
 		MSG_MISSING_INFO_HASH:       "info_hash missing from request",
@@ -97,16 +97,16 @@ var (
 	mika *Tracker
 
 	err_parse_reply = errors.New("Failed to parse reply")
-	err_cast_reply = errors.New("Failed to cast reply into type")
+	err_cast_reply  = errors.New("Failed to cast reply into type")
 
 	config     *Config
 	configLock = new(sync.RWMutex)
 
 	pool *redis.Pool
 
-	profile = flag.String("profile", "", "write cpu profile to file")
+	profile     = flag.String("profile", "", "write cpu profile to file")
 	config_file = flag.String("config", "./config.json", "Config file path")
-	num_procs = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
+	num_procs   = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
 )
 
 // math.Max for uint64
@@ -172,7 +172,7 @@ func responseError(message string) string {
 
 // Estimate a peers speed using downloaded amount over time
 func estSpeed(start_time int32, last_time int32, bytes_sent uint64) float64 {
-	if last_time < start_time {
+	if start_time <= 0 || last_time <= 0 || bytes_sent <= 0 || last_time < start_time {
 		return 0.0
 	}
 	return float64(bytes_sent) / (float64(last_time) - float64(start_time))
@@ -201,6 +201,10 @@ func HandleTorrentInfo(c *echo.Context) {
 		return
 	}
 	torrent := mika.GetTorrentByID(r, torrent_id)
+
+	for _, peer := range torrent.Peers {
+		log.Println(peer)
+	}
 	c.JSON(http.StatusOK, torrent)
 
 }
@@ -274,14 +278,14 @@ func init() {
 	go func() {
 		for received_signal := range s {
 			switch received_signal {
-				case syscall.SIGINT:
+			case syscall.SIGINT:
 				log.Println("\nShutting down!")
 				if *profile != "" {
 					log.Println("> Writing out profile info")
 					pprof.StopCPUProfile()
 				}
 				os.Exit(0)
-				case syscall.SIGUSR2:
+			case syscall.SIGUSR2:
 				log.Println("SIGUSR2")
 				<-s
 				loadConfig(false)

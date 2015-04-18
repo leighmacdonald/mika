@@ -83,7 +83,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 
-	Debug("TorrentID: ", torrent)
+	Debug("Torrent: ", torrent)
 
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
@@ -99,9 +99,10 @@ func HandleAnnounce(c *echo.Context) {
 	if ann.Event == STOPPED {
 		torrent.DelPeer(r, peer)
 	} else {
-		torrent.AddPeer(r, peer)
+		if !torrent.HasPeer(peer) {
+			torrent.AddPeer(r, peer)
+		}
 	}
-	peers := torrent.GetPeers(r, ann.NumWant)
 
 	if ann.Event == STOPPED {
 		// Remove from torrents active peer set
@@ -152,10 +153,10 @@ func HandleAnnounce(c *echo.Context) {
 			r.Send("SREM", peer.KeyUserIncomplete, torrent.TorrentID)
 
 			torrent.Leechers++
-			Debug("Torrent Leechers +1")
+			Debug("[STARTED] Torrent Leechers +1")
 		} else {
 			torrent.Seeders++
-			Debug("Torrent Seeders  +1")
+			Debug("[STARTED] Torrent Seeders  +1")
 		}
 	}
 	if ann.Event != STOPPED {
@@ -182,6 +183,8 @@ func HandleAnnounce(c *echo.Context) {
 		"interval":     config.AnnInterval,
 		"min interval": config.AnnIntervalMin,
 	}
+
+	peers := torrent.GetPeers(r, ann.NumWant)
 	if peers != nil {
 		dict["peers"] = makeCompactPeers(peers, ann.PeerID)
 	}

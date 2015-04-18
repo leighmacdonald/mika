@@ -101,20 +101,16 @@ func (peer *Peer) IsSeeder() bool {
 func makeCompactPeers(peers []*Peer, skip_id string) []byte {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {
-		if peer == nil {
-			log.Println("NIL PEER??")
-		} else {
-			if peer.Port <= 0 {
-				// FIXME Why does empty peer exist with 0 port??
-				continue
-			}
-			if peer.PeerID == skip_id {
-				continue
-			}
-
-			out_buf.Write(net.ParseIP(peer.IP).To4())
-			out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+		if peer.Port <= 0 {
+			// FIXME Why does empty peer exist with 0 port??
+			continue
 		}
+		if peer.PeerID == skip_id {
+			continue
+		}
+
+		out_buf.Write(net.ParseIP(peer.IP).To4())
+		out_buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
 	}
 	return out_buf.Bytes()
 }
@@ -123,6 +119,7 @@ func makeCompactPeers(peers []*Peer, skip_id string) []byte {
 // within, otherwise just return a default value peer
 func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer, error) {
 	peer := &Peer{
+		PeerID:        peer_id,
 		Active:        false,
 		Announces:     0,
 		SpeedUP:       0,
@@ -154,6 +151,7 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 			return peer, err_cast_reply
 		} else {
 			peer.New = false
+			peer.PeerID = peer_id
 		}
 	}
 	return peer, nil

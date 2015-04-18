@@ -31,7 +31,7 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64) *Torrent {
 			Announces:  0,
 			Uploaded:   0,
 			Downloaded: 0,
-			Peers:      make(map[string]*Peer),
+			Peers:      []*Peer{},
 		}
 
 		torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d", torrent_id))

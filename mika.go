@@ -116,6 +116,15 @@ func UMax(a, b uint64) uint64 {
 	}
 }
 
+// math.Min for uint64
+func UMin(a, b uint64) uint64 {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
 // Create a new redis pool
 func newPool(server, password string, max_idle int) *redis.Pool {
 	return &redis.Pool{

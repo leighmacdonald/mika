@@ -40,13 +40,14 @@ def load_stats(redis_conn):
             redis_conn.set(key, 0)
 
 
-def load_passkeys(db_conn, redis_conn):
-    print("> Loading passkeys... ")
+def load_users(db_conn, redis_conn):
+    print("> Loading users... ")
     with db_conn.cursor() as cur:
-        cur.execute("SELECT passkey, id FROM users")
-        passkeys = cur.fetchall()
-    for passkey, user_id in passkeys:
-        redis_conn.set("t:user:{}".format(passkey), user_id)
+        cur.execute("SELECT passkey, id, download, upload FROM users")
+        users = cur.fetchall()
+    for user in users:
+        redis_conn.set("t:user:{}".format(user[0]), user[1])
+        redis_conn.hmset("t:u:{}".format(user[1]), {'downloaded': user[2], 'uploaded': user[3]})
 
 
 def load_whitelist(db_conn, redis_conn):
@@ -83,7 +84,7 @@ def warmup(**args):
     redis_conn = make_redis()
     load_stats(redis_conn)
     load_whitelist(db_conn, redis_conn)
-    load_passkeys(db_conn, redis_conn)
+    load_users(db_conn, redis_conn)
     load_torrents(db_conn, redis_conn)
 
 

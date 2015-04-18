@@ -52,6 +52,10 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64) *Torrent {
 			return nil
 		}
 
+		// Reset counts since we cant guarantee the accuracy after restart
+		torrent.Seeders = 0
+		torrent.Leechers = 0
+
 		// Make these once and save the results in mem
 		torrent.TorrentKey = fmt.Sprintf("t:t:%d", torrent_id)
 		torrent.TorrentPeersKey = fmt.Sprintf("t:t:%d:p", torrent_id)

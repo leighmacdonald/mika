@@ -15,8 +15,8 @@ type Peer struct {
 	Uploaded          uint64  `redis:"uploaded" json:"uploaded"`
 	Downloaded        uint64  `redis:"downloaded" json:"downloaded"`
 	Corrupt           uint64  `redis:"corrupt" json:"corrupt"`
-	IP                string  `redis:"ip" json:"-"`
-	Port              uint64  `redis:"port" json:"-"`
+	IP                string  `redis:"ip" json:"ip"`
+	Port              uint64  `redis:"port" json:"port"`
 	Left              uint64  `redis:"left" json:"left"`
 	Announces         uint64  `redis:"announces" json:"announces"`
 	TotalTime         uint32  `redis:"total_time" json:"total_time"`
@@ -43,15 +43,11 @@ func (peer *Peer) Update(announce *AnnounceRequest) {
 	peer.Uploaded += announce.Uploaded
 	peer.Downloaded += announce.Downloaded
 	peer.IP = announce.IPv4.String()
+	peer.Port = announce.Port
 	peer.Corrupt += announce.Corrupt
 	peer.Left = announce.Left
 	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, announce.Uploaded)
 	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, announce.Downloaded)
-	if announce.Event == STOPPED {
-		peer.Active = false
-	} else {
-		peer.Active = true
-	}
 	// Must be active to have a real time delta
 	if peer.Active && peer.AnnounceLast > 0 {
 		time_diff := uint64(unixtime() - peer.AnnounceLast)
@@ -72,22 +68,22 @@ func (peer *Peer) SetUserID(user_id uint64) {
 
 func (peer *Peer) Sync(r redis.Conn) {
 	r.Send(
-		"HMSET", peer.KeyPeer,
-		"ip", peer.IP,
-		"port", peer.Port,
-		"left", peer.Left,
-		"first_announce", peer.AnnounceFirst,
-		"last_announce", peer.AnnounceLast,
-		"total_time", peer.TotalTime,
-		"speed_up", peer.SpeedUP,
-		"speed_dn", peer.SpeedDN,
-		"active", peer.Active,
-		"uploaded", peer.Uploaded,
-		"downloaded", peer.Downloaded,
-		"corrupt", peer.Corrupt,
-		"user_id", peer.UserID, // Shouldn't need to be here
-		"peer_id", peer.PeerID, // Shouldn't need to be here
-		"torrent_id", peer.TorrentID, // Shouldn't need to be here
+	"HMSET", peer.KeyPeer,
+	"ip", peer.IP,
+	"port", peer.Port,
+	"left", peer.Left,
+	"first_announce", peer.AnnounceFirst,
+	"last_announce", peer.AnnounceLast,
+	"total_time", peer.TotalTime,
+	"speed_up", peer.SpeedUP,
+	"speed_dn", peer.SpeedDN,
+	"active", peer.Active,
+	"uploaded", peer.Uploaded,
+	"downloaded", peer.Downloaded,
+	"corrupt", peer.Corrupt,
+	"user_id", peer.UserID, // Shouldn't need to be here
+	"peer_id", peer.PeerID, // Shouldn't need to be here
+	"torrent_id", peer.TorrentID, // Shouldn't need to be here
 	)
 
 }
@@ -134,7 +130,6 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 		AnnounceLast:  unixtime(),
 		TotalTime:     0,
 		UserID:        0,
-		New:           true,
 		TorrentID:     torrent_id,
 		KeyPeer:       fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id),
 	}
@@ -150,7 +145,6 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 			log.Println("Failed to fetch peer: ", err)
 			return peer, err_cast_reply
 		} else {
-			peer.New = false
 			peer.PeerID = peer_id
 		}
 	}

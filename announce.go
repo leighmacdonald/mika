@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	STOPPED   = iota
-	STARTED   = iota
+	STOPPED = iota
+	STARTED = iota
 	COMPLETED = iota
-	ANNOUNCE  = iota
+	ANNOUNCE = iota
 )
 
 type AnnounceRequest struct {
@@ -113,13 +113,15 @@ func HandleAnnounce(c *echo.Context) {
 		// Mark the peer as inactive
 		r.Send("HSET", peer.KeyPeer, "active", 0)
 
-		// Handle total changes if we were previously an active peer?
-		if peer.Left > 0 {
-			Debug("[STOPPED] Torrent Leechers -1")
-			torrent.Leechers--
-		} else {
-			Debug("[STOPPED] Torrent Seeders  -1")
-			torrent.Seeders--
+		if peer.Active {
+			// Handle total changes if we were previously an active peer?
+			if peer.Left > 0 {
+				Debug("[STOPPED] Torrent Leechers -1")
+				torrent.Leechers--
+			} else {
+				Debug("[STOPPED] Torrent Seeders  -1")
+				torrent.Seeders--
+			}
 		}
 
 	} else if ann.Event == COMPLETED {
@@ -147,19 +149,36 @@ func HandleAnnounce(c *echo.Context) {
 		r.Send("SREM", peer.KeyUserHNR, torrent.TorrentID)
 
 	} else if ann.Event == STARTED {
+		// Ignore start event from active peers to prevent stat skew potential
+		if !peer.Active {
+			if !peer.IsSeeder() {
+				// Add the torrent to the users incomplete set
+				r.Send("SREM", peer.KeyUserIncomplete, torrent.TorrentID)
 
-		if ann.Left > 0 {
-			// Add the torrent to the users incomplete set
-			r.Send("SREM", peer.KeyUserIncomplete, torrent.TorrentID)
-
-			torrent.Leechers++
-			Debug("[STARTED] Torrent Leechers +1")
-		} else {
-			torrent.Seeders++
-			Debug("[STARTED] Torrent Seeders  +1")
+				torrent.Leechers++
+				Debug("[STARTED] Torrent Leechers +1")
+			} else {
+				torrent.Seeders++
+				Debug("[STARTED] Torrent Seeders  +1")
+			}
+		}
+	} else {
+		// If not active, this is a regula
+		if !peer.Active {
+			if peer.IsSeeder() {
+				Debug("[ANN] Torrent Seeders +1")
+				torrent.Seeders++
+			} else {
+				Debug("[ANN] Torrent Leechers +1")
+				torrent.Leechers++
+			}
 		}
 	}
+
 	if ann.Event != STOPPED {
+
+		peer.Active = true
+
 		// Add peer to torrent active peers
 		r.Send("SADD", torrent.TorrentPeersKey, ann.PeerID)
 
@@ -217,11 +236,11 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	event := ANNOUNCE
 	event_name, _ := q.Params["event"]
 	switch event_name {
-	case "started":
+		case "started":
 		event = STARTED
-	case "stopped":
+		case "stopped":
 		event = STOPPED
-	case "complete":
+		case "complete":
 		event = COMPLETED
 	}
 

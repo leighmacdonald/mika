@@ -16,7 +16,7 @@ type Torrent struct {
 	Downloaded      uint64  `redis:"downloaded" json:"downloaded"`
 	TorrentKey      string  `redis:"-" json:"-"`
 	TorrentPeersKey string  `redis:"-" json:"-"`
-	Peers           []*Peer `redis:"-" json:"-"`
+	Peers           []*Peer `redis:"-" json:"peers"`
 }
 
 func (torrent *Torrent) Update(announce *AnnounceRequest) {
@@ -93,10 +93,10 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 	for i, tor_peer := range torrent.Peers {
 		if tor_peer == peer {
-			if len(torrent.Peers) == i+1 {
+			if len(torrent.Peers) == 1 {
 				torrent.Peers = nil
 			} else {
-				torrent.Peers = append(torrent.Peers[:i], torrent.Peers[i+1])
+				torrent.Peers = append(torrent.Peers[:i], torrent.Peers[i+1:]...)
 			}
 			break
 		}

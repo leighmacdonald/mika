@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
+	"sync"
 )
 
 type User struct {
+	sync.RWMutex
 	UserID     uint64
 	Uploaded   uint64
 	Downloaded uint64
@@ -82,6 +84,8 @@ func GetUser(r redis.Conn, passkey string) *User {
 }
 
 func (user *User) Update(announce *AnnounceRequest) {
+	user.Lock()
+	defer user.Unlock()
 	user.Uploaded += announce.Uploaded
 	user.Downloaded += announce.Downloaded
 	user.Corrupt += announce.Corrupt
@@ -92,13 +96,13 @@ func (user *User) Update(announce *AnnounceRequest) {
 
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
-		"HMSET", user.UserKey,
-		"user_id", user.UserID,
-		"uploaded", user.Uploaded,
-		"downloaded", user.Downloaded,
-		"corrupt", user.Corrupt,
-		"snatches", user.Snatches,
-		"announces", user.Announces,
+	"HMSET", user.UserKey,
+	"user_id", user.UserID,
+	"uploaded", user.Uploaded,
+	"downloaded", user.Downloaded,
+	"corrupt", user.Corrupt,
+	"snatches", user.Snatches,
+	"announces", user.Announces,
 	)
 }
 

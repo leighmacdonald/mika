@@ -7,9 +7,11 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 )
 
 type Peer struct {
+	sync.RWMutex
 	SpeedUP           float64 `redis:"speed_up" json:"speed_up"`
 	SpeedDN           float64 `redis:"speed_dn" json:"speed_dn"`
 	Uploaded          uint64  `redis:"uploaded" json:"uploaded"`
@@ -36,6 +38,8 @@ type Peer struct {
 
 // Update the stored values with the data from an announce
 func (peer *Peer) Update(announce *AnnounceRequest) {
+	peer.Lock()
+	defer peer.Unlock()
 	cur_time := unixtime()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
@@ -59,6 +63,8 @@ func (peer *Peer) Update(announce *AnnounceRequest) {
 }
 
 func (peer *Peer) SetUserID(user_id uint64) {
+	peer.Lock()
+	defer peer.Unlock()
 	peer.UserID = user_id
 	peer.KeyUserActive = fmt.Sprintf("t:u:%d:active", user_id)
 	peer.KeyUserIncomplete = fmt.Sprintf("t:u:%d:incomplete", user_id)

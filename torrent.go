@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
+	"sync"
 )
 
 type Torrent struct {
+	sync.RWMutex
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
 	Seeders         int16   `redis:"seeders" json:"seeders"`
 	Leechers        int16   `redis:"leechers" json:"leechers"`
@@ -20,6 +22,8 @@ type Torrent struct {
 }
 
 func (torrent *Torrent) Update(announce *AnnounceRequest) {
+	torrent.Lock()
+	defer torrent.Unlock()
 	torrent.Announces++
 	torrent.Uploaded += announce.Uploaded
 	torrent.Downloaded += announce.Downloaded
@@ -27,20 +31,20 @@ func (torrent *Torrent) Update(announce *AnnounceRequest) {
 
 func (torrent *Torrent) Sync(r redis.Conn) {
 	r.Send(
-		"HMSET", torrent.TorrentKey,
-		"torrent_id", torrent.TorrentID,
-		"seeders", torrent.Seeders,
-		"leechers", torrent.Leechers,
-		"snatches", torrent.Snatches,
-		"announces", torrent.Announces,
-		"uploaded", torrent.Uploaded,
-		"downloaded", torrent.Downloaded,
+	"HMSET", torrent.TorrentKey,
+	"torrent_id", torrent.TorrentID,
+	"seeders", torrent.Seeders,
+	"leechers", torrent.Leechers,
+	"snatches", torrent.Snatches,
+	"announces", torrent.Announces,
+	"uploaded", torrent.Uploaded,
+	"downloaded", torrent.Downloaded,
 	)
 }
 
 func (torrent *Torrent) findPeer(peer_id string) *Peer {
-	mika.RLock()
-	defer mika.RUnlock()
+	torrent.RLock()
+	defer torrent.RUnlock()
 	for _, peer := range torrent.Peers {
 		if peer.PeerID == peer_id {
 			return peer
@@ -65,18 +69,18 @@ func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
 			return nil, err
 		}
 
-		mika.Lock()
+		torrent.Lock()
 		torrent.Peers = append(torrent.Peers, peer)
-		mika.Unlock()
+		torrent.Unlock()
 	}
 	return peer, nil
 }
 
 // Add a peer to a torrents active peer_id list
 func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
-	mika.Lock()
+	torrent.Lock()
 	torrent.Peers = append(torrent.Peers, peer)
-	mika.Unlock()
+	torrent.Unlock()
 
 	v, err := r.Do("SADD", fmt.Sprintf("t:t:%d:p", torrent.TorrentID), peer.PeerID)
 	if err != nil {

@@ -97,13 +97,13 @@ func (user *User) Update(announce *AnnounceRequest) {
 
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
-	"HMSET", user.UserKey,
-	"user_id", user.UserID,
-	"uploaded", user.Uploaded,
-	"downloaded", user.Downloaded,
-	"corrupt", user.Corrupt,
-	"snatches", user.Snatches,
-	"announces", user.Announces,
+		"HMSET", user.UserKey,
+		"user_id", user.UserID,
+		"uploaded", user.Uploaded,
+		"downloaded", user.Downloaded,
+		"corrupt", user.Corrupt,
+		"snatches", user.Snatches,
+		"announces", user.Announces,
 	)
 }
 

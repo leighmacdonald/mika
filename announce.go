@@ -188,9 +188,6 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 		return nil, err
 	}
 
-	s := strings.Split(c.Request.RemoteAddr, ":")
-	ip_req, _ := s[0], s[1]
-
 	compact := q.Params["compact"] != "0"
 
 	event := ANNOUNCE
@@ -218,12 +215,26 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	ipv4, err := getIP(q.Params["ip"])
 	if err != nil {
-		ipv4_new, err := getIP(ip_req)
-		if err != nil {
-			log.Println(err)
-			return nil, errors.New("Invalid ip hash")
+		// Look for forwarded ip in header then default to remote addr
+		forwarded_ip := c.Request.Header.Get("X-Forwarded-For")
+		if forwarded_ip != "" {
+			ipv4_new, err := getIP(forwarded_ip)
+			if err != nil {
+				log.Println(err)
+				return nil, errors.New("Invalid ip header")
+			}
+			ipv4 = ipv4_new
+		} else {
+			s := strings.Split(c.Request.RemoteAddr, ":")
+			ip_req, _ := s[0], s[1]
+			ipv4_new, err := getIP(ip_req)
+			if err != nil {
+				log.Println(err)
+				return nil, errors.New("Invalid ip hash")
+			}
+			ipv4 = ipv4_new
 		}
-		ipv4 = ipv4_new
+
 	}
 
 	port, err := q.Uint64("port")

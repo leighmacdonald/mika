@@ -41,7 +41,6 @@ type Peer struct {
 // Update the stored values with the data from an announce
 func (peer *Peer) Update(announce *AnnounceRequest) {
 	peer.Lock()
-	defer peer.Unlock()
 	cur_time := unixtime()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
@@ -69,16 +68,17 @@ func (peer *Peer) Update(announce *AnnounceRequest) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
+	peer.Unlock()
 }
 
 func (peer *Peer) SetUserID(user_id uint64) {
 	peer.Lock()
-	defer peer.Unlock()
 	peer.UserID = user_id
 	peer.KeyUserActive = fmt.Sprintf("t:u:%d:active", user_id)
 	peer.KeyUserIncomplete = fmt.Sprintf("t:u:%d:incomplete", user_id)
 	peer.KeyUserComplete = fmt.Sprintf("t:u:%d:complete", user_id)
 	peer.KeyUserHNR = fmt.Sprintf("t:u:%d:hnr", user_id)
+	peer.Unlock()
 }
 
 func (peer *Peer) Sync(r redis.Conn) {

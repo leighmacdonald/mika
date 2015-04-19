@@ -17,6 +17,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
 	"github.com/chihaya/bencode"
@@ -32,6 +33,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -134,7 +136,7 @@ func UMin(a, b uint64) uint64 {
 func newPool(server, password string, max_idle int) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     max_idle,
-		IdleTimeout: 240 * time.Second,
+		IdleTimeout: 10 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", server)
 			if err != nil {
@@ -148,6 +150,11 @@ func newPool(server, password string, max_idle int) *redis.Pool {
 			}
 			return c, err
 		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+		Wait: true,
 	}
 }
 
@@ -181,6 +188,12 @@ func estSpeed(start_time int32, last_time int32, bytes_sent uint64) float64 {
 	return float64(bytes_sent) / (float64(last_time) - float64(start_time))
 }
 
+func jsonString(obj interface{}) string {
+	var b bytes.Buffer
+	json.NewEncoder(&b).Encode(obj)
+	return strings.Replace(b.String(), "\n", "", -1)
+}
+
 // Generate a 32bit unix timestamp
 func unixtime() int32 {
 	return int32(time.Now().Unix())
@@ -209,19 +222,21 @@ func HandleTorrentInfo(c *echo.Context) {
 		log.Println(peer)
 	}
 	c.JSON(http.StatusOK, torrent)
-
 }
 
-func CaptureMessage(message string) {
+func CaptureMessage(message ...string) {
 	if config.SentryDSN == "" {
 		return
 	}
-
-	id, err := raven_client.CaptureMessage(message)
+	msg := strings.Join(message, "")
+	if msg == "" {
+		return
+	}
+	_, err := raven_client.CaptureMessage()
 	if err != nil {
 		log.Println(err)
 	}
-	Debug("Event Registered:", id)
+	//Debug("Event Registered:", id)
 }
 
 // Do it

@@ -24,6 +24,7 @@ type User struct {
 func findUserID(r redis.Conn, passkey string) uint64 {
 	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
 	if err != nil {
+		CaptureMessage("user.findUserID")
 		log.Println(err)
 		return 0
 	}
@@ -85,13 +86,13 @@ func GetUser(r redis.Conn, passkey string) *User {
 
 func (user *User) Update(announce *AnnounceRequest) {
 	user.Lock()
-	defer user.Unlock()
 	user.Uploaded += announce.Uploaded
 	user.Downloaded += announce.Downloaded
 	user.Corrupt += announce.Corrupt
 	if announce.Event == COMPLETED {
 		user.Snatches++
 	}
+	user.Unlock()
 }
 
 func (user *User) Sync(r redis.Conn) {

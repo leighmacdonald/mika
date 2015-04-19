@@ -12,7 +12,7 @@ def bin2hex(bin_info_hash):
     return binascii.b2a_hex(bin_info_hash).lower()
 
 
-def load_torrents(db_conn, redis_conn, force=True):
+def load_torrents(db_conn, redis_conn, force=False):
     print("> Loading torrents...")
     with db_conn.cursor() as cur:
         cur.execute("SELECT info_hash, id  FROM torrents where info_hash <> ''")

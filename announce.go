@@ -75,19 +75,18 @@ func HandleAnnounce(c *echo.Context) {
 	}
 
 	if !IsValidClient(r, ann.PeerID) {
-		CaptureMessage(err.Error())
+		CaptureMessage(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
 		oops(c, MSG_INVALID_PEER_ID)
 		return
 	}
 
 	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
 	if torrent == nil {
-		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		return
 	}
 
-	Debug("Torrent: ", torrent)
+	//Debug("Torrent: ", jsonString(torrent))
 
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {

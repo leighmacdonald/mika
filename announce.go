@@ -42,7 +42,7 @@ type AnnounceResponse struct {
 	Peers       string `bencode:"peers"`
 }
 
-// Parse and return a IP from a string?hkey=be4f5a96-c76a-42b6-90b3-5ac7686ff719&WebsiteKey=927055e8-ec5d-4b51-96ef-5dbe0a133439
+// Parse and return a IP from a string
 func getIP(ip_str string) (net.IP, error) {
 	ip := net.ParseIP(ip_str)
 	if ip != nil {
@@ -148,15 +148,14 @@ func HandleAnnounce(c *echo.Context) {
 		// peer from torrents in the case of a non-clean client shutdown
 		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent.TorrentID, ann.PeerID), config.ReapInterval, 1)
 	}
+	r.Flush()
 
 	torrent.Seeders, torrent.Leechers = torrent.PeerCounts()
 	peer.AnnounceLast = unixtime()
 
-	peer.Sync(r)
-	torrent.Sync(r)
-	user.Sync(r)
-
-	r.Flush()
+	sync_peer <- peer
+	sync_torrent <- torrent
+	sync_user <- user
 
 	dict := bencode.Dict{
 		"complete":     torrent.Seeders,

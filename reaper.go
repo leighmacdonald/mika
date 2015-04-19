@@ -71,7 +71,7 @@ func ReapPeer(torrent_id, peer_id string) {
 
 // This is a goroutine that will watch for peer key expiry events and
 // act on them, removing them from the active peer lists
-func PeerStalker() {
+func peerStalker() {
 	r := pool.Get()
 	defer r.Close()
 

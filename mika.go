@@ -39,6 +39,10 @@ import (
 	"time"
 )
 
+type SyncWriter interface {
+	Sync(r redis.Conn)
+}
+
 type ErrorResponse struct {
 	FailReason string `bencode:"failure reason"`
 }
@@ -98,6 +102,10 @@ var (
 	}
 
 	mika *Tracker
+
+	sync_user    = make(chan *User, 100)
+	sync_peer    = make(chan *Peer, 1000)
+	sync_torrent = make(chan *Torrent, 500)
 
 	err_parse_reply = errors.New("Failed to parse reply")
 	err_cast_reply  = errors.New("Failed to cast reply into type")
@@ -239,6 +247,25 @@ func CaptureMessage(message ...string) {
 	//Debug("Event Registered:", id)
 }
 
+func syncWriter() {
+	r := pool.Get()
+	defer r.Close()
+	for {
+		select {
+		case user := <-sync_user:
+			user.Sync(r)
+		case torrent := <-sync_torrent:
+			torrent.Sync(r)
+		case peer := <-sync_peer:
+			peer.Sync(r)
+		}
+		err := r.Flush()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
 // Do it
 func main() {
 	log.Println(cheese)
@@ -293,7 +320,10 @@ func main() {
 	e.Get("/torrent/:torrent_id", HandleTorrentInfo)
 
 	// Start watching for expiring peers
-	go PeerStalker()
+	go peerStalker()
+
+	// Start writer channel
+	go syncWriter()
 
 	// Start server
 	e.Run(config.ListenHost)

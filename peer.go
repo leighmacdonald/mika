@@ -11,6 +11,7 @@ import (
 )
 
 type Peer struct {
+	SyncWriter
 	sync.RWMutex
 	SpeedUP           float64 `redis:"speed_up" json:"speed_up"`
 	SpeedDN           float64 `redis:"speed_dn" json:"speed_dn"`

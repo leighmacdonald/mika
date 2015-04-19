@@ -8,6 +8,7 @@ import (
 )
 
 type User struct {
+	SyncWriter
 	sync.RWMutex
 	UserID     uint64
 	Uploaded   uint64

@@ -11,7 +11,6 @@ import (
 )
 
 type Peer struct {
-	SyncWriter
 	sync.RWMutex
 	SpeedUP           float64 `redis:"speed_up" json:"speed_up"`
 	SpeedDN           float64 `redis:"speed_dn" json:"speed_dn"`
@@ -84,24 +83,24 @@ func (peer *Peer) SetUserID(user_id uint64) {
 
 func (peer *Peer) Sync(r redis.Conn) {
 	r.Send(
-		"HMSET", peer.KeyPeer,
-		"ip", peer.IP,
-		"port", peer.Port,
-		"left", peer.Left,
-		"first_announce", peer.AnnounceFirst,
-		"last_announce", peer.AnnounceLast,
-		"total_time", peer.TotalTime,
-		"speed_up", peer.SpeedUP,
-		"speed_dn", peer.SpeedDN,
-		"speed_up_max", peer.SpeedUPMax,
-		"speed_dn_max", peer.SpeedDNMax,
-		"active", peer.Active,
-		"uploaded", peer.Uploaded,
-		"downloaded", peer.Downloaded,
-		"corrupt", peer.Corrupt,
-		"user_id", peer.UserID, // Shouldn't need to be here
-		"peer_id", peer.PeerID, // Shouldn't need to be here
-		"torrent_id", peer.TorrentID, // Shouldn't need to be here
+	"HMSET", peer.KeyPeer,
+	"ip", peer.IP,
+	"port", peer.Port,
+	"left", peer.Left,
+	"first_announce", peer.AnnounceFirst,
+	"last_announce", peer.AnnounceLast,
+	"total_time", peer.TotalTime,
+	"speed_up", peer.SpeedUP,
+	"speed_dn", peer.SpeedDN,
+	"speed_up_max", peer.SpeedUPMax,
+	"speed_dn_max", peer.SpeedDNMax,
+	"active", peer.Active,
+	"uploaded", peer.Uploaded,
+	"downloaded", peer.Downloaded,
+	"corrupt", peer.Corrupt,
+	"user_id", peer.UserID, // Shouldn't need to be here
+	"peer_id", peer.PeerID, // Shouldn't need to be here
+	"torrent_id", peer.TorrentID, // Shouldn't need to be here
 	)
 
 }

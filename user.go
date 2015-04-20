@@ -8,6 +8,7 @@ import (
 )
 
 type User struct {
+	Queued
 	sync.RWMutex
 	UserID     uint64
 	Uploaded   uint64

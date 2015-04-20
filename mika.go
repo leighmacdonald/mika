@@ -47,6 +47,10 @@ type DBEntity interface {
 	Sync(r redis.Conn) bool
 }
 
+type Queued struct {
+	InQueue bool
+}
+
 const (
 	MSG_OK                      int = 0
 	MSG_INVALID_REQ_TYPE        int = 100
@@ -249,11 +253,17 @@ func syncWriter() {
 	for {
 		select {
 		case user := <-sync_user:
+			log.Println("sync user")
 			user.Sync(r)
+			user.InQueue = false
 		case torrent := <-sync_torrent:
+			log.Println("sync torrent")
 			torrent.Sync(r)
+			torrent.InQueue = false
 		case peer := <-sync_peer:
+			log.Println("sync peer")
 			peer.Sync(r)
+			peer.InQueue = false
 		}
 		err := r.Flush()
 		if err != nil {

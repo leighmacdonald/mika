@@ -8,6 +8,7 @@ import (
 )
 
 type Torrent struct {
+	Queued
 	sync.RWMutex
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
 	Seeders         int16   `redis:"seeders" json:"seeders"`

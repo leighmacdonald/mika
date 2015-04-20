@@ -152,10 +152,18 @@ func HandleAnnounce(c *echo.Context) {
 
 	torrent.Seeders, torrent.Leechers = torrent.PeerCounts()
 	peer.AnnounceLast = unixtime()
-
-	sync_peer <- peer
-	sync_torrent <- torrent
-	sync_user <- user
+	if !peer.InQueue {
+		peer.InQueue = true
+		sync_peer <- peer
+	}
+	if !torrent.InQueue {
+		torrent.InQueue = true
+		sync_torrent <- torrent
+	}
+	if !user.InQueue {
+		user.InQueue = true
+		sync_user <- user
+	}
 
 	dict := bencode.Dict{
 		"complete":     torrent.Seeders,
@@ -234,7 +242,6 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 			}
 			ipv4 = ipv4_new
 		}
-
 	}
 
 	port, err := q.Uint64("port")

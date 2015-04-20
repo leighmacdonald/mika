@@ -40,20 +40,29 @@ type Peer struct {
 }
 
 // Update the stored values with the data from an announce
-func (peer *Peer) Update(announce *AnnounceRequest) {
+func (peer *Peer) Update(announce *AnnounceRequest) (ul uint64, dl uint64) {
 	peer.Lock()
 	cur_time := unixtime()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
+
+	ul = announce.Uploaded - peer.Uploaded
+	dl = announce.Downloaded - peer.Downloaded
+	if ul < 0 {
+		ul = 0
+	}
+	if dl < 0 {
+		dl = 0
+	}
 	// Change to int or byte?
-	peer.Uploaded += announce.Uploaded
-	peer.Downloaded += announce.Downloaded
+	peer.Uploaded = announce.Uploaded
+	peer.Downloaded = announce.Downloaded
 	peer.IP = announce.IPv4.String()
 	peer.Port = announce.Port
-	peer.Corrupt += announce.Corrupt
+	peer.Corrupt = announce.Corrupt
 	peer.Left = announce.Left
-	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, announce.Uploaded)
-	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, announce.Downloaded)
+	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, ul)
+	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, dl)
 	if peer.SpeedUP > peer.SpeedUPMax {
 		peer.SpeedUPMax = peer.SpeedUP
 	}
@@ -70,6 +79,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) {
 		}
 	}
 	peer.Unlock()
+	return ul, dl
 }
 
 func (peer *Peer) SetUserID(user_id uint64) {
@@ -84,24 +94,24 @@ func (peer *Peer) SetUserID(user_id uint64) {
 
 func (peer *Peer) Sync(r redis.Conn) {
 	r.Send(
-		"HMSET", peer.KeyPeer,
-		"ip", peer.IP,
-		"port", peer.Port,
-		"left", peer.Left,
-		"first_announce", peer.AnnounceFirst,
-		"last_announce", peer.AnnounceLast,
-		"total_time", peer.TotalTime,
-		"speed_up", peer.SpeedUP,
-		"speed_dn", peer.SpeedDN,
-		"speed_up_max", peer.SpeedUPMax,
-		"speed_dn_max", peer.SpeedDNMax,
-		"active", peer.Active,
-		"uploaded", peer.Uploaded,
-		"downloaded", peer.Downloaded,
-		"corrupt", peer.Corrupt,
-		"user_id", peer.UserID, // Shouldn't need to be here
-		"peer_id", peer.PeerID, // Shouldn't need to be here
-		"torrent_id", peer.TorrentID, // Shouldn't need to be here
+	"HMSET", peer.KeyPeer,
+	"ip", peer.IP,
+	"port", peer.Port,
+	"left", peer.Left,
+	"first_announce", peer.AnnounceFirst,
+	"last_announce", peer.AnnounceLast,
+	"total_time", peer.TotalTime,
+	"speed_up", peer.SpeedUP,
+	"speed_dn", peer.SpeedDN,
+	"speed_up_max", peer.SpeedUPMax,
+	"speed_dn_max", peer.SpeedDNMax,
+	"active", peer.Active,
+	"uploaded", peer.Uploaded,
+	"downloaded", peer.Downloaded,
+	"corrupt", peer.Corrupt,
+	"user_id", peer.UserID, // Shouldn't need to be here
+	"peer_id", peer.PeerID, // Shouldn't need to be here
+	"torrent_id", peer.TorrentID, // Shouldn't need to be here
 	)
 
 }

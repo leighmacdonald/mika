@@ -85,10 +85,10 @@ func GetUser(r redis.Conn, passkey string) *User {
 	return user
 }
 
-func (user *User) Update(announce *AnnounceRequest) {
+func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
 	user.Lock()
-	user.Uploaded += announce.Uploaded
-	user.Downloaded += announce.Downloaded
+	user.Uploaded += upload_diff
+	user.Downloaded += download_diff
 	user.Corrupt += announce.Corrupt
 	if announce.Event == COMPLETED {
 		user.Snatches++

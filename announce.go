@@ -96,9 +96,10 @@ func HandleAnnounce(c *echo.Context) {
 	}
 	peer.SetUserID(user.UserID) //where to put this/handle this cleaner?
 
-	peer.Update(ann)
+	// user update MUST happen before peer sync since we rely on the old dl/ul values
+	ul, dl := peer.Update(ann)
+	user.Update(ann, ul, dl)
 	torrent.Update(ann)
-	user.Update(ann)
 
 	if ann.Event == STOPPED {
 		torrent.DelPeer(r, peer)

@@ -17,14 +17,12 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"flag"
 	"github.com/chihaya/bencode"
 	"github.com/garyburd/redigo/redis"
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
-	//	"github.com/thoas/stats"
 	"fmt"
 	"log"
 	"net/http"
@@ -174,12 +172,6 @@ func estSpeed(start_time int32, last_time int32, bytes_sent uint64) float64 {
 	return float64(bytes_sent) / (float64(last_time) - float64(start_time))
 }
 
-func jsonString(obj interface{}) string {
-	var b bytes.Buffer
-	json.NewEncoder(&b).Encode(obj)
-	return strings.Replace(b.String(), "\n", "", -1)
-}
-
 // Generate a 32bit unix timestamp
 func unixtime() int32 {
 	return int32(time.Now().Unix())
@@ -310,20 +302,13 @@ func main() {
 	// Initialize the redis pool manager
 	go PoolPoolManager(pool)
 
+	go dbStatIndexer()
+
 	// Initialize the router + middlewares
 	e := echo.New()
 
 	// Passkey is the only param we use, so only allocate for 1
 	e.MaxParam(1)
-
-	// Third-party middleware
-	//	s := stats.New()
-	//	e.Use(s.Handler)
-
-	// Stats route
-	//	e.Get("/stats", func(c *echo.Context) {
-	//		c.JSON(200, s.Data())
-	//	})
 
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)
@@ -342,12 +327,18 @@ func main() {
 }
 
 func init() {
-	log.Println(version)
+	if version == "" {
+		log.Fatalln(`Build this binary with "make", not "go build"`)
+	}
 	// Parse CLI args
 	flag.Parse()
 
+	// Start stat counter
 	stats = NewStatCounter(counter)
+	go stats.counter()
+	go stats.statPrinter()
 
+	// Alloc tracker
 	mika = &Tracker{
 		Torrents: make(map[uint64]*Torrent),
 		Users:    make(map[uint64]*User),

@@ -41,12 +41,7 @@ func NewStatCounter(c chan int) *StatsCounter {
 		InvalidInfohash: 0,
 		InvalidClient:   0,
 	}
-
-	go counter.counter()
-	go counter.statPrinter()
-
 	return counter
-
 }
 
 func (stats *StatsCounter) counter() {
@@ -76,10 +71,10 @@ func (stats *StatsCounter) counter() {
 func (stats *StatsCounter) statPrinter() {
 	for {
 		time.Sleep(60 * time.Second)
-		reqsec := stats.Requests / 60
+		req_sec := stats.Requests / 60
 		log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d",
 			stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
-			stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, reqsec)
+			stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec)
 		stats.Requests = 0
 	}
 }

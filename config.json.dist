@@ -8,6 +8,7 @@
   "AnnIntervalMin": 10,
   "ReapInterval": 400,
   "HNRThreshold": 1209600,
+  "IndexInterval": 60,
   "SQLHost": "localhost",
   "SQLPort": 3306,
   "SQLDB": "dbname",

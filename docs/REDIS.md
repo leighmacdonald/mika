@@ -152,6 +152,17 @@ Global requests count
 
 t:stats:requests
 
+Indexes
+-------
+
+We will be maintaining some indexed fields to give the ability to sort torrent by.
+
+    [ZADD] t:i:leechers
+    [ZADD] t:i:seeders
+    [ZADD] t:i:snatches
+
+
+
 Pub/Sub Channels
 ----------------
 

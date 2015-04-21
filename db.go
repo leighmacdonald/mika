@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/garyburd/redigo/redis"
 	"log"
+	"time"
 )
 
 var (
@@ -59,4 +60,38 @@ func getRedisConnection() redis.Conn {
 
 func returnRedisConnection(conn redis.Conn) {
 	connDone <- conn
+}
+
+
+// This function will periodically update the torrent sort indexes
+func dbStatIndexer() {
+	log.Println("Background indexer started")
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+
+	key_leechers := "t:i:leechers"
+	key_seeders := "t:i:seeders"
+	key_snatches := "t:i:snatches"
+
+	count := 0
+
+	for {
+		time.Sleep(time.Duration(config.IndexInterval) * time.Second)
+		mika.RLock()
+		for _, torrent := range mika.Torrents {
+			r.Send("ZADD", key_leechers, torrent.Leechers, torrent.TorrentID)
+			r.Send("ZADD", key_seeders, torrent.Seeders, torrent.TorrentID)
+			r.Send("ZADD", key_snatches, torrent.Snatches, torrent.TorrentID)
+			count++
+			if count >= 50 {
+				r.Flush()
+				count = 0
+			}
+		}
+		mika.RUnlock()
+		if count > 0 {
+			r.Flush()
+		}
+		count = 0
+	}
 }

@@ -16,6 +16,7 @@ type Config struct {
 	AnnInterval    int
 	AnnIntervalMin int
 	ReapInterval   int
+	IndexInterval  int
 	HNRThreshold   uint32
 	SentryDSN      string
 }

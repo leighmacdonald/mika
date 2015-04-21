@@ -94,13 +94,11 @@ func HandleAnnounce(c *echo.Context) {
 
 	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
 	if torrent == nil {
-		log.Println("Torrent not found:", ann.InfoHash)
+		log.Println(fmt.Sprintf("Torrent not found: %x", ann.InfoHash))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		counter <- EV_INVALID_INFOHASH
 		return
 	}
-
-	//Debug("Torrent: ", jsonString(torrent))
 
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
@@ -241,7 +239,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	ipv4, err := getIP(q.Params["ip"])
 	if err != nil {
-		// Look for forwarded ip in header then default to remote addr
+		// Look for forwarded ip in header then default to remote address
 		forwarded_ip := c.Request.Header.Get("X-Forwarded-For")
 		if forwarded_ip != "" {
 			ipv4_new, err := getIP(forwarded_ip)

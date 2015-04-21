@@ -38,13 +38,9 @@ To build, set your $GOPATH env var to $git_project_clone, install deps and go bu
     
     hacker@nsa:$ cd $git_project_clone
     hacker@nsa:$ export GOPATH=$git_project_clone
-    hacker@nsa:$ go get github.com/garyburd/redigo/redis
-    hacker@nsa:$ go get github.com/kisielk/raven-go/raven
-    hacker@nsa:$ go get github.com/labstack/echo
-    hacker@nsa:$ go get github.com/thoas/stats
-    hacker@nsa:$ go get github.com/chihaya/bencode
-    hacker@nsa:$ cd src/mika
-    hacker@nsa:$ go build -o ../../mika    
+    hacker@nsa:$ go get github.com/chihaya/bencode github.com/garyburd/redigo/redis github.com/kisielk/raven-go/raven github.com/labstack/echo
+    hacker@nsa:$ make
+    hacker@nsa:$ ./mika
 
 ### Run-time options:
 
@@ -58,3 +54,7 @@ to lower this if there is other contentious services running too.
 * `SIGUSR2` - Reload config
 
 
+### Auto start
+
+There are many ways to start the application as a service. Currently I am using
+supervisord and have included an example configuration under the `docs` folder.

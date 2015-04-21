@@ -25,6 +25,7 @@ import (
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
 	//	"github.com/thoas/stats"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -74,8 +75,8 @@ var (
                           /_______________/ |
     ________________      |  __________  |  |
    /               /|     | |          | |  |
-  /               / |     | |  Mika    | |  |
- /_______________/  |/\   | |  v1.0    | |  |
+  /               / |     | | > Mika   | |  |
+ /_______________/  |/\   | | %s  | |  |
 (_______________(   |  \  | |__________| | /
 (_______________(   |   \ |______________|/ ___/\
 (_______________(  /     |____>______<_____/     \
@@ -101,6 +102,8 @@ var (
 	}
 
 	mika *Tracker
+
+	version string
 
 	// Channels
 	sync_user    = make(chan *User, 100)
@@ -138,46 +141,6 @@ func UMin(a, b uint64) uint64 {
 		return a
 	} else {
 		return b
-	}
-}
-
-func RedisConnB() (redis.Conn, error) {
-	conn, err := redis.Dial("tcp", config.RedisHost)
-	if err != nil {
-		return nil, err
-	}
-	if config.RedisPass != "" {
-		if _, err := conn.Do("AUTH", config.RedisPass); err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-	return conn, nil
-}
-
-// Create a new redis pool
-func newPool(server, password string, max_idle int) *redis.Pool {
-	return &redis.Pool{
-		MaxActive:   0,
-		MaxIdle:     max_idle,
-		IdleTimeout: 10 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", server)
-			if err != nil {
-				return nil, err
-			}
-			if password != "" {
-				if _, err := c.Do("AUTH", password); err != nil {
-					c.Close()
-					return nil, err
-				}
-			}
-			return c, err
-		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			return err
-		},
 	}
 }
 
@@ -246,9 +209,6 @@ func HandleTorrentInfo(c *echo.Context) {
 	}
 	torrent := mika.GetTorrentByID(r, torrent_id)
 
-	//	for _, peer := range torrent.Peers {
-	//		log.Println(peer)
-	//	}
 	c.JSON(http.StatusOK, torrent)
 }
 
@@ -264,7 +224,6 @@ func CaptureMessage(message ...string) {
 	if err != nil {
 		log.Println(err)
 	}
-	//Debug("Event Registered:", id)
 }
 
 func syncWriter() {
@@ -299,7 +258,7 @@ func syncWriter() {
 
 // Do it
 func main() {
-	log.Println(cheese)
+	log.Println(fmt.Sprintf(cheese, version))
 
 	log.Println("Process ID:", os.Getpid())
 
@@ -347,9 +306,9 @@ func main() {
 			return err
 		},
 	}
+
+	// Initialize the redis pool manager
 	go PoolPoolManager(pool)
-	// Initialize the redis pool
-	//pool = newPool(config.RedisHost, config.RedisPass, config.RedisMaxIdle)
 
 	// Initialize the router + middlewares
 	e := echo.New()
@@ -373,7 +332,7 @@ func main() {
 	e.Get("/torrent/:torrent_id", HandleTorrentInfo)
 
 	// Start watching for expiring peers
-	//go peerStalker()
+	go peerStalker()
 
 	// Start writer channel
 	go syncWriter()
@@ -383,6 +342,7 @@ func main() {
 }
 
 func init() {
+	log.Println(version)
 	// Parse CLI args
 	flag.Parse()
 

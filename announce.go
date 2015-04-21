@@ -54,7 +54,13 @@ func getIP(ip_str string) (net.IP, error) {
 // Route handler for the /announce endpoint
 // Here be dragons
 func HandleAnnounce(c *echo.Context) {
-	r := pool.Get()
+	r, redis_err := RedisConn()
+	if redis_err != nil {
+		CaptureMessage(redis_err.Error())
+		log.Println("Announce redis conn:", redis_err.Error())
+		oops(c, MSG_GENERIC_ERROR)
+		return
+	}
 	defer r.Close()
 
 	ann, err := NewAnnounce(c)
@@ -96,7 +102,7 @@ func HandleAnnounce(c *echo.Context) {
 	}
 	peer.SetUserID(user.UserID) //where to put this/handle this cleaner?
 
-	// user update MUST happen before peer sync since we rely on the old dl/ul values
+	// user update MUST happen after peer update since we rely on the old dl/ul values
 	ul, dl := peer.Update(ann)
 	user.Update(ann, ul, dl)
 	torrent.Update(ann)

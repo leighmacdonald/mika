@@ -19,7 +19,13 @@ type ScrapeResponse struct {
 // Route handler for the /scrape requests
 // /scrape?info_hash=f%5bs%de06%19%d3ET%cc%81%bd%e5%0dZ%84%7f%f3%da
 func HandleScrape(c *echo.Context) {
-	r := pool.Get()
+	r, err := RedisConn()
+	if err != nil {
+		CaptureMessage(err.Error())
+		log.Println("Scrape cannot connect to redis", err.Error())
+		oops(c, MSG_GENERIC_ERROR)
+		return
+	}
 	defer r.Close()
 	Debug("Got scrape")
 	Debug(c.Request.RequestURI)

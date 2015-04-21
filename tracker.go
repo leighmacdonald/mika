@@ -53,6 +53,8 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64) *Torrent {
 		}
 
 		// Reset counts since we cant guarantee the accuracy after restart
+		// TODO allow reloading of peer/seed counts if a maximum time has not elapsed
+		// since the last startup.
 		torrent.Seeders = 0
 		torrent.Leechers = 0
 

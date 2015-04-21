@@ -82,7 +82,7 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string) *Torrent 
 		return nil
 	}
 	if torrent_id_reply == nil {
-		log.Println("Invalid info hash")
+		log.Println(fmt.Sprintf("Invalid info hash: %x", info_hash))
 		return nil
 	}
 	torrent_id, tid_err := redis.Uint64(torrent_id_reply, nil)

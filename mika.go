@@ -24,7 +24,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
-	"github.com/thoas/stats"
+//	"github.com/thoas/stats"
 	"log"
 	"net/http"
 	"os"
@@ -330,13 +330,13 @@ func main() {
 	e.MaxParam(1)
 
 	// Third-party middleware
-	s := stats.New()
-	e.Use(s.Handler)
+	//	s := stats.New()
+	//	e.Use(s.Handler)
 
 	// Stats route
-	e.Get("/stats", func(c *echo.Context) {
-		c.JSON(200, s.Data())
-	})
+	//	e.Get("/stats", func(c *echo.Context) {
+	//		c.JSON(200, s.Data())
+	//	})
 
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)

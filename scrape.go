@@ -39,9 +39,6 @@ func HandleScrape(c *echo.Context) {
 	}
 
 	// Todo limit scrape to N torrents
-
-	log.Println("Infohashes in scrape:", q.InfoHashes)
-
 	resp := make(bencode.Dict, len(q.InfoHashes))
 
 	for _, info_hash := range q.InfoHashes {
@@ -66,6 +63,6 @@ func HandleScrape(c *echo.Context) {
 		oops(c, MSG_GENERIC_ERROR)
 	}
 	encoded := out_bytes.String()
-	log.Println(encoded)
+	Debug(encoded)
 	c.String(http.StatusOK, encoded)
 }

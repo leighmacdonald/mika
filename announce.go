@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	STOPPED   = iota
-	STARTED   = iota
+	STOPPED = iota
+	STARTED = iota
 	COMPLETED = iota
-	ANNOUNCE  = iota
+	ANNOUNCE = iota
 )
 
 type AnnounceRequest struct {
@@ -88,7 +88,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
 	if torrent == nil {
-		oops(c, MSG_GENERIC_ERROR)
+		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		return
 	}
 
@@ -208,11 +208,11 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	event := ANNOUNCE
 	event_name, _ := q.Params["event"]
 	switch event_name {
-	case "started":
+		case "started":
 		event = STARTED
-	case "stopped":
+		case "stopped":
 		event = STOPPED
-	case "complete":
+		case "complete":
 		event = COMPLETED
 	}
 

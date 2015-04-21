@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	STOPPED = iota
-	STARTED = iota
+	STOPPED   = iota
+	STARTED   = iota
 	COMPLETED = iota
-	ANNOUNCE = iota
+	ANNOUNCE  = iota
 )
 
 type AnnounceRequest struct {
@@ -54,11 +54,13 @@ func getIP(ip_str string) (net.IP, error) {
 // Route handler for the /announce endpoint
 // Here be dragons
 func HandleAnnounce(c *echo.Context) {
+	counter <- EV_ANNOUNCE
 	r, redis_err := RedisConn()
 	if redis_err != nil {
 		CaptureMessage(redis_err.Error())
 		log.Println("Announce redis conn:", redis_err.Error())
 		oops(c, MSG_GENERIC_ERROR)
+		counter <- EV_ANNOUNCE_FAIL
 		return
 	}
 	defer r.Close()
@@ -68,6 +70,7 @@ func HandleAnnounce(c *echo.Context) {
 		CaptureMessage(err.Error())
 		log.Println(err)
 		oops(c, MSG_GENERIC_ERROR)
+		counter <- EV_ANNOUNCE_FAIL
 		return
 	}
 
@@ -77,18 +80,21 @@ func HandleAnnounce(c *echo.Context) {
 	if user == nil {
 		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
+		counter <- EV_INVALID_PASSKEY
 		return
 	}
 
 	if !IsValidClient(r, ann.PeerID) {
 		CaptureMessage(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
 		oops(c, MSG_INVALID_PEER_ID)
+		counter <- EV_INVALID_CLIENT
 		return
 	}
 
 	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
 	if torrent == nil {
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
+		counter <- EV_INVALID_INFOHASH
 		return
 	}
 
@@ -98,6 +104,7 @@ func HandleAnnounce(c *echo.Context) {
 	if err != nil {
 		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
+		counter <- EV_ANNOUNCE_FAIL
 		return
 	}
 	peer.SetUserID(user.UserID) //where to put this/handle this cleaner?
@@ -189,6 +196,7 @@ func HandleAnnounce(c *echo.Context) {
 	er_msg_encoded := encoder.Encode(dict)
 	if er_msg_encoded != nil {
 		oops(c, MSG_GENERIC_ERROR)
+		counter <- EV_ANNOUNCE_FAIL
 		return
 	}
 
@@ -208,11 +216,11 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	event := ANNOUNCE
 	event_name, _ := q.Params["event"]
 	switch event_name {
-		case "started":
+	case "started":
 		event = STARTED
-		case "stopped":
+	case "stopped":
 		event = STOPPED
-		case "complete":
+	case "complete":
 		event = COMPLETED
 	}
 

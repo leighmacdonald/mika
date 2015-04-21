@@ -34,6 +34,7 @@ func HandleScrape(c *echo.Context) {
 
 	user := GetUser(r, passkey)
 	if user == nil {
+		log.Println("Invalid passkey supplied:", passkey)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_INVALID_PASSKEY
 		return
@@ -42,7 +43,7 @@ func HandleScrape(c *echo.Context) {
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		CaptureMessage(err.Error())
-		log.Println(err)
+		log.Println("Failed to parse scrape qs:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_SCRAPE_FAIL
 		return

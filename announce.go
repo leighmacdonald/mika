@@ -68,7 +68,7 @@ func HandleAnnounce(c *echo.Context) {
 	ann, err := NewAnnounce(c)
 	if err != nil {
 		CaptureMessage(err.Error())
-		log.Println(err)
+		log.Println("Failed to parse announce:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
 		return
@@ -78,12 +78,14 @@ func HandleAnnounce(c *echo.Context) {
 
 	user := GetUser(r, passkey)
 	if user == nil {
+		log.Println("Invalid passkey:", passkey)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_INVALID_PASSKEY
 		return
 	}
 
 	if !IsValidClient(r, ann.PeerID) {
+		log.Println(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
 		CaptureMessage(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
 		oops(c, MSG_INVALID_PEER_ID)
 		counter <- EV_INVALID_CLIENT
@@ -92,6 +94,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
 	if torrent == nil {
+		log.Println("Torrent not found:", ann.InfoHash)
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		counter <- EV_INVALID_INFOHASH
 		return
@@ -101,6 +104,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
+		log.Println("Failed to fetch/create peer:", err.Error())
 		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
@@ -227,12 +231,12 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	info_hash, exists := q.Params["info_hash"]
 	if !exists {
-		return nil, errors.New("Invalid info hash")
+		return nil, errors.New("Info hash not supplied")
 	}
 
 	peerID, exists := q.Params["peer_id"]
 	if !exists {
-		return nil, errors.New("Invalid peer_id")
+		return nil, errors.New("Peer id not supplied")
 	}
 
 	ipv4, err := getIP(q.Params["ip"])
@@ -272,14 +276,14 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	downloaded, err := q.Uint64("downloaded")
 	if err != nil {
-		return nil, errors.New("Invalid downloaded value")
+		downloaded = 0
 	} else {
 		downloaded = UMax(0, downloaded)
 	}
 
 	uploaded, err := q.Uint64("uploaded")
 	if err != nil {
-		return nil, errors.New("Invalid uploaded value")
+		uploaded = 0
 	} else {
 		uploaded = UMax(0, uploaded)
 	}

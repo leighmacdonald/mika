@@ -236,7 +236,6 @@ func HandleTorrentInfo(c *echo.Context) {
 		log.Println("TorrentInfo redis conn:", r.Err().Error())
 		return
 	}
-	defer r.Close()
 
 	torrent_id_str := c.Param("torrent_id")
 	torrent_id, err := strconv.ParseUint(torrent_id_str, 10, 64)
@@ -276,7 +275,6 @@ func syncWriter() {
 		log.Println("SyncWriter redis conn:", r.Err().Error())
 		return
 	}
-	defer r.Close()
 	for {
 		select {
 		case user := <-sync_user:
@@ -294,7 +292,7 @@ func syncWriter() {
 		}
 		err := r.Flush()
 		if err != nil {
-			log.Println(err)
+			log.Println("Failed to flush connection:", err)
 		}
 	}
 }

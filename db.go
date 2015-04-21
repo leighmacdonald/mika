@@ -51,11 +51,8 @@ func PoolPoolManager(pool *redis.Pool) {
 
 func getRedisConnection() redis.Conn {
 	var conn redis.Conn
-	// request a connection. This signals that you're waiting for one.
+	// request a connection.
 	connRequest <- true
-	// block and wait for the connection.
-	// It'd be possible to do it with timeouts (https://gobyexample.com/timeouts),
-	// but I didn't think it was that necessary for me.
 	conn = <-connResponse
 	return conn
 }

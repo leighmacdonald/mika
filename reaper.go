@@ -84,7 +84,6 @@ func peerStalker() {
 		log.Println("Reaper cannot connect to redis", r.Err().Error())
 		return
 	}
-	defer r.Close()
 
 	psc := redis.PubSubConn{Conn: r}
 	psc.Subscribe("__keyevent@0__:expired")

@@ -55,10 +55,10 @@ func getIP(ip_str string) (net.IP, error) {
 // Here be dragons
 func HandleAnnounce(c *echo.Context) {
 	counter <- EV_ANNOUNCE
-	r, redis_err := RedisConn()
-	if redis_err != nil {
-		CaptureMessage(redis_err.Error())
-		log.Println("Announce redis conn:", redis_err.Error())
+	r := pool.Get()
+	if r.Err() != nil {
+		CaptureMessage(r.Err().Error())
+		log.Println("Announce redis conn:", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
 		return

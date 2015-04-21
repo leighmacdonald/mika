@@ -118,7 +118,7 @@ var (
 	config     *Config
 	configLock = new(sync.RWMutex)
 
-	//	pool *redis.Pool
+	pool *redis.Pool
 
 	profile     = flag.String("profile", "", "write cpu profile to file")
 	config_file = flag.String("config", "./config.json", "Config file path")
@@ -143,7 +143,7 @@ func UMin(a, b uint64) uint64 {
 	}
 }
 
-func RedisConn() (redis.Conn, error) {
+func RedisConnB() (redis.Conn, error) {
 	conn, err := redis.Dial("tcp", config.RedisHost)
 	if err != nil {
 		return nil, err
@@ -175,11 +175,6 @@ func newPool(server, password string, max_idle int) *redis.Pool {
 			}
 			return c, err
 		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			return err
-		},
-		Wait: true,
 	}
 }
 
@@ -231,10 +226,10 @@ func Debug(msg ...interface{}) {
 }
 
 func HandleTorrentInfo(c *echo.Context) {
-	r, redis_err := RedisConn()
-	if redis_err != nil {
-		CaptureMessage(redis_err.Error())
-		log.Println("TorrentInfo redis conn:", redis_err.Error())
+	r := pool.Get()
+	if r.Err() != nil {
+		CaptureMessage(r.Err().Error())
+		log.Println("TorrentInfo redis conn:", r.Err().Error())
 		return
 	}
 	defer r.Close()
@@ -270,10 +265,10 @@ func CaptureMessage(message ...string) {
 }
 
 func syncWriter() {
-	r, redis_err := RedisConn()
-	if redis_err != nil {
-		CaptureMessage(redis_err.Error())
-		log.Println("SyncWriter redis conn:", redis_err.Error())
+	r := pool.Get()
+	if r.Err() != nil {
+		CaptureMessage(r.Err().Error())
+		log.Println("SyncWriter redis conn:", r.Err().Error())
 		return
 	}
 	defer r.Close()
@@ -325,7 +320,7 @@ func main() {
 	CaptureMessage("Started tracker")
 
 	// Initialize the redis pool
-	//	pool = newPool(config.RedisHost, config.RedisPass, config.RedisMaxIdle)
+	pool = newPool(config.RedisHost, config.RedisPass, config.RedisMaxIdle)
 
 	// Initialize the router + middlewares
 	e := echo.New()

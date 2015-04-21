@@ -20,10 +20,10 @@ type ScrapeResponse struct {
 // /scrape?info_hash=f%5bs%de06%19%d3ET%cc%81%bd%e5%0dZ%84%7f%f3%da
 func HandleScrape(c *echo.Context) {
 	counter <- EV_SCRAPE
-	r, err := RedisConn()
-	if err != nil {
-		CaptureMessage(err.Error())
-		log.Println("Scrape cannot connect to redis", err.Error())
+	r := pool.Get()
+	if r.Err() != nil {
+		CaptureMessage(r.Err().Error())
+		log.Println("Scrape cannot connect to redis", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_SCRAPE_FAIL
 		return
@@ -34,7 +34,6 @@ func HandleScrape(c *echo.Context) {
 
 	user := GetUser(r, passkey)
 	if user == nil {
-		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_INVALID_PASSKEY
 		return

@@ -30,6 +30,16 @@ func HandleScrape(c *echo.Context) {
 	}
 	defer r.Close()
 
+	passkey := c.Param("passkey")
+
+	user := GetUser(r, passkey)
+	if user == nil {
+		CaptureMessage(err.Error())
+		oops(c, MSG_GENERIC_ERROR)
+		counter <- EV_INVALID_PASSKEY
+		return
+	}
+
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		CaptureMessage(err.Error())

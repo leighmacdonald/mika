@@ -160,6 +160,7 @@ func RedisConnB() (redis.Conn, error) {
 // Create a new redis pool
 func newPool(server, password string, max_idle int) *redis.Pool {
 	return &redis.Pool{
+		MaxActive:   0,
 		MaxIdle:     max_idle,
 		IdleTimeout: 10 * time.Second,
 		Dial: func() (redis.Conn, error) {
@@ -174,6 +175,10 @@ func newPool(server, password string, max_idle int) *redis.Pool {
 				}
 			}
 			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
 		},
 	}
 }

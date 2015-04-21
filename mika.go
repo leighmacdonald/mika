@@ -276,15 +276,15 @@ func syncWriter() {
 	for {
 		select {
 		case user := <-sync_user:
-			log.Println("sync user")
+			Debug("sync user")
 			user.Sync(r)
 			user.InQueue = false
 		case torrent := <-sync_torrent:
-			log.Println("sync torrent")
+			Debug("sync torrent")
 			torrent.Sync(r)
 			torrent.InQueue = false
 		case peer := <-sync_peer:
-			log.Println("sync peer")
+			Debug("sync peer")
 			peer.Sync(r)
 			peer.InQueue = false
 		}

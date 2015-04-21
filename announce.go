@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	STOPPED   = iota
-	STARTED   = iota
+	STOPPED = iota
+	STARTED = iota
 	COMPLETED = iota
-	ANNOUNCE  = iota
+	ANNOUNCE = iota
 )
 
 type AnnounceRequest struct {
@@ -78,7 +78,6 @@ func HandleAnnounce(c *echo.Context) {
 
 	user := GetUser(r, passkey)
 	if user == nil {
-		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_INVALID_PASSKEY
 		return
@@ -216,11 +215,11 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	event := ANNOUNCE
 	event_name, _ := q.Params["event"]
 	switch event_name {
-	case "started":
+		case "started":
 		event = STARTED
-	case "stopped":
+		case "stopped":
 		event = STOPPED
-	case "complete":
+		case "complete":
 		event = COMPLETED
 	}
 

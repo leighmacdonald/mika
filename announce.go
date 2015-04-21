@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	STOPPED   = iota
-	STARTED   = iota
+	STOPPED = iota
+	STARTED = iota
 	COMPLETED = iota
-	ANNOUNCE  = iota
+	ANNOUNCE = iota
 )
 
 type AnnounceRequest struct {
@@ -56,6 +56,7 @@ func getIP(ip_str string) (net.IP, error) {
 func HandleAnnounce(c *echo.Context) {
 	counter <- EV_ANNOUNCE
 	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
 		log.Println("Announce redis conn:", r.Err().Error())
@@ -63,7 +64,7 @@ func HandleAnnounce(c *echo.Context) {
 		counter <- EV_ANNOUNCE_FAIL
 		return
 	}
-	defer r.Close()
+
 
 	ann, err := NewAnnounce(c)
 	if err != nil {
@@ -215,11 +216,11 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	event := ANNOUNCE
 	event_name, _ := q.Params["event"]
 	switch event_name {
-	case "started":
+		case "started":
 		event = STARTED
-	case "stopped":
+		case "stopped":
 		event = STOPPED
-	case "complete":
+		case "complete":
 		event = COMPLETED
 	}
 

@@ -21,6 +21,7 @@ type ScrapeResponse struct {
 func HandleScrape(c *echo.Context) {
 	counter <- EV_SCRAPE
 	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
 		log.Println("Scrape cannot connect to redis", r.Err().Error())
@@ -28,7 +29,6 @@ func HandleScrape(c *echo.Context) {
 		counter <- EV_SCRAPE_FAIL
 		return
 	}
-	defer r.Close()
 
 	passkey := c.Param("passkey")
 

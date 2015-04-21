@@ -244,9 +244,9 @@ func HandleTorrentInfo(c *echo.Context) {
 	}
 	torrent := mika.GetTorrentByID(r, torrent_id)
 
-	for _, peer := range torrent.Peers {
-		log.Println(peer)
-	}
+	//	for _, peer := range torrent.Peers {
+	//		log.Println(peer)
+	//	}
 	c.JSON(http.StatusOK, torrent)
 }
 

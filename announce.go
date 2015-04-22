@@ -131,7 +131,9 @@ func HandleAnnounce(c *echo.Context) {
 
 		// Mark the peer as inactive
 		r.Send("HSET", peer.KeyPeer, "active", 0)
-
+		if peer.IsHNR() {
+			peer.AddHNR(r, torrent.TorrentID)
+		}
 	} else if ann.Event == COMPLETED {
 
 		// Remove the torrent from the users incomplete set

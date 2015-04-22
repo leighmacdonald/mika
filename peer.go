@@ -113,11 +113,19 @@ func (peer *Peer) Sync(r redis.Conn) {
 		"peer_id", peer.PeerID, // Shouldn't need to be here
 		"torrent_id", peer.TorrentID, // Shouldn't need to be here
 	)
+}
 
+func (peer *Peer) IsHNR() bool {
+	return peer.Left > 0 && peer.AnnounceFirst-unixtime() > config.HNRThreshold
 }
 
 func (peer *Peer) IsSeeder() bool {
 	return peer.Left == 0
+}
+
+func (peer *Peer) AddHNR(r redis.Conn, torrent_id uint64) {
+	r.Send("SADD", fmt.Sprintf("t:u:%d:hnr", peer.UserID), torrent_id)
+	Debug("Added HnR:", torrent_id, peer.UserID)
 }
 
 // Generate a compact peer field array containing the byte representations

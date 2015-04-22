@@ -17,7 +17,7 @@ type Config struct {
 	AnnIntervalMin int
 	ReapInterval   int
 	IndexInterval  int
-	HNRThreshold   uint32
+	HNRThreshold   int32
 	SentryDSN      string
 	InfluxDSN      string
 	InfluxDB       string

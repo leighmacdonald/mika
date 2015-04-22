@@ -52,9 +52,8 @@ func ReapPeer(torrent_id, peer_id string) {
 		}
 		queued += 1
 	}
-	if peer.TotalTime < config.HNRThreshold {
-		r.Send("SADD", fmt.Sprintf("t:u:%d:hnr", peer.UserID), torrent_id)
-		Debug("Added HnR:", torrent_id, peer.UserID)
+	if peer.IsHNR() {
+		peer.AddHNR(r, torrent.TorrentID)
 	}
 
 	r.Flush()

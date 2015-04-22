@@ -11,6 +11,8 @@
   "IndexInterval": 60,
   "InfluxDSN": "http://172.16.110:8086",
   "InfluxDB": "mika-dev",
+  "InfluxUser": "",
+  "InfluxPass": "",
   "SQLHost": "localhost",
   "SQLPort": 3306,
   "SQLDB": "dbname",

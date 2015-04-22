@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/influxdb/influxdb/client"
+	//"github.com/influxdb/influxdb/client"
 	"log"
 	"time"
+	//"net/url"
 )
 
 const (
@@ -28,10 +29,33 @@ type StatsCounter struct {
 	InvalidInfohash uint64
 	InvalidClient   uint64
 
-	influxDB *client.Client
+	//influxDB *client.Client
 }
 
 func NewStatCounter(c chan int) *StatsCounter {
+	//	u, err := url.Parse(config.InfluxDSN)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	conf := client.Config{
+	//		URL:      *u,
+	//		Username: config.InfluxUser,
+	//		Password: config.InfluxPass,
+	//	}
+	//
+	//	con, err := client.NewClient(conf)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	dur, ver, err := con.Ping()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	log.Printf("InfluxDB Happy as a Hippo! %v, %s", dur, ver)
+
 	counter := &StatsCounter{
 		channel:         c,
 		Requests:        0,
@@ -43,6 +67,7 @@ func NewStatCounter(c chan int) *StatsCounter {
 		InvalidPasskey:  0,
 		InvalidInfohash: 0,
 		InvalidClient:   0,
+		//influxDB:        con,
 	}
 	return counter
 }

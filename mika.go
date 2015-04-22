@@ -337,6 +337,8 @@ func init() {
 	// Parse CLI args
 	flag.Parse()
 
+	loadConfig(true)
+
 	// Start stat counter
 	stats = NewStatCounter(counter)
 	go stats.counter()
@@ -348,7 +350,6 @@ func init() {
 		Users:    make(map[uint64]*User),
 	}
 
-	loadConfig(true)
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGUSR2, syscall.SIGINT)
 	go func() {

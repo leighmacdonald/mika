@@ -21,6 +21,8 @@ type Config struct {
 	SentryDSN      string
 	InfluxDSN      string
 	InfluxDB       string
+	InfluxUser     string
+	InfluxPass     string
 }
 
 func loadConfig(fail bool) {

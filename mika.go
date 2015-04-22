@@ -19,11 +19,11 @@ import (
 	"bytes"
 	"errors"
 	"flag"
+	"fmt"
 	"github.com/chihaya/bencode"
 	"github.com/garyburd/redigo/redis"
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -183,6 +183,10 @@ func Debug(msg ...interface{}) {
 	}
 }
 
+func HandleVersion(c *echo.Context) {
+	c.String(http.StatusOK, fmt.Sprintf("mika/%s", version))
+}
+
 func HandleTorrentInfo(c *echo.Context) {
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
@@ -313,7 +317,7 @@ func main() {
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)
 	e.Get("/:passkey/scrape", HandleScrape)
-
+	e.Get("/version", HandleVersion)
 	e.Get("/torrent/:torrent_id", HandleTorrentInfo)
 
 	// Start watching for expiring peers
@@ -365,7 +369,6 @@ func init() {
 				log.Println("> Reloaded config")
 				CaptureMessage("Reloaded configuration")
 			}
-
 		}
 	}()
 }

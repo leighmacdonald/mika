@@ -74,22 +74,28 @@ func dbStatIndexer() {
 
 	count := 0
 
+	leecher_args := []uint64{}
+	seeder_args := []uint64{}
+	snatch_args := []uint64{}
+
 	for {
 		time.Sleep(time.Duration(config.IndexInterval) * time.Second)
 		mika.RLock()
 		for _, torrent := range mika.Torrents {
-			r.Send("ZADD", key_leechers, torrent.Leechers, torrent.TorrentID)
-			r.Send("ZADD", key_seeders, torrent.Seeders, torrent.TorrentID)
-			r.Send("ZADD", key_snatches, torrent.Snatches, torrent.TorrentID)
+			leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
+			seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
+			snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
 			count++
-			if count >= 50 {
-				r.Flush()
-				count = 0
-			}
 		}
 		mika.RUnlock()
 		if count > 0 {
+			r.Send("ZADD", key_leechers, leecher_args)
+			r.Send("ZADD", key_seeders, seeder_args)
+			r.Send("ZADD", key_snatches, snatch_args)
 			r.Flush()
+			leecher_args = leecher_args[:0]
+			seeder_args = seeder_args[:0]
+			snatch_args = snatch_args[:0]
 		}
 		count = 0
 	}

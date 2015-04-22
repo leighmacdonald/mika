@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/influxdb/influxdb/client"
 	"log"
 	"time"
 )
@@ -26,6 +27,8 @@ type StatsCounter struct {
 	InvalidPasskey  uint64
 	InvalidInfohash uint64
 	InvalidClient   uint64
+
+	influxDB *client.Client
 }
 
 func NewStatCounter(c chan int) *StatsCounter {

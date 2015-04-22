@@ -38,7 +38,7 @@ To build, set your $GOPATH env var to $git_project_clone, install deps and go bu
     
     hacker@nsa:$ cd $git_project_clone
     hacker@nsa:$ export GOPATH=$git_project_clone
-    hacker@nsa:$ go get github.com/chihaya/bencode github.com/garyburd/redigo/redis github.com/kisielk/raven-go/raven github.com/labstack/echo
+    hacker@nsa:$ go get github.com/chihaya/bencode github.com/garyburd/redigo/redis github.com/kisielk/raven-go/raven github.com/labstack/echo github.com/influxdb/influxdb/client
     hacker@nsa:$ make
     hacker@nsa:$ ./mika
 

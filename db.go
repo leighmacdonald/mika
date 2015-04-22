@@ -62,7 +62,6 @@ func returnRedisConnection(conn redis.Conn) {
 	connDone <- conn
 }
 
-
 // This function will periodically update the torrent sort indexes
 func dbStatIndexer() {
 	log.Println("Background indexer started")

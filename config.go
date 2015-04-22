@@ -19,6 +19,8 @@ type Config struct {
 	IndexInterval  int
 	HNRThreshold   uint32
 	SentryDSN      string
+	InfluxDSN      string
+	InfluxDB       string
 }
 
 func loadConfig(fail bool) {

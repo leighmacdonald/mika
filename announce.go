@@ -94,7 +94,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
 	if torrent == nil {
-		log.Println(fmt.Sprintf("Torrent not found: %x", ann.InfoHash))
+		Debug(fmt.Sprintf("Torrent not found: %x", ann.InfoHash))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		counter <- EV_INVALID_INFOHASH
 		return

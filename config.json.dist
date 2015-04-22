@@ -9,6 +9,8 @@
   "ReapInterval": 400,
   "HNRThreshold": 1209600,
   "IndexInterval": 60,
+  "InfluxDSN": "http://172.16.110:8086",
+  "InfluxDB": "mika-dev",
   "SQLHost": "localhost",
   "SQLPort": 3306,
   "SQLDB": "dbname",

@@ -37,7 +37,6 @@ func findUserID(r redis.Conn, passkey string) uint64 {
 	return user_id
 }
 
-
 // fetch a user from the backend database if
 func GetUser(r redis.Conn, passkey string) *User {
 

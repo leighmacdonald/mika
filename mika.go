@@ -10,8 +10,11 @@
 //
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
-// echo never > /sys/kernel/mm/transparent_hugepage/enabled
 // echo 10000 > /proc/sys/net/core/somaxconn
+//
+// redis.conf
+// maxmemory-policy noeviction
+// notify-keyspace-events "KEx"
 
 package main
 

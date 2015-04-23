@@ -1,15 +1,31 @@
 """
 Simple client to interact with the backend tracker instance.
 """
+from __future__ import print_function
+import requests
 
 
 class TrackerClient(object):
+    def __init__(self, host, port):
+        self._host = host
+        self._port = port
 
-    def __init__(self):
-        pass
+    def _request(self, path, method='get', payload=None):
+        if method == "get":
+            resp = requests.get(self._make_url(path))
+        elif method == "port":
+            resp = requests.post(self._make_url(path), json=payload)
+        else:
+            raise Exception("no")
+        if resp.ok:
+            return resp.json()
+        return False
+
+    def _make_url(self, path):
+        return "http://{}:{}/api{}".format(self._host, self._port, path)
 
     def torrent_get(self, torrent_id):
-        pass
+        return self._request("/torrent/{}".format(torrent_id))
 
     def torrent_get_all(self, torrent_ids):
         pass
@@ -61,4 +77,3 @@ class TrackerClient(object):
 
     def _key(self, *args):
         pass
-

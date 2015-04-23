@@ -274,6 +274,7 @@ func main() {
 	api_grp.Get("/torrent/:torrent_id", HandleTorrentGet)
 	api_grp.Post("/torrent", HandleTorrentAdd)
 	api_grp.Get("/test", HandleGetTorrentPeer)
+	api_grp.Get("/user/:user_id", HandleUserGet)
 
 	// Start watching for expiring peers
 	go peerStalker()

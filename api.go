@@ -16,9 +16,15 @@ type ResponseErr struct {
 	Msg    string `json:"msg"`
 	Status int    `json:"status"`
 }
+
+type UserPayload struct {
+	UserID uint64 `json:"user_id"`
+}
+
 type TorrentPayload struct {
 	TorrentID uint64 `json:"torrent_id"`
 }
+
 type TorrentAddPayload struct {
 	TorrentPayload
 	InfoHash string `json:"info_hash"`
@@ -89,6 +95,7 @@ func HandleTorrentDel(c *echo.Context) error {
 	if torrent == nil {
 		return errors.New("Invalid torrent id")
 	}
+
 	return c.JSON(http.StatusOK, ResponseErr{"moo", 200})
 }
 
@@ -96,8 +103,21 @@ func HandleUserGetActive(c *echo.Context) {
 
 }
 
-func HandleUserGet(c *echo.Context) {
+func HandleUserGet(c *echo.Context) error {
+	user_id_str := c.Param("user_id")
+	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
+	if err != nil {
+		Debug(err)
+		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
+	}
 
+	mika.RLock()
+	defer mika.RUnlock()
+	user, exists := mika.Users[user_id]
+	if !exists {
+		return c.JSON(http.StatusNotFound, ResponseErr{"Not Found", 404})
+	}
+	return c.JSON(http.StatusOK, user)
 }
 
 func HandleUserUpdatePasskey(c *echo.Context) {

@@ -56,7 +56,8 @@ class TrackerClient(object):
         pass
 
     def user_get(self, user_id):
-        pass
+        resp = self._request("/user/{}".format(user_id))
+        return resp.json() if resp.ok else None
 
     def user_update_passkey(self, passkey_old, passkey_new, user_id):
         pass

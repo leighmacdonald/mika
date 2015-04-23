@@ -11,14 +11,17 @@ type Torrent struct {
 	Queued
 	sync.RWMutex
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
+	InfoHash        string  `redis:"info_hash" json:"info_hash"`
 	Seeders         int16   `redis:"seeders" json:"seeders"`
 	Leechers        int16   `redis:"leechers" json:"leechers"`
 	Snatches        int16   `redis:"snatches" json:"snatches"`
 	Announces       uint64  `redis:"announces" json:"announces" `
 	Uploaded        uint64  `redis:"uploaded" json:"uploaded"`
 	Downloaded      uint64  `redis:"downloaded" json:"downloaded"`
-	TorrentKey      string  `redis:"-" json:"-"`
-	TorrentPeersKey string  `redis:"-" json:"-"`
+	TorrentKey      string  `redis:"-" json:"key_torrent"`
+	TorrentPeersKey string  `redis:"-" json:"key_peers"`
+	Enabled         bool    `redis:"enabled" json:"enabled"`
+	Reason          string  `redis:"reason" json:"reason"`
 	Peers           []*Peer `redis:"-" json:"peers"`
 }
 
@@ -40,6 +43,9 @@ func (torrent *Torrent) Sync(r redis.Conn) {
 		"announces", torrent.Announces,
 		"uploaded", torrent.Uploaded,
 		"downloaded", torrent.Downloaded,
+		"info_hash", torrent.InfoHash,
+		"reason", torrent.Reason,
+		"enabled", torrent.Enabled,
 	)
 }
 
@@ -52,6 +58,19 @@ func (torrent *Torrent) findPeer(peer_id string) *Peer {
 		}
 	}
 	return nil
+}
+
+func (torrent *Torrent) Delete(reason string) {
+	torrent.Enabled = false
+	torrent.Reason = reason
+}
+
+func (torrent *Torrent) DelReason() string {
+	if torrent.Reason == "" {
+		return "TOrrent deleted"
+	} else {
+		return torrent.Reason
+	}
 }
 
 // Fetch an existing peers data if it exists, other wise generate a

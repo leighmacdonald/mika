@@ -98,8 +98,14 @@ func HandleAnnounce(c *echo.Context) {
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		counter <- EV_INVALID_INFOHASH
 		return
+	} else if !torrent.Enabled {
+		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
+		counter <- EV_INVALID_INFOHASH
+		return
 	}
-
+	if torrent.InfoHash == "" {
+		torrent.InfoHash = ann.InfoHash
+	}
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
 		log.Println("Failed to fetch/create peer:", err.Error())

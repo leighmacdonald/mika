@@ -82,9 +82,9 @@ func dbStatIndexer() {
 		time.Sleep(time.Duration(config.IndexInterval) * time.Second)
 		mika.RLock()
 		for _, torrent := range mika.Torrents {
-			leecher_args = append(leecher_args, uint64(torrent.Leechers), uint64(torrent.TorrentID))
-			seeder_args = append(seeder_args, uint64(torrent.Seeders), uint64(torrent.TorrentID))
-			snatch_args = append(snatch_args, uint64(torrent.Snatches), uint64(torrent.TorrentID))
+			leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
+			seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
+			snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
 			count++
 		}
 		mika.RUnlock()

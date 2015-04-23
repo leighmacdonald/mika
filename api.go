@@ -16,10 +16,17 @@ type ResponseErr struct {
 	Msg    string `json:"msg"`
 	Status int    `json:"status"`
 }
-
-type TorrentAddPayload struct {
+type TorrentPayload struct {
 	TorrentID uint64 `json:"torrent_id"`
-	InfoHash  string `json:"info_hash"`
+}
+type TorrentAddPayload struct {
+	TorrentPayload
+	InfoHash string `json:"info_hash"`
+}
+
+type TorrentDelPayload struct {
+	TorrentPayload
+	Reason string
 }
 
 func HandleVersion(c *echo.Context) {
@@ -68,8 +75,18 @@ func HandleTorrentAdd(c *echo.Context) error {
 	return c.JSON(http.StatusCreated, Response{})
 }
 
-func HandleTorrentDel(c *echo.Context) {
-
+func HandleTorrentDel(c *echo.Context) error {
+	payload := &TorrentDelPayload{}
+	if err := c.Bind(payload); err != nil {
+		return err
+	}
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+	torrent := mika.GetTorrentByID(r, payload.TorrentID)
+	if torrent == nil {
+		return errors.New("Invalid torrent id")
+	}
+	return c.JSON(http.StatusOK, ResponseErr{"moo", 200})
 }
 
 func HandleUserGetActive(c *echo.Context) {

@@ -146,6 +146,12 @@ func oops(c *echo.Context, msg_code int) {
 	c.String(msg_code, responseError(resp_msg[msg_code]))
 }
 
+// Output a bencoded error code to the torrent client using
+// a preset message code constant
+func oopsStr(c *echo.Context, msg_code int, msg string) {
+	c.String(msg_code, responseError(msg))
+}
+
 // Generate a bencoded error response for the torrent client to
 // parse and display to the user
 func responseError(message string) string {

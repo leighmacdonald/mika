@@ -16,12 +16,12 @@ type Tracker struct {
 // Fetch a torrents data from the database and return a Torrent struct.
 // If the torrent doesn't exist in the database a new skeleton Torrent
 // instance will be returned.
-func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64) *Torrent {
+func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool) *Torrent {
 
 	mika.RLock()
 	torrent, cached := mika.Torrents[torrent_id]
 	mika.RUnlock()
-	if !cached || torrent == nil {
+	if make_new && (!cached || torrent == nil) {
 		// Make new struct to use for cache
 		torrent := &Torrent{
 			TorrentID: torrent_id,
@@ -71,7 +71,7 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64) *Torrent {
 // Fetch the stores torrent_id that corresponds to the info_hash supplied
 // as a GET value. If the info_hash doesn't return an id we consider the torrent
 // either soft-deleted or non-existent
-func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string) *Torrent {
+func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new bool) *Torrent {
 	torrent_id_reply, err := r.Do("GET", fmt.Sprintf("t:info_hash:%x", info_hash))
 	if err != nil {
 		log.Println("Failed to execute torrent_id query", err)
@@ -85,5 +85,5 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string) *Torrent 
 		log.Println("Failed to parse torrent_id reply", tid_err)
 		return nil
 	}
-	return t.GetTorrentByID(r, torrent_id)
+	return t.GetTorrentByID(r, torrent_id, make_new)
 }

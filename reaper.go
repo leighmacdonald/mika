@@ -26,7 +26,7 @@ func ReapPeer(torrent_id, peer_id string) {
 		return
 	}
 
-	torrent := mika.GetTorrentByID(r, torrent_id_uint)
+	torrent := mika.GetTorrentByID(r, torrent_id_uint, false)
 	if torrent == nil {
 		log.Println("Failed to fetch torrent while reaping")
 		return

@@ -37,19 +37,19 @@ func HandleTorrentGet(c *echo.Context) error {
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
 	if r.Err() != nil {
-		CaptureMessage(r.Err().Error())
-		log.Println("TorrentInfo redis conn:", r.Err().Error())
-		return errors.New("Internal error")
+		return c.JSON(http.StatusInternalServerError, ResponseErr{})
 	}
 
 	torrent_id_str := c.Param("torrent_id")
 	torrent_id, err := strconv.ParseUint(torrent_id_str, 10, 64)
 	if err != nil {
-		log.Println(err)
-		return c.String(http.StatusNotFound, err.Error())
+		Debug(err)
+		return c.JSON(http.StatusNotFound, ResponseErr{})
 	}
-	torrent := mika.GetTorrentByID(r, torrent_id)
-
+	torrent := mika.GetTorrentByID(r, torrent_id, false)
+	if torrent == nil {
+		return c.JSON(http.StatusNotFound, ResponseErr{})
+	}
 	return c.JSON(http.StatusOK, torrent)
 }
 
@@ -58,7 +58,6 @@ func HandleTorrentAdd(c *echo.Context) error {
 	if err := c.Bind(payload); err != nil {
 		return err
 	}
-	log.Println(payload)
 	if payload.TorrentID <= 0 {
 		return errors.New("Invalid torrent id")
 	} else if len(payload.InfoHash) != 40 {
@@ -72,6 +71,10 @@ func HandleTorrentAdd(c *echo.Context) error {
 		return errors.New("Failed to insert torrent")
 	}
 
+	torrent := mika.GetTorrentByID(r, payload.TorrentID, true)
+	torrent.Enabled = true
+
+	log.Println("Added new torrent:", payload)
 	return c.JSON(http.StatusCreated, Response{})
 }
 
@@ -82,7 +85,7 @@ func HandleTorrentDel(c *echo.Context) error {
 	}
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
-	torrent := mika.GetTorrentByID(r, payload.TorrentID)
+	torrent := mika.GetTorrentByID(r, payload.TorrentID, false)
 	if torrent == nil {
 		return errors.New("Invalid torrent id")
 	}

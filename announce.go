@@ -95,7 +95,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 
-	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash)
+	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash, true)
 	if torrent == nil {
 		Debug(fmt.Sprintf("Torrent not found: %x", ann.InfoHash))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)

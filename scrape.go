@@ -53,7 +53,7 @@ func HandleScrape(c *echo.Context) {
 	resp := make(bencode.Dict, len(q.InfoHashes))
 
 	for _, info_hash := range q.InfoHashes {
-		torrent := mika.GetTorrentByInfoHash(r, info_hash)
+		torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 		if torrent != nil {
 			resp[info_hash] = bencode.Dict{
 				"complete":   torrent.Seeders,

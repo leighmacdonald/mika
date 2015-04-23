@@ -13,25 +13,29 @@ class TrackerClient(object):
     def _request(self, path, method='get', payload=None):
         if method == "get":
             resp = requests.get(self._make_url(path))
-        elif method == "port":
+        elif method == "post":
             resp = requests.post(self._make_url(path), json=payload)
         else:
             raise Exception("no")
-        if resp.ok:
-            return resp.json()
-        return False
+        return resp
 
     def _make_url(self, path):
         return "http://{}:{}/api{}".format(self._host, self._port, path)
 
     def torrent_get(self, torrent_id):
-        return self._request("/torrent/{}".format(torrent_id))
+        resp = self._request("/torrent/{}".format(torrent_id))
+        if resp.ok:
+            return resp.json()
+        return None
 
     def torrent_get_all(self, torrent_ids):
         pass
 
     def torrent_add(self, info_hash, torrent_id):
-        pass
+        return self._request("/torrent", method='post', payload={
+            'info_hash': info_hash,
+            'torrent_id': torrent_id
+        })
 
     def torrent_del(self, info_hash):
         pass

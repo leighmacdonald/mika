@@ -25,12 +25,10 @@ import (
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -183,31 +181,6 @@ func Debug(msg ...interface{}) {
 	}
 }
 
-func HandleVersion(c *echo.Context) {
-	c.String(http.StatusOK, fmt.Sprintf("mika/%s", version))
-}
-
-func HandleTorrentInfo(c *echo.Context) {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
-	if r.Err() != nil {
-		CaptureMessage(r.Err().Error())
-		log.Println("TorrentInfo redis conn:", r.Err().Error())
-		return
-	}
-
-	torrent_id_str := c.Param("torrent_id")
-	torrent_id, err := strconv.ParseUint(torrent_id_str, 10, 64)
-	if err != nil {
-		log.Println(err)
-		c.String(http.StatusNotFound, err.Error())
-		return
-	}
-	torrent := mika.GetTorrentByID(r, torrent_id)
-
-	c.JSON(http.StatusOK, torrent)
-}
-
 func CaptureMessage(message ...string) {
 	if config.SentryDSN == "" {
 		return
@@ -219,36 +192,6 @@ func CaptureMessage(message ...string) {
 	_, err := raven_client.CaptureMessage()
 	if err != nil {
 		log.Println(err)
-	}
-}
-
-func syncWriter() {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
-	if r.Err() != nil {
-		CaptureMessage(r.Err().Error())
-		log.Println("SyncWriter redis conn:", r.Err().Error())
-		return
-	}
-	for {
-		select {
-		case user := <-sync_user:
-			Debug("sync user")
-			user.Sync(r)
-			user.InQueue = false
-		case torrent := <-sync_torrent:
-			Debug("sync torrent")
-			torrent.Sync(r)
-			torrent.InQueue = false
-		case peer := <-sync_peer:
-			Debug("sync peer")
-			peer.Sync(r)
-			peer.InQueue = false
-		}
-		err := r.Flush()
-		if err != nil {
-			log.Println("Failed to flush connection:", err)
-		}
 	}
 }
 
@@ -311,14 +254,17 @@ func main() {
 	// Initialize the router + middlewares
 	e := echo.New()
 
-	// Passkey is the only param we use, so only allocate for 1
-	e.MaxParam(1)
+	e.MaxParam(2)
 
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)
 	e.Get("/:passkey/scrape", HandleScrape)
-	e.Get("/version", HandleVersion)
-	e.Get("/torrent/:torrent_id", HandleTorrentInfo)
+
+	api_grp := e.Group("/api")
+	api_grp.Get("/version", HandleVersion)
+	api_grp.Get("/torrent/:torrent_id", HandleTorrentGet)
+	api_grp.Post("/torrent", HandleTorrentAdd)
+	api_grp.Get("/test", HandleGetTorrentPeer)
 
 	// Start watching for expiring peers
 	go peerStalker()

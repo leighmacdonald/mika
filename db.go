@@ -82,9 +82,9 @@ func dbStatIndexer() {
 		time.Sleep(time.Duration(config.IndexInterval) * time.Second)
 		mika.RLock()
 		for _, torrent := range mika.Torrents {
-			leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
-			seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
-			snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
+			leecher_args = append(leecher_args, uint64(torrent.Leechers), uint64(torrent.TorrentID))
+			seeder_args = append(seeder_args, uint64(torrent.Seeders), uint64(torrent.TorrentID))
+			snatch_args = append(snatch_args, uint64(torrent.Snatches), uint64(torrent.TorrentID))
 			count++
 		}
 		mika.RUnlock()
@@ -98,5 +98,38 @@ func dbStatIndexer() {
 			snatch_args = snatch_args[:0]
 		}
 		count = 0
+	}
+}
+
+// Handle writing out new data to the redis db in a queued manner
+// Only items with the .InQueue flag set to false should be added.
+// TODO channel as param
+func syncWriter() {
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+	if r.Err() != nil {
+		CaptureMessage(r.Err().Error())
+		log.Println("SyncWriter redis conn:", r.Err().Error())
+		return
+	}
+	for {
+		select {
+		case user := <-sync_user:
+			Debug("sync user")
+			user.Sync(r)
+			user.InQueue = false
+		case torrent := <-sync_torrent:
+			Debug("sync torrent")
+			torrent.Sync(r)
+			torrent.InQueue = false
+		case peer := <-sync_peer:
+			Debug("sync peer")
+			peer.Sync(r)
+			peer.InQueue = false
+		}
+		err := r.Flush()
+		if err != nil {
+			log.Println("Failed to flush connection:", err)
+		}
 	}
 }

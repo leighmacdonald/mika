@@ -83,7 +83,10 @@ func HandleAnnounce(c *echo.Context) {
 		counter <- EV_INVALID_PASSKEY
 		return
 	}
-
+	if !user.CanLeech && ann.Left > 0 {
+		oopsStr(c, MSG_GENERIC_ERROR, "Leech Disabled")
+		return
+	}
 	if !IsValidClient(r, ann.PeerID) {
 		log.Println(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
 		CaptureMessage(fmt.Sprintf("Invalid Client: %s", ann.PeerID))

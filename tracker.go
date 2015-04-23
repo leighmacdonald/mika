@@ -72,15 +72,6 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64) *Torrent {
 // as a GET value. If the info_hash doesn't return an id we consider the torrent
 // either soft-deleted or non-existent
 func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string) *Torrent {
-	mika.RLock()
-	defer mika.RUnlock()
-
-	for _, torrent := range t.Torrents {
-		if torrent.InfoHash == info_hash {
-			return torrent
-		}
-	}
-
 	torrent_id_reply, err := r.Do("GET", fmt.Sprintf("t:info_hash:%x", info_hash))
 	if err != nil {
 		log.Println("Failed to execute torrent_id query", err)

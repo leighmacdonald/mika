@@ -260,7 +260,7 @@ func main() {
 	// Initialize the router + middlewares
 	e := echo.New()
 
-	e.MaxParam(2)
+	e.MaxParam(1)
 
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)

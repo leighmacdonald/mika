@@ -10,14 +10,15 @@ import (
 type User struct {
 	Queued
 	sync.RWMutex
-	UserID     uint64
-	Uploaded   uint64
-	Downloaded uint64
-	Corrupt    uint64
-	Snatches   uint32
-	UserKey    string
-	Announces  uint64
-	Peers      []**Peer
+	UserID     uint64   `redis:"user_id" json:"user_id"`
+	Uploaded   uint64   `redis:"uploaded" json:"uploaded"`
+	Downloaded uint64   `redis:"downloaded" json:"downloaded"`
+	Corrupt    uint64   `redis:"corrupt" json:"corrupt"`
+	Snatches   uint32   `redis:"snatches" json:"snatches"`
+	UserKey    string   `redis:"-" json:"key"`
+	CanLeech   bool     `redis:"can_leech" json:"can_leech"`
+	Announces  uint64   `redis:"announces" json:"announces"`
+	Peers      []**Peer `redis:"-" json:"-"`
 }
 
 // Fetch a user_id from the supplied passkey. A return value
@@ -57,6 +58,7 @@ func GetUser(r redis.Conn, passkey string) *User {
 			Uploaded:   0,
 			Downloaded: 0,
 			Snatches:   0,
+			CanLeech:   true,
 			Peers:      make([]**Peer, 1),
 			UserKey:    fmt.Sprintf("t:u:%d", user_id),
 		}
@@ -88,13 +90,13 @@ func GetUser(r redis.Conn, passkey string) *User {
 
 func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
 	user.Lock()
+	defer user.Unlock()
 	user.Uploaded += upload_diff
 	user.Downloaded += download_diff
 	user.Corrupt += announce.Corrupt
 	if announce.Event == COMPLETED {
 		user.Snatches++
 	}
-	user.Unlock()
 }
 
 func (user *User) Sync(r redis.Conn) {
@@ -106,6 +108,7 @@ func (user *User) Sync(r redis.Conn) {
 		"corrupt", user.Corrupt,
 		"snatches", user.Snatches,
 		"announces", user.Announces,
+		"can_leech", user.CanLeech,
 	)
 }
 

@@ -17,7 +17,7 @@ type User struct {
 	Downloaded uint64   `redis:"downloaded" json:"downloaded"`
 	Corrupt    uint64   `redis:"corrupt" json:"corrupt"`
 	Snatches   uint32   `redis:"snatches" json:"snatches"`
-	Passkey    uint32   `redis:"passkey" json:"-"`
+	Passkey    string   `redis:"passkey" json:"-"`
 	UserKey    string   `redis:"-" json:"key"`
 	CanLeech   bool     `redis:"can_leech" json:"can_leech"`
 	Announces  uint64   `redis:"announces" json:"announces"`
@@ -41,6 +41,7 @@ func findUserID(r redis.Conn, passkey string) uint64 {
 	return user_id
 }
 
+// Create a new user instance, loading existing data from redis if it exists
 func fetchUser(r redis.Conn, user_id uint64) *User {
 	user := &User{
 		UserID:     user_id,
@@ -49,6 +50,7 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 		Uploaded:   0,
 		Downloaded: 0,
 		Snatches:   0,
+		Passkey:    "",
 		CanLeech:   true,
 		Peers:      make([]**Peer, 1),
 		UserKey:    fmt.Sprintf("t:u:%d", user_id),
@@ -67,6 +69,7 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 
 	err = redis.ScanStruct(values, user)
 	if err != nil {
+		log.Println(err)
 		return nil
 	}
 	return user
@@ -95,17 +98,20 @@ func GetUser(r redis.Conn, passkey string) *User {
 	return user
 }
 
+// Update user stats from announce request
 func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
 	user.Lock()
 	defer user.Unlock()
 	user.Uploaded += upload_diff
 	user.Downloaded += download_diff
 	user.Corrupt += announce.Corrupt
+	user.Announces++
 	if announce.Event == COMPLETED {
 		user.Snatches++
 	}
 }
 
+// Write our bits out to redis
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
 		"HMSET", user.UserKey,
@@ -116,6 +122,7 @@ func (user *User) Sync(r redis.Conn) {
 		"snatches", user.Snatches,
 		"announces", user.Announces,
 		"can_leech", user.CanLeech,
+		"passkey", user.Passkey,
 	)
 }
 
@@ -123,6 +130,7 @@ func (user *User) AddPeer(peer *Peer) {
 	user.Peers = append(user.Peers, &peer)
 }
 
+// Load all the users into memory
 func initUsers(r redis.Conn) {
 	user_keys_reply, err := r.Do("KEYS", "t:u:*")
 	if err != nil {

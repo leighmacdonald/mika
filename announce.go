@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	STOPPED   = iota
-	STARTED   = iota
+	STOPPED = iota
+	STARTED = iota
 	COMPLETED = iota
-	ANNOUNCE  = iota
+	ANNOUNCE = iota
 )
 
 type AnnounceRequest struct {
@@ -201,6 +201,8 @@ func HandleAnnounce(c *echo.Context) {
 	peers := torrent.GetPeers(r, ann.NumWant)
 	if peers != nil {
 		dict["peers"] = makeCompactPeers(peers, ann.PeerID)
+	} else {
+		dict["peers"] = []byte{}
 	}
 	var out_bytes bytes.Buffer
 	encoder := bencode.NewEncoder(&out_bytes)
@@ -228,11 +230,11 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	event := ANNOUNCE
 	event_name, _ := q.Params["event"]
 	switch event_name {
-	case "started":
+		case "started":
 		event = STARTED
-	case "stopped":
+		case "stopped":
 		event = STOPPED
-	case "complete":
+		case "complete":
 		event = COMPLETED
 	}
 

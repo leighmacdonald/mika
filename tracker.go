@@ -13,6 +13,18 @@ type Tracker struct {
 	Users    map[uint64]*User
 }
 
+// Load the models into memory from redis
+//
+func (t *Tracker) Initialize() error {
+	log.Println("Initializing models in memory...")
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+
+	initUsers(r)
+
+	return nil
+}
+
 // Fetch a torrents data from the database and return a Torrent struct.
 // If the torrent doesn't exist in the database a new skeleton Torrent
 // instance will be returned.

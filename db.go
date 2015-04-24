@@ -15,7 +15,7 @@ var (
 	connWaiting  int = 0
 )
 
-func PoolPoolManager(pool *redis.Pool) {
+func redisPoolManager(pool *redis.Pool) {
 	var conn redis.Conn
 	var err error
 	for {

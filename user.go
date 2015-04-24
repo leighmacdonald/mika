@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -15,6 +17,7 @@ type User struct {
 	Downloaded uint64   `redis:"downloaded" json:"downloaded"`
 	Corrupt    uint64   `redis:"corrupt" json:"corrupt"`
 	Snatches   uint32   `redis:"snatches" json:"snatches"`
+	Passkey    uint32   `redis:"passkey" json:"-"`
 	UserKey    string   `redis:"-" json:"key"`
 	CanLeech   bool     `redis:"can_leech" json:"can_leech"`
 	Announces  uint64   `redis:"announces" json:"announces"`
@@ -38,6 +41,37 @@ func findUserID(r redis.Conn, passkey string) uint64 {
 	return user_id
 }
 
+func fetchUser(r redis.Conn, user_id uint64) *User {
+	user := &User{
+		UserID:     user_id,
+		Announces:  0,
+		Corrupt:    0,
+		Uploaded:   0,
+		Downloaded: 0,
+		Snatches:   0,
+		CanLeech:   true,
+		Peers:      make([]**Peer, 1),
+		UserKey:    fmt.Sprintf("t:u:%d", user_id),
+	}
+
+	user_reply, err := r.Do("HGETALL", user.UserKey)
+	if err != nil {
+		return nil
+	}
+
+	values, err := redis.Values(user_reply, nil)
+	if err != nil {
+		log.Println("Failed to parse user reply: ", err)
+		return nil
+	}
+
+	err = redis.ScanStruct(values, user)
+	if err != nil {
+		return nil
+	}
+	return user
+}
+
 // fetch a user from the backend database if
 func GetUser(r redis.Conn, passkey string) *User {
 
@@ -51,34 +85,7 @@ func GetUser(r redis.Conn, passkey string) *User {
 	mika.RUnlock()
 
 	if !exists {
-		user = &User{
-			UserID:     user_id,
-			Announces:  0,
-			Corrupt:    0,
-			Uploaded:   0,
-			Downloaded: 0,
-			Snatches:   0,
-			CanLeech:   true,
-			Peers:      make([]**Peer, 1),
-			UserKey:    fmt.Sprintf("t:u:%d", user_id),
-		}
-
-		user_reply, err := r.Do("HGETALL", user.UserKey)
-		if err != nil {
-			return nil
-		}
-
-		values, err := redis.Values(user_reply, nil)
-		if err != nil {
-			log.Println("Failed to parse user reply: ", err)
-			return nil
-		}
-
-		err = redis.ScanStruct(values, user)
-		if err != nil {
-			return nil
-		}
-
+		user = fetchUser(r, user_id)
 		mika.Lock()
 		mika.Users[user_id] = user
 		mika.Unlock()
@@ -114,4 +121,38 @@ func (user *User) Sync(r redis.Conn) {
 
 func (user *User) AddPeer(peer *Peer) {
 	user.Peers = append(user.Peers, &peer)
+}
+
+func initUsers(r redis.Conn) {
+	user_keys_reply, err := r.Do("KEYS", "t:u:*")
+	if err != nil {
+		log.Println("Failed to get torrent from redis", err)
+		return
+	}
+	user_keys, err := redis.Strings(user_keys_reply, nil)
+	if err != nil {
+		log.Println("Failed to parse peer reply: ", err)
+		return
+	}
+	users := 0
+	mika.Lock()
+	defer mika.Unlock()
+	for _, user_key := range user_keys {
+		pcs := strings.SplitN(user_key, ":", 3)
+		if len(pcs) != 3 {
+			continue
+		}
+		user_id, err := strconv.ParseUint(pcs[2], 10, 64)
+		if err != nil {
+			// Other key type probably
+			continue
+		}
+		user := fetchUser(r, user_id)
+		if user != nil {
+			mika.Users[user_id] = user
+			users++
+		}
+	}
+
+	log.Println(fmt.Sprintf("Loaded %d users into memory", users))
 }

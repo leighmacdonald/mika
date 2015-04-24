@@ -27,10 +27,10 @@ type Torrent struct {
 
 func (torrent *Torrent) Update(announce *AnnounceRequest) {
 	torrent.Lock()
+	defer torrent.Unlock()
 	torrent.Announces++
 	torrent.Uploaded += announce.Uploaded
 	torrent.Downloaded += announce.Downloaded
-	torrent.Unlock()
 }
 
 func (torrent *Torrent) Sync(r redis.Conn) {

@@ -233,9 +233,7 @@ func main() {
 	connResponse = make(chan redis.Conn, 200)
 	connDone = make(chan redis.Conn, 200)
 	pool = &redis.Pool{
-		MaxActive:   200,
-		MaxIdle:     200,
-		IdleTimeout: 10 * time.Second,
+		MaxIdle: 20,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", config.RedisHost)
 			if err != nil {
@@ -256,7 +254,10 @@ func main() {
 	}
 
 	// Initialize the redis pool manager
-	go PoolPoolManager(pool)
+	go redisPoolManager(pool)
+
+	// Pre load models into memory
+	mika.Initialize()
 
 	go dbStatIndexer()
 

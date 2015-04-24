@@ -14,13 +14,13 @@ type Tracker struct {
 }
 
 // Load the models into memory from redis
-//
 func (t *Tracker) Initialize() error {
 	log.Println("Initializing models in memory...")
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
 
 	initUsers(r)
+	initTorrents(r)
 
 	return nil
 }
@@ -29,54 +29,20 @@ func (t *Tracker) Initialize() error {
 // If the torrent doesn't exist in the database a new skeleton Torrent
 // instance will be returned.
 func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool) *Torrent {
-
 	mika.RLock()
 	torrent, cached := mika.Torrents[torrent_id]
 	mika.RUnlock()
 	if make_new && (!cached || torrent == nil) {
-		// Make new struct to use for cache
-		torrent := &Torrent{
-			TorrentID: torrent_id,
-			InfoHash:  "",
-			Enabled:   true,
-			Peers:     []*Peer{},
+		torrent = fetchTorrent(r, torrent_id)
+		if torrent != nil {
+			mika.Lock()
+			mika.Torrents[torrent_id] = torrent
+			mika.Unlock()
+			Debug("Added new torrent to in-memory cache:", torrent_id)
+		} else {
+			Debug("Failed to get torrent by id, no entry")
 		}
-
-		torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d", torrent_id))
-		if err != nil {
-			log.Println("Failed to get torrent from redis", err)
-			return nil
-		}
-
-		values, err := redis.Values(torrent_reply, nil)
-		if err != nil {
-			log.Println("Failed to parse peer reply: ", err)
-			return nil
-		}
-
-		err = redis.ScanStruct(values, torrent)
-		if err != nil {
-			log.Println("Torrent scanstruct failure", err)
-			return nil
-		}
-
-		// Reset counts since we cant guarantee the accuracy after restart
-		// TODO allow reloading of peer/seed counts if a maximum time has not elapsed
-		// since the last startup.
-		torrent.Seeders = 0
-		torrent.Leechers = 0
-
-		// Make these once and save the results in mem
-		torrent.TorrentKey = fmt.Sprintf("t:t:%d", torrent_id)
-		torrent.TorrentPeersKey = fmt.Sprintf("t:t:%d:p", torrent_id)
-
-		mika.Lock()
-		mika.Torrents[torrent_id] = torrent
-		mika.Unlock()
-		Debug("Added new torrent to in-memory cache:", torrent_id)
-		return torrent
 	}
-
 	return torrent
 }
 

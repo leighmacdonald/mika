@@ -21,9 +21,14 @@ type UserPayload struct {
 	UserID uint64 `json:"user_id"`
 }
 
+type UserCreatePayload struct {
+	UserPayload
+	Passkey string `json:"passkey"`
+}
+
 type UserUpdatePayload struct {
 	UserPayload
-	Passkey    string `json:"passkey"`
+	UserCreatePayload
 	CanLeech   bool   `json:"can_leech"`
 	Downloaded uint64 `json:"downloaded"`
 	Uploaded   uint64 `json:"uploaded"`
@@ -126,6 +131,35 @@ func HandleUserGet(c *echo.Context) error {
 		return c.JSON(http.StatusNotFound, ResponseErr{"Not Found", 404})
 	}
 	return c.JSON(http.StatusOK, user)
+}
+
+func HandleUserCreate(c *echo.Context) error {
+	payload := &UserCreatePayload{}
+	if err := c.Bind(payload); err != nil {
+		return err
+	}
+	if payload.Passkey == "" || payload.UserID <= 0 {
+		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
+	}
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+	user := GetUserByID(r, payload.UserID, false)
+
+	if user != nil {
+		return c.JSON(http.StatusConflict, ResponseErr{"User exists", http.StatusConflict})
+	}
+
+	user = GetUserByID(r, payload.UserID, true)
+	mika.Lock()
+	user.Passkey = payload.Passkey
+	user.CanLeech = true
+	user.Enabled = true
+	mika.Unlock()
+	if !user.InQueue {
+		user.InQueue = true
+		sync_user <- user
+	}
+	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
 }
 
 func HandleUserUpdate(c *echo.Context) error {

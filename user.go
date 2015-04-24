@@ -13,6 +13,7 @@ type User struct {
 	Queued
 	sync.RWMutex
 	UserID     uint64   `redis:"user_id" json:"user_id"`
+	Enabled    bool     `redis:"enabled" json:"enabled"`
 	Uploaded   uint64   `redis:"uploaded" json:"uploaded"`
 	Downloaded uint64   `redis:"downloaded" json:"downloaded"`
 	Corrupt    uint64   `redis:"corrupt" json:"corrupt"`
@@ -48,6 +49,7 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 		Announces:  0,
 		Corrupt:    0,
 		Uploaded:   0,
+		Enabled:    true,
 		Downloaded: 0,
 		Snatches:   0,
 		Passkey:    "",
@@ -75,19 +77,22 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 	return user
 }
 
-// fetch a user from the backend database if
-func GetUser(r redis.Conn, passkey string) *User {
-
+func GetUserByPasskey(r redis.Conn, passkey string) *User {
 	user_id := findUserID(r, passkey)
 	if user_id == 0 {
 		return nil
 	}
+	return GetUserByID(r, user_id, false)
+}
+
+// fetch a user from the backend database if
+func GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *User {
 
 	mika.RLock()
 	user, exists := mika.Users[user_id]
 	mika.RUnlock()
 
-	if !exists {
+	if !exists && auto_create {
 		user = fetchUser(r, user_id)
 		mika.Lock()
 		mika.Users[user_id] = user
@@ -123,6 +128,7 @@ func (user *User) Sync(r redis.Conn) {
 		"announces", user.Announces,
 		"can_leech", user.CanLeech,
 		"passkey", user.Passkey,
+		"enabled", user.Enabled,
 	)
 }
 

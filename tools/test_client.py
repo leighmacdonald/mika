@@ -35,3 +35,7 @@ class ClientTest(unittest.TestCase):
         user = self.client.user_get(94)
         self.assertEqual(user['downloaded'], a)
         self.assertEqual(user['uploaded'], a)
+
+    def test_user_add(self):
+        resp = self.client.user_add(999999, "asdfadfasdfasdfasdfasd")
+        self.assertTrue(resp)

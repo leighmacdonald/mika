@@ -32,7 +32,7 @@ func HandleScrape(c *echo.Context) {
 
 	passkey := c.Param("passkey")
 
-	user := GetUser(r, passkey)
+	user := GetUserByPasskey(r, passkey)
 	if user == nil {
 		log.Println("Invalid passkey supplied:", passkey)
 		oops(c, MSG_GENERIC_ERROR)

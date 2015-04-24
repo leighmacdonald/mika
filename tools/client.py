@@ -70,14 +70,12 @@ class TrackerClient(object):
         resp = self._request("/user/{}".format(user_id))
         return resp.json() if resp.ok else None
 
-    def user_update_passkey(self, passkey_old, passkey_new, user_id):
-        pass
-
-    def passkey_del(self, passkey):
-        pass
-
-    def passkey_add(self, passkey, user_id):
-        pass
+    def user_add(self, user_id, passkey):
+        resp = self._request("/user", method='post', payload={
+            'user_id': user_id,
+            'passkey': passkey
+        })
+        return resp.ok
 
     def whitelist_update(self, prefix_old, prefix_new, client_name):
         pass

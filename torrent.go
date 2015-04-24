@@ -69,7 +69,7 @@ func (torrent *Torrent) Delete(reason string) {
 
 func (torrent *Torrent) DelReason() string {
 	if torrent.Reason == "" {
-		return "TOrrent deleted"
+		return "Torrent deleted"
 	} else {
 		return torrent.Reason
 	}

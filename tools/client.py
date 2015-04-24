@@ -15,6 +15,8 @@ class TrackerClient(object):
             resp = requests.get(self._make_url(path))
         elif method == "post":
             resp = requests.post(self._make_url(path), json=payload)
+        elif method == "delete":
+            resp = requests.delete(self._make_url(path))
         else:
             raise Exception("no")
         return resp
@@ -81,13 +83,15 @@ class TrackerClient(object):
         pass
 
     def whitelist_del(self, prefix):
-        pass
+        resp = self._request("/whitelist/{}".format(prefix), method='delete')
+        return resp.ok
 
     def whitelist_add(self, prefix, client_name):
-        pass
-
-    def get_torrent_peer(self, torrent_id, peer_id):
-        pass
+        resp = self._request("/whitelist", method='post', payload={
+            'prefix': prefix,
+            'client': client_name
+        })
+        return resp.ok
 
     def _key(self, *args):
         pass

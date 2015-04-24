@@ -47,6 +47,14 @@ type TorrentDelPayload struct {
 	TorrentPayload
 	Reason string
 }
+type WhitelistPayload struct {
+	Prefix string `json:"prefix"`
+}
+
+type WhitelistAddPayload struct {
+	WhitelistPayload
+	Client string `json:"client"`
+}
 
 func HandleVersion(c *echo.Context) {
 	c.String(http.StatusOK, fmt.Sprintf("mika/%s", version))
@@ -195,16 +203,39 @@ func HandleUserUpdate(c *echo.Context) error {
 	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
 }
 
-func HandleWhitelistAdd(c *echo.Context) {
+func HandleWhitelistAdd(c *echo.Context) error {
+	payload := &WhitelistAddPayload{}
+	if err := c.Bind(payload); err != nil {
+		return err
+	}
+	for _, prefix := range whitelist {
+		if prefix == payload.Prefix {
+			return c.JSON(http.StatusConflict, ResponseErr{"ok", http.StatusConflict})
+		}
+	}
+	whitelist = append(whitelist, payload.Prefix)
 
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+
+	r.Do("HSET", "t:whitelist", payload.Prefix, payload.Client)
+
+	return c.JSON(http.StatusCreated, ResponseErr{"ok", http.StatusCreated})
 }
 
-func HandleWhitelistDel(c *echo.Context) {
+func HandleWhitelistDel(c *echo.Context) error {
+	prefix := c.Param("prefix")
+	for _, p := range whitelist {
+		if p == prefix {
+			r := getRedisConnection()
+			defer returnRedisConnection(r)
 
-}
-
-func HandleWhitelistUpdate(c *echo.Context) {
-
+			r.Do("HDEL", "t:whitelist", prefix)
+			initWhitelist(r)
+			return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
+		}
+	}
+	return c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
 }
 
 func HandleGetTorrentPeer(c *echo.Context) error {

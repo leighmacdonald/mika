@@ -115,6 +115,7 @@ var (
 
 	stats *StatsCounter
 
+	whitelist    []string
 	raven_client *raven.Client
 
 	config     *Config
@@ -278,6 +279,8 @@ func main() {
 	api_grp.Get("/user/:user_id", HandleUserGet)
 	api_grp.Post("/user/:user_id", HandleUserUpdate)
 	api_grp.Post("/user", HandleUserCreate)
+	api_grp.Post("/whitelist", HandleWhitelistAdd)
+	api_grp.Delete("/whitelist/:prefix", HandleWhitelistDel)
 
 	// Start watching for expiring peers
 	go peerStalker()
@@ -293,6 +296,8 @@ func init() {
 	if version == "" {
 		log.Fatalln(`Build this binary with "make", not "go build"`)
 	}
+	whitelist = []string{}
+
 	// Parse CLI args
 	flag.Parse()
 

@@ -192,18 +192,13 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 // Checked if the clients peer_id prefix matches the client prefixes
 // stored in the white lists
 func IsValidClient(r redis.Conn, peer_id string) bool {
-	a, err := r.Do("HKEYS", "t:whitelist")
 
-	if err != nil {
-		log.Println(err)
-		return false
-	}
-	clients, err := redis.Strings(a, nil)
-	for _, client_prefix := range clients {
+	for _, client_prefix := range whitelist {
 		if strings.HasPrefix(peer_id, client_prefix) {
 			return true
 		}
 	}
+
 	log.Println("Got non-whitelisted client:", peer_id)
 	return false
 }

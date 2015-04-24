@@ -19,6 +19,7 @@ func (t *Tracker) Initialize() error {
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
 
+	initWhitelist(r)
 	initUsers(r)
 	initTorrents(r)
 
@@ -64,4 +65,16 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new 
 		return nil
 	}
 	return t.GetTorrentByID(r, torrent_id, make_new)
+}
+
+func initWhitelist(r redis.Conn) {
+	whitelist = []string{}
+	a, err := r.Do("HKEYS", "t:whitelist")
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	whitelist, err = redis.Strings(a, nil)
+	log.Println(fmt.Sprintf("Loaded %d whitelist clients", len(whitelist)))
 }

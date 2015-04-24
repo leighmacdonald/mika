@@ -39,3 +39,10 @@ class ClientTest(unittest.TestCase):
     def test_user_add(self):
         resp = self.client.user_add(999999, "asdfadfasdfasdfasdfasd")
         self.assertTrue(resp)
+
+    def test_whitelist_add(self):
+        self.assertTrue(self.client.whitelist_add("test2", "moo"))
+
+    def test_whitelist_del(self):
+        resp = self.client.whitelist_del("test2")
+        self.assertTrue(resp)

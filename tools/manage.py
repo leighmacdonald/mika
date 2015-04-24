@@ -27,8 +27,11 @@ def load_torrents(db_conn, redis_conn, force=False):
                 'seeders': 0,
                 'snatches': 0,
                 'uploaded': 0,
-                'downloaded': 0
+                'downloaded': 0,
+                'info_hash': info_hash
             })
+        else:
+            redis_conn.hset(torrent_key, "info_hash", info_hash)
         # Set info_hash -> torrent_id mapping
         redis_conn.set("t:info_hash:{}".format(bin2hex(info_hash).decode("utf8")), torrent_id)
 
@@ -43,11 +46,11 @@ def load_stats(redis_conn):
 def load_users(db_conn, redis_conn):
     print("> Loading users... ")
     with db_conn.cursor() as cur:
-        cur.execute("SELECT passkey, id, download, upload FROM users")
+        cur.execute("SELECT passkey, id FROM users")
         users = cur.fetchall()
     for user in users:
         redis_conn.set("t:user:{}".format(user[0]), user[1])
-        redis_conn.hmset("t:u:{}".format(user[1]), {'downloaded': user[2], 'uploaded': user[3]})
+        # redis_conn.hmset("t:u:{}".format(user[1]), {'downloaded': user[2], 'uploaded': user[3]})
 
 
 def load_whitelist(db_conn, redis_conn):

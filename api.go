@@ -21,6 +21,14 @@ type UserPayload struct {
 	UserID uint64 `json:"user_id"`
 }
 
+type UserUpdatePayload struct {
+	UserPayload
+	Passkey    string `json:"passkey"`
+	CanLeech   bool   `json:"can_leech"`
+	Downloaded uint64 `json:"downloaded"`
+	Uploaded   uint64 `json:"uploaded"`
+}
+
 type TorrentPayload struct {
 	TorrentID uint64 `json:"torrent_id"`
 }
@@ -120,8 +128,37 @@ func HandleUserGet(c *echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
-func HandleUserUpdatePasskey(c *echo.Context) {
+func HandleUserUpdate(c *echo.Context) error {
+	payload := &UserUpdatePayload{}
+	if err := c.Bind(payload); err != nil {
+		return err
+	}
+	user_id_str := c.Param("user_id")
+	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
+	if err != nil {
+		Debug(err)
+		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format", 0})
+	}
 
+	mika.RLock()
+	user, exists := mika.Users[user_id]
+	mika.RUnlock()
+	if !exists {
+		return c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
+	}
+
+	user.Lock()
+	user.Uploaded = payload.Uploaded
+	user.Downloaded = payload.Downloaded
+	user.Passkey = payload.Passkey
+	user.CanLeech = payload.CanLeech
+	user.Unlock()
+
+	if !user.InQueue {
+		user.InQueue = true
+		sync_user <- user
+	}
+	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
 }
 
 func HandleWhitelistAdd(c *echo.Context) {

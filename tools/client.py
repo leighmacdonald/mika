@@ -52,8 +52,19 @@ class TrackerClient(object):
     def user_get_hnr(self, user_id):
         pass
 
-    def user_update(self, user_id, payload):
-        pass
+    def user_update(self, user_id, uploaded=None, downloaded=None, passkey=None, can_leech=None):
+        user = self.user_get(user_id)
+        if not user:
+            return False
+        updated_data = {
+            'uploaded': uploaded if uploaded is not None else user['uploaded'],
+            'downloaded': downloaded if downloaded is not None else user['downloaded'],
+            'can_leech': can_leech if can_leech is not None else user['can_leech'],
+            'passkey': passkey if passkey is not None else user['passkey'],
+        }
+
+        resp = self._request("/user/{}".format(user_id), 'post', payload=updated_data)
+        return resp.ok
 
     def user_get(self, user_id):
         resp = self._request("/user/{}".format(user_id))

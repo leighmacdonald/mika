@@ -17,7 +17,7 @@ type User struct {
 	Downloaded uint64   `redis:"downloaded" json:"downloaded"`
 	Corrupt    uint64   `redis:"corrupt" json:"corrupt"`
 	Snatches   uint32   `redis:"snatches" json:"snatches"`
-	Passkey    string   `redis:"passkey" json:"-"`
+	Passkey    string   `redis:"passkey" json:"passkey"`
 	UserKey    string   `redis:"-" json:"key"`
 	CanLeech   bool     `redis:"can_leech" json:"can_leech"`
 	Announces  uint64   `redis:"announces" json:"announces"`

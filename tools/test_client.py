@@ -1,3 +1,4 @@
+import random
 import unittest
 from tools import client
 
@@ -19,7 +20,6 @@ class ClientTest(unittest.TestCase):
         self.assertIsNone(t2)
 
     def test_torrent_add(self):
-
         resp = self.client.torrent_add(self.hash_1, self.id_1)
         self.assertTrue(resp)
 
@@ -27,4 +27,11 @@ class ClientTest(unittest.TestCase):
         resp = self.client.user_get(94)
         self.assertEqual(resp['user_id'], 94)
 
+    def test_user_update(self):
+        a = random.randint(0, 1000)
+        resp = self.client.user_update(94, downloaded=a, uploaded=a)
+        self.assertTrue(resp)
 
+        user = self.client.user_get(94)
+        self.assertEqual(user['downloaded'], a)
+        self.assertEqual(user['uploaded'], a)

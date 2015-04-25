@@ -106,18 +106,31 @@ func HandleTorrentAdd(c *echo.Context) error {
 }
 
 func HandleTorrentDel(c *echo.Context) error {
-	payload := &TorrentDelPayload{}
-	if err := c.Bind(payload); err != nil {
-		return err
-	}
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
-	torrent := mika.GetTorrentByID(r, payload.TorrentID, false)
-	if torrent == nil {
-		return errors.New("Invalid torrent id")
+	if r.Err() != nil {
+		return c.JSON(http.StatusInternalServerError, ResponseErr{})
 	}
 
-	return c.JSON(http.StatusOK, ResponseErr{"moo", 200})
+	torrent_id_str := c.Param("torrent_id")
+	torrent_id, err := strconv.ParseUint(torrent_id_str, 10, 64)
+	if err != nil {
+		Debug(err)
+		return c.JSON(http.StatusNotFound, ResponseErr{})
+	}
+	torrent := mika.GetTorrentByID(r, torrent_id, false)
+	if torrent == nil {
+		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id", http.StatusNotFound})
+	}
+	mika.Lock()
+	torrent.Enabled = false
+	mika.Unlock()
+	if !torrent.InQueue {
+		torrent.InQueue = true
+		sync_torrent <- torrent
+	}
+
+	return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
 }
 
 func HandleUserGetActive(c *echo.Context) {
@@ -231,7 +244,7 @@ func HandleWhitelistDel(c *echo.Context) error {
 			defer returnRedisConnection(r)
 
 			r.Do("HDEL", "t:whitelist", prefix)
-			initWhitelist(r)
+			go initWhitelist(r)
 			return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
 		}
 	}

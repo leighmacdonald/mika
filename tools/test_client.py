@@ -23,6 +23,10 @@ class ClientTest(unittest.TestCase):
         resp = self.client.torrent_add(self.hash_1, self.id_1)
         self.assertTrue(resp)
 
+    def test_torrent_del(self):
+        resp = self.client.torrent_del(self.id_1)
+        self.assertTrue(resp)
+
     def test_user_get(self):
         resp = self.client.user_get(94)
         self.assertEqual(resp['user_id'], 94)

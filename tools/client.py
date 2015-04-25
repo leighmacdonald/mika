@@ -39,8 +39,8 @@ class TrackerClient(object):
             'torrent_id': torrent_id
         })
 
-    def torrent_del(self, info_hash):
-        pass
+    def torrent_del(self, torrent_id):
+        return self._request("/torrent/{}".format(torrent_id), method='delete').ok
 
     def user_get_active(self, user_id):
         pass

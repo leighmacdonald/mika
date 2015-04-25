@@ -275,6 +275,7 @@ func main() {
 	api_grp.Get("/version", HandleVersion)
 	api_grp.Get("/torrent/:torrent_id", HandleTorrentGet)
 	api_grp.Post("/torrent", HandleTorrentAdd)
+	api_grp.Delete("/torrent/:torrent_id", HandleTorrentDel)
 	api_grp.Get("/test", HandleGetTorrentPeer)
 	api_grp.Get("/user/:user_id", HandleUserGet)
 	api_grp.Post("/user/:user_id", HandleUserUpdate)

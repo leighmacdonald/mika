@@ -15,9 +15,10 @@ def bin2hex(bin_info_hash):
 def load_torrents(db_conn, redis_conn, force=False):
     print("> Loading torrents...")
     with db_conn.cursor() as cur:
-        cur.execute("SELECT HEX(info_hash), id  FROM torrents where info_hash <> ''")
+        cur.execute("SELECT info_hash, id  FROM torrents where info_hash <> ''")
         hashes = cur.fetchall()
     for info_hash, torrent_id in hashes:
+        ih = bin2hex(info_hash).decode()
         torrent_key = "t:t:{}".format(torrent_id)
         # init default struct if not already exists
         if not redis_conn.exists(torrent_key) or force:
@@ -28,12 +29,12 @@ def load_torrents(db_conn, redis_conn, force=False):
                 'snatches': 0,
                 'uploaded': 0,
                 'downloaded': 0,
-                'info_hash': info_hash
+                'info_hash': ih
             })
         else:
-            redis_conn.hset(torrent_key, "info_hash", info_hash)
+            redis_conn.hset(torrent_key, "info_hash", ih)
         # Set info_hash -> torrent_id mapping
-        redis_conn.set("t:info_hash:{}".format(info_hash), torrent_id)
+        redis_conn.set("t:info_hash:{}".format(ih), torrent_id)
 
 
 def load_stats(redis_conn):

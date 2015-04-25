@@ -79,9 +79,6 @@ class TrackerClient(object):
         })
         return resp.ok
 
-    def whitelist_update(self, prefix_old, prefix_new, client_name):
-        pass
-
     def whitelist_del(self, prefix):
         resp = self._request("/whitelist/{}".format(prefix), method='delete')
         return resp.ok
@@ -92,6 +89,3 @@ class TrackerClient(object):
             'client': client_name
         })
         return resp.ok
-
-    def _key(self, *args):
-        pass

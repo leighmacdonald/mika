@@ -273,7 +273,7 @@ func main() {
 
 	api_grp := e.Group("/api")
 	api_grp.Get("/version", HandleVersion)
-	api_grp.Get("/torrent/:torrent_id", HandleTorrentGet)
+	api_grp.Get("/torrent/:info_hash", HandleTorrentGet)
 	api_grp.Post("/torrent", HandleTorrentAdd)
 	api_grp.Delete("/torrent/:torrent_id", HandleTorrentDel)
 	api_grp.Get("/test", HandleGetTorrentPeer)
@@ -311,7 +311,7 @@ func init() {
 
 	// Alloc tracker
 	mika = &Tracker{
-		Torrents: make(map[uint64]*Torrent),
+		Torrents: make(map[string]*Torrent),
 		Users:    make(map[uint64]*User),
 	}
 

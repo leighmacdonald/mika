@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
-	"strconv"
-	"strings"
 	"sync"
 )
 
@@ -33,6 +31,7 @@ func (torrent *Torrent) Update(announce *AnnounceRequest) {
 	torrent.Announces++
 	torrent.Uploaded += announce.Uploaded
 	torrent.Downloaded += announce.Downloaded
+	torrent.Seeders, torrent.Leechers = torrent.PeerCounts()
 }
 
 func (torrent *Torrent) Sync(r redis.Conn) {
@@ -158,78 +157,4 @@ func (torrent *Torrent) PeerCounts() (int16, int16) {
 // Get an array of peers for the torrent
 func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
 	return torrent.Peers[0:UMin(uint64(len(torrent.Peers)), uint64(max_peers))]
-}
-
-func initTorrents(r redis.Conn) {
-	torrent_keys_reply, err := r.Do("KEYS", "t:t:*")
-	if err != nil {
-		log.Println("Failed to get torrent from redis", err)
-		return
-	}
-	torrent_keys, err := redis.Strings(torrent_keys_reply, nil)
-	if err != nil {
-		log.Println("Failed to parse torrent keys reply: ", err)
-		return
-	}
-	torrents := 0
-	mika.Lock()
-	defer mika.Unlock()
-	for _, torrent_key := range torrent_keys {
-		pcs := strings.SplitN(torrent_key, ":", 3)
-		if len(pcs) != 3 {
-			continue
-		}
-		torrent_id, err := strconv.ParseUint(pcs[2], 10, 64)
-		if err != nil {
-			// Other key type probably
-			continue
-		}
-		user := fetchTorrent(r, torrent_id)
-		if user != nil {
-			mika.Torrents[torrent_id] = user
-			torrents++
-		}
-	}
-
-	log.Println(fmt.Sprintf("Loaded %d torrents into memory", torrents))
-}
-
-func fetchTorrent(r redis.Conn, torrent_id uint64) *Torrent {
-	// Make new struct to use for cache
-	torrent := &Torrent{
-		TorrentID: torrent_id,
-		InfoHash:  "",
-		Enabled:   true,
-		Peers:     []*Peer{},
-	}
-
-	torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d", torrent_id))
-	if err != nil {
-		log.Println("Failed to get torrent from redis", err)
-		return nil
-	}
-
-	values, err := redis.Values(torrent_reply, nil)
-	if err != nil {
-		log.Println("Failed to parse torrent reply: ", err)
-		return nil
-	}
-
-	err = redis.ScanStruct(values, torrent)
-	if err != nil {
-		log.Println("Torrent scanstruct failure", err)
-		return nil
-	}
-
-	// Reset counts since we cant guarantee the accuracy after restart
-	// TODO allow reloading of peer/seed counts if a maximum time has not elapsed
-	// since the last startup.
-	torrent.Seeders = 0
-	torrent.Leechers = 0
-
-	// Make these once and save the results in mem
-	torrent.TorrentKey = fmt.Sprintf("t:t:%d", torrent_id)
-	torrent.TorrentPeersKey = fmt.Sprintf("t:t:%d:p", torrent_id)
-
-	return torrent
 }

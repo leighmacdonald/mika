@@ -15,26 +15,15 @@ def bin2hex(bin_info_hash):
 def load_torrents(db_conn, redis_conn, force=False):
     print("> Loading torrents...")
     with db_conn.cursor() as cur:
-        cur.execute("SELECT info_hash, id  FROM torrents where info_hash <> ''")
+        cur.execute("SELECT lower(hex(info_hash)), id  FROM torrents where info_hash <> ''")
         hashes = cur.fetchall()
     for info_hash, torrent_id in hashes:
-        ih = bin2hex(info_hash).decode()
-        torrent_key = "t:t:{}".format(torrent_id)
+        torrent_key = "t:t:{}".format(info_hash)
         # init default struct if not already exists
-        if not redis_conn.exists(torrent_key) or force:
-            redis_conn.hmset(torrent_key, {
-                'announces': 0,
-                'leechers': 0,
-                'seeders': 0,
-                'snatches': 0,
-                'uploaded': 0,
-                'downloaded': 0,
-                'info_hash': ih
-            })
-        else:
-            redis_conn.hset(torrent_key, "info_hash", ih)
-        # Set info_hash -> torrent_id mapping
-        redis_conn.set("t:info_hash:{}".format(ih), torrent_id)
+        redis_conn.hmset(torrent_key, {
+            'info_hash': info_hash,
+            'torrent_id': torrent_id
+        })
 
 
 def load_stats(redis_conn):
@@ -50,10 +39,8 @@ def load_users(db_conn, redis_conn):
         cur.execute("SELECT passkey, id FROM users")
         users = cur.fetchall()
     for user in users:
-        k = "t:u:{}".format(user[1])
         redis_conn.set("t:user:{}".format(user[0]), user[1])
-        if redis_conn.exists(k):
-            redis_conn.hset(k, 'passkey', user[0])
+        redis_conn.hset("t:u:{}".format(user[1]), 'passkey', user[0])
 
 
 def load_whitelist(db_conn, redis_conn):

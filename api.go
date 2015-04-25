@@ -67,13 +67,8 @@ func HandleTorrentGet(c *echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, ResponseErr{})
 	}
 
-	torrent_id_str := c.Param("torrent_id")
-	torrent_id, err := strconv.ParseUint(torrent_id_str, 10, 64)
-	if err != nil {
-		Debug(err)
-		return c.JSON(http.StatusNotFound, ResponseErr{})
-	}
-	torrent := mika.GetTorrentByID(r, torrent_id, false)
+	info_hash := c.Param("info_hash")
+	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{})
 	}
@@ -244,7 +239,7 @@ func HandleWhitelistDel(c *echo.Context) error {
 			defer returnRedisConnection(r)
 
 			r.Do("HDEL", "t:whitelist", prefix)
-			go initWhitelist(r)
+			go mika.initWhitelist(r)
 			return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
 		}
 	}

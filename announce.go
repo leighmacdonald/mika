@@ -95,7 +95,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 
-	torrent := mika.GetTorrentByInfoHash(r, ann.InfoHash, true)
+	torrent := mika.GetTorrentByInfoHash(r, fmt.Sprintf("%x", ann.InfoHash), true)
 	if torrent == nil {
 		Debug(fmt.Sprintf("Torrent not found: %x", ann.InfoHash))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
@@ -105,9 +105,6 @@ func HandleAnnounce(c *echo.Context) {
 		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
 		counter <- EV_INVALID_INFOHASH
 		return
-	}
-	if torrent.InfoHash == "" {
-		torrent.InfoHash = ann.InfoHash
 	}
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
@@ -176,7 +173,6 @@ func HandleAnnounce(c *echo.Context) {
 	}
 	r.Flush()
 
-	torrent.Seeders, torrent.Leechers = torrent.PeerCounts()
 	peer.AnnounceLast = unixtime()
 	if !peer.InQueue {
 		peer.InQueue = true

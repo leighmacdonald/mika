@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
-	"strconv"
-	"strings"
 	"sync"
 )
 
@@ -134,39 +132,4 @@ func (user *User) Sync(r redis.Conn) {
 
 func (user *User) AddPeer(peer *Peer) {
 	user.Peers = append(user.Peers, &peer)
-}
-
-// Load all the users into memory
-func initUsers(r redis.Conn) {
-	user_keys_reply, err := r.Do("KEYS", "t:u:*")
-	if err != nil {
-		log.Println("Failed to get torrent from redis", err)
-		return
-	}
-	user_keys, err := redis.Strings(user_keys_reply, nil)
-	if err != nil {
-		log.Println("Failed to parse peer reply: ", err)
-		return
-	}
-	users := 0
-	mika.Lock()
-	defer mika.Unlock()
-	for _, user_key := range user_keys {
-		pcs := strings.SplitN(user_key, ":", 3)
-		if len(pcs) != 3 {
-			continue
-		}
-		user_id, err := strconv.ParseUint(pcs[2], 10, 64)
-		if err != nil {
-			// Other key type probably
-			continue
-		}
-		user := fetchUser(r, user_id)
-		if user != nil {
-			mika.Users[user_id] = user
-			users++
-		}
-	}
-
-	log.Println(fmt.Sprintf("Loaded %d users into memory", users))
 }

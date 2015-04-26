@@ -10,18 +10,22 @@ import (
 type User struct {
 	Queued
 	sync.RWMutex
-	UserID     uint64   `redis:"user_id" json:"user_id"`
-	Enabled    bool     `redis:"enabled" json:"enabled"`
-	Uploaded   uint64   `redis:"uploaded" json:"uploaded"`
-	Downloaded uint64   `redis:"downloaded" json:"downloaded"`
-	Corrupt    uint64   `redis:"corrupt" json:"corrupt"`
-	Snatches   uint32   `redis:"snatches" json:"snatches"`
-	Passkey    string   `redis:"passkey" json:"passkey"`
-	UserKey    string   `redis:"-" json:"key"`
-	Username   string   `redis:"username" json:"username"`
-	CanLeech   bool     `redis:"can_leech" json:"can_leech"`
-	Announces  uint64   `redis:"announces" json:"announces"`
-	Peers      []**Peer `redis:"-" json:"-"`
+	UserID        uint64   `redis:"user_id" json:"user_id"`
+	Enabled       bool     `redis:"enabled" json:"enabled"`
+	Uploaded      uint64   `redis:"uploaded" json:"uploaded"`
+	Downloaded    uint64   `redis:"downloaded" json:"downloaded"`
+	Corrupt       uint64   `redis:"corrupt" json:"corrupt"`
+	Snatches      uint32   `redis:"snatches" json:"snatches"`
+	Passkey       string   `redis:"passkey" json:"passkey"`
+	UserKey       string   `redis:"-" json:"key"`
+	Username      string   `redis:"username" json:"username"`
+	CanLeech      bool     `redis:"can_leech" json:"can_leech"`
+	Announces     uint64   `redis:"announces" json:"announces"`
+	Peers         []**Peer `redis:"-" json:"-"`
+	KeyActive     string   `redis:"-" json:"-"`
+	KeyIncomplete string   `redis:"-" json:"-"`
+	KeyComplete   string   `redis:"-" json:"-"`
+	KeyHNR        string   `redis:"-" json:"-"`
 }
 
 // Fetch a user_id from the supplied passkey. A return value
@@ -74,6 +78,12 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 		log.Println(err)
 		return nil
 	}
+
+	user.KeyActive = fmt.Sprintf("t:u:%d:active", user_id)
+	user.KeyIncomplete = fmt.Sprintf("t:u:%d:incomplete", user_id)
+	user.KeyComplete = fmt.Sprintf("t:u:%d:complete", user_id)
+	user.KeyHNR = fmt.Sprintf("t:u:%d:hnr", user_id)
+
 	return user
 }
 

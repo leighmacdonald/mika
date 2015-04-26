@@ -13,31 +13,27 @@ import (
 type Peer struct {
 	Queued
 	sync.RWMutex
-	SpeedUP           float64 `redis:"speed_up" json:"speed_up"`
-	SpeedDN           float64 `redis:"speed_dn" json:"speed_dn"`
-	SpeedUPMax        float64 `redis:"speed_up" json:"speed_up_max"`
-	SpeedDNMax        float64 `redis:"speed_dn" json:"speed_dn_max"`
-	Uploaded          uint64  `redis:"uploaded" json:"uploaded"`
-	Downloaded        uint64  `redis:"downloaded" json:"downloaded"`
-	Corrupt           uint64  `redis:"corrupt" json:"corrupt"`
-	IP                string  `redis:"ip" json:"ip"`
-	Port              uint64  `redis:"port" json:"port"`
-	Left              uint64  `redis:"left" json:"left"`
-	Announces         uint64  `redis:"announces" json:"announces"`
-	TotalTime         uint32  `redis:"total_time" json:"total_time"`
-	AnnounceLast      int32   `redis:"last_announce" json:"last_announce"`
-	AnnounceFirst     int32   `redis:"first_announce" json:"first_announce"`
-	New               bool    `redis:"new" json:"-"`
-	PeerID            string  `redis:"peer_id" json:"peer_id"`
-	Active            bool    `redis:"active"  json:"active"`
-	Username          string  `redis:"username"  json:"username"`
-	UserID            uint64  `redis:"user_id"  json:"user_id"`
-	TorrentID         uint64  `redis:"torrent_id" json:"torrent_id"`
-	KeyPeer           string  `redis:"-" json:"-"`
-	KeyUserActive     string  `redis:"-" json:"-"`
-	KeyUserIncomplete string  `redis:"-" json:"-"`
-	KeyUserComplete   string  `redis:"-" json:"-"`
-	KeyUserHNR        string  `redis:"-" json:"-"`
+	SpeedUP       float64 `redis:"speed_up" json:"speed_up"`
+	SpeedDN       float64 `redis:"speed_dn" json:"speed_dn"`
+	SpeedUPMax    float64 `redis:"speed_up" json:"speed_up_max"`
+	SpeedDNMax    float64 `redis:"speed_dn" json:"speed_dn_max"`
+	Uploaded      uint64  `redis:"uploaded" json:"uploaded"`
+	Downloaded    uint64  `redis:"downloaded" json:"downloaded"`
+	Corrupt       uint64  `redis:"corrupt" json:"corrupt"`
+	IP            string  `redis:"ip" json:"ip"`
+	Port          uint64  `redis:"port" json:"port"`
+	Left          uint64  `redis:"left" json:"left"`
+	Announces     uint64  `redis:"announces" json:"announces"`
+	TotalTime     uint32  `redis:"total_time" json:"total_time"`
+	AnnounceLast  int32   `redis:"last_announce" json:"last_announce"`
+	AnnounceFirst int32   `redis:"first_announce" json:"first_announce"`
+	New           bool    `redis:"new" json:"-"`
+	PeerID        string  `redis:"peer_id" json:"peer_id"`
+	Active        bool    `redis:"active"  json:"active"`
+	Username      string  `redis:"username"  json:"username"`
+	UserID        uint64  `redis:"user_id"  json:"user_id"`
+	TorrentID     uint64  `redis:"torrent_id" json:"torrent_id"`
+	KeyPeer       string  `redis:"-" json:"-"`
 }
 
 // Update the stored values with the data from an announce
@@ -87,10 +83,6 @@ func (peer *Peer) SetUserID(user_id uint64, username string) {
 	peer.Lock()
 	defer peer.Unlock()
 	peer.UserID = user_id
-	peer.KeyUserActive = fmt.Sprintf("t:u:%d:active", user_id)
-	peer.KeyUserIncomplete = fmt.Sprintf("t:u:%d:incomplete", user_id)
-	peer.KeyUserComplete = fmt.Sprintf("t:u:%d:complete", user_id)
-	peer.KeyUserHNR = fmt.Sprintf("t:u:%d:hnr", user_id)
 	peer.Username = username
 }
 

@@ -234,7 +234,7 @@ func main() {
 	connResponse = make(chan redis.Conn, 200)
 	connDone = make(chan redis.Conn, 200)
 	pool = &redis.Pool{
-		MaxIdle: 20,
+		MaxIdle: 1000,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", config.RedisHost)
 			if err != nil {
@@ -272,15 +272,19 @@ func main() {
 	e.Get("/:passkey/scrape", HandleScrape)
 
 	api_grp := e.Group("/api")
+
 	api_grp.Get("/version", HandleVersion)
+	api_grp.Get("/test", HandleGetTorrentPeer)
+
 	api_grp.Get("/torrent/:info_hash", HandleTorrentGet)
 	api_grp.Post("/torrent", HandleTorrentAdd)
 	api_grp.Get("/torrent/:info_hash/peers", HandleGetTorrentPeers)
 	api_grp.Delete("/torrent/:info_hash", HandleTorrentDel)
-	api_grp.Get("/test", HandleGetTorrentPeer)
+
 	api_grp.Get("/user/:user_id", HandleUserGet)
 	api_grp.Post("/user/:user_id", HandleUserUpdate)
 	api_grp.Post("/user", HandleUserCreate)
+
 	api_grp.Post("/whitelist", HandleWhitelistAdd)
 	api_grp.Delete("/whitelist/:prefix", HandleWhitelistDel)
 

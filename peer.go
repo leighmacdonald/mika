@@ -30,6 +30,7 @@ type Peer struct {
 	New               bool    `redis:"new" json:"-"`
 	PeerID            string  `redis:"peer_id" json:"peer_id"`
 	Active            bool    `redis:"active"  json:"active"`
+	Username          string  `redis:"username"  json:"username"`
 	UserID            uint64  `redis:"user_id"  json:"user_id"`
 	TorrentID         uint64  `redis:"torrent_id" json:"torrent_id"`
 	KeyPeer           string  `redis:"-" json:"-"`
@@ -42,6 +43,7 @@ type Peer struct {
 // Update the stored values with the data from an announce
 func (peer *Peer) Update(announce *AnnounceRequest) (ul uint64, dl uint64) {
 	peer.Lock()
+	defer peer.Unlock()
 	cur_time := unixtime()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
@@ -78,18 +80,18 @@ func (peer *Peer) Update(announce *AnnounceRequest) (ul uint64, dl uint64) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
-	peer.Unlock()
 	return ul, dl
 }
 
-func (peer *Peer) SetUserID(user_id uint64) {
+func (peer *Peer) SetUserID(user_id uint64, username string) {
 	peer.Lock()
+	defer peer.Unlock()
 	peer.UserID = user_id
 	peer.KeyUserActive = fmt.Sprintf("t:u:%d:active", user_id)
 	peer.KeyUserIncomplete = fmt.Sprintf("t:u:%d:incomplete", user_id)
 	peer.KeyUserComplete = fmt.Sprintf("t:u:%d:complete", user_id)
 	peer.KeyUserHNR = fmt.Sprintf("t:u:%d:hnr", user_id)
-	peer.Unlock()
+	peer.Username = username
 }
 
 func (peer *Peer) Sync(r redis.Conn) {
@@ -109,6 +111,7 @@ func (peer *Peer) Sync(r redis.Conn) {
 		"uploaded", peer.Uploaded,
 		"downloaded", peer.Downloaded,
 		"corrupt", peer.Corrupt,
+		"username", peer.Username,
 		"user_id", peer.UserID, // Shouldn't need to be here
 		"peer_id", peer.PeerID, // Shouldn't need to be here
 		"torrent_id", peer.TorrentID, // Shouldn't need to be here
@@ -162,6 +165,7 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 		Downloaded:    0,
 		Left:          0,
 		Corrupt:       0,
+		Username:      "",
 		IP:            "127.0.0.1",
 		Port:          0,
 		AnnounceFirst: unixtime(),

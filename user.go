@@ -18,6 +18,7 @@ type User struct {
 	Snatches   uint32   `redis:"snatches" json:"snatches"`
 	Passkey    string   `redis:"passkey" json:"passkey"`
 	UserKey    string   `redis:"-" json:"key"`
+	Username   string   `redis:"username" json:"username"`
 	CanLeech   bool     `redis:"can_leech" json:"can_leech"`
 	Announces  uint64   `redis:"announces" json:"announces"`
 	Peers      []**Peer `redis:"-" json:"-"`
@@ -51,6 +52,7 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 		Downloaded: 0,
 		Snatches:   0,
 		Passkey:    "",
+		Username:   "",
 		CanLeech:   true,
 		Peers:      make([]**Peer, 1),
 		UserKey:    fmt.Sprintf("t:u:%d", user_id),
@@ -115,6 +117,7 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 }
 
 // Write our bits out to redis
+// TODO only write out what is changed
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
 		"HMSET", user.UserKey,
@@ -127,6 +130,7 @@ func (user *User) Sync(r redis.Conn) {
 		"can_leech", user.CanLeech,
 		"passkey", user.Passkey,
 		"enabled", user.Enabled,
+		"username", user.Username,
 	)
 }
 

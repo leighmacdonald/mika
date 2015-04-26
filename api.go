@@ -32,6 +32,7 @@ type UserUpdatePayload struct {
 	CanLeech   bool   `json:"can_leech"`
 	Downloaded uint64 `json:"downloaded"`
 	Uploaded   uint64 `json:"uploaded"`
+	Enabled    bool   `json:"enabled"`
 }
 
 type TorrentPayload struct {
@@ -41,6 +42,7 @@ type TorrentPayload struct {
 type TorrentAddPayload struct {
 	TorrentPayload
 	InfoHash string `json:"info_hash"`
+	Name     string `json:"name"`
 }
 
 type TorrentDelPayload struct {
@@ -88,15 +90,25 @@ func HandleTorrentAdd(c *echo.Context) error {
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
 
-	_, err := r.Do("SET", payload.InfoHash, payload.TorrentID)
-	if err != nil {
-		return errors.New("Failed to insert torrent")
+	torrent := mika.GetTorrentByInfoHash(r, payload.InfoHash, false)
+	if torrent != nil {
+		torrent.Enabled = true
+	} else {
+		torrent = &Torrent{
+			InfoHash:  payload.InfoHash,
+			Name:      payload.Name,
+			TorrentID: payload.TorrentID,
+			Enabled:   true,
+			Peers:     []*Peer{},
+		}
+
+		mika.Lock()
+		mika.Torrents[payload.InfoHash] = torrent
+		mika.Unlock()
 	}
+	sync_torrent <- torrent
 
-	torrent := mika.GetTorrentByID(r, payload.TorrentID, true)
-	torrent.Enabled = true
-
-	log.Println("Added new torrent:", payload)
+	log.Println("Added new torrent:", payload.Name)
 	return c.JSON(http.StatusCreated, Response{})
 }
 
@@ -107,13 +119,8 @@ func HandleTorrentDel(c *echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, ResponseErr{})
 	}
 
-	torrent_id_str := c.Param("torrent_id")
-	torrent_id, err := strconv.ParseUint(torrent_id_str, 10, 64)
-	if err != nil {
-		Debug(err)
-		return c.JSON(http.StatusNotFound, ResponseErr{})
-	}
-	torrent := mika.GetTorrentByID(r, torrent_id, false)
+	info_hash := c.Param("info_hash")
+	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id", http.StatusNotFound})
 	}
@@ -198,10 +205,12 @@ func HandleUserUpdate(c *echo.Context) error {
 	}
 
 	user.Lock()
+	// Let us do partial updates as well
 	user.Uploaded = payload.Uploaded
 	user.Downloaded = payload.Downloaded
 	user.Passkey = payload.Passkey
 	user.CanLeech = payload.CanLeech
+	user.Enabled = payload.Enabled
 	user.Unlock()
 
 	if !user.InQueue {
@@ -221,13 +230,12 @@ func HandleWhitelistAdd(c *echo.Context) error {
 			return c.JSON(http.StatusConflict, ResponseErr{"ok", http.StatusConflict})
 		}
 	}
-	whitelist = append(whitelist, payload.Prefix)
 
 	r := getRedisConnection()
 	defer returnRedisConnection(r)
 
 	r.Do("HSET", "t:whitelist", payload.Prefix, payload.Client)
-
+	go mika.initWhitelist(r)
 	return c.JSON(http.StatusCreated, ResponseErr{"ok", http.StatusCreated})
 }
 
@@ -248,4 +256,19 @@ func HandleWhitelistDel(c *echo.Context) error {
 
 func HandleGetTorrentPeer(c *echo.Context) error {
 	return c.JSON(http.StatusOK, ResponseErr{"Nope! :(", 200})
+}
+
+func HandleGetTorrentPeers(c *echo.Context) error {
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+	if r.Err() != nil {
+		return c.JSON(http.StatusInternalServerError, ResponseErr{})
+	}
+
+	info_hash := c.Param("info_hash")
+	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
+	if torrent == nil {
+		return c.JSON(http.StatusNotFound, ResponseErr{})
+	}
+	return c.JSON(http.StatusOK, torrent.Peers)
 }

@@ -68,39 +68,42 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new 
 func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 	// Make new struct to use for cache
 	torrent := &Torrent{
-		TorrentID: 0,
-		InfoHash:  info_hash,
-		Enabled:   true,
-		Seeders:   0,
-		Leechers:  0,
-		Snatches:  0,
-		Peers:     []*Peer{},
+		InfoHash: info_hash,
+		Name:     "",
+		Enabled:  true,
+		Peers:    []*Peer{},
 	}
 
-	torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%s", info_hash))
+	exists_reply, err := r.Do("EXISTS", fmt.Sprintf("t:t:%s", info_hash))
+	exists, err := redis.Bool(exists_reply, err)
 	if err != nil {
-		log.Println("Failed to get torrent from redis", err)
-		return nil
+		exists = false
 	}
+	if exists {
+		torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%s", info_hash))
+		if err != nil {
+			log.Println("Failed to get torrent from redis", err)
+			return nil
+		}
 
-	values, err := redis.Values(torrent_reply, nil)
-	if err != nil {
-		log.Println("Failed to parse torrent reply: ", err)
-		return nil
+		values, err := redis.Values(torrent_reply, nil)
+		if err != nil {
+			log.Println("Failed to parse torrent reply: ", err)
+			return nil
+		}
+
+		err = redis.ScanStruct(values, torrent)
+		if err != nil {
+			log.Println("Torrent scanstruct failure", err)
+			return nil
+		}
+
+		if torrent.TorrentID == 0 {
+			Debug("Trying to fetch info hash without valid key:", info_hash)
+			r.Do("DEL", fmt.Sprintf("t:t:%s", torrent.InfoHash))
+			return nil
+		}
 	}
-
-	err = redis.ScanStruct(values, torrent)
-	if err != nil {
-		log.Println("Torrent scanstruct failure", err)
-		return nil
-	}
-
-	if torrent.TorrentID == 0 {
-		Debug("Trying to fetch info hash without valid key:", info_hash)
-		r.Do("DEL", fmt.Sprintf("t:t:%s", torrent.InfoHash))
-		return nil
-	}
-
 	// Reset counts since we cant guarantee the accuracy after restart
 	// TODO allow reloading of peer/seed counts if a maximum time has not elapsed
 	// since the last startup.

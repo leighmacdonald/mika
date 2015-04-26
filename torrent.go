@@ -10,6 +10,7 @@ import (
 type Torrent struct {
 	Queued
 	sync.RWMutex
+	Name            string  `redis:"name" json:"name"`
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
 	InfoHash        string  `redis:"info_hash" json:"info_hash"`
 	Seeders         int16   `redis:"seeders" json:"seeders"`
@@ -47,6 +48,7 @@ func (torrent *Torrent) Sync(r redis.Conn) {
 		"info_hash", torrent.InfoHash,
 		"reason", torrent.Reason,
 		"enabled", torrent.Enabled,
+		"name", torrent.Name,
 	)
 }
 

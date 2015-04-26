@@ -15,14 +15,16 @@ def bin2hex(bin_info_hash):
 def load_torrents(db_conn, redis_conn, force=False):
     print("> Loading torrents...")
     with db_conn.cursor() as cur:
-        cur.execute("SELECT lower(hex(info_hash)), id  FROM torrents where info_hash <> ''")
+        cur.execute("SELECT lower(hex(info_hash)), id, release_name  FROM torrents WHERE info_hash <> ''")
         hashes = cur.fetchall()
-    for info_hash, torrent_id in hashes:
+    for x in hashes:
+        info_hash, torrent_id, release_name = x
         torrent_key = "t:t:{}".format(info_hash)
         # init default struct if not already exists
         redis_conn.hmset(torrent_key, {
             'info_hash': info_hash,
-            'torrent_id': torrent_id
+            'torrent_id': torrent_id,
+            'name': release_name
         })
 
 
@@ -36,11 +38,12 @@ def load_stats(redis_conn):
 def load_users(db_conn, redis_conn):
     print("> Loading users... ")
     with db_conn.cursor() as cur:
-        cur.execute("SELECT passkey, id FROM users")
+        cur.execute("SELECT passkey, id, username FROM users")
         users = cur.fetchall()
     for user in users:
         redis_conn.set("t:user:{}".format(user[0]), user[1])
         redis_conn.hset("t:u:{}".format(user[1]), 'passkey', user[0])
+        redis_conn.hset("t:u:{}".format(user[1]), 'username', user[2])
 
 
 def load_whitelist(db_conn, redis_conn):
@@ -48,7 +51,7 @@ def load_whitelist(db_conn, redis_conn):
     key = "t:whitelist"
     redis_conn.delete(key)
     with db_conn.cursor() as cur:
-        cur.execute("SELECT peer_id, vstring as client FROM xbt_client_whitelist")
+        cur.execute("SELECT peer_id, vstring AS client FROM xbt_client_whitelist")
         clients = cur.fetchall()
     for peer_id, client in clients:
         redis_conn.hset(key, peer_id, client)

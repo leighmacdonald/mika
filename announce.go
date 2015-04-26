@@ -114,7 +114,7 @@ func HandleAnnounce(c *echo.Context) {
 		counter <- EV_ANNOUNCE_FAIL
 		return
 	}
-	peer.SetUserID(user.UserID) //where to put this/handle this cleaner?
+	peer.SetUserID(user.UserID, user.Username) //where to put this/handle this cleaner?
 
 	// user update MUST happen after peer update since we rely on the old dl/ul values
 	ul, dl := peer.Update(ann)

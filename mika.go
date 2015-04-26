@@ -47,7 +47,7 @@ type DBEntity interface {
 }
 
 type Queued struct {
-	InQueue bool
+	InQueue bool `redis:"-" json:"-"`
 }
 
 const (
@@ -275,7 +275,8 @@ func main() {
 	api_grp.Get("/version", HandleVersion)
 	api_grp.Get("/torrent/:info_hash", HandleTorrentGet)
 	api_grp.Post("/torrent", HandleTorrentAdd)
-	api_grp.Delete("/torrent/:torrent_id", HandleTorrentDel)
+	api_grp.Get("/torrent/:info_hash/peers", HandleGetTorrentPeers)
+	api_grp.Delete("/torrent/:info_hash", HandleTorrentDel)
 	api_grp.Get("/test", HandleGetTorrentPeer)
 	api_grp.Get("/user/:user_id", HandleUserGet)
 	api_grp.Post("/user/:user_id", HandleUserUpdate)

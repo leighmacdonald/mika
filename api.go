@@ -24,7 +24,9 @@ type UserPayload struct {
 
 type UserCreatePayload struct {
 	UserPayload
-	Passkey string `json:"passkey"`
+	Passkey  string `json:"passkey"`
+	CanLeech bool   `json:"can_leech"`
+	Name     string `json:"name"`
 }
 
 type UserUpdatePayload struct {
@@ -238,8 +240,9 @@ func HandleUserCreate(c *echo.Context) error {
 	user = GetUserByID(r, payload.UserID, true)
 	mika.Lock()
 	user.Passkey = payload.Passkey
-	user.CanLeech = true
+	user.CanLeech = payload.CanLeech
 	user.Enabled = true
+	user.Username = payload.Name
 	mika.Unlock()
 	if !user.InQueue {
 		user.InQueue = true

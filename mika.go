@@ -250,6 +250,11 @@ func main() {
 		},
 		TestOnBorrow: func(c redis.Conn, t time.Time) error {
 			_, err := c.Do("PING")
+			if err != nil {
+				// TODO remove me, temp hack to allow supervisord to reload process
+				// since we currently don't acutually handle graceful reconnects yet.
+				log.Fatalln("Bad redis voodoo! exiting!")
+			}
 			return err
 		},
 	}
@@ -281,9 +286,10 @@ func main() {
 	api_grp.Get("/torrent/:info_hash/peers", HandleGetTorrentPeers)
 	api_grp.Delete("/torrent/:info_hash", HandleTorrentDel)
 
+	api_grp.Post("/user", HandleUserCreate)
 	api_grp.Get("/user/:user_id", HandleUserGet)
 	api_grp.Post("/user/:user_id", HandleUserUpdate)
-	api_grp.Post("/user", HandleUserCreate)
+	api_grp.Get("/user/:user_id/torrents", HandleUserTorrents)
 
 	api_grp.Post("/whitelist", HandleWhitelistAdd)
 	api_grp.Delete("/whitelist/:prefix", HandleWhitelistDel)

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/garyburd/redigo/redis"
 	"github.com/labstack/echo"
 	"log"
 	"net/http"
@@ -45,6 +46,13 @@ type TorrentAddPayload struct {
 	Name     string `json:"name"`
 }
 
+type UserTorrentsResponse struct {
+	Active     []string `json:"active"`
+	HNR        []string `json:"hnr"`
+	Complete   []string `json:"complete"`
+	Incomplete []string `json:"incomplete"`
+}
+
 type TorrentDelPayload struct {
 	TorrentPayload
 	Reason string
@@ -72,7 +80,7 @@ func HandleTorrentGet(c *echo.Context) error {
 	info_hash := c.Param("info_hash")
 	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
-		return c.JSON(http.StatusNotFound, ResponseErr{})
+		return c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash", 404})
 	}
 	return c.JSON(http.StatusOK, torrent)
 }
@@ -135,25 +143,80 @@ func HandleTorrentDel(c *echo.Context) error {
 	return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
 }
 
-func HandleUserGetActive(c *echo.Context) {
-
-}
-
-func HandleUserGet(c *echo.Context) error {
+func getUser(c *echo.Context) *User {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
 		Debug(err)
-		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
+		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
+		return nil
 	}
 
 	mika.RLock()
 	defer mika.RUnlock()
 	user, exists := mika.Users[user_id]
 	if !exists {
-		return c.JSON(http.StatusNotFound, ResponseErr{"Not Found", 404})
+		c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
+		return nil
 	}
-	return c.JSON(http.StatusOK, user)
+	return user
+}
+
+func HandleUserTorrents(c *echo.Context) error {
+	user := getUser(c)
+	if user == nil {
+		return nil
+	}
+	response := UserTorrentsResponse{}
+	r := getRedisConnection()
+	defer returnRedisConnection(r)
+
+	a, err := r.Do("SMEMBERS", user.KeyActive)
+
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	active_list, err := redis.Strings(a, nil)
+
+	a, err = r.Do("SMEMBERS", user.KeyHNR)
+
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	hnr_list, err := redis.Strings(a, nil)
+
+	a, err = r.Do("SMEMBERS", user.KeyComplete)
+
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	complete_list, err := redis.Strings(a, nil)
+
+	a, err = r.Do("SMEMBERS", user.KeyIncomplete)
+
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	incomplete_list, err := redis.Strings(a, nil)
+
+	response.Active = active_list
+	response.HNR = hnr_list
+	response.Incomplete = incomplete_list
+	response.Complete = complete_list
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func HandleUserGet(c *echo.Context) error {
+	user := getUser(c)
+	if user != nil {
+		return c.JSON(http.StatusOK, user)
+	}
+	return nil
 }
 
 func HandleUserCreate(c *echo.Context) error {

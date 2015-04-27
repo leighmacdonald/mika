@@ -141,8 +141,7 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 		return
 	}
 	torrents := 0
-	mika.Lock()
-	defer mika.Unlock()
+
 	for _, torrent_key := range torrent_keys {
 		pcs := strings.SplitN(torrent_key, ":", 3)
 		if len(pcs) != 3 {
@@ -174,8 +173,7 @@ func (t *Tracker) initUsers(r redis.Conn) {
 		return
 	}
 	users := 0
-	mika.Lock()
-	defer mika.Unlock()
+
 	for _, user_key := range user_keys {
 		pcs := strings.SplitN(user_key, ":", 3)
 		if len(pcs) != 3 {

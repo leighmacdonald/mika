@@ -92,15 +92,15 @@ func GetUserByPasskey(r redis.Conn, passkey string) *User {
 // fetch a user from the backend database if
 func GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *User {
 
-	mika.RLock()
+	mika.UsersMutex.RLock()
 	user, exists := mika.Users[user_id]
-	mika.RUnlock()
+	mika.UsersMutex.RUnlock()
 
 	if !exists && auto_create {
 		user = fetchUser(r, user_id)
-		mika.Lock()
+		mika.UsersMutex.Lock()
 		mika.Users[user_id] = user
-		mika.Unlock()
+		mika.UsersMutex.Unlock()
 		Debug("Added new user to in-memory cache:", user_id)
 		return user
 	}
@@ -124,17 +124,17 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 // TODO only write out what is changed
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
-	"HMSET", user.UserKey,
-	"user_id", user.UserID,
-	"uploaded", user.Uploaded,
-	"downloaded", user.Downloaded,
-	"corrupt", user.Corrupt,
-	"snatches", user.Snatches,
-	"announces", user.Announces,
-	"can_leech", user.CanLeech,
-	"passkey", user.Passkey,
-	"enabled", user.Enabled,
-	"username", user.Username,
+		"HMSET", user.UserKey,
+		"user_id", user.UserID,
+		"uploaded", user.Uploaded,
+		"downloaded", user.Downloaded,
+		"corrupt", user.Corrupt,
+		"snatches", user.Snatches,
+		"announces", user.Announces,
+		"can_leech", user.CanLeech,
+		"passkey", user.Passkey,
+		"enabled", user.Enabled,
+		"username", user.Username,
 	)
 }
 

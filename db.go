@@ -80,14 +80,16 @@ func dbStatIndexer() {
 
 	for {
 		time.Sleep(time.Duration(config.IndexInterval) * time.Second)
-		mika.RLock()
+		mika.TorrentsMutex.RLock()
 		for _, torrent := range mika.Torrents {
+			torrent.RLock()
 			leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
 			seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
 			snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
+			torrent.RUnlock()
 			count++
 		}
-		mika.RUnlock()
+		mika.TorrentsMutex.RUnlock()
 		if count > 0 {
 			r.Send("ZADD", key_leechers, leecher_args)
 			r.Send("ZADD", key_seeders, seeder_args)
@@ -117,15 +119,21 @@ func syncWriter() {
 		case user := <-sync_user:
 			Debug("sync user")
 			user.Sync(r)
+			user.Lock()
 			user.InQueue = false
+			user.Unlock()
 		case torrent := <-sync_torrent:
 			Debug("sync torrent")
 			torrent.Sync(r)
+			torrent.Lock()
 			torrent.InQueue = false
+			torrent.Unlock()
 		case peer := <-sync_peer:
 			Debug("sync peer")
 			peer.Sync(r)
+			peer.Lock()
 			peer.InQueue = false
+			peer.Unlock()
 		}
 		err := r.Flush()
 		if err != nil {

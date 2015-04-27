@@ -10,9 +10,11 @@ import (
 )
 
 type Tracker struct {
-	sync.RWMutex
-	Torrents map[string]*Torrent
-	Users    map[uint64]*User
+	TorrentsMutex *sync.RWMutex
+	Torrents      map[string]*Torrent
+
+	UsersMutex *sync.RWMutex
+	Users      map[uint64]*User
 }
 
 // Load the models into memory from redis
@@ -32,8 +34,8 @@ func (t *Tracker) Initialize() error {
 // If the torrent doesn't exist in the database a new skeleton Torrent
 // instance will be returned.
 func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool) *Torrent {
-	mika.RLock()
-	defer mika.RUnlock()
+	mika.TorrentsMutex.RLock()
+	defer mika.TorrentsMutex.RUnlock()
 	for _, torrent := range t.Torrents {
 		if torrent.TorrentID == torrent_id {
 			return torrent
@@ -46,9 +48,9 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool)
 // as a GET value. If the info_hash doesn't return an id we consider the torrent
 // either soft-deleted or non-existent
 func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new bool) *Torrent {
-	mika.RLock()
-	defer mika.RUnlock()
+	mika.TorrentsMutex.RLock()
 	torrent, exists := t.Torrents[info_hash]
+	mika.TorrentsMutex.RUnlock()
 	if exists {
 		return torrent
 	}
@@ -57,9 +59,9 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new 
 		if torrent == nil {
 			return nil
 		}
-		mika.Lock()
+		mika.TorrentsMutex.Lock()
 		t.Torrents[info_hash] = torrent
-		mika.Unlock()
+		mika.TorrentsMutex.Unlock()
 		Debug("Added new torrent to in-memory cache:", info_hash)
 	}
 	return nil
@@ -149,7 +151,9 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 		}
 		torrent := t.FetchTorrent(r, pcs[2])
 		if torrent != nil {
+			mika.TorrentsMutex.Lock()
 			mika.Torrents[torrent.InfoHash] = torrent
+			mika.TorrentsMutex.Unlock()
 			torrents++
 		} else {
 			// Drop keys we don't have valid id's'for
@@ -186,7 +190,9 @@ func (t *Tracker) initUsers(r redis.Conn) {
 		}
 		user := fetchUser(r, user_id)
 		if user != nil {
+			mika.UsersMutex.Lock()
 			mika.Users[user_id] = user
+			mika.UsersMutex.Unlock()
 			users++
 		}
 	}

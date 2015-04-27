@@ -101,6 +101,7 @@ func HandleTorrentAdd(c *echo.Context) error {
 	defer r.Close()
 
 	torrent := mika.GetTorrentByInfoHash(r, payload.InfoHash, false)
+	mika.TorrentsMutex.Lock()
 	if torrent != nil {
 		torrent.Enabled = true
 	} else {
@@ -111,10 +112,8 @@ func HandleTorrentAdd(c *echo.Context) error {
 			Enabled:   true,
 			Peers:     []*Peer{},
 		}
-
-		mika.Lock()
 		mika.Torrents[payload.InfoHash] = torrent
-		mika.Unlock()
+		mika.TorrentsMutex.Unlock()
 	}
 	sync_torrent <- torrent
 
@@ -134,9 +133,9 @@ func HandleTorrentDel(c *echo.Context) error {
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id", http.StatusNotFound})
 	}
-	mika.Lock()
+	torrent.Lock()
 	torrent.Enabled = false
-	mika.Unlock()
+	torrent.Unlock()
 	if !torrent.InQueue {
 		torrent.InQueue = true
 		sync_torrent <- torrent
@@ -153,10 +152,9 @@ func getUser(c *echo.Context) *User {
 		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
 		return nil
 	}
-
-	mika.RLock()
-	defer mika.RUnlock()
+	mika.UsersMutex.RLock()
 	user, exists := mika.Users[user_id]
+	mika.UsersMutex.RUnlock()
 	if !exists {
 		c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
 		return nil
@@ -238,15 +236,17 @@ func HandleUserCreate(c *echo.Context) error {
 	}
 
 	user = GetUserByID(r, payload.UserID, true)
-	mika.Lock()
+	user.Lock()
 	user.Passkey = payload.Passkey
 	user.CanLeech = payload.CanLeech
 	user.Enabled = true
 	user.Username = payload.Name
-	mika.Unlock()
 	if !user.InQueue {
 		user.InQueue = true
+		user.Unlock()
 		sync_user <- user
+	} else {
+		user.Unlock()
 	}
 	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
 }
@@ -263,9 +263,9 @@ func HandleUserUpdate(c *echo.Context) error {
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format", 0})
 	}
 
-	mika.RLock()
+	mika.UsersMutex.Lock()
 	user, exists := mika.Users[user_id]
-	mika.RUnlock()
+	mika.UsersMutex.RUnlock()
 	if !exists {
 		return c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
 	}
@@ -277,11 +277,13 @@ func HandleUserUpdate(c *echo.Context) error {
 	user.Passkey = payload.Passkey
 	user.CanLeech = payload.CanLeech
 	user.Enabled = payload.Enabled
-	user.Unlock()
 
 	if !user.InQueue {
 		user.InQueue = true
+		user.Unlock()
 		sync_user <- user
+	} else {
+		user.Unlock()
 	}
 	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
 }

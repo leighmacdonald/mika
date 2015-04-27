@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 	//"net/url"
+	"sync"
 )
 
 const (
@@ -18,6 +19,7 @@ const (
 )
 
 type StatsCounter struct {
+	sync.RWMutex
 	channel         chan int
 	Requests        uint64
 	RequestsFail    uint64
@@ -75,6 +77,7 @@ func NewStatCounter(c chan int) *StatsCounter {
 func (stats *StatsCounter) counter() {
 	for {
 		v := <-stats.channel
+		stats.Lock()
 		switch v {
 		case EV_ANNOUNCE:
 			stats.Announce++
@@ -93,16 +96,22 @@ func (stats *StatsCounter) counter() {
 		case EV_INVALID_CLIENT:
 			stats.InvalidClient++
 		}
+		stats.Unlock()
 	}
 }
 
 func (stats *StatsCounter) statPrinter() {
 	for {
 		time.Sleep(60 * time.Second)
+		stats.RLock()
 		req_sec := stats.Requests / 60
 		log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d",
 			stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
 			stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec)
+		stats.RUnlock()
+		stats.Lock()
 		stats.Requests = 0
+		stats.Unlock()
+
 	}
 }

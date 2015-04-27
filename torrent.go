@@ -27,12 +27,14 @@ type Torrent struct {
 }
 
 func (torrent *Torrent) Update(announce *AnnounceRequest) {
+	s, l := torrent.PeerCounts()
 	torrent.Lock()
-	defer torrent.Unlock()
 	torrent.Announces++
 	torrent.Uploaded += announce.Uploaded
 	torrent.Downloaded += announce.Downloaded
-	torrent.Seeders, torrent.Leechers = torrent.PeerCounts()
+	torrent.Seeders = s
+	torrent.Leechers = l
+	torrent.Unlock()
 }
 
 func (torrent *Torrent) Sync(r redis.Conn) {
@@ -101,9 +103,7 @@ func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
 
 // Add a peer to a torrents active peer_id list
 func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
-	torrent.Lock()
 	torrent.Peers = append(torrent.Peers, peer)
-	torrent.Unlock()
 
 	v, err := r.Do("SADD", fmt.Sprintf("t:t:%s:p", torrent.InfoHash), peer.PeerID)
 	if err != nil {
@@ -146,6 +146,8 @@ func (torrent *Torrent) HasPeer(peer *Peer) bool {
 
 func (torrent *Torrent) PeerCounts() (int16, int16) {
 	s, l := 0, 0
+	torrent.RLock()
+	defer torrent.RUnlock()
 	for _, p := range torrent.Peers {
 		if p.IsSeeder() {
 			s++

@@ -79,7 +79,7 @@ func HandleAnnounce(c *echo.Context) {
 	user := GetUserByPasskey(r, passkey)
 	if user == nil {
 		log.Println("HandleAnnounce: Invalid passkey", passkey)
-		oops(c, MSG_GENERIC_ERROR)
+		oopsStr(c, MSG_GENERIC_ERROR, "Invalid passkey")
 		counter <- EV_INVALID_PASSKEY
 		return
 	}

@@ -88,7 +88,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 	if !IsValidClient(r, ann.PeerID) {
-		log.Println("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID, user.UserID, user.Username))
+		log.Println("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID[0:6], user.UserID, user.Username))
 		oops(c, MSG_INVALID_PEER_ID)
 		counter <- EV_INVALID_CLIENT
 		return
@@ -170,7 +170,7 @@ func HandleAnnounce(c *echo.Context) {
 		// Refresh the peers expiration timer
 		// If this expires, the peer reaper takes over and removes the
 		// peer from torrents in the case of a non-clean client shutdown
-		r.Send("SETEX", fmt.Sprintf("t:t:%d:%s:exp", torrent.TorrentID, ann.PeerID), config.ReapInterval, 1)
+		r.Send("SETEX", fmt.Sprintf("t:t:%s:%s:exp", torrent.InfoHash, ann.PeerID), config.ReapInterval, 1)
 	}
 	r.Flush()
 

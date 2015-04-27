@@ -31,18 +31,26 @@ type User struct {
 // Fetch a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
 func findUserID(r redis.Conn, passkey string) uint64 {
-	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
-	if err != nil {
-		CaptureMessage("user.findUserID")
-		log.Println(err)
-		return 0
+	mika.RLock()
+	defer mika.RUnlock()
+	for _, user := range mika.Users {
+		if user.Passkey == passkey {
+			return user.UserID
+		}
 	}
-	user_id, err_b := redis.Uint64(user_id_reply, nil)
-	if err_b != nil {
-		log.Println("Failed to find user", err_b)
-		return 0
-	}
-	return user_id
+	return 0
+	//	user_id_reply, err := r.Do("GET", fmt.Sprintf("t:user:%s", passkey))
+	//	if err != nil {
+	//		CaptureMessage("user.findUserID")
+	//		log.Println(err)
+	//		return 0
+	//	}
+	//	user_id, err_b := redis.Uint64(user_id_reply, nil)
+	//	if err_b != nil {
+	//		log.Println("Failed to find user", err_b)
+	//		return 0
+	//	}
+	//	return user_id
 }
 
 // Create a new user instance, loading existing data from redis if it exists

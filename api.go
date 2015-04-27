@@ -84,6 +84,7 @@ func HandleTorrentGet(c *echo.Context) error {
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash", 404})
 	}
+	log.Println("HandleTorrentGet: Fetched torrent", info_hash)
 	return c.JSON(http.StatusOK, torrent)
 }
 
@@ -117,7 +118,7 @@ func HandleTorrentAdd(c *echo.Context) error {
 	}
 	sync_torrent <- torrent
 
-	log.Println("Added new torrent:", payload.Name)
+	log.Println("HandleTorrentAdd: Added new torrent:", payload.Name)
 	return c.JSON(http.StatusCreated, Response{})
 }
 
@@ -140,7 +141,7 @@ func HandleTorrentDel(c *echo.Context) error {
 		torrent.InQueue = true
 		sync_torrent <- torrent
 	}
-
+	log.Println("HandleTorrentDel: Deleted torrent", info_hash)
 	return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
 }
 
@@ -148,7 +149,7 @@ func getUser(c *echo.Context) *User {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		Debug(err)
+		Debug("getUser: ", err)
 		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
 		return nil
 	}
@@ -174,31 +175,28 @@ func HandleUserTorrents(c *echo.Context) error {
 	a, err := r.Do("SMEMBERS", user.KeyActive)
 
 	if err != nil {
-		log.Println(err)
+		log.Println("HandleUserTorrents: Failed to fetch user active", err)
 		return nil
 	}
 	active_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyHNR)
-
 	if err != nil {
-		log.Println(err)
+		log.Println("HandleUserTorrents: Failed to fetch user HNR", err)
 		return nil
 	}
 	hnr_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyComplete)
-
 	if err != nil {
-		log.Println(err)
+		log.Println("HandleUserTorrents: Failed to fetch user completes", err)
 		return nil
 	}
 	complete_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyIncomplete)
-
 	if err != nil {
-		log.Println(err)
+		log.Println("HandleUserTorrents: Failed to fetch user incompletes", err)
 		return nil
 	}
 	incomplete_list, err := redis.Strings(a, nil)
@@ -248,6 +246,7 @@ func HandleUserCreate(c *echo.Context) error {
 	} else {
 		user.Unlock()
 	}
+	log.Println("HandleUserCreate: Created new user", fmt.Sprintf("[%d/%s]", payload.UserID, payload.Name))
 	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
 }
 
@@ -259,7 +258,7 @@ func HandleUserUpdate(c *echo.Context) error {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		Debug(err)
+		Debug("HandleUserUpdate: Failed to parse user id", err)
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format", 0})
 	}
 
@@ -285,6 +284,7 @@ func HandleUserUpdate(c *echo.Context) error {
 	} else {
 		user.Unlock()
 	}
+	log.Println("HandleUserUpdate: Updated user", user_id)
 	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
 }
 
@@ -304,6 +304,7 @@ func HandleWhitelistAdd(c *echo.Context) error {
 
 	r.Do("HSET", "t:whitelist", payload.Prefix, payload.Client)
 	mika.initWhitelist(r)
+	log.Println("HandleWhitelistAdd: Added new client to whitelist", payload.Prefix)
 	return c.JSON(http.StatusCreated, ResponseErr{"ok", http.StatusCreated})
 }
 
@@ -316,6 +317,7 @@ func HandleWhitelistDel(c *echo.Context) error {
 
 			r.Do("HDEL", "t:whitelist", prefix)
 			mika.initWhitelist(r)
+			log.Println("HandleWhitelistDel: Deleted client from whitelist", prefix)
 			return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
 		}
 	}
@@ -338,5 +340,6 @@ func HandleGetTorrentPeers(c *echo.Context) error {
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{})
 	}
+	Debug("HandleGetTorrentPeers: Got torrent peers", info_hash)
 	return c.JSON(http.StatusOK, torrent.Peers)
 }

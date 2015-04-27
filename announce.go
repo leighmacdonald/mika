@@ -60,7 +60,7 @@ func HandleAnnounce(c *echo.Context) {
 	r := pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		log.Println("Announce redis conn:", r.Err().Error())
+		log.Println("HandleAnnounce: Failed to get redis conn:", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
 		return
@@ -68,7 +68,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	ann, err := NewAnnounce(c)
 	if err != nil {
-		log.Println("Failed to parse announce:", err)
+		log.Println("HandleAnnounce: Failed to parse announce:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
 		return
@@ -78,7 +78,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	user := GetUserByPasskey(r, passkey)
 	if user == nil {
-		log.Println("Invalid passkey:", passkey)
+		log.Println("HandleAnnounce: Invalid passkey", passkey)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_INVALID_PASSKEY
 		return
@@ -88,7 +88,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 	if !IsValidClient(r, ann.PeerID) {
-		log.Println(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
+		log.Println("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID, user.UserID, user.Username))
 		oops(c, MSG_INVALID_PEER_ID)
 		counter <- EV_INVALID_CLIENT
 		return
@@ -96,18 +96,19 @@ func HandleAnnounce(c *echo.Context) {
 
 	torrent := mika.GetTorrentByInfoHash(r, fmt.Sprintf("%x", ann.InfoHash), true)
 	if torrent == nil {
-		Debug(fmt.Sprintf("Torrent not found: %x", ann.InfoHash))
+		log.Println("HandleAnnounce:", fmt.Sprintf("Torrent not found: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		counter <- EV_INVALID_INFOHASH
 		return
 	} else if !torrent.Enabled {
+		Debug("HandleAnnounce:", fmt.Sprintf("Disabled torrent: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
 		counter <- EV_INVALID_INFOHASH
 		return
 	}
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
-		log.Println("Failed to fetch/create peer:", err.Error())
+		log.Println("HandleAnnounce: Failed to fetch/create peer:", err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
 		return
@@ -205,6 +206,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	er_msg_encoded := encoder.Encode(dict)
 	if er_msg_encoded != nil {
+		log.Println("HandleAnnounce:", fmt.Sprintf("Failed to encode response %s [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
 		return

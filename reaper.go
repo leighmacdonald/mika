@@ -14,21 +14,21 @@ func ReapPeer(info_hash, peer_id string) {
 	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
-		log.Println("Reaper redis conn:", r.Err().Error())
+		log.Println("ReapPeer: Reaper redis conn:", r.Err().Error())
 		return
 	}
 	Debug("Reaping peer:", info_hash, peer_id)
 
 	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
-		log.Println("Failed to fetch torrent while reaping")
+		log.Println("ReapPeer:", "Failed to fetch torrent while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id))
 		return
 	}
 
 	// Fetch before we set active to 0
 	peer, err := torrent.GetPeer(r, peer_id)
 	if err != nil {
-		log.Println("Failed to fetch peer while reaping")
+		log.Println("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id))
 		return
 	}
 
@@ -53,10 +53,10 @@ func ReapPeer(info_hash, peer_id string) {
 	v, err := r.Receive()
 	queued -= 1
 	if err != nil {
-		log.Println("Tried to remove non-existant peer: ", info_hash, peer_id)
+		log.Println("ReapPeer: Tried to remove non-existant peer: ", info_hash, peer_id)
 	}
 	if v == "1" {
-		Debug("Reaped peer successfully: ", peer_id)
+		Debug("ReapPeer: Reaped peer successfully: ", peer_id)
 	}
 
 	// all needed i think, must match r.Send count?
@@ -73,7 +73,7 @@ func peerStalker() {
 	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
-		log.Println("Reaper cannot connect to redis", r.Err().Error())
+		log.Println("peerStalker: Reaper cannot connect to redis", r.Err().Error())
 		return
 	}
 
@@ -89,10 +89,10 @@ func peerStalker() {
 			}
 
 		case redis.Subscription:
-			Debug("Subscribed to channel:", v.Channel)
+			Debug("peerStalker: Subscribed to channel:", v.Channel)
 
 		case error:
-			log.Println("Subscriber error: ", v.Error())
+			log.Println("peerStalker: Subscriber error: ", v.Error())
 		}
 	}
 }

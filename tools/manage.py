@@ -42,6 +42,7 @@ def load_users(db_conn, redis_conn):
         users = cur.fetchall()
     for user in users:
         redis_conn.set("t:user:{}".format(user[0]), user[1])
+        redis_conn.hset("t:u:{}".format(user[1]), 'user_id', user[1])
         redis_conn.hset("t:u:{}".format(user[1]), 'passkey', user[0])
         redis_conn.hset("t:u:{}".format(user[1]), 'username', user[2])
 

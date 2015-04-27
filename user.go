@@ -30,7 +30,7 @@ type User struct {
 
 // Fetch a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
-func findUserID(r redis.Conn, passkey string) uint64 {
+func findUserID(passkey string) uint64 {
 	for _, user := range mika.Users {
 		if user.Passkey == passkey {
 			return user.UserID
@@ -82,7 +82,7 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 }
 
 func GetUserByPasskey(r redis.Conn, passkey string) *User {
-	user_id := findUserID(r, passkey)
+	user_id := findUserID(passkey)
 	if user_id == 0 {
 		return nil
 	}
@@ -124,17 +124,17 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 // TODO only write out what is changed
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
-		"HMSET", user.UserKey,
-		"user_id", user.UserID,
-		"uploaded", user.Uploaded,
-		"downloaded", user.Downloaded,
-		"corrupt", user.Corrupt,
-		"snatches", user.Snatches,
-		"announces", user.Announces,
-		"can_leech", user.CanLeech,
-		"passkey", user.Passkey,
-		"enabled", user.Enabled,
-		"username", user.Username,
+	"HMSET", user.UserKey,
+	"user_id", user.UserID,
+	"uploaded", user.Uploaded,
+	"downloaded", user.Downloaded,
+	"corrupt", user.Corrupt,
+	"snatches", user.Snatches,
+	"announces", user.Announces,
+	"can_leech", user.CanLeech,
+	"passkey", user.Passkey,
+	"enabled", user.Enabled,
+	"username", user.Username,
 	)
 }
 

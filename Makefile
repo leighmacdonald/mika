@@ -1,6 +1,6 @@
 .PHONY: all test clean build install
 
-GOFLAGS = -ldflags "-X main.version `git rev-parse --short HEAD`"
+GOFLAGS = -ldflags "-X main.version `git rev-parse --short HEAD`" -race
 
 all: build
 

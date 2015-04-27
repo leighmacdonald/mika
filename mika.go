@@ -234,7 +234,6 @@ func main() {
 	connResponse = make(chan redis.Conn, 200)
 	connDone = make(chan redis.Conn, 200)
 	pool = &redis.Pool{
-		MaxIdle: 2,
 		MaxIdle:     0,
 		IdleTimeout: 600 * time.Second,
 		Wait: true,

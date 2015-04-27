@@ -7,14 +7,26 @@
 // Set in sysctl.conf
 // fs.file-max=100000
 // vm.overcommit_memory = 1
-//
+// vm.swappiness=0
+// net.ipv4.tcp_sack=1                   # enable selective acknowledgements
+// net.ipv4.tcp_timestamps=1             # needed for selective acknowledgements
+// net.ipv4.tcp_window_scaling=1         # scale the network window
+// net.ipv4.tcp_congestion_control=cubic # better congestion algorythm
+// net.ipv4.tcp_syncookies=1             # enable syn cookied
+// net.ipv4.tcp_tw_recycle=1             # recycle sockets quickly
+// net.ipv4.tcp_max_syn_backlog=NUMBER   # backlog setting
+// net.core.somaxconn=10000              # up the number of connections per port
+// #net.core.rmem_max=NUMBER              # up the receive buffer size
+// #net.core.wmem_max=NUMBER              # up the buffer size for all connections
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
 // echo 10000 > /proc/sys/net/core/somaxconn
-//
+// echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
 // redis.conf
 // maxmemory-policy noeviction
 // notify-keyspace-events "KEx"
+// tcp-backlog 65536
+//
 
 package main
 
@@ -271,30 +283,36 @@ func main() {
 
 	// Initialize the router + middlewares
 	e := echo.New()
-
+	//	e.HTTPErrorHandler(func(err error, c *echo.Context) {
+	//		if err != nil {
+	//			// TODO: Warning
+	//			log.Printf("echo: %s", color.Yellow("http error handler not registered"))
+	//			http.Error(c.Response, err.Error(), 404)
+	//		}
+	//	})
 	e.MaxParam(1)
 
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)
 	e.Get("/:passkey/scrape", HandleScrape)
 
-	api_grp := e.Group("/api")
+	api := e.Group("/api")
 
-	api_grp.Get("/version", HandleVersion)
-	api_grp.Get("/test", HandleGetTorrentPeer)
+	api.Get("/version", HandleVersion)
+	api.Get("/test", HandleGetTorrentPeer)
 
-	api_grp.Get("/torrent/:info_hash", HandleTorrentGet)
-	api_grp.Post("/torrent", HandleTorrentAdd)
-	api_grp.Get("/torrent/:info_hash/peers", HandleGetTorrentPeers)
-	api_grp.Delete("/torrent/:info_hash", HandleTorrentDel)
+	api.Get("/torrent/:info_hash", HandleTorrentGet)
+	api.Post("/torrent", HandleTorrentAdd)
+	api.Get("/torrent/:info_hash/peers", HandleGetTorrentPeers)
+	api.Delete("/torrent/:info_hash", HandleTorrentDel)
 
-	api_grp.Post("/user", HandleUserCreate)
-	api_grp.Get("/user/:user_id", HandleUserGet)
-	api_grp.Post("/user/:user_id", HandleUserUpdate)
-	api_grp.Get("/user/:user_id/torrents", HandleUserTorrents)
+	api.Post("/user", HandleUserCreate)
+	api.Get("/user/:user_id", HandleUserGet)
+	api.Post("/user/:user_id", HandleUserUpdate)
+	api.Get("/user/:user_id/torrents", HandleUserTorrents)
 
-	api_grp.Post("/whitelist", HandleWhitelistAdd)
-	api_grp.Delete("/whitelist/:prefix", HandleWhitelistDel)
+	api.Post("/whitelist", HandleWhitelistAdd)
+	api.Delete("/whitelist/:prefix", HandleWhitelistDel)
 
 	// Start watching for expiring peers
 	go peerStalker()

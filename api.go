@@ -10,12 +10,12 @@ import (
 	"strconv"
 )
 
-type Response struct {
+type ResponseOK struct {
+	Msg string `json:"message"`
 }
 
 type ResponseErr struct {
-	Msg    string `json:"msg"`
-	Status int    `json:"status"`
+	Err string `json:"error"`
 }
 
 type UserPayload struct {
@@ -68,6 +68,10 @@ type WhitelistAddPayload struct {
 	Client string `json:"client"`
 }
 
+var (
+	resp_ok = ResponseOK{"ok"}
+)
+
 func HandleVersion(c *echo.Context) {
 	c.String(http.StatusOK, fmt.Sprintf("mika/%s", version))
 }
@@ -82,7 +86,7 @@ func HandleTorrentGet(c *echo.Context) error {
 	info_hash := c.Param("info_hash")
 	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
-		return c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash", 404})
+		return c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
 	}
 	log.Println("HandleTorrentGet: Fetched torrent", info_hash)
 	return c.JSON(http.StatusOK, torrent)
@@ -114,12 +118,12 @@ func HandleTorrentAdd(c *echo.Context) error {
 			Peers:     []*Peer{},
 		}
 		mika.Torrents[payload.InfoHash] = torrent
-		mika.TorrentsMutex.Unlock()
 	}
+	mika.TorrentsMutex.Unlock()
 	sync_torrent <- torrent
 
 	log.Println("HandleTorrentAdd: Added new torrent:", payload.Name)
-	return c.JSON(http.StatusCreated, Response{})
+	return c.JSON(http.StatusCreated, resp_ok)
 }
 
 func HandleTorrentDel(c *echo.Context) error {
@@ -132,7 +136,7 @@ func HandleTorrentDel(c *echo.Context) error {
 	info_hash := c.Param("info_hash")
 	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
-		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id", http.StatusNotFound})
+		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id"})
 	}
 	torrent.Lock()
 	torrent.Enabled = false
@@ -142,7 +146,7 @@ func HandleTorrentDel(c *echo.Context) error {
 		sync_torrent <- torrent
 	}
 	log.Println("HandleTorrentDel: Deleted torrent", info_hash)
-	return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
+	return c.JSON(http.StatusOK, resp_ok)
 }
 
 func getUser(c *echo.Context) *User {
@@ -150,14 +154,14 @@ func getUser(c *echo.Context) *User {
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
 		Debug("getUser: ", err)
-		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
+		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
 		return nil
 	}
 	mika.UsersMutex.RLock()
 	user, exists := mika.Users[user_id]
 	mika.UsersMutex.RUnlock()
 	if !exists {
-		c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
+		c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
 		return nil
 	}
 	return user
@@ -176,6 +180,7 @@ func HandleUserTorrents(c *echo.Context) error {
 
 	if err != nil {
 		log.Println("HandleUserTorrents: Failed to fetch user active", err)
+		c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user active torrents"})
 		return nil
 	}
 	active_list, err := redis.Strings(a, nil)
@@ -183,21 +188,21 @@ func HandleUserTorrents(c *echo.Context) error {
 	a, err = r.Do("SMEMBERS", user.KeyHNR)
 	if err != nil {
 		log.Println("HandleUserTorrents: Failed to fetch user HNR", err)
-		return nil
+		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user hnr torrents"})
 	}
 	hnr_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyComplete)
 	if err != nil {
 		log.Println("HandleUserTorrents: Failed to fetch user completes", err)
-		return nil
+		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user completed torrents"})
 	}
 	complete_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyIncomplete)
 	if err != nil {
 		log.Println("HandleUserTorrents: Failed to fetch user incompletes", err)
-		return nil
+		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user incompleted torrents"})
 	}
 	incomplete_list, err := redis.Strings(a, nil)
 
@@ -223,14 +228,14 @@ func HandleUserCreate(c *echo.Context) error {
 		return err
 	}
 	if payload.Passkey == "" || payload.UserID <= 0 {
-		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
+		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
 	}
 	r := pool.Get()
 	defer r.Close()
 	user := GetUserByID(r, payload.UserID, false)
 
 	if user != nil {
-		return c.JSON(http.StatusConflict, ResponseErr{"User exists", http.StatusConflict})
+		return c.JSON(http.StatusConflict, ResponseErr{"User exists"})
 	}
 
 	user = GetUserByID(r, payload.UserID, true)
@@ -247,7 +252,7 @@ func HandleUserCreate(c *echo.Context) error {
 		user.Unlock()
 	}
 	log.Println("HandleUserCreate: Created new user", fmt.Sprintf("[%d/%s]", payload.UserID, payload.Name))
-	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
+	return c.JSON(http.StatusOK, resp_ok)
 }
 
 func HandleUserUpdate(c *echo.Context) error {
@@ -259,14 +264,14 @@ func HandleUserUpdate(c *echo.Context) error {
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
 		Debug("HandleUserUpdate: Failed to parse user id", err)
-		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format", 0})
+		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format"})
 	}
 
 	mika.UsersMutex.RLock()
 	user, exists := mika.Users[user_id]
 	mika.UsersMutex.RUnlock()
 	if !exists {
-		return c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
+		return c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
 	}
 
 	user.Lock()
@@ -285,7 +290,7 @@ func HandleUserUpdate(c *echo.Context) error {
 		user.Unlock()
 	}
 	log.Println("HandleUserUpdate: Updated user", user_id)
-	return c.JSON(http.StatusOK, ResponseErr{"ok", 200})
+	return c.JSON(http.StatusOK, resp_ok)
 }
 
 func HandleWhitelistAdd(c *echo.Context) error {
@@ -295,7 +300,7 @@ func HandleWhitelistAdd(c *echo.Context) error {
 	}
 	for _, prefix := range whitelist {
 		if prefix == payload.Prefix {
-			return c.JSON(http.StatusConflict, ResponseErr{"ok", http.StatusConflict})
+			return c.JSON(http.StatusConflict, resp_ok)
 		}
 	}
 
@@ -305,7 +310,7 @@ func HandleWhitelistAdd(c *echo.Context) error {
 	r.Do("HSET", "t:whitelist", payload.Prefix, payload.Client)
 	mika.initWhitelist(r)
 	log.Println("HandleWhitelistAdd: Added new client to whitelist", payload.Prefix)
-	return c.JSON(http.StatusCreated, ResponseErr{"ok", http.StatusCreated})
+	return c.JSON(http.StatusCreated, resp_ok)
 }
 
 func HandleWhitelistDel(c *echo.Context) error {
@@ -318,14 +323,14 @@ func HandleWhitelistDel(c *echo.Context) error {
 			r.Do("HDEL", "t:whitelist", prefix)
 			mika.initWhitelist(r)
 			log.Println("HandleWhitelistDel: Deleted client from whitelist", prefix)
-			return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
+			return c.JSON(http.StatusOK, resp_ok)
 		}
 	}
-	return c.JSON(http.StatusNotFound, ResponseErr{"User not Found", 404})
+	return c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
 }
 
 func HandleGetTorrentPeer(c *echo.Context) error {
-	return c.JSON(http.StatusOK, ResponseErr{"Nope! :(", 200})
+	return c.JSON(http.StatusOK, ResponseErr{"Nope! :("})
 }
 
 func HandleGetTorrentPeers(c *echo.Context) error {

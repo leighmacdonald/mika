@@ -234,8 +234,10 @@ func main() {
 	connResponse = make(chan redis.Conn, 200)
 	connDone = make(chan redis.Conn, 200)
 	pool = &redis.Pool{
-		MaxIdle:     100,
-		IdleTimeout: 0,
+		MaxIdle: 2,
+		MaxIdle:     0,
+		IdleTimeout: 600 * time.Second,
+		Wait: true,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", config.RedisHost)
 			if err != nil {

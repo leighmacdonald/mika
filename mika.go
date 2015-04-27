@@ -95,7 +95,7 @@ var (
 		MSG_INVALID_PEER_ID:         "Peer ID Invalid",
 		MSG_INVALID_NUM_WANT:        "num_want invalid",
 		MSG_INFO_HASH_NOT_FOUND:     "info_hash was not found, better luck next time",
-		MSG_CLIENT_REQUEST_TOO_FAST: "Slot down there jimmy.",
+		MSG_CLIENT_REQUEST_TOO_FAST: "Slow down there jimmy.",
 		MSG_MALFORMED_REQUEST:       "Malformed request",
 		MSG_GENERIC_ERROR:           "Generic Error :(",
 	}

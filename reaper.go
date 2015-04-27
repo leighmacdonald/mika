@@ -21,14 +21,14 @@ func ReapPeer(info_hash, peer_id string) {
 
 	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
-		log.Println("ReapPeer:", "Failed to fetch torrent while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id))
+		log.Println("ReapPeer:", "Failed to fetch torrent while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
 
 	// Fetch before we set active to 0
 	peer, err := torrent.GetPeer(r, peer_id)
 	if err != nil {
-		log.Println("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id))
+		log.Println("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
 

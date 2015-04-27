@@ -73,8 +73,8 @@ func HandleVersion(c *echo.Context) {
 }
 
 func HandleTorrentGet(c *echo.Context) error {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		return c.JSON(http.StatusInternalServerError, ResponseErr{})
 	}
@@ -97,8 +97,8 @@ func HandleTorrentAdd(c *echo.Context) error {
 	} else if len(payload.InfoHash) != 40 {
 		return errors.New("Invalid info hash")
 	}
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 
 	torrent := mika.GetTorrentByInfoHash(r, payload.InfoHash, false)
 	if torrent != nil {
@@ -123,8 +123,8 @@ func HandleTorrentAdd(c *echo.Context) error {
 }
 
 func HandleTorrentDel(c *echo.Context) error {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		return c.JSON(http.StatusInternalServerError, ResponseErr{})
 	}
@@ -170,8 +170,8 @@ func HandleUserTorrents(c *echo.Context) error {
 		return nil
 	}
 	response := UserTorrentsResponse{}
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 
 	a, err := r.Do("SMEMBERS", user.KeyActive)
 
@@ -229,8 +229,8 @@ func HandleUserCreate(c *echo.Context) error {
 	if payload.Passkey == "" || payload.UserID <= 0 {
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id", 0})
 	}
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 	user := GetUserByID(r, payload.UserID, false)
 
 	if user != nil {
@@ -297,11 +297,11 @@ func HandleWhitelistAdd(c *echo.Context) error {
 		}
 	}
 
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 
 	r.Do("HSET", "t:whitelist", payload.Prefix, payload.Client)
-	go mika.initWhitelist(r)
+	mika.initWhitelist(r)
 	return c.JSON(http.StatusCreated, ResponseErr{"ok", http.StatusCreated})
 }
 
@@ -309,11 +309,11 @@ func HandleWhitelistDel(c *echo.Context) error {
 	prefix := c.Param("prefix")
 	for _, p := range whitelist {
 		if p == prefix {
-			r := getRedisConnection()
-			defer returnRedisConnection(r)
+			r := pool.Get()
+			defer r.Close()
 
 			r.Do("HDEL", "t:whitelist", prefix)
-			go mika.initWhitelist(r)
+			mika.initWhitelist(r)
 			return c.JSON(http.StatusOK, ResponseErr{"ok", http.StatusOK})
 		}
 	}
@@ -325,8 +325,8 @@ func HandleGetTorrentPeer(c *echo.Context) error {
 }
 
 func HandleGetTorrentPeers(c *echo.Context) error {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		return c.JSON(http.StatusInternalServerError, ResponseErr{})
 	}

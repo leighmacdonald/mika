@@ -11,8 +11,8 @@ import (
 // Will mark a torrent peer as inactive and remove them
 // from the torrents active peer_id set
 func ReapPeer(torrent_id, peer_id string) {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
 		log.Println("Reaper redis conn:", r.Err().Error())
@@ -76,8 +76,8 @@ func ReapPeer(torrent_id, peer_id string) {
 // This is a goroutine that will watch for peer key expiry events and
 // act on them, removing them from the active peer lists
 func peerStalker() {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
 		log.Println("Reaper cannot connect to redis", r.Err().Error())

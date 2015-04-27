@@ -65,8 +65,8 @@ func returnRedisConnection(conn redis.Conn) {
 // This function will periodically update the torrent sort indexes
 func dbStatIndexer() {
 	log.Println("Background indexer started")
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 
 	key_leechers := "t:i:leechers"
 	key_seeders := "t:i:seeders"
@@ -105,8 +105,8 @@ func dbStatIndexer() {
 // Only items with the .InQueue flag set to false should be added.
 // TODO channel as param
 func syncWriter() {
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
 		log.Println("SyncWriter redis conn:", r.Err().Error())

@@ -18,8 +18,8 @@ type Tracker struct {
 // Load the models into memory from redis
 func (t *Tracker) Initialize() error {
 	log.Println("Initializing models in memory...")
-	r := getRedisConnection()
-	defer returnRedisConnection(r)
+	r := pool.Get()
+	defer r.Close()
 
 	t.initWhitelist(r)
 	t.initUsers(r)

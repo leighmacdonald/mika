@@ -263,7 +263,7 @@ func HandleUserUpdate(c *echo.Context) error {
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format", 0})
 	}
 
-	mika.UsersMutex.Lock()
+	mika.UsersMutex.RLock()
 	user, exists := mika.Users[user_id]
 	mika.UsersMutex.RUnlock()
 	if !exists {

@@ -9,6 +9,7 @@ import (
 	"sync"
 )
 
+// Main track struct holding all the known models
 type Tracker struct {
 	TorrentsMutex *sync.RWMutex
 	Torrents      map[string]*Torrent
@@ -62,11 +63,13 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new 
 		mika.TorrentsMutex.Lock()
 		t.Torrents[info_hash] = torrent
 		mika.TorrentsMutex.Unlock()
-		Debug("Added new torrent to in-memory cache:", info_hash)
+		Debug("GetTorrentByInfoHash: Added new torrent to in-memory cache:", info_hash)
 	}
 	return nil
 }
 
+// Create a new torrent, fetching info from redis if exist data
+// exists.
 func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 	// Make new struct to use for cache
 	torrent := &Torrent{
@@ -84,24 +87,24 @@ func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 	if exists {
 		torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%s", info_hash))
 		if err != nil {
-			log.Println("Failed to get torrent from redis", err)
+			log.Println("FetchTorrent: Failed to get torrent from redis", err)
 			return nil
 		}
 
 		values, err := redis.Values(torrent_reply, nil)
 		if err != nil {
-			log.Println("Failed to parse torrent reply: ", err)
+			log.Println("FetchTorrent: Failed to parse torrent reply: ", err)
 			return nil
 		}
 
 		err = redis.ScanStruct(values, torrent)
 		if err != nil {
-			log.Println("Torrent scanstruct failure", err)
+			log.Println("FetchTorrent: Torrent scanstruct failure", err)
 			return nil
 		}
 
 		if torrent.TorrentID == 0 {
-			Debug("Trying to fetch info hash without valid key:", info_hash)
+			Debug("FetchTorrent: Trying to fetch info hash without valid key:", info_hash)
 			r.Do("DEL", fmt.Sprintf("t:t:%s", torrent.InfoHash))
 			return nil
 		}
@@ -119,27 +122,29 @@ func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 	return torrent
 }
 
+// Fetch the client whitelist from redis and load it into memory
 func (t *Tracker) initWhitelist(r redis.Conn) {
 	whitelist = []string{}
 	a, err := r.Do("HKEYS", "t:whitelist")
 
 	if err != nil {
-		log.Println(err)
+		log.Println("initWhitelist: Failed to fetch whitelist", err)
 		return
 	}
 	whitelist, err = redis.Strings(a, nil)
 	log.Println(fmt.Sprintf("Loaded %d whitelist clients", len(whitelist)))
 }
 
+// Fetch the torrents stored in redis and load them into active memory as models
 func (t *Tracker) initTorrents(r redis.Conn) {
 	torrent_keys_reply, err := r.Do("KEYS", "t:t:*")
 	if err != nil {
-		log.Println("Failed to get torrent from redis", err)
+		log.Println("initTorrents: Failed to get torrent from redis", err)
 		return
 	}
 	torrent_keys, err := redis.Strings(torrent_keys_reply, nil)
 	if err != nil {
-		log.Println("Failed to parse torrent keys reply: ", err)
+		log.Println("initTorrents: Failed to parse torrent keys reply: ", err)
 		return
 	}
 	torrents := 0
@@ -168,12 +173,12 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 func (t *Tracker) initUsers(r redis.Conn) {
 	user_keys_reply, err := r.Do("KEYS", "t:u:*")
 	if err != nil {
-		log.Println("Failed to get torrent from redis", err)
+		log.Println("initUsers: Failed to get torrent from redis", err)
 		return
 	}
 	user_keys, err := redis.Strings(user_keys_reply, nil)
 	if err != nil {
-		log.Println("Failed to parse peer reply: ", err)
+		log.Println("initUsers: Failed to parse peer reply: ", err)
 		return
 	}
 	users := 0

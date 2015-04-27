@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// Announce types
 const (
 	STOPPED   = iota
 	STARTED   = iota
@@ -19,6 +20,7 @@ const (
 	ANNOUNCE  = iota
 )
 
+// Represents an announce received from the bittorrent client
 type AnnounceRequest struct {
 	Compact    bool
 	Downloaded uint64

@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
-	"strconv"
 	"strings"
 )
 
 // Will mark a torrent peer as inactive and remove them
 // from the torrents active peer_id set
-func ReapPeer(torrent_id, peer_id string) {
+func ReapPeer(info_hash, peer_id string) {
 	r := pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
@@ -18,15 +17,9 @@ func ReapPeer(torrent_id, peer_id string) {
 		log.Println("Reaper redis conn:", r.Err().Error())
 		return
 	}
-	Debug("Reaping peer:", torrent_id, peer_id)
+	Debug("Reaping peer:", info_hash, peer_id)
 
-	torrent_id_uint, err := strconv.ParseUint(torrent_id, 10, 64)
-	if err != nil {
-		log.Println("Failed to parse torrent id into uint64", err)
-		return
-	}
-
-	torrent := mika.GetTorrentByID(r, torrent_id_uint, false)
+	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
 		log.Println("Failed to fetch torrent while reaping")
 		return
@@ -42,13 +35,13 @@ func ReapPeer(torrent_id, peer_id string) {
 	torrent.DelPeer(r, peer)
 
 	queued := 2
-	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent_id), peer_id)
-	r.Send("HSET", fmt.Sprintf("t:t:%s:p:%s", torrent_id, peer_id), "active", 0)
+	r.Send("SREM", fmt.Sprintf("t:t:%s:p", info_hash), peer_id)
+	r.Send("HSET", fmt.Sprintf("t:t:%s:p:%s", info_hash, peer_id), "active", 0)
 	if peer.Active {
 		if peer.Left > 0 {
-			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "leechers", -1)
+			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", info_hash), "leechers", -1)
 		} else {
-			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", torrent_id), "seeders", -1)
+			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", info_hash), "seeders", -1)
 		}
 		queued += 1
 	}
@@ -60,7 +53,7 @@ func ReapPeer(torrent_id, peer_id string) {
 	v, err := r.Receive()
 	queued -= 1
 	if err != nil {
-		log.Println("Tried to remove non-existant peer: ", torrent_id, peer_id)
+		log.Println("Tried to remove non-existant peer: ", info_hash, peer_id)
 	}
 	if v == "1" {
 		Debug("Reaped peer successfully: ", peer_id)

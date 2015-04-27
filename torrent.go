@@ -82,12 +82,12 @@ func (torrent *Torrent) DelReason() string {
 func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
 	peer := torrent.findPeer(peer_id)
 	if peer == nil {
-		peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%d:%s", torrent.TorrentID, peer_id))
+		peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%s:%s", torrent.InfoHash, peer_id))
 		if err != nil {
 			log.Println("Error executing peer fetch query: ", err)
 			return nil, err
 		}
-		peer, err = makePeer(peer_reply, torrent.TorrentID, peer_id)
+		peer, err = makePeer(peer_reply, torrent.TorrentID, torrent.InfoHash, peer_id)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +105,7 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 	torrent.Peers = append(torrent.Peers, peer)
 	torrent.Unlock()
 
-	v, err := r.Do("SADD", fmt.Sprintf("t:t:%d:p", torrent.TorrentID), peer.PeerID)
+	v, err := r.Do("SADD", fmt.Sprintf("t:t:%s:p", torrent.InfoHash), peer.PeerID)
 	if err != nil {
 		log.Println("Error executing peer fetch query: ", err)
 		return false
@@ -129,7 +129,7 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 		}
 	}
 
-	r.Send("SREM", fmt.Sprintf("t:t:%d:p", torrent.TorrentID), peer.PeerID)
+	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent.InfoHash), peer.PeerID)
 	r.Send("HSET", peer.KeyPeer, "active", 0)
 
 	return true

@@ -58,7 +58,6 @@ func HandleAnnounce(c *echo.Context) {
 	r := pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		CaptureMessage(r.Err().Error())
 		log.Println("Announce redis conn:", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
@@ -67,7 +66,6 @@ func HandleAnnounce(c *echo.Context) {
 
 	ann, err := NewAnnounce(c)
 	if err != nil {
-		CaptureMessage(err.Error())
 		log.Println("Failed to parse announce:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
@@ -89,7 +87,6 @@ func HandleAnnounce(c *echo.Context) {
 	}
 	if !IsValidClient(r, ann.PeerID) {
 		log.Println(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
-		CaptureMessage(fmt.Sprintf("Invalid Client: %s", ann.PeerID))
 		oops(c, MSG_INVALID_PEER_ID)
 		counter <- EV_INVALID_CLIENT
 		return
@@ -109,7 +106,6 @@ func HandleAnnounce(c *echo.Context) {
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
 		log.Println("Failed to fetch/create peer:", err.Error())
-		CaptureMessage(err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_ANNOUNCE_FAIL
 		return
@@ -153,7 +149,9 @@ func HandleAnnounce(c *echo.Context) {
 
 	} else if ann.Event == STARTED {
 		// Ignore start event from active peers to prevent stat skew potential
-		r.Send("SADD", user.KeyIncomplete, torrent.TorrentID)
+		if !peer.IsSeeder() {
+			r.Send("SADD", user.KeyIncomplete, torrent.TorrentID)
+		}
 	}
 
 	if ann.Event != STOPPED {

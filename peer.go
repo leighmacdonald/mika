@@ -144,7 +144,7 @@ func makeCompactPeers(peers []*Peer, skip_id string) []byte {
 
 // Generate a new instance of a peer from the redis reply if data is contained
 // within, otherwise just return a default value peer
-func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer, error) {
+func makePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer_id string) (*Peer, error) {
 	peer := &Peer{
 		PeerID:        peer_id,
 		Active:        false,
@@ -165,7 +165,7 @@ func makePeer(redis_reply interface{}, torrent_id uint64, peer_id string) (*Peer
 		TotalTime:     0,
 		UserID:        0,
 		TorrentID:     torrent_id,
-		KeyPeer:       fmt.Sprintf("t:t:%d:%s", torrent_id, peer_id),
+		KeyPeer:       fmt.Sprintf("t:t:%s:%s", info_hash, peer_id),
 	}
 
 	values, err := redis.Values(redis_reply, nil)

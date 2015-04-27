@@ -234,7 +234,8 @@ func main() {
 	connResponse = make(chan redis.Conn, 200)
 	connDone = make(chan redis.Conn, 200)
 	pool = &redis.Pool{
-		MaxIdle: 1000,
+		MaxIdle:     100,
+		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", config.RedisHost)
 			if err != nil {
@@ -253,7 +254,7 @@ func main() {
 			if err != nil {
 				// TODO remove me, temp hack to allow supervisord to reload process
 				// since we currently don't acutually handle graceful reconnects yet.
-				log.Fatalln("Bad redis voodoo! exiting!")
+				log.Fatalln("Bad redis voodoo! exiting!", err)
 			}
 			return err
 		},

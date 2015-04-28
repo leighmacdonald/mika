@@ -79,16 +79,16 @@ func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 		Enabled:  true,
 		Peers:    []*Peer{},
 	}
-
-	exists_reply, err := r.Do("EXISTS", fmt.Sprintf("t:t:%s", info_hash))
+	key := fmt.Sprintf("t:t:%s", info_hash)
+	exists_reply, err := r.Do("EXISTS", key)
 	exists, err := redis.Bool(exists_reply, err)
 	if err != nil {
 		exists = false
 	}
 	if exists {
-		torrent_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%s", info_hash))
+		torrent_reply, err := r.Do("HGETALL", key)
 		if err != nil {
-			log.Println("FetchTorrent: Failed to get torrent from redis", err)
+			log.Println(fmt.Sprintf("FetchTorrent: Failed to get torrent from redis [%s]", key), err)
 			return nil
 		}
 

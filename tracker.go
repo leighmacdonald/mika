@@ -49,6 +49,7 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool)
 // as a GET value. If the info_hash doesn't return an id we consider the torrent
 // either soft-deleted or non-existent
 func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new bool) *Torrent {
+	info_hash = strings.ToLower(info_hash)
 	mika.TorrentsMutex.RLock()
 	torrent, exists := t.Torrents[info_hash]
 	mika.TorrentsMutex.RUnlock()

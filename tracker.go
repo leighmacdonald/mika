@@ -154,7 +154,8 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 
 	for _, torrent_key := range torrent_keys {
 		pcs := strings.SplitN(torrent_key, ":", 3)
-		if len(pcs) != 3 {
+		// Skip malformed keys and peer suffixed keys
+		if len(pcs) != 3 || len(pcs[2]) != 40 {
 			continue
 		}
 		torrent := t.FetchTorrent(r, pcs[2])

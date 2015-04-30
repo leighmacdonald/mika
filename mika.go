@@ -262,15 +262,15 @@ func main() {
 			}
 			return c, err
 		},
-		//		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-		//			_, err := c.Do("PING")
-		//			if err != nil {
-		//				// TODO remove me, temp hack to allow supervisord to reload process
-		//				// since we currently don't acutually handle graceful reconnects yet.
-		//				log.Fatalln("Bad redis voodoo! exiting!", err)
-		//			}
-		//			return err
-		//		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			if err != nil {
+				// TODO remove me, temp hack to allow supervisord to reload process
+				// since we currently don't actually handle graceful reconnects yet.
+				log.Fatalln("Bad redis voodoo! exiting!", err)
+			}
+			return err
+		},
 	}
 
 	// Initialize the redis pool manager
@@ -283,13 +283,6 @@ func main() {
 
 	// Initialize the router + middlewares
 	e := echo.New()
-	//	e.HTTPErrorHandler(func(err error, c *echo.Context) {
-	//		if err != nil {
-	//			// TODO: Warning
-	//			log.Printf("echo: %s", color.Yellow("http error handler not registered"))
-	//			http.Error(c.Response, err.Error(), 404)
-	//		}
-	//	})
 	e.MaxParam(1)
 
 	// Public tracker routes

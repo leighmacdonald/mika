@@ -92,6 +92,8 @@ func HandleTorrentGet(c *echo.Context) error {
 	return c.JSON(http.StatusOK, torrent)
 }
 
+// Add new torrents into the active torrent set
+// {torrent_id: "", info_hash: "", name: ""}
 func HandleTorrentAdd(c *echo.Context) error {
 	payload := &TorrentAddPayload{}
 	if err := c.Bind(payload); err != nil {
@@ -101,6 +103,8 @@ func HandleTorrentAdd(c *echo.Context) error {
 		return errors.New("Invalid torrent id")
 	} else if len(payload.InfoHash) != 40 {
 		return errors.New("Invalid info hash")
+	} else if payload.Name == "" {
+		return errors.New("Invalid release name, cannot be empty")
 	}
 	r := pool.Get()
 	defer r.Close()
@@ -109,6 +113,8 @@ func HandleTorrentAdd(c *echo.Context) error {
 	mika.TorrentsMutex.Lock()
 	if torrent != nil {
 		torrent.Enabled = true
+		torrent.Name = payload.Name
+		torrent.TorrentID = payload.TorrentID
 	} else {
 		torrent = &Torrent{
 			InfoHash:  payload.InfoHash,

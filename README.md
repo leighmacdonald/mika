@@ -15,9 +15,9 @@ Create and configure a new `config.json` file from the `config.json.dist` exampl
 Currently we are storing torrent data in MySQL. Because of this we need
 to load the existing data into redis. This includes the following entities:
 
-- torrent.info_hash -> torrent.id We track torrents using torrent_id internally
-- user.passkey -> user.id To validate users and track their relationship to specific peer_id's
-- whitelist.peer_id -> whitelist.vstring Load the current client white list
+- torrent.info_hash We track torrents using torrent_id internally
+- user.passkey To validate users and track their relationship to specific peer_id's
+- whitelist.peer_id whitelist.vstring Load the current client white list
 
 To do this we use the manage.py script with the warmup command as follows and run 
 the tracker.
@@ -34,7 +34,6 @@ the tracker.
 If building a binary from source you will need a Go 1.4+ SDK installed.
 
 To build, set your $GOPATH env var to $git_project_clone, install deps and go build.
-
     
     hacker@nsa:$ cd $git_project_clone
     hacker@nsa:$ export GOPATH=$git_project_clone

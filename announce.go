@@ -117,8 +117,8 @@ func HandleAnnounce(c *echo.Context) {
 
 	// user update MUST happen after peer update since we rely on the old dl/ul values
 	ul, dl := peer.Update(ann)
-	user.Update(ann, ul, dl)
 	torrent.Update(ann)
+	user.Update(ann, ul, dl, torrent.MultiUp, torrent.MultiDn)
 
 	if ann.Event == STOPPED {
 		torrent.DelPeer(r, peer)

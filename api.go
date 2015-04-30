@@ -116,6 +116,8 @@ func HandleTorrentAdd(c *echo.Context) error {
 			TorrentID: payload.TorrentID,
 			Enabled:   true,
 			Peers:     []*Peer{},
+			MultiUp:   1.0,
+			MultiDn:   1.0,
 		}
 		mika.Torrents[payload.InfoHash] = torrent
 	}

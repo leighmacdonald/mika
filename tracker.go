@@ -78,6 +78,8 @@ func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 		Name:     "",
 		Enabled:  true,
 		Peers:    []*Peer{},
+		MultiUp:  1.0,
+		MultiDn:  1.0,
 	}
 	key := fmt.Sprintf("t:t:%s", info_hash)
 	exists_reply, err := r.Do("EXISTS", key)

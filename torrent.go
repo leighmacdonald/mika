@@ -24,6 +24,8 @@ type Torrent struct {
 	Enabled         bool    `redis:"enabled" json:"enabled"`
 	Reason          string  `redis:"reason" json:"reason"`
 	Peers           []*Peer `redis:"-" json:"peers"`
+	MultiUp         float64 `redis:"multi_up" json:"multi_up"`
+	MultiDn         float64 `redis:"multi_dn" json:"multi_dn"`
 }
 
 func (torrent *Torrent) Update(announce *AnnounceRequest) {
@@ -51,6 +53,8 @@ func (torrent *Torrent) Sync(r redis.Conn) {
 		"reason", torrent.Reason,
 		"enabled", torrent.Enabled,
 		"name", torrent.Name,
+		"multi_up", torrent.MultiUp,
+		"multi_dn", torrent.MultiDn,
 	)
 }
 

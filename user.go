@@ -108,11 +108,11 @@ func GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *User {
 }
 
 // Update user stats from announce request
-func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
+func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff uint64, multi_up, multi_dn float64) {
 	user.Lock()
 	defer user.Unlock()
-	user.Uploaded += upload_diff
-	user.Downloaded += download_diff
+	user.Uploaded += uint64(float64(upload_diff) * multi_up)
+	user.Downloaded += uint64(float64(download_diff) * multi_dn)
 	user.Corrupt += announce.Corrupt
 	user.Announces++
 	if announce.Event == COMPLETED {

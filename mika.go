@@ -120,6 +120,7 @@ var (
 	sync_user    = make(chan *User, 100)
 	sync_peer    = make(chan *Peer, 1000)
 	sync_torrent = make(chan *Torrent, 500)
+	sync_payload = make(chan Payload, 1000)
 	counter      = make(chan int)
 
 	err_parse_reply = errors.New("Failed to parse reply")
@@ -242,9 +243,6 @@ func main() {
 	}
 	CaptureMessage("Started tracker")
 
-	connRequest = make(chan bool, 200)
-	connResponse = make(chan redis.Conn, 200)
-	connDone = make(chan redis.Conn, 200)
 	pool = &redis.Pool{
 		MaxIdle:     0,
 		IdleTimeout: 600 * time.Second,
@@ -272,9 +270,6 @@ func main() {
 			return err
 		},
 	}
-
-	// Initialize the redis pool manager
-	go redisPoolManager(pool)
 
 	// Pre load models into memory
 	mika.Initialize()

@@ -6,61 +6,32 @@ import (
 	"time"
 )
 
+// Defined a single payload to send to the backend data store (redis)
+type Payload struct {
+	Command string
+	Args    []interface{}
+}
+
+func NewPayload(command string, args ...interface{}) Payload {
+	if len(args) < 1 {
+		panic("Not enough arguments to make payload")
+	}
+	return Payload{Command: command, Args: args}
+}
+
+//
+type BulkPayload struct {
+	Payloads []Payload
+}
+
+func (db *BulkPayload) AddPayload(payload ...Payload) {
+	db.Payloads = append(db.Payloads, payload...)
+
+}
+
 var (
 	pool *redis.Pool
-
-	connRequest  chan bool
-	connResponse chan redis.Conn
-	connDone     chan redis.Conn
-	connWaiting  int = 0
 )
-
-func redisPoolManager(pool *redis.Pool) {
-	var conn redis.Conn
-	var err error
-	for {
-		select {
-		case <-connRequest:
-			// someone wants a connection. try to get one.
-			conn = pool.Get()
-			err = conn.Err()
-			switch err {
-			case redis.ErrPoolExhausted:
-				// none left. wait for a free one.
-				connWaiting++
-			case nil:
-				// got one. return it.
-				connResponse <- conn
-			default:
-				// misc failure. Might want to panic or return error on channel. this may never resolve itself.
-				log.Println(err, "Error getting connection")
-				connWaiting++
-			}
-		case conn = <-connDone:
-			// someone is done with a connection.
-			if connWaiting > 0 {
-				// someone is waiting for one. return this connection to them.
-				connWaiting--
-				connResponse <- conn
-			} else {
-				// nobody is waiting. return it to the pool.
-				conn.Close()
-			}
-		}
-	}
-}
-
-func getRedisConnection() redis.Conn {
-	var conn redis.Conn
-	// request a connection.
-	connRequest <- true
-	conn = <-connResponse
-	return conn
-}
-
-func returnRedisConnection(conn redis.Conn) {
-	connDone <- conn
-}
 
 // This function will periodically update the torrent sort indexes
 func dbStatIndexer() {
@@ -116,6 +87,9 @@ func syncWriter() {
 	}
 	for {
 		select {
+		case payload := <-sync_payload:
+			Debug("Sync payload")
+			r.Do(payload.Command, payload.Args...)
 		case user := <-sync_user:
 			Debug("sync user")
 			user.Sync(r)

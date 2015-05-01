@@ -99,7 +99,10 @@ class TrackerClient(object):
         torrents = []
         keys = self._redis.keys("t:t:*")
         for key in keys:
-            key = key.decode()
+            try:
+                key = key.decode()
+            except UnicodeDecodeError:
+                pass
             try:
                 if len(key) != 44:
                     continue
@@ -128,7 +131,10 @@ class TrackerClient(object):
                 }
                 users.append(user)
             except Exception as err:
+
                 print(err)
+                print(data)
+                print(k)
                 break
 
         users.sort(key=lambda u: u[sort])

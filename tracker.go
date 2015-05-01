@@ -120,7 +120,7 @@ func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 
 	// Make these once and save the results in mem
 	torrent.TorrentKey = fmt.Sprintf("t:t:%s", info_hash)
-	torrent.TorrentPeersKey = fmt.Sprintf("t:t:%s:p", info_hash)
+	torrent.TorrentPeersKey = fmt.Sprintf("t:tp:%s", info_hash)
 
 	return torrent
 }

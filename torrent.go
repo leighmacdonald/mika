@@ -109,7 +109,7 @@ func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
 func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 	torrent.Peers = append(torrent.Peers, peer)
 
-	v, err := r.Do("SADD", fmt.Sprintf("t:t:%s:p", torrent.InfoHash), peer.PeerID)
+	v, err := r.Do("SADD", fmt.Sprintf("t:tp:%s", torrent.InfoHash), peer.PeerID)
 	if err != nil {
 		log.Println("Error executing peer fetch query: ", err)
 		return false
@@ -133,7 +133,7 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 		}
 	}
 
-	r.Send("SREM", fmt.Sprintf("t:t:%s:p", torrent.InfoHash), peer.PeerID)
+	r.Send("SREM", fmt.Sprintf("t:tp:%s", torrent.InfoHash), peer.PeerID)
 	r.Send("HSET", peer.KeyPeer, "active", 0)
 
 	return true

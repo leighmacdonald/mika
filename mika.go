@@ -224,12 +224,12 @@ func runTracker() {
 	e := echo.New()
 	e.MaxParam(1)
 
-	e.HTTPErrorHandler(func(code int, err error, c *echo.Context) {
-		log.Println("--------")
-		log.Println(err)
-		c.JSON(code, ResponseErr{err.Error()})
-		return
-	})
+//	e.HTTPErrorHandler(func(code int, err error, c *echo.Context) {
+//		log.Println("--------")
+//		log.Println(err)
+//		c.JSON(code, ResponseErr{err.Error()})
+//		return
+//	})
 
 	// Public tracker routes
 	e.Get("/:passkey/announce", HandleAnnounce)

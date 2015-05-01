@@ -139,3 +139,33 @@ class TrackerClient(object):
 
         users.sort(key=lambda u: u[sort])
         return users
+
+    def cleanup(self, delete=False):
+        # Look for active/inactive user suffix keys etc. t:u:$id:*
+        keys = [k for k in self._redis.keys("t:u:*")]
+        old_keys = []
+        for key in keys:
+            if len(key.split(b":")) != 3:
+                old_keys.append(key)
+        for key in old_keys:
+            print(key)
+            if delete:
+                self._redis.delete(key)
+        # Look for peer suffix keys t:t:$ih:*
+        keys = [k for k in self._redis.keys("t:t:*")]
+        for key in keys:
+            k = key.split(b":")
+            if len(k) != 3:
+                old_keys.append(key)
+            else:
+                # Look for old int based keys
+                try:
+                    int(k[2])
+                except Exception:
+                    pass
+                else:
+                    keys.append(key)
+        for key in old_keys:
+            print(key)
+            if delete:
+                self._redis.delete(key)

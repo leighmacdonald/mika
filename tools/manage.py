@@ -129,6 +129,10 @@ def users_list(sort="user_id", **args):
             print(user)
 
 
+def tracker_cleanup(delete=False, **args):
+    get_tracker().cleanup(delete=delete)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Tracker management cli")
     parser.add_argument("-c", "--config", help="Config file path (config.json)", default="./config.json")
@@ -146,6 +150,10 @@ def parse_args():
     users_cmd = subparsers.add_parser("users", help="List users stored in redis")
     users_cmd.add_argument("-s", "--sort", help="Sort by: user_id, uploaded, downloaded", default="user_id")
     users_cmd.set_defaults(func=users_list)
+
+    cleanup_cmd = subparsers.add_parser("cleanup", help="Clean up old deprecated keys")
+    cleanup_cmd.add_argument("-d", "--delete", action="store_true", help="Deleted the keys from redis")
+    cleanup_cmd.set_defaults(func=tracker_cleanup)
 
     return vars(parser.parse_args())
 

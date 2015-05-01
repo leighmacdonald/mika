@@ -2,9 +2,11 @@
 import binascii
 import json
 import argparse
+from operator import attrgetter
 from subprocess import call
 import pymysql
 import redis
+from redis.exceptions import ResponseError
 
 config = {}
 
@@ -87,8 +89,66 @@ def warmup(**args):
 
 
 def gen_key(**args):
+    print("> Generating new keys...")
     call("openssl req -x509 -nodes -days 365 -newkey rsa:1024 -keyout key_priv -out key_ca", shell=True)
 
+
+def torrents_list(**args):
+    redis_conn = make_redis()
+
+    keys = redis_conn.keys("t:t:*")
+    for key in keys:
+        key = key.decode()
+        try:
+            if len(key) != 44:
+                continue
+            tor = redis_conn.hgetall(key)
+        except ResponseError as err:
+            print(err)
+            print(key)
+            break
+        else:
+            try:
+                print("[{}] S: {} L: {} {}".format(
+                    tor[b'info_hash'].decode(),
+                    tor[b'seeders'].decode().rjust(4),
+                    tor[b'leechers'].decode().rjust(4),
+                    tor[b'name'].decode(),))
+            except Exception:
+                print(tor)
+
+
+def unicode_keys(d):
+    return
+
+
+def users_list(sort="user_id", **args):
+    redis_conn = make_redis()
+    try:
+        sort = bytes(sort, "utf8")
+    except:
+        pass
+    keys = [k for k in redis_conn.keys("t:u:*")]
+    users = []
+    for k in keys:
+        try:
+            users.append({k: v for k, v in redis_conn.hgetall(k).items()})
+        except Exception as err:
+            print(err)
+            print(k)
+    print(users[0])
+    users.sort(key=lambda u: u[sort])
+    for user in users:
+        print("[{}] ID: {} Up: {} Dn: {}".format(
+            user[b'passkey'].decode(),
+            user[b'user_id'].decode().rjust(5),
+            user.get(b'uploaded', b'00').decode().rjust(18),
+            user.get(b'downloaded', b'00').decode().rjust(18)))
+        try:
+            pass
+        except Exception as err:
+            print(err)
+            print(user)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Tracker management cli")
@@ -100,6 +160,13 @@ def parse_args():
 
     genkey_cmd = subparsers.add_parser("genkey", help="Generate a new set of SSL keys")
     genkey_cmd.set_defaults(func=gen_key)
+
+    torrents_cmd = subparsers.add_parser("torrents", help="List torrents stored in redis")
+    torrents_cmd.set_defaults(func=torrents_list)
+
+    users_cmd = subparsers.add_parser("users", help="List users stored in redis")
+    users_cmd.add_argument("-s", "--sort", help="Sort by: user_id, uploaded, downloaded", default="user_id")
+    users_cmd.set_defaults(func=users_list)
 
     return vars(parser.parse_args())
 

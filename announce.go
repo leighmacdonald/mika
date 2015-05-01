@@ -74,7 +74,7 @@ func HandleAnnounce(c *echo.Context) {
 		return
 	}
 
-	passkey := c.Param("passkey")
+	passkey := c.P(0) // eat a dick
 
 	user := GetUserByPasskey(r, passkey)
 	if user == nil {

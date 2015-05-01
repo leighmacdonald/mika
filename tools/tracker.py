@@ -153,10 +153,11 @@ class TrackerClient(object):
                 self._redis.delete(key)
         # Look for peer suffix keys t:t:$ih:*
         keys = [k for k in self._redis.keys("t:t:*")]
+        old_keys_2 = []
         for key in keys:
             k = key.split(b":")
             if len(k) != 3:
-                old_keys.append(key)
+                old_keys_2.append(key)
             else:
                 # Look for old int based keys
                 try:
@@ -164,8 +165,8 @@ class TrackerClient(object):
                 except Exception:
                     pass
                 else:
-                    keys.append(key)
-        for key in old_keys:
+                    old_keys_2.append(key)
+        for key in old_keys_2:
             print(key)
             if delete:
                 self._redis.delete(key)

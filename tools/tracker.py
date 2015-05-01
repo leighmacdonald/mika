@@ -3,12 +3,17 @@ Simple client to interact with the backend tracker instance.
 """
 from __future__ import print_function
 import requests
+import redis
+from redis.exceptions import ResponseError
 
 
 class TrackerClient(object):
-    def __init__(self, host, port):
-        self._host = host
-        self._port = port
+    def __init__(self, api_uri, redis_host="localhost", redis_port=6379, redis_db=0):
+        self._api_uri = api_uri
+        self._redis_host = redis_host
+        self._redis_port = redis_port
+        self._redis_db = redis_db
+        self._redis = redis.StrictRedis(host=redis_host, port=int(redis_port), db=int(redis_db))
 
     def _request(self, path, method='get', payload=None):
         if method == "get":
@@ -22,7 +27,7 @@ class TrackerClient(object):
         return resp
 
     def _make_url(self, path):
-        return "http://{}:{}/api{}".format(self._host, self._port, path)
+        return "".join([self._api_uri, path])
 
     def torrent_get(self, torrent_id):
         resp = self._request("/torrent/{}".format(torrent_id))
@@ -89,3 +94,42 @@ class TrackerClient(object):
             'client': client_name
         })
         return resp.ok
+
+    def torrent_get_all_redis(self):
+        torrents = []
+        keys = self._redis.keys("t:t:*")
+        for key in keys:
+            key = key.decode()
+            try:
+                if len(key) != 44:
+                    continue
+                tor = self._redis.hgetall(key)
+            except ResponseError as err:
+                print(err)
+                print(key)
+                break
+            else:
+                torrents.append(tor)
+        return torrents
+
+    def users_get_all_redis(self, sort="user_id"):
+        users = []
+        keys = [k for k in self._redis.keys("t:u:*")]
+        for k in keys:
+            try:
+                data = self._redis.hgetall(k)
+                user = {
+                    'passkey': data.get(b'passkey', "ERROR: PASSKEY NOT SET"),
+                    'user_id': int(data.get(b'user_id', b"-1")),
+                    'downloaded': int(data.get(b'downloaded', b"-1")),
+                    'uploaded': int(data.get(b'uploaded', b"-1")),
+                    'username': data.get(b'username', b"ERROR: NO USER!").decode(),
+                    'enabled': data.get(b'enabled', b"0").decode()
+                }
+                users.append(user)
+            except Exception as err:
+                print(err)
+                break
+
+        users.sort(key=lambda u: u[sort])
+        return users

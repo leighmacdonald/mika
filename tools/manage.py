@@ -2,10 +2,10 @@
 import binascii
 import json
 import argparse
-from operator import attrgetter
 from subprocess import call
 import pymysql
 import redis
+import tracker
 from redis.exceptions import ResponseError
 
 config = {}
@@ -93,29 +93,20 @@ def gen_key(**args):
     call("openssl req -x509 -nodes -days 365 -newkey rsa:1024 -keyout key_priv -out key_ca", shell=True)
 
 
-def torrents_list(**args):
-    redis_conn = make_redis()
+def get_tracker():
+    return tracker.TrackerClient(config['ListenHostAPI'], *config['RedisHost'].split(":"))
 
-    keys = redis_conn.keys("t:t:*")
-    for key in keys:
-        key = key.decode()
+
+def torrents_list(**args):
+    for tor in get_tracker().torrent_get_all_redis():
         try:
-            if len(key) != 44:
-                continue
-            tor = redis_conn.hgetall(key)
-        except ResponseError as err:
-            print(err)
-            print(key)
-            break
-        else:
-            try:
-                print("[{}] S: {} L: {} {}".format(
-                    tor[b'info_hash'].decode(),
-                    tor[b'seeders'].decode().rjust(4),
-                    tor[b'leechers'].decode().rjust(4),
-                    tor[b'name'].decode(),))
-            except Exception:
-                print(tor)
+            print("[{}] S: {} L: {} {}".format(
+                tor[b'info_hash'].decode(),
+                tor[b'seeders'].decode().rjust(4),
+                tor[b'leechers'].decode().rjust(4),
+                tor[b'name'].decode(),))
+        except Exception:
+            print(tor)
 
 
 def unicode_keys(d):
@@ -123,32 +114,20 @@ def unicode_keys(d):
 
 
 def users_list(sort="user_id", **args):
-    redis_conn = make_redis()
-    try:
-        sort = bytes(sort, "utf8")
-    except:
-        pass
-    keys = [k for k in redis_conn.keys("t:u:*")]
-    users = []
-    for k in keys:
-        try:
-            users.append({k: v for k, v in redis_conn.hgetall(k).items()})
-        except Exception as err:
-            print(err)
-            print(k)
-    print(users[0])
-    users.sort(key=lambda u: u[sort])
-    for user in users:
-        print("[{}] ID: {} Up: {} Dn: {}".format(
-            user[b'passkey'].decode(),
-            user[b'user_id'].decode().rjust(5),
-            user.get(b'uploaded', b'00').decode().rjust(18),
-            user.get(b'downloaded', b'00').decode().rjust(18)))
+    for user in get_tracker().users_get_all_redis(sort):
+        print("[{}] ID: {} Up: {} Dn: {} Enabled: {} Name: {}".format(
+            user['passkey'].decode(),
+            str(user['user_id']).rjust(5),
+            str(user.get('uploaded', '?')).rjust(18),
+            str(user.get('downloaded', '?')).rjust(18),
+            str(user.get('enabled', '?')),
+            str(user.get('username', '?'))))
         try:
             pass
         except Exception as err:
             print(err)
             print(user)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Tracker management cli")
@@ -174,4 +153,5 @@ def parse_args():
 if __name__ == "__main__":
     options = parse_args()
     config = json.loads(open(options['config']).read())
+    tracker.TrackerClient(config['ListenHostAPI'])
     options['func'](**options)

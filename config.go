@@ -10,9 +10,12 @@ import (
 type Config struct {
 	Debug          bool
 	ListenHost     string
+	ListenHostAPI  string
 	RedisHost      string
 	RedisPass      string
 	RedisMaxIdle   int
+	SSLPrivateKey  string
+	SSLCert        string
 	AnnInterval    int
 	AnnIntervalMin int
 	ReapInterval   int

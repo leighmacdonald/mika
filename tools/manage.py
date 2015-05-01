@@ -2,6 +2,7 @@
 import binascii
 import json
 import argparse
+from subprocess import call
 import pymysql
 import redis
 
@@ -85,6 +86,10 @@ def warmup(**args):
     load_torrents(db_conn, redis_conn)
 
 
+def gen_key(**args):
+    call("openssl req -x509 -nodes -days 365 -newkey rsa:1024 -keyout key_priv -out key_ca", shell=True)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Tracker management cli")
     parser.add_argument("-c", "--config", help="Config file path (config.json)", default="./config.json")
@@ -92,6 +97,9 @@ def parse_args():
 
     warmup_cmd = subparsers.add_parser('warmup', help='Warmup the redis cache')
     warmup_cmd.set_defaults(func=warmup)
+
+    genkey_cmd = subparsers.add_parser("genkey", help="Generate a new set of SSL keys")
+    genkey_cmd.set_defaults(func=gen_key)
 
     return vars(parser.parse_args())
 

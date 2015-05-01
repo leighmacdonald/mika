@@ -28,3 +28,6 @@ virt*
 config.json
 /mika
 /src/github.com
+
+key_ca
+key_priv

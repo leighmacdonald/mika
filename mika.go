@@ -218,6 +218,52 @@ func CaptureMessage(message ...string) {
 	}
 }
 
+func runTracker() {
+	log.Println("Loading tracker router on:", config.ListenHost)
+	// Initialize the router + middlewares
+	e := echo.New()
+	e.MaxParam(1)
+
+	e.HTTPErrorHandler(func(code int, err error, c *echo.Context) {
+		log.Println("--------")
+		log.Println(err)
+		c.JSON(code, ResponseErr{err.Error()})
+		return
+	})
+
+	// Public tracker routes
+	e.Get("/:passkey/announce", HandleAnnounce)
+	e.Get("/:passkey/scrape", HandleScrape)
+
+	e.Run(config.ListenHost)
+}
+
+func runAPI() {
+	log.Println("Loading API router on:", config.ListenHostAPI, "(TLS)")
+	e := echo.New()
+	e.MaxParam(1)
+	api := e.Group("/api")
+	api.Use(func(c *echo.Context) {
+
+	})
+	api.Get("/version", HandleVersion)
+	api.Get("/test", HandleGetTorrentPeer)
+
+	api.Get("/torrent/:info_hash", HandleTorrentGet)
+	api.Post("/torrent", HandleTorrentAdd)
+	api.Get("/torrent/:info_hash/peers", HandleGetTorrentPeers)
+	api.Delete("/torrent/:info_hash", HandleTorrentDel)
+
+	api.Post("/user", HandleUserCreate)
+	api.Get("/user/:user_id", HandleUserGet)
+	api.Post("/user/:user_id", HandleUserUpdate)
+	api.Get("/user/:user_id/torrents", HandleUserTorrents)
+
+	api.Post("/whitelist", HandleWhitelistAdd)
+	api.Delete("/whitelist/:prefix", HandleWhitelistDel)
+	e.RunTLS(config.ListenHostAPI, config.SSLCert, config.SSLPrivateKey)
+}
+
 // Do it
 func main() {
 	log.Println(fmt.Sprintf(cheese, version))
@@ -276,32 +322,6 @@ func main() {
 
 	go dbStatIndexer()
 
-	// Initialize the router + middlewares
-	e := echo.New()
-	e.MaxParam(1)
-
-	// Public tracker routes
-	e.Get("/:passkey/announce", HandleAnnounce)
-	e.Get("/:passkey/scrape", HandleScrape)
-
-	api := e.Group("/api")
-
-	api.Get("/version", HandleVersion)
-	api.Get("/test", HandleGetTorrentPeer)
-
-	api.Get("/torrent/:info_hash", HandleTorrentGet)
-	api.Post("/torrent", HandleTorrentAdd)
-	api.Get("/torrent/:info_hash/peers", HandleGetTorrentPeers)
-	api.Delete("/torrent/:info_hash", HandleTorrentDel)
-
-	api.Post("/user", HandleUserCreate)
-	api.Get("/user/:user_id", HandleUserGet)
-	api.Post("/user/:user_id", HandleUserUpdate)
-	api.Get("/user/:user_id/torrents", HandleUserTorrents)
-
-	api.Post("/whitelist", HandleWhitelistAdd)
-	api.Delete("/whitelist/:prefix", HandleWhitelistDel)
-
 	// Start watching for expiring peers
 	go peerStalker()
 
@@ -309,7 +329,8 @@ func main() {
 	go syncWriter()
 
 	// Start server
-	e.Run(config.ListenHost)
+	go runTracker()
+	runAPI()
 }
 
 func init() {

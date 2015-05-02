@@ -237,7 +237,7 @@ func runTracker() {
 	e.Get("/:passkey/announce", HandleAnnounce)
 	e.Get("/:passkey/scrape", HandleScrape)
 
-	log.Fatal(e.Run(config.ListenHost))
+	e.Run(config.ListenHost)
 }
 
 func runAPI() {

@@ -28,14 +28,17 @@ type Torrent struct {
 	MultiDn         float64 `redis:"multi_dn" json:"multi_dn"`
 }
 
-func (torrent *Torrent) Update(announce *AnnounceRequest) {
+func (torrent *Torrent) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
 	s, l := torrent.PeerCounts()
 	torrent.Lock()
 	torrent.Announces++
-	torrent.Uploaded += announce.Uploaded
-	torrent.Downloaded += announce.Downloaded
+	torrent.Uploaded += upload_diff
+	torrent.Downloaded += download_diff
 	torrent.Seeders = s
 	torrent.Leechers = l
+	if announce.Event == COMPLETED {
+		torrent.Snatches++
+	}
 	torrent.Unlock()
 }
 

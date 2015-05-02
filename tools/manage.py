@@ -97,6 +97,14 @@ def get_tracker():
     return tracker.TrackerClient(config['ListenHostAPI'], *config['RedisHost'].split(":"))
 
 
+def wipe_torrent_uldl(**args):
+    redis_conn = make_redis()
+    for tor in get_tracker().torrent_get_all_redis():
+        key = "t:t:{}".format(tor[b'info_hash'].decode())
+        redis_conn.hset(key, "downloaded", 0)
+        redis_conn.hset(key, "uploaded", 0)
+
+
 def torrents_list(**args):
     for tor in get_tracker().torrent_get_all_redis():
         try:
@@ -154,6 +162,10 @@ def parse_args():
     cleanup_cmd = subparsers.add_parser("cleanup", help="Clean up old deprecated keys")
     cleanup_cmd.add_argument("-d", "--delete", action="store_true", help="Deleted the keys from redis")
     cleanup_cmd.set_defaults(func=tracker_cleanup)
+
+    wipetorstats_cmd = subparsers.add_parser("wipetorstats", help="List torrents stored in redis")
+    wipetorstats_cmd.set_defaults(func=wipe_torrent_uldl)
+
 
     return vars(parser.parse_args())
 

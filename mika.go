@@ -284,6 +284,29 @@ func runAPI() {
 	log.Fatal(srv.ListenAndServeTLS(config.SSLCert, config.SSLPrivateKey))
 }
 
+func sigHandler(s chan os.Signal) {
+	for received_signal := range s {
+		switch received_signal {
+		case syscall.SIGINT:
+			log.Println("")
+			log.Println("CAUGHT SIGINT: Shutting down!")
+			if *profile != "" {
+				log.Println("> Writing out profile info")
+				pprof.StopCPUProfile()
+			}
+			CaptureMessage("Stopped tracker")
+			os.Exit(0)
+		case syscall.SIGUSR2:
+			log.Println("")
+			log.Println("CAUGHT SIGUSR2: Reloading config")
+			<-s
+			loadConfig(false)
+			log.Println("> Reloaded config")
+			CaptureMessage("Reloaded configuration")
+		}
+	}
+}
+
 // Do it
 func main() {
 	log.Println(fmt.Sprintf(cheese, version))
@@ -379,26 +402,5 @@ func init() {
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGUSR2, syscall.SIGINT)
-	go func() {
-		for received_signal := range s {
-			switch received_signal {
-			case syscall.SIGINT:
-				log.Println("")
-				log.Println("CAUGHT SIGINT: Shutting down!")
-				if *profile != "" {
-					log.Println("> Writing out profile info")
-					pprof.StopCPUProfile()
-				}
-				CaptureMessage("Stopped tracker")
-				os.Exit(0)
-			case syscall.SIGUSR2:
-				log.Println("")
-				log.Println("CAUGHT SIGUSR2: Reloading config")
-				<-s
-				loadConfig(false)
-				log.Println("> Reloaded config")
-				CaptureMessage("Reloaded configuration")
-			}
-		}
-	}()
+	go sigHandler(s)
 }

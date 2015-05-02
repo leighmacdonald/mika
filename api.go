@@ -77,19 +77,21 @@ func HandleVersion(c *echo.Context) {
 }
 
 func HandleTorrentGet(c *echo.Context) error {
-	r := pool.Get()
-	defer r.Close()
-	if r.Err() != nil {
-		return c.JSON(http.StatusInternalServerError, ResponseErr{})
-	}
-
 	info_hash := c.Param("info_hash")
-	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
+	torrent := mika.GetTorrentByInfoHash(nil, info_hash, false)
 	if torrent == nil {
-		return c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
+		err := c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
+		if err != nil {
+			log.Println("ERR1: ", err)
+		}
+	} else {
+		log.Println("HandleTorrentGet: Fetched torrent", info_hash)
+		err := c.JSON(http.StatusOK, torrent)
+		if err != nil {
+			log.Println("ERR2: ", err)
+		}
 	}
-	log.Println("HandleTorrentGet: Fetched torrent", info_hash)
-	return c.JSON(http.StatusOK, torrent)
+	return nil
 }
 
 // Add new torrents into the active torrent set

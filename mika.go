@@ -32,6 +32,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,6 +41,7 @@ import (
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -235,7 +237,7 @@ func runTracker() {
 	e.Get("/:passkey/announce", HandleAnnounce)
 	e.Get("/:passkey/scrape", HandleScrape)
 
-	e.Run(config.ListenHost)
+	log.Fatal(e.Run(config.ListenHost))
 }
 
 func runAPI() {
@@ -261,7 +263,19 @@ func runAPI() {
 
 	api.Post("/whitelist", HandleWhitelistAdd)
 	api.Delete("/whitelist/:prefix", HandleWhitelistDel)
-	e.RunTLS(config.ListenHostAPI, config.SSLCert, config.SSLPrivateKey)
+	tls_config := &tls.Config{
+		MinVersion:               tls.VersionTLS12,
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+		},
+	}
+	srv := http.Server{TLSConfig: tls_config, Addr: config.ListenHostAPI, Handler: e}
+	log.Fatal(srv.ListenAndServeTLS(config.SSLCert, config.SSLPrivateKey))
 }
 
 // Do it

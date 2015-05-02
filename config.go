@@ -31,7 +31,7 @@ type Config struct {
 func loadConfig(fail bool) {
 	file, err := ioutil.ReadFile(*config_file)
 	if err != nil {
-		log.Println("open config: ", err)
+		log.Println("loadConfig: Failed to open config file:", err)
 		if fail {
 			os.Exit(1)
 		}
@@ -39,7 +39,7 @@ func loadConfig(fail bool) {
 
 	temp := new(Config)
 	if err = json.Unmarshal(file, temp); err != nil {
-		log.Println("! Parse config error: ", err)
+		log.Println("loadConfig: Failed to parse config: ", err)
 		if fail {
 			os.Exit(1)
 		}

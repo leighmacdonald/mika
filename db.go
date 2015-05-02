@@ -35,7 +35,7 @@ var (
 
 // This function will periodically update the torrent sort indexes
 func dbStatIndexer() {
-	log.Println("Background indexer started")
+	log.Println("dbStatIndexer: Background indexer started")
 	r := pool.Get()
 	defer r.Close()
 
@@ -82,7 +82,7 @@ func syncWriter() {
 	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
-		log.Println("SyncWriter redis conn:", r.Err().Error())
+		log.Println("SyncWriter: Failed to get redis conn:", r.Err().Error())
 		return
 	}
 	for {
@@ -111,7 +111,7 @@ func syncWriter() {
 		}
 		err := r.Flush()
 		if err != nil {
-			log.Println("Failed to flush connection:", err)
+			log.Println("syncWriter: Failed to flush connection:", err)
 		}
 	}
 }

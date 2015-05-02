@@ -255,7 +255,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 		if forwarded_ip != "" {
 			ipv4_new, err := getIP(forwarded_ip)
 			if err != nil {
-				log.Println(err)
+				log.Println("NewAnnounce: Failed to parse header supplied IP", err)
 				return nil, errors.New("Invalid ip header")
 			}
 			ipv4 = ipv4_new
@@ -264,7 +264,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 			ip_req, _ := s[0], s[1]
 			ipv4_new, err := getIP(ip_req)
 			if err != nil {
-				log.Println(err)
+				log.Println("NewAnnounce: Failed to parse detected IP", err)
 				return nil, errors.New("Invalid ip hash")
 			}
 			ipv4 = ipv4_new

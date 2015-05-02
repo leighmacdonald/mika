@@ -24,7 +24,7 @@ func HandleScrape(c *echo.Context) {
 	defer r.Close()
 	if r.Err() != nil {
 		CaptureMessage(r.Err().Error())
-		log.Println("Scrape cannot connect to redis", r.Err().Error())
+		log.Println("HandleScrape: Cannot connect to redis", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_SCRAPE_FAIL
 		return
@@ -34,7 +34,7 @@ func HandleScrape(c *echo.Context) {
 
 	user := GetUserByPasskey(r, passkey)
 	if user == nil {
-		log.Println("Invalid passkey supplied:", passkey)
+		log.Println("HandleScrape: Invalid passkey supplied:", passkey)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_INVALID_PASSKEY
 		return
@@ -43,7 +43,7 @@ func HandleScrape(c *echo.Context) {
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		CaptureMessage(err.Error())
-		log.Println("Failed to parse scrape qs:", err)
+		log.Println("HandleScrape: Failed to parse scrape qs:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_SCRAPE_FAIL
 		return
@@ -70,7 +70,7 @@ func HandleScrape(c *echo.Context) {
 	err = encoder.Encode(resp)
 	if err != nil {
 		CaptureMessage(err.Error())
-		log.Println("Failed to encode scrape response:", err)
+		log.Println("HandleScrape: Failed to encode scrape response:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		counter <- EV_SCRAPE_FAIL
 		return

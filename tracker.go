@@ -20,7 +20,7 @@ type Tracker struct {
 
 // Load the models into memory from redis
 func (t *Tracker) Initialize() error {
-	log.Println("Initializing models in memory...")
+	log.Println("Initialize: Initializing models in memory...")
 	r := pool.Get()
 	defer r.Close()
 
@@ -135,7 +135,7 @@ func (t *Tracker) initWhitelist(r redis.Conn) {
 		return
 	}
 	whitelist, err = redis.Strings(a, nil)
-	log.Println(fmt.Sprintf("Loaded %d whitelist clients", len(whitelist)))
+	log.Println(fmt.Sprintf("initWhitelist: Loaded %d whitelist clients", len(whitelist)))
 }
 
 // Fetch the torrents stored in redis and load them into active memory as models
@@ -170,7 +170,7 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 		}
 	}
 
-	log.Println(fmt.Sprintf("Loaded %d torrents into memory", torrents))
+	log.Println(fmt.Sprintf("initTorrents: Loaded %d torrents into memory", torrents))
 }
 
 // Load all the users into memory
@@ -206,5 +206,5 @@ func (t *Tracker) initUsers(r redis.Conn) {
 		}
 	}
 
-	log.Println(fmt.Sprintf("Loaded %d users into memory", users))
+	log.Println(fmt.Sprintf("initUsers: Loaded %d users into memory", users))
 }

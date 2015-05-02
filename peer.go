@@ -170,13 +170,13 @@ func makePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer
 
 	values, err := redis.Values(redis_reply, nil)
 	if err != nil {
-		log.Println("Failed to parse peer reply: ", err)
+		log.Println("makePeer: Failed to parse peer reply: ", err)
 		return peer, err_parse_reply
 	}
 	if values != nil {
 		err := redis.ScanStruct(values, peer)
 		if err != nil {
-			log.Println("Failed to fetch peer: ", err)
+			log.Println("makePeer: Failed to scan peer struct: ", err)
 			return peer, err_cast_reply
 		} else {
 			peer.PeerID = peer_id
@@ -195,6 +195,6 @@ func IsValidClient(r redis.Conn, peer_id string) bool {
 		}
 	}
 
-	log.Println("Got non-whitelisted client:", peer_id)
+	log.Println("IsValidClient: Got non-whitelisted client:", peer_id)
 	return false
 }

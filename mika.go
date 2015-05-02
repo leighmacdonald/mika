@@ -216,7 +216,7 @@ func CaptureMessage(message ...string) {
 	}
 	_, err := raven_client.CaptureMessage()
 	if err != nil {
-		log.Println(err)
+		log.Println("CaptureMessage: Failed to send message:", err)
 	}
 }
 
@@ -377,7 +377,8 @@ func init() {
 		for received_signal := range s {
 			switch received_signal {
 			case syscall.SIGINT:
-				log.Println("\nShutting down!")
+				log.Println("")
+				log.Println("CAUGHT SIGINT: Shutting down!")
 				if *profile != "" {
 					log.Println("> Writing out profile info")
 					pprof.StopCPUProfile()
@@ -385,7 +386,8 @@ func init() {
 				CaptureMessage("Stopped tracker")
 				os.Exit(0)
 			case syscall.SIGUSR2:
-				log.Println("SIGUSR2")
+				log.Println("")
+				log.Println("CAUGHT SIGUSR2: Reloading config")
 				<-s
 				loadConfig(false)
 				log.Println("> Reloaded config")

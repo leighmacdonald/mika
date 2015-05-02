@@ -90,7 +90,7 @@ func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
 	if peer == nil {
 		peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%s:%s", torrent.InfoHash, peer_id))
 		if err != nil {
-			log.Println("Error executing peer fetch query: ", err)
+			log.Println("GetPeer: Error executing peer fetch query: ", err)
 			return nil, err
 		}
 		peer, err = makePeer(peer_reply, torrent.TorrentID, torrent.InfoHash, peer_id)
@@ -111,11 +111,11 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 
 	v, err := r.Do("SADD", fmt.Sprintf("t:tp:%s", torrent.InfoHash), peer.PeerID)
 	if err != nil {
-		log.Println("Error executing peer fetch query: ", err)
+		log.Println("AddPeer: Error executing peer fetch query: ", err)
 		return false
 	}
 	if v == "0" {
-		log.Println("Tried to add peer to set with existing element")
+		log.Println("AddPeer: Tried to add peer to set with existing element")
 	}
 	return true
 }

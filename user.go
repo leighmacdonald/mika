@@ -63,13 +63,13 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 
 	values, err := redis.Values(user_reply, nil)
 	if err != nil {
-		log.Println("Failed to parse user reply: ", err)
+		log.Println("fetchUser: Failed to parse user reply: ", err)
 		return nil
 	}
 
 	err = redis.ScanStruct(values, user)
 	if err != nil {
-		log.Println(err)
+		log.Println("fetchUser: Failed to scan redis values:", err)
 		return nil
 	}
 

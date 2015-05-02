@@ -355,7 +355,7 @@ func main() {
 
 func init() {
 	if version == "" {
-		log.Fatalln(`Build this binary with "make", not "go build"`)
+		log.Println(`[WARN] Build this binary with "make", not "go build"`)
 	}
 	whitelist = []string{}
 

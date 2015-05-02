@@ -12,7 +12,7 @@ install:
 	@go get $(GOFLAGS) ./...
 
 test: install
-	@go test $(GOFLAGS) ./...
+	@go test $(GOFLAGS)
 
 cover: install
 	@go test -coverprofile=`pwd`/coverage.out $(GOFLAGS) ./... && go tool cover -html=`pwd`/coverage.out

@@ -7,6 +7,8 @@
   "SSLPrivateKey": "key_priv",
   "SSLCert": "key_ca",
   "ListenHostAPI": ":34001",
+  "APIUsername": "",
+  "APIPassword": "",
   "AnnInterval": 300,
   "AnnIntervalMin": 10,
   "ReapInterval": 400,

@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"github.com/chihaya/bencode"
 	"github.com/garyburd/redigo/redis"
+	"github.com/goji/httpauth"
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
 	"log"
@@ -245,9 +246,14 @@ func runAPI() {
 	e := echo.New()
 	e.MaxParam(1)
 	api := e.Group("/api")
-	api.Use(func(c *echo.Context) {
 
-	})
+	// Optionally enabled BasicAuth over the TLS only API
+	if config.APIUsername == "" || config.APIPassword == "" {
+		log.Println("[WARN] No credentials set for API. All users granted access.")
+	} else {
+		api.Use(httpauth.SimpleBasicAuth(config.APIUsername, config.APIPassword))
+	}
+
 	api.Get("/version", HandleVersion)
 	api.Get("/test", HandleGetTorrentPeer)
 
@@ -344,7 +350,7 @@ func main() {
 
 	// Start server
 	go runTracker()
-	runAPI()
+	runAPI() // Block so we don't return
 }
 
 func init() {

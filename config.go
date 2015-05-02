@@ -11,6 +11,8 @@ type Config struct {
 	Debug          bool
 	ListenHost     string
 	ListenHostAPI  string
+	APIUsername    string
+	APIPassword    string
 	RedisHost      string
 	RedisPass      string
 	RedisMaxIdle   int

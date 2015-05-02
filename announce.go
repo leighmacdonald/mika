@@ -117,7 +117,7 @@ func HandleAnnounce(c *echo.Context) {
 
 	// user update MUST happen after peer update since we rely on the old dl/ul values
 	ul, dl := peer.Update(ann)
-	torrent.Update(ann)
+	torrent.Update(ann, ul, dl)
 	user.Update(ann, ul, dl, torrent.MultiUp, torrent.MultiDn)
 
 	if ann.Event == STOPPED {
@@ -136,6 +136,7 @@ func HandleAnnounce(c *echo.Context) {
 
 		// Mark the peer as inactive
 		r.Send("HSET", peer.KeyPeer, "active", 0)
+
 		if peer.IsHNR() {
 			peer.AddHNR(r, torrent.TorrentID)
 		}
@@ -151,8 +152,14 @@ func HandleAnnounce(c *echo.Context) {
 		r.Send("SREM", user.KeyHNR, torrent.TorrentID)
 
 	} else if ann.Event == STARTED {
-		// Ignore start event from active peers to prevent stat skew potential
-		if !peer.IsSeeder() {
+		// Make sure we account for a user completing a torrent outside of
+		// our view, or resuming from previously completions
+		if peer.IsSeeder() {
+			r.Send("SREM", user.KeyHNR, torrent.TorrentID)
+			r.Send("SREM", user.KeyIncomplete, torrent.TorrentID)
+			r.Send("SADD", user.KeyComplete, torrent.TorrentID)
+		} else {
+			r.Send("SREM", user.KeyComplete, torrent.TorrentID)
 			r.Send("SADD", user.KeyIncomplete, torrent.TorrentID)
 		}
 	}
@@ -170,7 +177,7 @@ func HandleAnnounce(c *echo.Context) {
 		// Refresh the peers expiration timer
 		// If this expires, the peer reaper takes over and removes the
 		// peer from torrents in the case of a non-clean client shutdown
-		r.Send("SETEX", fmt.Sprintf("t:t:%s:%s:exp", torrent.InfoHash, ann.PeerID), config.ReapInterval, 1)
+		r.Send("SETEX", fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, ann.PeerID), config.ReapInterval, 1)
 	}
 	r.Flush()
 

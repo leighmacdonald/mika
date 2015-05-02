@@ -55,7 +55,7 @@ in our swarms
 
 **Torrent Key**
 
-[HASH] "t:t:$torrent_id"
+[HASH] "t:t:<info_hash>"
 
 **Torrent Columns and Types**
 - announces int
@@ -67,7 +67,7 @@ Torrent Peer Data in Hash Key
 
 **Torrent Peer Key**
 
-[HASH] t:t:$torrent_id:$peer_id
+[HASH] t:p:<torrent_id>:<peer_id>
 
 **Torrent Peer Columns and Types**
 
@@ -90,14 +90,14 @@ announce from the peer. If this key expires we process the peer_id, removing
 it from the torrents active peer set and marking the peer as active = 0. This key
 is removed upon a stopped event as well.
 
-[SETEX] "t:t:$torrent_id:$peer_id:exp" -> "$ReapInterval" "1"
+[SETEX] "t:ptimeout:$torrent_id:$peer_id" -> "$ReapInterval" "1"
 
 **Torrent Peer Set**
 
 There will potentially be a set used to store peers for a torrent, but this
 may not be needed as scanning the keys could be fast enough.
 
-[SET] "t:t:$torrent_id:p"
+[SET] t:tpeers:<info_hash>
 
 **Peers Torrent Set**
 

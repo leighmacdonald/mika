@@ -111,7 +111,7 @@ func (peer *Peer) Sync(r redis.Conn) {
 }
 
 func (peer *Peer) IsHNR() bool {
-	return peer.Left > 0 && peer.AnnounceFirst-unixtime() > config.HNRThreshold
+	return peer.Left > 0 && peer.TotalTime < uint32(config.HNRThreshold)
 }
 
 func (peer *Peer) IsSeeder() bool {
@@ -165,7 +165,7 @@ func makePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer
 		TotalTime:     0,
 		UserID:        0,
 		TorrentID:     torrent_id,
-		KeyPeer:       fmt.Sprintf("t:t:%s:%s", info_hash, peer_id),
+		KeyPeer:       fmt.Sprintf("t:p:%s:%s", info_hash, peer_id),
 	}
 
 	values, err := redis.Values(redis_reply, nil)

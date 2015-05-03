@@ -89,6 +89,7 @@ func HandleTorrentGet(c *echo.Context) error {
 		err := c.JSON(http.StatusOK, torrent)
 		if err != nil {
 			log.Println("ERR2: ", err)
+			log.Println(torrent)
 		}
 	}
 	return nil

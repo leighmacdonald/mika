@@ -156,19 +156,19 @@ class TrackerClient(object):
             if delete:
                 self._redis.delete(key)
         # Look for peer suffix keys t:t:$ih:*
-        keys = [k.decode() for k in self._redis.keys("t:t:*")]
+        keys = [k for k in self._redis.keys("t:t:*")]
         old_keys_2 = []
         for key in keys:
-            k = key.split(":")
-            if len(k) != 3 or k[2].startswith("b'"):
+            k = key.split(b":")
+            if len(k) != 3 or k[2].startswith(b"b'"):
                 old_keys_2.append(key)
             else:
                 # Look for old int based keys
                 try:
                     int(k[2])
                 except Exception:
-                    torrent = self._redis.hgetall(key)
-                    self._validate_int_fields(key, torrent,
+                    torrent = self._redis.hgetall(key.decode())
+                    self._validate_int_fields(key.decode(), torrent,
                                               [b'downloaded', b'uploaded', b'snatches', b'announces', b'seeders',
                                                b'leechers'], update=delete)
                 else:

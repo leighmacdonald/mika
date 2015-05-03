@@ -13,54 +13,66 @@ import (
 type Peer struct {
 	Queued
 	sync.RWMutex
-	SpeedUP       float64 `redis:"speed_up" json:"speed_up"`
-	SpeedDN       float64 `redis:"speed_dn" json:"speed_dn"`
-	SpeedUPMax    float64 `redis:"speed_up" json:"speed_up_max"`
-	SpeedDNMax    float64 `redis:"speed_dn" json:"speed_dn_max"`
-	Uploaded      uint64  `redis:"uploaded" json:"uploaded"`
-	Downloaded    uint64  `redis:"downloaded" json:"downloaded"`
-	Corrupt       uint64  `redis:"corrupt" json:"corrupt"`
-	IP            string  `redis:"ip" json:"ip"`
-	Port          uint64  `redis:"port" json:"port"`
-	Left          uint64  `redis:"left" json:"left"`
-	Announces     uint64  `redis:"announces" json:"announces"`
-	TotalTime     uint32  `redis:"total_time" json:"total_time"`
-	AnnounceLast  int32   `redis:"last_announce" json:"last_announce"`
-	AnnounceFirst int32   `redis:"first_announce" json:"first_announce"`
-	New           bool    `redis:"new" json:"-"`
-	PeerID        string  `redis:"peer_id" json:"peer_id"`
-	Active        bool    `redis:"active"  json:"active"`
-	Username      string  `redis:"username"  json:"username"`
-	UserID        uint64  `redis:"user_id"  json:"user_id"`
-	TorrentID     uint64  `redis:"torrent_id" json:"torrent_id"`
-	KeyPeer       string  `redis:"-" json:"-"`
+	SpeedUP        float64 `redis:"speed_up" json:"speed_up"`
+	SpeedDN        float64 `redis:"speed_dn" json:"speed_dn"`
+	SpeedUPMax     float64 `redis:"speed_up" json:"speed_up_max"`
+	SpeedDNMax     float64 `redis:"speed_dn" json:"speed_dn_max"`
+	Uploaded       uint64  `redis:"uploaded" json:"uploaded"`
+	Downloaded     uint64  `redis:"downloaded" json:"downloaded"`
+	UploadedLast   uint64  `redis:"-" json:"-"`
+	DownloadedLast uint64  `redis:"-" json:"-"`
+	Corrupt        uint64  `redis:"corrupt" json:"corrupt"`
+	IP             string  `redis:"ip" json:"ip"`
+	Port           uint64  `redis:"port" json:"port"`
+	Left           uint64  `redis:"left" json:"left"`
+	Announces      uint64  `redis:"announces" json:"announces"`
+	TotalTime      uint32  `redis:"total_time" json:"total_time"`
+	AnnounceLast   int32   `redis:"last_announce" json:"last_announce"`
+	AnnounceFirst  int32   `redis:"first_announce" json:"first_announce"`
+	New            bool    `redis:"new" json:"-"`
+	PeerID         string  `redis:"peer_id" json:"peer_id"`
+	Active         bool    `redis:"active"  json:"active"`
+	Username       string  `redis:"username"  json:"username"`
+	UserID         uint64  `redis:"user_id"  json:"user_id"`
+	TorrentID      uint64  `redis:"torrent_id" json:"torrent_id"`
+	KeyPeer        string  `redis:"-" json:"-"`
 }
 
 // Update the stored values with the data from an announce
-func (peer *Peer) Update(announce *AnnounceRequest) (ul uint64, dl uint64) {
+func (peer *Peer) Update(announce *AnnounceRequest) (up_diff uint64, dl_diff uint64) {
 	peer.Lock()
 	defer peer.Unlock()
 	cur_time := unixtime()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
 
-	ul = announce.Uploaded - peer.Uploaded
-	dl = announce.Downloaded - peer.Downloaded
-	if ul < 0 {
-		ul = 0
+	if peer.UploadedLast > 0 || peer.DownloadedLast > 0 {
+		up_diff = announce.Uploaded - peer.UploadedLast
+		dl_diff = announce.Downloaded - peer.DownloadedLast
+	} else {
+		up_diff = announce.Uploaded
+		dl_diff = announce.Downloaded
 	}
-	if dl < 0 {
-		dl = 0
+
+	peer.DownloadedLast = announce.Downloaded
+	peer.UploadedLast = announce.Uploaded
+
+	if up_diff < 0 {
+		up_diff = 0
 	}
+	if dl_diff < 0 {
+		dl_diff = 0
+	}
+
 	// Change to int or byte?
-	peer.Uploaded = announce.Uploaded
-	peer.Downloaded = announce.Downloaded
+	peer.Uploaded += up_diff
+	peer.Downloaded += dl_diff
 	peer.IP = announce.IPv4.String()
 	peer.Port = announce.Port
 	peer.Corrupt = announce.Corrupt
 	peer.Left = announce.Left
-	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, ul)
-	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, dl)
+	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, up_diff)
+	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, dl_diff)
 	if peer.SpeedUP > peer.SpeedUPMax {
 		peer.SpeedUPMax = peer.SpeedUP
 	}
@@ -76,7 +88,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) (ul uint64, dl uint64) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
-	return ul, dl
+	return up_diff, dl_diff
 }
 
 func (peer *Peer) SetUserID(user_id uint64, username string) {
@@ -119,7 +131,7 @@ func (peer *Peer) IsSeeder() bool {
 }
 
 func (peer *Peer) AddHNR(r redis.Conn, torrent_id uint64) {
-	r.Send("SADD", fmt.Sprintf("t:u:%d:hnr", peer.UserID), torrent_id)
+	r.Send("SADD", fmt.Sprintf("t:u:hnr:%d", peer.UserID), torrent_id)
 	Debug("Added HnR:", torrent_id, peer.UserID)
 }
 

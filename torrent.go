@@ -138,7 +138,7 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 
 	r.Send("SREM", fmt.Sprintf("t:tp:%s", torrent.InfoHash), peer.PeerID)
 	r.Send("HSET", peer.KeyPeer, "active", 0)
-
+	peer.Active = false
 	return true
 }
 

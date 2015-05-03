@@ -36,7 +36,7 @@ func ReapPeer(info_hash, peer_id string) {
 
 	queued := 2
 	r.Send("SREM", fmt.Sprintf("t:tp:%s", info_hash), peer_id)
-	r.Send("HSET", fmt.Sprintf("t:t:%s:p:%s", info_hash, peer_id), "active", 0)
+	r.Send("HSET", peer.KeyPeer, "active", 0)
 	if peer.Active {
 		if peer.Left > 0 {
 			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", info_hash), "leechers", -1)

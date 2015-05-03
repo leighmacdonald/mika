@@ -73,10 +73,10 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 		return nil
 	}
 
-	user.KeyActive = fmt.Sprintf("t:u:%d:active", user_id)
-	user.KeyIncomplete = fmt.Sprintf("t:u:%d:incomplete", user_id)
-	user.KeyComplete = fmt.Sprintf("t:u:%d:complete", user_id)
-	user.KeyHNR = fmt.Sprintf("t:u:%d:hnr", user_id)
+	user.KeyActive = fmt.Sprintf("t:u:active:%d", user_id)
+	user.KeyIncomplete = fmt.Sprintf("t:u:incomplete:%d", user_id)
+	user.KeyComplete = fmt.Sprintf("t:u:complete:%d", user_id)
+	user.KeyHNR = fmt.Sprintf("t:u:hnr:%d", user_id)
 
 	return user
 }

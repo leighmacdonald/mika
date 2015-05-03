@@ -147,26 +147,53 @@ class TrackerClient(object):
         for key in keys:
             if len(key.split(b":")) != 3:
                 old_keys.append(key)
+            else:
+                user = self._redis.hgetall(key)
+                self._validate_int_fields(key, user,
+                                          [b'downloaded', b'uploaded', b'snatches', b'announces', b'corrupt'])
         for key in old_keys:
             print(key)
             if delete:
                 self._redis.delete(key)
         # Look for peer suffix keys t:t:$ih:*
-        keys = [k for k in self._redis.keys("t:t:*")]
+        keys = [k.decode() for k in self._redis.keys("t:t:*")]
         old_keys_2 = []
         for key in keys:
-            k = key.split(b":")
-            if len(k) != 3:
+            k = key.split(":")
+            if len(k) != 3 or k[2].startswith("b'"):
                 old_keys_2.append(key)
             else:
                 # Look for old int based keys
                 try:
                     int(k[2])
                 except Exception:
-                    pass
+                    torrent = self._redis.hgetall(key)
+                    self._validate_int_fields(key, torrent,
+                                              [b'downloaded', b'uploaded', b'snatches', b'announces', b'seeders',
+                                               b'leechers'], update=delete)
                 else:
                     old_keys_2.append(key)
         for key in old_keys_2:
             print(key)
             if delete:
                 self._redis.delete(key)
+
+    def _validate_int_fields(self, key, data, hash_keys, update=False):
+        # Nothing should be this large yet, even if not max int size
+        max_int = 2 ** 62
+        for hash_key in hash_keys:
+            reset = False
+            try:
+                v = int(data[hash_key])
+            except KeyError:
+                print("[{}] No hash key: {}".format(key, hash_key))
+                reset = True
+            else:
+                if v < 0:
+                    print("[{}] Negative int: {}".format(hash_key))
+                    reset = True
+                elif v > max_int:
+                    print("[{}] Max int: {}".format(hash_key))
+                    reset = True
+            if reset:
+                self._redis.hset(key, hash_key, 0)

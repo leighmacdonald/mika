@@ -39,39 +39,38 @@ type Peer struct {
 }
 
 // Update the stored values with the data from an announce
-func (peer *Peer) Update(announce *AnnounceRequest) (up_diff uint64, dl_diff uint64) {
+func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	peer.Lock()
 	defer peer.Unlock()
 	cur_time := unixtime()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
 
-	if peer.UploadedLast > 0 || peer.DownloadedLast > 0 {
-		up_diff = announce.Uploaded - peer.UploadedLast
-		dl_diff = announce.Downloaded - peer.DownloadedLast
+	ul_diff := uint64(0)
+	dl_diff := uint64(0)
+
+	if announce.Event == STARTED {
+		peer.Uploaded = announce.Uploaded
+		peer.Downloaded = announce.Downloaded
+	} else if announce.Uploaded < peer.Uploaded || announce.Downloaded < peer.Downloaded {
+		peer.Uploaded = announce.Uploaded
+		peer.Downloaded = announce.Downloaded
 	} else {
-		up_diff = announce.Uploaded
-		dl_diff = announce.Downloaded
-	}
+		if announce.Uploaded != peer.Uploaded {
+			ul_diff = announce.Uploaded - peer.Uploaded
+			peer.Uploaded = announce.Uploaded
+		}
+		if announce.Downloaded != peer.Downloaded {
+			dl_diff = announce.Downloaded - peer.Downloaded
+			peer.Downloaded = announce.Downloaded
+		}
 
-	peer.DownloadedLast = announce.Downloaded
-	peer.UploadedLast = announce.Uploaded
-
-	if up_diff < 0 {
-		up_diff = 0
 	}
-	if dl_diff < 0 {
-		dl_diff = 0
-	}
-
-	// Change to int or byte?
-	peer.Uploaded += up_diff
-	peer.Downloaded += dl_diff
 	peer.IP = announce.IPv4.String()
 	peer.Port = announce.Port
 	peer.Corrupt = announce.Corrupt
 	peer.Left = announce.Left
-	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, up_diff)
+	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, ul_diff)
 	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, dl_diff)
 	if peer.SpeedUP > peer.SpeedUPMax {
 		peer.SpeedUPMax = peer.SpeedUP
@@ -88,7 +87,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) (up_diff uint64, dl_diff uin
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
-	return up_diff, dl_diff
+	return ul_diff, dl_diff
 }
 
 func (peer *Peer) SetUserID(user_id uint64, username string) {

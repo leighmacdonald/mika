@@ -193,7 +193,7 @@ class TrackerClient(object):
                     print("[{}] Negative int: {}".format(hash_key))
                     reset = True
                 elif v > max_int:
-                    print("[{}] Max int: {}".format(hash_key))
+                    print("[{}] Max int: {}".format(hash_key, v))
                     reset = True
             if reset:
                 self._redis.hset(key, hash_key, 0)

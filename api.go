@@ -89,7 +89,7 @@ func HandleTorrentGet(c *echo.Context) error {
 			log.Println("ERR1: ", err)
 		}
 	} else {
-		log.Println("HandleTorrentGet: Fetched torrent", info_hash)
+		Debug("HandleTorrentGet: Fetched torrent", info_hash)
 		err := c.JSON(http.StatusOK, torrent)
 		if err != nil {
 			log.Println("ERR2: ", err)

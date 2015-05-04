@@ -41,6 +41,7 @@ import (
 	"github.com/goji/httpauth"
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
+	mw "github.com/labstack/echo/middleware"
 	"log"
 	"net/http"
 	"os"
@@ -248,6 +249,8 @@ func runAPI() {
 	e := echo.New()
 	e.MaxParam(1)
 	api := e.Group("/api")
+	e.Use(mw.Logger)
+	e.Use(StatsMW)
 
 	// Optionally enabled BasicAuth over the TLS only API
 	if config.APIUsername == "" || config.APIPassword == "" {

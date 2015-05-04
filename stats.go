@@ -6,6 +6,7 @@ import (
 	"time"
 	//"net/url"
 	"sync"
+	"github.com/labstack/echo"
 )
 
 const (
@@ -16,6 +17,8 @@ const (
 	EV_INVALID_PASSKEY  = iota
 	EV_INVALID_INFOHASH = iota
 	EV_INVALID_CLIENT   = iota
+	EV_API              = iota
+	EV_API_FAIL         = iota
 )
 
 type StatsCounter struct {
@@ -30,7 +33,8 @@ type StatsCounter struct {
 	InvalidPasskey  uint64
 	InvalidInfohash uint64
 	InvalidClient   uint64
-
+	APIRequests     uint64
+	APIRequestsFail uint64
 	//influxDB *client.Client
 }
 
@@ -69,6 +73,8 @@ func NewStatCounter(c chan int) *StatsCounter {
 		InvalidPasskey:  0,
 		InvalidInfohash: 0,
 		InvalidClient:   0,
+		APIRequests:     0,
+		APIRequestsFail: 0,
 		//influxDB:        con,
 	}
 	return counter
@@ -79,6 +85,11 @@ func (stats *StatsCounter) counter() {
 		v := <-stats.channel
 		stats.Lock()
 		switch v {
+		case EV_API:
+			stats.APIRequests++
+			stats.Requests++
+		case EV_API_FAIL:
+			stats.APIRequestsFail++
 		case EV_ANNOUNCE:
 			stats.Announce++
 			stats.Requests++
@@ -99,18 +110,26 @@ func (stats *StatsCounter) counter() {
 		stats.Unlock()
 	}
 }
+func StatsMW(h echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		counter <- EV_API
+		return nil
+	}
+}
 
 func (stats *StatsCounter) statPrinter() {
 	for {
 		time.Sleep(60 * time.Second)
 		stats.RLock()
 		req_sec := stats.Requests / 60
-		log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d",
+		req_sec_api := stats.APIRequests / 60
+		log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
 			stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
-			stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec)
+			stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec, req_sec_api)
 		stats.RUnlock()
 		stats.Lock()
 		stats.Requests = 0
+		stats.APIRequests = 0
 		stats.Unlock()
 
 	}

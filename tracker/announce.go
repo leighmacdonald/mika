@@ -1,4 +1,4 @@
-package main
+package tracker
 
 import (
 	"bytes"
@@ -10,6 +10,10 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/stats"
+	"git.totdev.in/totv/mika/util"
+	"git.totdev.in/totv/mika/conf"
 )
 
 // Announce types
@@ -55,14 +59,14 @@ func getIP(ip_str string) (net.IP, error) {
 
 // Route handler for the /announce endpoint
 // Here be dragons
-func HandleAnnounce(c *echo.Context) {
-	counter <- EV_ANNOUNCE
-	r := pool.Get()
+func (t *Tracker) HandleAnnounce(c *echo.Context) {
+	stats.Counter <- stats.EV_ANNOUNCE
+	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
 		log.Println("HandleAnnounce: Failed to get redis conn:", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
-		counter <- EV_ANNOUNCE_FAIL
+		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
 	}
 
@@ -70,47 +74,47 @@ func HandleAnnounce(c *echo.Context) {
 	if err != nil {
 		log.Println("HandleAnnounce: Failed to parse announce:", err)
 		oops(c, MSG_GENERIC_ERROR)
-		counter <- EV_ANNOUNCE_FAIL
+		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
 	}
 
 	passkey := c.P(0) // eat a dick
 
-	user := GetUserByPasskey(r, passkey)
+	user := t.GetUserByPasskey(r, passkey)
 	if user == nil {
 		log.Println("HandleAnnounce: Invalid passkey", passkey)
 		oopsStr(c, MSG_GENERIC_ERROR, "Invalid passkey")
-		counter <- EV_INVALID_PASSKEY
+		stats.Counter <- stats.EV_INVALID_PASSKEY
 		return
 	}
 	if !user.CanLeech && ann.Left > 0 {
 		oopsStr(c, MSG_GENERIC_ERROR, "Leech Disabled")
 		return
 	}
-	if !IsValidClient(r, ann.PeerID) {
+	if !t.IsValidClient(r, ann.PeerID) {
 		log.Println("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID[0:6], user.UserID, user.Username))
 		oops(c, MSG_INVALID_PEER_ID)
-		counter <- EV_INVALID_CLIENT
+		stats.Counter <- stats.EV_INVALID_CLIENT
 		return
 	}
 
-	torrent := mika.GetTorrentByInfoHash(r, fmt.Sprintf("%x", ann.InfoHash), true)
+	torrent := t.GetTorrentByInfoHash(r, fmt.Sprintf("%x", ann.InfoHash), true)
 	if torrent == nil {
-		Debug("HandleAnnounce:", fmt.Sprintf("Torrent not found: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
+		util.Debug("HandleAnnounce:", fmt.Sprintf("Torrent not found: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
-		counter <- EV_INVALID_INFOHASH
+		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return
 	} else if !torrent.Enabled {
-		Debug("HandleAnnounce:", fmt.Sprintf("Disabled torrent: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
+		util.Debug("HandleAnnounce:", fmt.Sprintf("Disabled torrent: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
-		counter <- EV_INVALID_INFOHASH
+		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return
 	}
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
 		log.Println("HandleAnnounce: Failed to fetch/create peer:", err.Error())
 		oops(c, MSG_GENERIC_ERROR)
-		counter <- EV_ANNOUNCE_FAIL
+		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
 	}
 	peer.SetUserID(user.UserID, user.Username) //where to put this/handle this cleaner?
@@ -177,34 +181,34 @@ func HandleAnnounce(c *echo.Context) {
 		// Refresh the peers expiration timer
 		// If this expires, the peer reaper takes over and removes the
 		// peer from torrents in the case of a non-clean client shutdown
-		r.Send("SETEX", fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, ann.PeerID), config.ReapInterval, 1)
+		r.Send("SETEX", fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, ann.PeerID), conf.Config.ReapInterval, 1)
 	}
 	r.Flush()
 
-	peer.AnnounceLast = unixtime()
+	peer.AnnounceLast = util.Unixtime()
 	if !peer.InQueue {
 		peer.InQueue = true
-		sync_peer <- peer
+		SyncPeerC <- peer
 	}
 	if !torrent.InQueue {
 		torrent.InQueue = true
-		sync_torrent <- torrent
+		SyncTorrentC <- torrent
 	}
 	if !user.InQueue {
 		user.InQueue = true
-		sync_user <- user
+		SyncUserC <- user
 	}
 
 	dict := bencode.Dict{
 		"complete":     torrent.Seeders,
 		"incomplete":   torrent.Leechers,
-		"interval":     config.AnnInterval,
-		"min interval": config.AnnIntervalMin,
+		"interval":     conf.Config.AnnInterval,
+		"min interval": conf.Config.AnnIntervalMin,
 	}
 
 	peers := torrent.GetPeers(r, ann.NumWant)
 	if peers != nil {
-		dict["peers"] = makeCompactPeers(peers, ann.PeerID)
+		dict["peers"] = MakeCompactPeers(peers, ann.PeerID)
 	} else {
 		dict["peers"] = []byte{}
 	}
@@ -215,7 +219,7 @@ func HandleAnnounce(c *echo.Context) {
 	if er_msg_encoded != nil {
 		log.Println("HandleAnnounce:", fmt.Sprintf("Failed to encode response %s [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_GENERIC_ERROR)
-		counter <- EV_ANNOUNCE_FAIL
+		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
 	}
 
@@ -287,21 +291,21 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	if err != nil {
 		return nil, errors.New("No left value")
 	} else {
-		left = UMax(0, left)
+		left = util.UMax(0, left)
 	}
 
 	downloaded, err := q.Uint64("downloaded")
 	if err != nil {
 		downloaded = 0
 	} else {
-		downloaded = UMax(0, downloaded)
+		downloaded = util.UMax(0, downloaded)
 	}
 
 	uploaded, err := q.Uint64("uploaded")
 	if err != nil {
 		uploaded = 0
 	} else {
-		uploaded = UMax(0, uploaded)
+		uploaded = util.UMax(0, uploaded)
 	}
 
 	corrupt, err := q.Uint64("corrupt")
@@ -309,7 +313,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 		// Assume we just don't have the param
 		corrupt = 0
 	} else {
-		corrupt = UMax(0, corrupt)
+		corrupt = util.UMax(0, corrupt)
 	}
 
 	return &AnnounceRequest{

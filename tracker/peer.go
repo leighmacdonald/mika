@@ -1,17 +1,20 @@
-package main
+package tracker
 
 import (
 	"bytes"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"git.totdev.in/totv/mika/db"
 	"log"
 	"net"
 	"strings"
 	"sync"
+	"git.totdev.in/totv/mika/util"
+	"git.totdev.in/totv/mika/conf"
 )
 
 type Peer struct {
-	Queued
+	db.Queued
 	sync.RWMutex
 	SpeedUP        float64 `redis:"speed_up" json:"speed_up"`
 	SpeedDN        float64 `redis:"speed_dn" json:"speed_dn"`
@@ -42,7 +45,7 @@ type Peer struct {
 func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	peer.Lock()
 	defer peer.Unlock()
-	cur_time := unixtime()
+	cur_time := util.Unixtime()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
 
@@ -70,8 +73,8 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	peer.Port = announce.Port
 	peer.Corrupt = announce.Corrupt
 	peer.Left = announce.Left
-	peer.SpeedUP = estSpeed(peer.AnnounceLast, cur_time, ul_diff)
-	peer.SpeedDN = estSpeed(peer.AnnounceLast, cur_time, dl_diff)
+	peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
+	peer.SpeedDN = util.EstSpeed(peer.AnnounceLast, cur_time, dl_diff)
 	if peer.SpeedUP > peer.SpeedUPMax {
 		peer.SpeedUPMax = peer.SpeedUP
 	}
@@ -81,9 +84,9 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 
 	// Must be active to have a real time delta
 	if peer.Active && peer.AnnounceLast > 0 {
-		time_diff := uint64(unixtime() - peer.AnnounceLast)
+		time_diff := uint64(util.Unixtime() - peer.AnnounceLast)
 		// Ignore long periods of inactivity
-		if time_diff < (uint64(config.AnnInterval) * 4) {
+		if time_diff < (uint64(conf.Config.AnnInterval) * 4) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
@@ -122,7 +125,7 @@ func (peer *Peer) Sync(r redis.Conn) {
 }
 
 func (peer *Peer) IsHNR() bool {
-	return peer.Left > 0 && peer.TotalTime < uint32(config.HNRThreshold)
+	return peer.Left > 0 && peer.TotalTime < uint32(conf.Config.HNRThreshold)
 }
 
 func (peer *Peer) IsSeeder() bool {
@@ -131,12 +134,12 @@ func (peer *Peer) IsSeeder() bool {
 
 func (peer *Peer) AddHNR(r redis.Conn, torrent_id uint64) {
 	r.Send("SADD", fmt.Sprintf("t:u:hnr:%d", peer.UserID), torrent_id)
-	Debug("Added HnR:", torrent_id, peer.UserID)
+	util.Debug("Added HnR:", torrent_id, peer.UserID)
 }
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(peers []*Peer, skip_id string) []byte {
+func MakeCompactPeers(peers []*Peer, skip_id string) []byte {
 	var out_buf bytes.Buffer
 	for _, peer := range peers {
 		if peer.Port <= 0 {
@@ -155,7 +158,7 @@ func makeCompactPeers(peers []*Peer, skip_id string) []byte {
 
 // Generate a new instance of a peer from the redis reply if data is contained
 // within, otherwise just return a default value peer
-func makePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer_id string) (*Peer, error) {
+func MakePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer_id string) (*Peer, error) {
 	peer := &Peer{
 		PeerID:        peer_id,
 		Active:        false,
@@ -171,8 +174,8 @@ func makePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer
 		Username:      "",
 		IP:            "127.0.0.1",
 		Port:          0,
-		AnnounceFirst: unixtime(),
-		AnnounceLast:  unixtime(),
+		AnnounceFirst: util.Unixtime(),
+		AnnounceLast:  util.Unixtime(),
 		TotalTime:     0,
 		UserID:        0,
 		TorrentID:     torrent_id,
@@ -198,9 +201,9 @@ func makePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer
 
 // Checked if the clients peer_id prefix matches the client prefixes
 // stored in the white lists
-func IsValidClient(r redis.Conn, peer_id string) bool {
+func (t *Tracker) IsValidClient(r redis.Conn, peer_id string) bool {
 
-	for _, client_prefix := range whitelist {
+	for _, client_prefix := range t.Whitelist {
 		if strings.HasPrefix(peer_id, client_prefix) {
 			return true
 		}

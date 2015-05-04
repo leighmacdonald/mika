@@ -1,13 +1,20 @@
-package main
+package conf
 
 import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"os"
+	"sync"
 )
 
-type Config struct {
+var (
+	// Global config instance & lock
+	Config     *Configuration
+	configLock = new(sync.RWMutex)
+)
+
+type Configuration struct {
 	Debug          bool
 	ListenHost     string
 	ListenHostAPI  string
@@ -30,8 +37,9 @@ type Config struct {
 	InfluxPass     string
 }
 
-func loadConfig(fail bool) {
-	file, err := ioutil.ReadFile(*config_file)
+func LoadConfig(config_file string, fail bool) {
+	log.Println("Loading config:", config_file)
+	file, err := ioutil.ReadFile(config_file)
 	if err != nil {
 		log.Println("loadConfig: Failed to open config file:", err)
 		if fail {
@@ -39,7 +47,7 @@ func loadConfig(fail bool) {
 		}
 	}
 
-	temp := new(Config)
+	temp := new(Configuration)
 	if err = json.Unmarshal(file, temp); err != nil {
 		log.Println("loadConfig: Failed to parse config: ", err)
 		if fail {
@@ -47,6 +55,6 @@ func loadConfig(fail bool) {
 		}
 	}
 	configLock.Lock()
-	config = temp
+	Config = temp
 	configLock.Unlock()
 }

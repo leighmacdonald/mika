@@ -1,4 +1,4 @@
-package main
+package stats
 
 import (
 	//"github.com/influxdb/influxdb/client"
@@ -35,6 +35,16 @@ type StatsCounter struct {
 	APIRequests     uint64
 	APIRequestsFail uint64
 	//influxDB *client.Client
+}
+var (
+	Counter      = make(chan int)
+	StatCounts *StatsCounter
+)
+
+func init() {
+	// Start stat counter
+	StatCounts = NewStatCounter(Counter)
+
 }
 
 func NewStatCounter(c chan int) *StatsCounter {
@@ -76,10 +86,14 @@ func NewStatCounter(c chan int) *StatsCounter {
 		APIRequestsFail: 0,
 		//influxDB:        con,
 	}
+
+	go counter.Counter()
+	go counter.statPrinter()
+
 	return counter
 }
 
-func (stats *StatsCounter) counter() {
+func (stats *StatsCounter) Counter() {
 	for {
 		v := <-stats.channel
 		stats.Lock()
@@ -111,7 +125,7 @@ func (stats *StatsCounter) counter() {
 }
 func StatsMW(h echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		counter <- EV_API
+		Counter <- EV_API
 		return nil
 	}
 }

@@ -1,25 +1,27 @@
-package main
+package tracker
 
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
 	"strings"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/util"
 )
 
 // Will mark a torrent peer as inactive and remove them
 // from the torrents active peer_id set
-func ReapPeer(info_hash, peer_id string) {
-	r := pool.Get()
+func (t *Tracker) ReapPeer(info_hash, peer_id string) {
+	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		CaptureMessage(r.Err().Error())
+		util.CaptureMessage(r.Err().Error())
 		log.Println("ReapPeer: Reaper redis conn:", r.Err().Error())
 		return
 	}
-	Debug("Reaping peer:", info_hash, peer_id)
+	util.Debug("Reaping peer:", info_hash, peer_id)
 
-	torrent := mika.GetTorrentByInfoHash(r, info_hash, false)
+	torrent := t.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
 		log.Println("ReapPeer: Failed to fetch torrent while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
@@ -56,7 +58,7 @@ func ReapPeer(info_hash, peer_id string) {
 		log.Println("ReapPeer: Tried to remove non-existant peer: ", info_hash, peer_id)
 	}
 	if v == "1" {
-		Debug("ReapPeer: Reaped peer successfully: ", peer_id)
+		util.Debug("ReapPeer: Reaped peer successfully: ", peer_id)
 	}
 
 	// all needed i think, must match r.Send count?
@@ -68,11 +70,11 @@ func ReapPeer(info_hash, peer_id string) {
 
 // This is a goroutine that will watch for peer key expiry events and
 // act on them, removing them from the active peer lists
-func peerStalker() {
-	r := pool.Get()
+func (t *Tracker) peerStalker() {
+	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		CaptureMessage(r.Err().Error())
+		util.CaptureMessage(r.Err().Error())
 		log.Println("peerStalker: Reaper cannot connect to redis", r.Err().Error())
 		return
 	}
@@ -85,11 +87,11 @@ func peerStalker() {
 		case redis.Message:
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
 			if len(p) > 4 {
-				ReapPeer(p[2], p[3])
+				t.ReapPeer(p[2], p[3])
 			}
 
 		case redis.Subscription:
-			Debug("peerStalker: Subscribed to channel:", v.Channel)
+			util.Debug("peerStalker: Subscribed to channel:", v.Channel)
 
 		case error:
 			log.Println("peerStalker: Subscriber error: ", v.Error())

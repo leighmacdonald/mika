@@ -21,6 +21,6 @@ bench: install
 	@go test -run=NONE -bench=. $(GOFLAGS) ./...
 
 clean:
-	@go clean $(GOFLAGS) -i ./...
+	@go clean $(GOFLAGS) -i
 
 ## EOF

@@ -1,14 +1,16 @@
-package main
+package tracker
 
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"git.totdev.in/totv/mika/db"
 	"log"
 	"sync"
+	"git.totdev.in/totv/mika/util"
 )
 
 type User struct {
-	Queued
+	db.Queued
 	sync.RWMutex
 	UserID        uint64   `redis:"user_id" json:"user_id"`
 	Enabled       bool     `redis:"enabled" json:"enabled"`
@@ -30,8 +32,8 @@ type User struct {
 
 // Fetch a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
-func findUserID(passkey string) uint64 {
-	for _, user := range mika.Users {
+func (t *Tracker) findUserID(passkey string) uint64 {
+	for _, user := range t.Users {
 		if user.Passkey == passkey {
 			return user.UserID
 		}
@@ -81,27 +83,27 @@ func fetchUser(r redis.Conn, user_id uint64) *User {
 	return user
 }
 
-func GetUserByPasskey(r redis.Conn, passkey string) *User {
-	user_id := findUserID(passkey)
+func (t *Tracker) GetUserByPasskey(r redis.Conn, passkey string) *User {
+	user_id := t.findUserID(passkey)
 	if user_id == 0 {
 		return nil
 	}
-	return GetUserByID(r, user_id, false)
+	return t.GetUserByID(r, user_id, false)
 }
 
 // fetch a user from the backend database if
-func GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *User {
+func (t *Tracker) GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *User {
 
-	mika.UsersMutex.RLock()
-	user, exists := mika.Users[user_id]
-	mika.UsersMutex.RUnlock()
+	t.UsersMutex.RLock()
+	user, exists := t.Users[user_id]
+	t.UsersMutex.RUnlock()
 
 	if !exists && auto_create {
 		user = fetchUser(r, user_id)
-		mika.UsersMutex.Lock()
-		mika.Users[user_id] = user
-		mika.UsersMutex.Unlock()
-		Debug("Added new user to in-memory cache:", user_id)
+		t.UsersMutex.Lock()
+		t.Users[user_id] = user
+		t.UsersMutex.Unlock()
+		util.Debug("Added new user to in-memory cache:", user_id)
 		return user
 	}
 	return user

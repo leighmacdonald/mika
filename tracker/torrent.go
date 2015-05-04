@@ -1,14 +1,16 @@
-package main
+package tracker
 
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"log"
 	"sync"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/util"
 )
 
 type Torrent struct {
-	Queued
+	db.Queued
 	sync.RWMutex
 	Name            string  `redis:"name" json:"name"`
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
@@ -96,7 +98,7 @@ func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
 			log.Println("GetPeer: Error executing peer fetch query: ", err)
 			return nil, err
 		}
-		peer, err = makePeer(peer_reply, torrent.TorrentID, torrent.InfoHash, peer_id)
+		peer, err = MakePeer(peer_reply, torrent.TorrentID, torrent.InfoHash, peer_id)
 		if err != nil {
 			return nil, err
 		}
@@ -167,5 +169,5 @@ func (torrent *Torrent) PeerCounts() (int16, int16) {
 
 // Get an array of peers for the torrent
 func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
-	return torrent.Peers[0:UMin(uint64(len(torrent.Peers)), uint64(max_peers))]
+	return torrent.Peers[0:util.UMin(uint64(len(torrent.Peers)), uint64(max_peers))]
 }

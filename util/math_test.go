@@ -1,13 +1,14 @@
-package main
+package util_test
 
 import (
+	"git.totdev.in/totv/mika/util"
 	"testing"
 )
 
 func TestUMin(t *testing.T) {
 	a := uint64(1)
 	b := uint64(2)
-	v := UMin(a, b)
+	v := util.UMin(a, b)
 	if v != a {
 		t.Error("Invalid min value")
 	}
@@ -16,39 +17,39 @@ func TestUMin(t *testing.T) {
 func TestUMax(t *testing.T) {
 	a := uint64(1)
 	b := uint64(2)
-	v := UMax(a, b)
+	v := util.UMax(a, b)
 	if v != b {
 		t.Error("Invalid min value")
 	}
 }
 
 func TestEstSpeed(t *testing.T) {
-	a := estSpeed(1000, 2000, 0)
+	a := util.EstSpeed(1000, 2000, 0)
 	if a != 0.0 {
 		t.Errorf("A: Invalid value %f", a)
 	}
 
-	b := estSpeed(2000, 1000, 0)
+	b := util.EstSpeed(2000, 1000, 0)
 	if b != 0.0 {
 		t.Errorf("B: Invalid value %f", b)
 	}
 
-	c := estSpeed(-1, 1, 0)
+	c := util.EstSpeed(-1, 1, 0)
 	if c != 0.0 {
 		t.Errorf("C: Invalid value %f", c)
 	}
 
-	d := estSpeed(1, -1, 0)
+	d := util.EstSpeed(1, -1, 0)
 	if d != 0.0 {
 		t.Errorf("D: Invalid value %f", d)
 	}
 
-	e := estSpeed(0, 0, 1)
+	e := util.EstSpeed(0, 0, 1)
 	if e != 0.0 {
 		t.Errorf("E: Invalid value %f", e)
 	}
 
-	ok := estSpeed(1000, 2000, 100000000)
+	ok := util.EstSpeed(1000, 2000, 100000000)
 	if ok != 100000.0 {
 		t.Errorf("E: Invalid value %f", ok)
 	}

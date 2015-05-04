@@ -13,10 +13,10 @@ install:
 	@go get $(GOFLAGS) ./...
 
 test: install
-	@go test $(GOFLAGS)
+	@go test $(GOFLAGS) */*_test.go
 
 cover: install
-	@go test -coverprofile=`pwd`/coverage.out $(GOFLAGS) ./... && go tool cover -html=`pwd`/coverage.out
+	@go test -coverprofile=coverage.out $(GOFLAGS) */*_test.go && go tool cover -html=coverage.out
 
 bench: install
 	@go test -run=NONE -bench=. $(GOFLAGS) ./...

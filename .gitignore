@@ -8,7 +8,7 @@ __pycache__
 # Folders
 _obj
 _test
-
+*.out
 # Architecture specific extensions/prefixes
 *.[568vq]
 [568vq].out

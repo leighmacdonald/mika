@@ -119,6 +119,8 @@ var (
 
 	version string
 
+	start_time int32
+
 	// Channels
 	sync_user    = make(chan *User, 100)
 	sync_peer    = make(chan *Peer, 1000)
@@ -255,7 +257,7 @@ func runAPI() {
 	}
 
 	api.Get("/version", HandleVersion)
-	api.Get("/test", HandleGetTorrentPeer)
+	api.Get("/uptime", HandleUptime)
 
 	api.Get("/torrent/:info_hash", HandleTorrentGet)
 	api.Post("/torrent", HandleTorrentAdd)
@@ -377,6 +379,7 @@ func main() {
 }
 
 func init() {
+	start_time = unixtime()
 	if version == "" {
 		log.Println(`[WARN] Build this binary with "make", not "go build"`)
 	}

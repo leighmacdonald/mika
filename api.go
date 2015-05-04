@@ -76,6 +76,10 @@ func HandleVersion(c *echo.Context) {
 	c.String(http.StatusOK, fmt.Sprintf("mika/%s", version))
 }
 
+func HandleUptime(c *echo.Context) {
+	c.String(http.StatusOK, fmt.Sprintf("%d", unixtime()-start_time))
+}
+
 func HandleTorrentGet(c *echo.Context) error {
 	info_hash := c.Param("info_hash")
 	torrent := mika.GetTorrentByInfoHash(nil, info_hash, false)

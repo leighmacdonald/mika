@@ -8,26 +8,35 @@ from redis.exceptions import ResponseError
 
 
 class TrackerClient(object):
-    def __init__(self, api_uri, redis_host="localhost", redis_port=6379, redis_db=0):
+    def __init__(self, api_uri, redis_host="localhost", redis_port=6379, redis_db=0, verify=False):
         self._api_uri = api_uri
         self._redis_host = redis_host
         self._redis_port = redis_port
         self._redis_db = redis_db
         self._redis = redis.StrictRedis(host=redis_host, port=int(redis_port), db=int(redis_db))
+        self._verify = verify
 
     def _request(self, path, method='get', payload=None):
         if method == "get":
-            resp = requests.get(self._make_url(path))
+            resp = requests.get(self._make_url(path), verify=self._verify)
         elif method == "post":
-            resp = requests.post(self._make_url(path), json=payload)
+            resp = requests.post(self._make_url(path), json=payload, verify=self._verify)
         elif method == "delete":
-            resp = requests.delete(self._make_url(path))
+            resp = requests.delete(self._make_url(path), verify=self._verify)
         else:
             raise Exception("no")
         return resp
 
     def _make_url(self, path):
         return "".join([self._api_uri, path])
+
+    @property
+    def version(self):
+        return self._request("/version").content.decode()
+
+    @property
+    def uptime(self):
+        return int(self._request("/uptime").content)
 
     def torrent_get(self, torrent_id):
         resp = self._request("/torrent/{}".format(torrent_id))

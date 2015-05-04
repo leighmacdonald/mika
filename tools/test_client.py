@@ -1,6 +1,6 @@
 import random
 import unittest
-from tools import client
+from tools import tracker
 
 
 class ClientTest(unittest.TestCase):
@@ -8,7 +8,7 @@ class ClientTest(unittest.TestCase):
     id_1 = 9999999999999
 
     def setUp(self):
-        self.client = client.TrackerClient("localhost", 34000)
+        self.client = tracker.TrackerClient("https://localhost:34001/api")
 
     def test_torrent_get(self):
         # TODO this will pass once torrent client get primed onstartup
@@ -50,3 +50,11 @@ class ClientTest(unittest.TestCase):
     def test_whitelist_del(self):
         resp = self.client.whitelist_del("test2")
         self.assertTrue(resp)
+
+    def test_version(self):
+        resp = self.client.version
+        self.assertTrue(resp.startswith("mika/"))
+
+    def test_uptime(self):
+        resp = self.client.uptime
+        self.assertTrue(resp > 0)

@@ -249,7 +249,7 @@ func runAPI() {
 	e := echo.New()
 	e.MaxParam(1)
 	api := e.Group("/api")
-	e.Use(mw.Logger)
+
 	e.Use(StatsMW)
 
 	// Optionally enabled BasicAuth over the TLS only API

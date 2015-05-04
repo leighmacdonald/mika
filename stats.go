@@ -4,7 +4,6 @@ import (
 	//"github.com/influxdb/influxdb/client"
 	"log"
 	"time"
-	//"net/url"
 	"github.com/labstack/echo"
 	"sync"
 )

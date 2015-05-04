@@ -41,7 +41,6 @@ import (
 	"github.com/goji/httpauth"
 	"github.com/kisielk/raven-go/raven"
 	"github.com/labstack/echo"
-	mw "github.com/labstack/echo/middleware"
 	"log"
 	"net/http"
 	"os"

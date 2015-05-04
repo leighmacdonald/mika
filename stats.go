@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 	//"net/url"
-	"sync"
 	"github.com/labstack/echo"
+	"sync"
 )
 
 const (

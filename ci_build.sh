@@ -10,7 +10,7 @@ go get -v github.com/julienschmidt/httprouter
 go get -v github.com/goji/param
 # go get -v github.com/influxdb/influxdb/client
 go get -v github.com/goji/httpauth
-mkdir src/git.totdev.in/totv
+mkdir -p src/git.totdev.in/totv
 ln -s `pwd` src/git.totdev.in/totv/mika
 make
 make test

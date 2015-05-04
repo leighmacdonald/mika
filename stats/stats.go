@@ -2,10 +2,10 @@ package stats
 
 import (
 	//"github.com/influxdb/influxdb/client"
-	"log"
-	"time"
 	"github.com/labstack/echo"
+	"log"
 	"sync"
+	"time"
 )
 
 const (
@@ -36,8 +36,9 @@ type StatsCounter struct {
 	APIRequestsFail uint64
 	//influxDB *client.Client
 }
+
 var (
-	Counter      = make(chan int)
+	Counter    = make(chan int)
 	StatCounts *StatsCounter
 )
 

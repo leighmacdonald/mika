@@ -2,11 +2,11 @@ package tracker
 
 import (
 	"fmt"
-	"github.com/garyburd/redigo/redis"
 	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/util"
+	"github.com/garyburd/redigo/redis"
 	"log"
 	"sync"
-	"git.totdev.in/totv/mika/util"
 )
 
 type User struct {

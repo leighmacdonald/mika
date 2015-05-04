@@ -3,14 +3,14 @@ package tracker
 import (
 	"errors"
 	"fmt"
+	"git.totdev.in/totv/mika"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/util"
 	"github.com/garyburd/redigo/redis"
 	"github.com/labstack/echo"
 	"log"
 	"net/http"
 	"strconv"
-	"git.totdev.in/totv/mika"
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/util"
 )
 
 type ResponseOK struct {

@@ -31,6 +31,14 @@ the tracker.
     > Loading torrents...    3819
     hacker@nsa:$ ./mika
     
+We also need to generate SSL keys for the API listener as follows:
+    
+    hacker@nsa:$ ./manage.py genkey
+    > Generating new keys...
+    Generating a 1024 bit RSA private key
+    ...
+    
+    
 ### Compiling
 
 If building a binary from source you will need a Go 1.4+ SDK installed.

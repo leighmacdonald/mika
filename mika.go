@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Version string
+	Version   string
 	StartTime int32
 
 	RavenClient *raven.Client

@@ -1,10 +1,10 @@
 package tracker
 
 import (
-	"github.com/labstack/echo"
 	"bytes"
-	"github.com/chihaya/bencode"
 	"errors"
+	"github.com/chihaya/bencode"
+	"github.com/labstack/echo"
 )
 
 type ErrorResponse struct {

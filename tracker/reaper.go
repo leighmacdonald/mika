@@ -2,11 +2,11 @@ package tracker
 
 import (
 	"fmt"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/util"
 	"github.com/garyburd/redigo/redis"
 	"log"
 	"strings"
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/util"
 )
 
 // Will mark a torrent peer as inactive and remove them

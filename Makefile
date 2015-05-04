@@ -1,12 +1,13 @@
 .PHONY: all test clean build install
 # export GOPATH=`pwd`
-GOFLAGS = -ldflags "-X main.version `git rev-parse --short HEAD`"
+GOFLAGS = -ldflags "-X git.totdev.in/totv/mika.Version `git rev-parse --short HEAD`"
 
 all: build
 
 
 build:
-	@go build $(GOFLAGS)
+	@go fmt ./...
+	@go build $(GOFLAGS) cmd/mika/mika.go
 
 install:
 	@go get $(GOFLAGS) ./...
@@ -22,5 +23,6 @@ bench: install
 
 clean:
 	@go clean $(GOFLAGS) -i
+	@rm mika
 
 ## EOF

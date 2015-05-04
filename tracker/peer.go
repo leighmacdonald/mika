@@ -3,14 +3,14 @@ package tracker
 import (
 	"bytes"
 	"fmt"
-	"github.com/garyburd/redigo/redis"
+	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/util"
+	"github.com/garyburd/redigo/redis"
 	"log"
 	"net"
 	"strings"
 	"sync"
-	"git.totdev.in/totv/mika/util"
-	"git.totdev.in/totv/mika/conf"
 )
 
 type Peer struct {

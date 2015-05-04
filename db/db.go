@@ -41,5 +41,3 @@ func (db *BulkPayload) AddPayload(payload ...Payload) {
 	db.Payloads = append(db.Payloads, payload...)
 
 }
-
-

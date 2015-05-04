@@ -1,10 +1,10 @@
 package util
 
 import (
-	"log"
 	"git.totdev.in/totv/mika"
-	"strings"
 	"git.totdev.in/totv/mika/conf"
+	"log"
+	"strings"
 )
 
 func Debug(msg ...interface{}) {

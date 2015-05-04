@@ -1,38 +1,35 @@
 package tracker
 
 import (
+	"crypto/tls"
 	"fmt"
+	"git.totdev.in/totv/mika/conf"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/stats"
+	"git.totdev.in/totv/mika/util"
 	"github.com/garyburd/redigo/redis"
+	"github.com/goji/httpauth"
+	"github.com/labstack/echo"
 	"log"
+	ghttp "net/http"
 	"strconv"
 	"strings"
 	"sync"
-	ghttp "net/http"
-	"git.totdev.in/totv/mika/util"
-	"git.totdev.in/totv/mika/db"
 	"time"
-	"github.com/labstack/echo"
-	"git.totdev.in/totv/mika/conf"
-	"github.com/goji/httpauth"
-	"git.totdev.in/totv/mika/stats"
-	"crypto/tls"
 )
 
 var (
 	Mika *Tracker
 
-
-// Channels
+	// Channels
 	SyncUserC    = make(chan *User, 100)
 	SyncPeerC    = make(chan *Peer, 1000)
 	SyncTorrentC = make(chan *Torrent, 500)
 )
 
-
 func init() {
 
 }
-
 
 // Main track struct holding all the known models
 type Tracker struct {
@@ -43,18 +40,17 @@ type Tracker struct {
 	Users      map[uint64]*User
 
 	WhitelistMutex *sync.RWMutex
-	Whitelist []string
-
+	Whitelist      []string
 }
 
 func NewTracker() *Tracker {
 	// Alloc tracker
 	tracker := &Tracker{
-		Torrents:      make(map[string]*Torrent),
-		Users:         make(map[uint64]*User),
-		TorrentsMutex: new(sync.RWMutex),
-		UsersMutex:    new(sync.RWMutex),
-		Whitelist: []string{},
+		Torrents:       make(map[string]*Torrent),
+		Users:          make(map[uint64]*User),
+		TorrentsMutex:  new(sync.RWMutex),
+		UsersMutex:     new(sync.RWMutex),
+		Whitelist:      []string{},
 		WhitelistMutex: new(sync.RWMutex),
 	}
 
@@ -142,6 +138,9 @@ func (t *Tracker) listenAPI() {
 			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
 		},
+	}
+	if conf.Config.SSLCert == "" || conf.Config.SSLPrivateKey == "" {
+		log.Fatalln("SSL config keys not set in config!")
 	}
 	srv := ghttp.Server{TLSConfig: tls_config, Addr: conf.Config.ListenHostAPI, Handler: e}
 	log.Fatal(srv.ListenAndServeTLS(conf.Config.SSLCert, conf.Config.SSLPrivateKey))
@@ -379,7 +378,7 @@ func (t *Tracker) syncWriter() {
 	}
 	for {
 		select {
-		case payload := <- db.SyncPayloadC:
+		case payload := <-db.SyncPayloadC:
 			util.Debug("Sync payload")
 			r.Do(payload.Command, payload.Args...)
 		case user := <-SyncUserC:

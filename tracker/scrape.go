@@ -2,13 +2,13 @@ package tracker
 
 import (
 	"bytes"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/stats"
+	"git.totdev.in/totv/mika/util"
 	"github.com/chihaya/bencode"
 	"github.com/labstack/echo"
 	"log"
 	"net/http"
-	"git.totdev.in/totv/mika/stats"
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/util"
 )
 
 type ScrapeRequest struct {

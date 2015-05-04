@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"git.totdev.in/totv/mika/conf"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/stats"
+	"git.totdev.in/totv/mika/util"
 	"github.com/chihaya/bencode"
 	"github.com/labstack/echo"
 	"log"
 	"net"
 	"net/http"
 	"strings"
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/stats"
-	"git.totdev.in/totv/mika/util"
-	"git.totdev.in/totv/mika/conf"
 )
 
 // Announce types

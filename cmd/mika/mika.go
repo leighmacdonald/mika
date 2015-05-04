@@ -33,6 +33,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"git.totdev.in/totv/mika"
+	"git.totdev.in/totv/mika/conf"
+	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/tracker"
+	"git.totdev.in/totv/mika/util"
 	"github.com/garyburd/redigo/redis"
 	"github.com/kisielk/raven-go/raven"
 	"log"
@@ -42,14 +47,7 @@ import (
 	"runtime/pprof"
 	"syscall"
 	"time"
-	"git.totdev.in/totv/mika"
-	"git.totdev.in/totv/mika/util"
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/conf"
-	"git.totdev.in/totv/mika/tracker"
 )
-
-
 
 var (
 	cheese = `
@@ -74,7 +72,6 @@ var (
 	config_file = flag.String("config", "./config.json", "Config file path")
 	num_procs   = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
 )
-
 
 func sigHandler(s chan os.Signal) {
 	for received_signal := range s {

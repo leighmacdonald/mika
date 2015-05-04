@@ -1,5 +1,6 @@
 #!/bin/bash
-export GOPATH=$GOPATH:`pwd`
+export GOPATH=`pwd`
+export GOBIN=$GOPATH/bin
 echo "Using gopath: $GOPATH"
 go get -v golang.org/x/tools/cmd/cover
 go get -v github.com/chihaya/bencode

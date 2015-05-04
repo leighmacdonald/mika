@@ -12,7 +12,7 @@ build:
 install:
 	@go get $(GOFLAGS) ./...
 
-test: install
+test:
 	@go test $(GOFLAGS) */*_test.go
 
 cover: install

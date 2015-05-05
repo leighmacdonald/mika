@@ -1,9 +1,11 @@
 package stats
 
 import (
-	//"github.com/influxdb/influxdb/client"
+	"git.totdev.in/totv/mika/conf"
+	"github.com/influxdb/influxdb/client"
 	"github.com/labstack/echo"
 	"log"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -18,6 +20,26 @@ const (
 	EV_INVALID_CLIENT   = iota
 	EV_API              = iota
 	EV_API_FAIL         = iota
+	EV_STARTUP          = iota
+	EV_SHUTDOWN         = iota
+)
+
+var (
+	Counter      = make(chan int)
+	StatCounts   *StatsCounter
+	influxDB     *client.Client
+	metric_names = map[int]string{
+		EV_STARTUP:          "ev_startup",
+		EV_ANNOUNCE:         "ev_announce",
+		EV_ANNOUNCE_FAIL:    "ev_announce_fail",
+		EV_API:              "ev_api",
+		EV_API_FAIL:         "ev_api_fail",
+		EV_SCRAPE:           "ev_scrape",
+		EV_SCRAPE_FAIL:      "ev_scrape_fail",
+		EV_INVALID_PASSKEY:  "ev_invalid_pk",
+		EV_INVALID_INFOHASH: "ev_invalid_info_hash",
+		EV_INVALID_CLIENT:   "ev_invalid_client",
+	}
 )
 
 type StatsCounter struct {
@@ -34,46 +56,45 @@ type StatsCounter struct {
 	InvalidClient   uint64
 	APIRequests     uint64
 	APIRequestsFail uint64
-	//influxDB *client.Client
 }
-
-var (
-	Counter    = make(chan int)
-	StatCounts *StatsCounter
-)
 
 func init() {
-	// Start stat counter
-	StatCounts = NewStatCounter(Counter)
 
 }
 
-func NewStatCounter(c chan int) *StatsCounter {
-	//	u, err := url.Parse(config.InfluxDSN)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
+func makePoint(name string, tags map[string]string, fields map[string]interface{}) {
 	//
-	//	conf := client.Config{
-	//		URL:      *u,
-	//		Username: config.InfluxUser,
-	//		Password: config.InfluxPass,
-	//	}
-	//
-	//	con, err := client.NewClient(conf)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//
-	//	dur, ver, err := con.Ping()
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//
-	//	log.Printf("InfluxDB Happy as a Hippo! %v, %s", dur, ver)
+}
+
+func NewStatCounter() *StatsCounter {
+	if conf.Config.InfluxDSN == "" {
+		log.Println("[WARN] Invalid influx dsn defined")
+	}
+	u, err := url.Parse(conf.Config.InfluxDSN)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	conf := client.Config{
+		URL:      *u,
+		Username: conf.Config.InfluxUser,
+		Password: conf.Config.InfluxPass,
+	}
+
+	con, err := client.NewClient(conf)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dur, ver, err := con.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("InfluxDB Happy as a Hippo! %v, %s", dur, ver)
 
 	counter := &StatsCounter{
-		channel:         c,
+		channel:         Counter,
 		Requests:        0,
 		RequestsFail:    0,
 		Announce:        0,
@@ -85,13 +106,18 @@ func NewStatCounter(c chan int) *StatsCounter {
 		InvalidClient:   0,
 		APIRequests:     0,
 		APIRequestsFail: 0,
-		//influxDB:        con,
 	}
+
+	influxDB = con
 
 	go counter.Counter()
 	go counter.statPrinter()
 
 	return counter
+}
+
+func addPoint(name string) {
+
 }
 
 func (stats *StatsCounter) Counter() {
@@ -131,20 +157,29 @@ func StatsMW(h echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func (stats *StatsCounter) statPrinter() {
+func (stats *StatsCounter) statPrinter() *time.Ticker {
+	ticker := time.NewTicker(60 * time.Second)
+	go func() {
+		for range ticker.C {
+			time.Sleep(60 * time.Second)
+			stats.RLock()
+			req_sec := stats.Requests / 60
+			req_sec_api := stats.APIRequests / 60
+			log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
+				stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
+				stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec, req_sec_api)
+			stats.RUnlock()
+			stats.Lock()
+			stats.Requests = 0
+			stats.APIRequests = 0
+			stats.Unlock()
+		}
+	}()
+	return ticker
+}
+
+func MetricsBatchWriter() {
 	for {
-		time.Sleep(60 * time.Second)
-		stats.RLock()
-		req_sec := stats.Requests / 60
-		req_sec_api := stats.APIRequests / 60
-		log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
-			stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
-			stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec, req_sec_api)
-		stats.RUnlock()
-		stats.Lock()
-		stats.Requests = 0
-		stats.APIRequests = 0
-		stats.Unlock()
 
 	}
 }

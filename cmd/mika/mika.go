@@ -36,6 +36,7 @@ import (
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/tracker"
 	"git.totdev.in/totv/mika/util"
 	"github.com/garyburd/redigo/redis"
@@ -119,6 +120,10 @@ func main() {
 	if err != nil {
 		log.Println("Could not connect to sentry")
 	}
+
+	// Start stat counter
+	stats.StatCounts = stats.NewStatCounter()
+
 	util.CaptureMessage("Started tracker")
 
 	db.Pool = &redis.Pool{

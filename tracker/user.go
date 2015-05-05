@@ -113,9 +113,12 @@ func (t *Tracker) GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *U
 func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff uint64, multi_up, multi_dn float64) {
 	user.Lock()
 	defer user.Unlock()
-	user.Uploaded += uint64(float64(upload_diff) * multi_up)
-	user.Downloaded += uint64(float64(download_diff) * multi_dn)
-	user.Corrupt += announce.Corrupt
+	if announce.Event != STARTED {
+		// Ignore downloaded value when starting
+		user.Uploaded += uint64(float64(upload_diff) * multi_up)
+		user.Downloaded += uint64(float64(download_diff) * multi_dn)
+		user.Corrupt += announce.Corrupt
+	}
 	user.Announces++
 	if announce.Event == COMPLETED {
 		user.Snatches++

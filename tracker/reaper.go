@@ -33,8 +33,8 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 		log.Println("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
-	user, err := t.GetUserByID(r, peer.UserID, false)
-	if err != nil {
+	user := t.GetUserByID(r, peer.UserID, false)
+	if user == nil {
 		log.Println("ReapPeer: Failed to fetch user while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}

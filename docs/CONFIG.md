@@ -14,10 +14,15 @@ is the annotated description of the options in lieu.
 Enable debug output. You shouldn't normally use this unless you are diagnosing an issue.
 
     "ListenHost": ":34000",
-    
+        
 Host and port that the tracker should listen to. If host is empty it will listen
 on all available interfaces. It's currently best to set it to a specific ipv4 interface
 so that unsupported ipv6 connections do not come in.
+
+    "ListenHostAPI": ":34001",
+
+Same as ListenHost except that uses TLS and must be on a different port. Used for all external 
+functionality.
 
     "RedisHost": "localhost:6379",
     
@@ -30,6 +35,14 @@ Optional redis password, leave as empty string if none.
     "RedisMaxIdle": 500,
     
 Maximum number of redis connections to leave idle at all times.
+
+    "SSLPrivateKey": "key_priv",
+
+SSL private key used for the API. Can be generated with manage.py genkey.
+    
+    "SSLCert": "key_ca",
+    
+SSL certificate which signed the private key in `SSLPrivateKey`
 
     "AnnInterval": 300,
     
@@ -54,13 +67,17 @@ valid peers too.
 Amount of time that must pass before an incomplete torrent is declared as a HnR. The user can stop and 
 start the torrent all they want without issue until this time has elapsed.
  
+    "HNRMinBytes": 52428800,
+    
+Minimum amount of data that must be downloaded to enable HNR's. Default is 50MB.
+
     "SQLHost": "localhost",
     "SQLPort": 3306,
     "SQLDB": "dbname",
     "SQLUser": "",
     "SQLPass": "",
     
-MySQL host details used by warmup scripts
+MySQL host details used by warmup scripts.
 
     "SentryDSN": "http://x:x@sentry-host.com/1"
     }

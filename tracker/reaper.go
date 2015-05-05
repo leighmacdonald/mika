@@ -74,7 +74,7 @@ func (t *Tracker) peerStalker() {
 		case redis.Message:
 			util.Debug(string(v.Data))
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
-			if len(p) >= 3 {
+			if len(p) >= 4 {
 				t.ReapPeer(p[2], p[3])
 			}
 

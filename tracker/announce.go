@@ -141,6 +141,8 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		// Mark the peer as inactive
 		r.Send("HSET", peer.KeyPeer, "active", 0)
 
+		r.Send("DEL", peer.KeyTimer)
+
 		if peer.IsHNR() {
 			peer.AddHNR(r, torrent.TorrentID)
 		}
@@ -181,7 +183,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		// Refresh the peers expiration timer
 		// If this expires, the peer reaper takes over and removes the
 		// peer from torrents in the case of a non-clean client shutdown
-		r.Send("SETEX", fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, ann.PeerID), conf.Config.ReapInterval, 1)
+		r.Send("SETEX", peer.KeyTimer, conf.Config.ReapInterval, 1)
 	}
 	r.Flush()
 

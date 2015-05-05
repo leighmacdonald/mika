@@ -33,38 +33,25 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 		log.Println("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
-
+	user, err := t.GetUserByID(r, peer.UserID, false)
+	if err != nil {
+		log.Println("ReapPeer: Failed to fetch user while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
+		return
+	}
 	torrent.DelPeer(r, peer)
 
-	queued := 2
-	r.Send("SREM", fmt.Sprintf("t:tp:%s", info_hash), peer_id)
-	r.Send("HSET", peer.KeyPeer, "active", 0)
-	if peer.Active {
-		if peer.Left > 0 {
-			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", info_hash), "leechers", -1)
-		} else {
-			r.Send("HINCRBY", fmt.Sprintf("t:t:%s", info_hash), "seeders", -1)
-		}
-		queued += 1
-	}
-	if peer.IsHNR() {
-		peer.AddHNR(r, torrent.TorrentID)
-	}
+	r.Send("SREM", user.KeyActive, peer.PeerID)
 
 	r.Flush()
 	v, err := r.Receive()
-	queued -= 1
 	if err != nil {
 		log.Println("ReapPeer: Tried to remove non-existant peer: ", info_hash, peer_id)
 	}
 	if v == "1" {
 		util.Debug("ReapPeer: Reaped peer successfully: ", peer_id)
 	}
-
-	// all needed i think, must match r.Send count?
-	for i := 0; i < queued; i++ {
-		r.Receive()
-	}
+	peer.Active = false
+	SyncPeerC <- peer
 
 }
 
@@ -85,8 +72,9 @@ func (t *Tracker) peerStalker() {
 		switch v := psc.Receive().(type) {
 
 		case redis.Message:
+			util.Debug(string(v.Data))
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
-			if len(p) > 4 {
+			if len(p) >= 3 {
 				t.ReapPeer(p[2], p[3])
 			}
 

@@ -4,6 +4,13 @@ GOFLAGS = -ldflags "-X git.totdev.in/totv/mika.Version `git rev-parse --short HE
 
 all: build
 
+deps:
+	@go get -v github.com/chihaya/bencode
+	@go get -v github.com/garyburd/redigo/redis
+	@go get -v github.com/kisielk/raven-go/raven
+	@go get -v github.com/labstack/echo
+	@go get -v github.com/influxdb/influxdb/client
+	@go get -v github.com/goji/httpauth
 
 build:
 	@go fmt ./...

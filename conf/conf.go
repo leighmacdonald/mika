@@ -30,6 +30,7 @@ type Configuration struct {
 	ReapInterval   int
 	IndexInterval  int
 	HNRThreshold   int32
+	HNRMinBytes    uint64
 	SentryDSN      string
 	InfluxDSN      string
 	InfluxDB       string
@@ -57,4 +58,9 @@ func LoadConfig(config_file string, fail bool) {
 	configLock.Lock()
 	Config = temp
 	configLock.Unlock()
+
+	if Config.ReapInterval <= Config.AnnIntervalMin {
+		log.Println("[WARN] ReapInterval less than AnnInterval (here be dragons!)")
+		log.Println("[WARN] This is almost certainly not what you want, fix required.")
+	}
 }

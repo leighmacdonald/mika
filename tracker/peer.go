@@ -39,6 +39,7 @@ type Peer struct {
 	UserID         uint64  `redis:"user_id"  json:"user_id"`
 	TorrentID      uint64  `redis:"torrent_id" json:"torrent_id"`
 	KeyPeer        string  `redis:"-" json:"-"`
+	KeyTimer       string  `redis:"-" json:"-"`
 }
 
 // Update the stored values with the data from an announce
@@ -90,6 +91,9 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
+	if announce.Event == STOPPED {
+		peer.Active = false
+	}
 	return ul_diff, dl_diff
 }
 
@@ -125,7 +129,7 @@ func (peer *Peer) Sync(r redis.Conn) {
 }
 
 func (peer *Peer) IsHNR() bool {
-	return peer.Left > 0 && peer.TotalTime < uint32(conf.Config.HNRThreshold)
+	return peer.Downloaded > conf.Config.HNRMinBytes && peer.Left > 0 && peer.TotalTime < uint32(conf.Config.HNRThreshold)
 }
 
 func (peer *Peer) IsSeeder() bool {
@@ -180,6 +184,7 @@ func MakePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer
 		UserID:        0,
 		TorrentID:     torrent_id,
 		KeyPeer:       fmt.Sprintf("t:p:%s:%s", info_hash, peer_id),
+		KeyTimer:      fmt.Sprintf("t:ptimeout:%s:%s", info_hash, peer_id),
 	}
 
 	values, err := redis.Values(redis_reply, nil)

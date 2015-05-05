@@ -127,6 +127,8 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 
 // Remove a peer from a torrents active peer_id list
 func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
+	torrent.RLock()
+	defer torrent.RUnlock()
 	for i, tor_peer := range torrent.Peers {
 		if tor_peer == peer {
 			if len(torrent.Peers) == 1 {
@@ -138,9 +140,14 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 		}
 	}
 
-	r.Send("SREM", fmt.Sprintf("t:tp:%s", torrent.InfoHash), peer.PeerID)
-	r.Send("HSET", peer.KeyPeer, "active", 0)
+	r.Send("SREM", torrent.TorrentPeersKey, peer.PeerID)
+
+	peer.Lock()
+	if peer.IsHNR() {
+		peer.AddHNR(r, torrent.TorrentID)
+	}
 	peer.Active = false
+	peer.Unlock()
 	return true
 }
 

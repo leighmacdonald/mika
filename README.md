@@ -39,16 +39,25 @@ We also need to generate SSL keys for the API listener as follows:
     ...
     
     
+### Current Issues & Considerations
+    
+The tracker does not currently gracefully reconnect everything when it looses connection
+ to its redis backend. If you ever restart redis, make sure to restart mika as well until
+ this issue is resolved.
+    
 ### Compiling
 
 If building a binary from source you will need a Go 1.4+ SDK installed.
 
 To build, set your $GOPATH env var to $git_project_clone, install deps and go build.
     
-    hacker@nsa:$ cd $git_project_clone
-    hacker@nsa:$ export GOPATH=$git_project_clone
-    hacker@nsa:$ go get github.com/chihaya/bencode github.com/garyburd/redigo/redis github.com/kisielk/raven-go/raven github.com/labstack/echo github.com/influxdb/influxdb/client github.com/goji/httpauth 
-    hacker@nsa:$ make
+    hacker@nsa:$ export GOPATH=$dir_path
+    hacker@nsa:$ mkdir -p $GOPATH/src/git.totdev.in/totv
+    hacker@nsa:$ cd $GOPATH/src/git.totdev.in/totv
+    hacker@nsa:$ git clone git@git.totdev.in:totv/mika
+    hacker@nsa:$ cd mika 
+    hacker@nsa:$ cp .hooks/pre-commit .git/hooks/
+    hacker@nsa:$ ./ci_build.sh
     hacker@nsa:$ ./mika
 
 ### Run-time options:

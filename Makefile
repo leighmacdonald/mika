@@ -20,7 +20,7 @@ install:
 	@go get $(GOFLAGS) ./...
 
 test:
-	@go test $(GOFLAGS) */*_test.go
+	@go test $(GOFLAGS) -cover ./util ./tracker ./cmd/mika ./conf ./db ./stats ./
 
 cover: install
 	@go test -coverprofile=coverage.out $(GOFLAGS) */*_test.go && go tool cover -html=coverage.out

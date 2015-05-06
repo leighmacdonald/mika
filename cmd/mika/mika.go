@@ -39,7 +39,6 @@ import (
 	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/tracker"
 	"git.totdev.in/totv/mika/util"
-	"github.com/garyburd/redigo/redis"
 	"github.com/kisielk/raven-go/raven"
 	"log"
 	"os"
@@ -47,7 +46,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"syscall"
-	"time"
 )
 
 var (
@@ -122,37 +120,9 @@ func main() {
 	}
 
 	// Start stat counter
-	stats.StatCounts = stats.NewStatCounter()
+	stats.Setup()
 
-	util.CaptureMessage("Started tracker")
-
-	db.Pool = &redis.Pool{
-		MaxIdle:     0,
-		IdleTimeout: 600 * time.Second,
-		Wait:        true,
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", conf.Config.RedisHost)
-			if err != nil {
-				return nil, err
-			}
-			if conf.Config.RedisPass != "" {
-				if _, err := c.Do("AUTH", conf.Config.RedisPass); err != nil {
-					c.Close()
-					return nil, err
-				}
-			}
-			return c, err
-		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			if err != nil {
-				// TODO remove me, temp hack to allow supervisord to reload process
-				// since we currently don't actually handle graceful reconnects yet.
-				log.Fatalln("Bad redis voodoo! exiting!", err)
-			}
-			return err
-		},
-	}
+	db.Setup(conf.Config.RedisHost, conf.Config.RedisPass)
 
 	tracker.Mika = tracker.NewTracker()
 	tracker.Mika.Initialize()

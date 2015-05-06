@@ -225,6 +225,8 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		return
 	}
 
+	stats.RecordAnnounce(user.UserID)
+
 	c.String(http.StatusOK, out_bytes.String())
 
 }

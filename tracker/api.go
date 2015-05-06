@@ -76,7 +76,7 @@ var (
 )
 
 func (t *Tracker) HandleVersion(c *echo.Context) {
-	c.String(http.StatusOK, fmt.Sprintf("mika/%s", mika.Version))
+	c.String(http.StatusOK, mika.VersionStr())
 }
 
 func (t *Tracker) HandleUptime(c *echo.Context) {

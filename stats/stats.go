@@ -1,7 +1,9 @@
 package stats
 
 import (
+	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
+	"git.totdev.in/totv/mika/util"
 	"github.com/influxdb/influxdb/client"
 	"github.com/labstack/echo"
 	"log"
@@ -40,6 +42,10 @@ var (
 		EV_INVALID_INFOHASH: "ev_invalid_info_hash",
 		EV_INVALID_CLIENT:   "ev_invalid_client",
 	}
+	pointChan     = make(chan client.Point)
+	sampleSize    = 3
+	currentSample = 0
+	pts           = make([]client.Point, sampleSize)
 )
 
 type StatsCounter struct {
@@ -48,6 +54,7 @@ type StatsCounter struct {
 	Requests        uint64
 	RequestsFail    uint64
 	Announce        uint64
+	UniqueUsers     uint64
 	AnnounceFail    uint64
 	Scrape          uint64
 	ScrapeFail      uint64
@@ -58,12 +65,9 @@ type StatsCounter struct {
 	APIRequestsFail uint64
 }
 
-func init() {
-
-}
-
-func makePoint(name string, tags map[string]string, fields map[string]interface{}) {
-	//
+func Setup() {
+	StatCounts = NewStatCounter()
+	go backgroundWriter()
 }
 
 func NewStatCounter() *StatsCounter {
@@ -76,9 +80,10 @@ func NewStatCounter() *StatsCounter {
 	}
 
 	conf := client.Config{
-		URL:      *u,
-		Username: conf.Config.InfluxUser,
-		Password: conf.Config.InfluxPass,
+		URL:       *u,
+		Username:  conf.Config.InfluxUser,
+		Password:  conf.Config.InfluxPass,
+		UserAgent: mika.VersionStr(),
 	}
 
 	con, err := client.NewClient(conf)
@@ -93,20 +98,7 @@ func NewStatCounter() *StatsCounter {
 
 	log.Printf("InfluxDB Happy as a Hippo! %v, %s", dur, ver)
 
-	counter := &StatsCounter{
-		channel:         Counter,
-		Requests:        0,
-		RequestsFail:    0,
-		Announce:        0,
-		AnnounceFail:    0,
-		Scrape:          0,
-		ScrapeFail:      0,
-		InvalidPasskey:  0,
-		InvalidInfohash: 0,
-		InvalidClient:   0,
-		APIRequests:     0,
-		APIRequestsFail: 0,
-	}
+	counter := &StatsCounter{channel: Counter}
 
 	influxDB = con
 
@@ -116,8 +108,35 @@ func NewStatCounter() *StatsCounter {
 	return counter
 }
 
-func addPoint(name string) {
+func RecordAnnounce(user_id uint64) {
+	p := client.Point{
+		Name: "announces",
+		Fields: map[string]interface{}{
+			"user_id": user_id,
+		},
+		Timestamp: time.Now(),
+		Precision: "s",
+	}
+	addPoint(p)
+}
 
+func writePoints() {
+	bps := client.BatchPoints{
+		Points:          pts,
+		Database:        "mika",
+		RetentionPolicy: "default",
+	}
+	_, err := influxDB.Write(bps)
+	if err != nil {
+		log.Fatal("Failed to write data points, discarding:", err)
+	} else {
+		util.Debug("Wrote samples out successfully")
+	}
+}
+
+func addPoint(pt client.Point) {
+	util.Debug("Adding point:", pt)
+	pointChan <- pt
 }
 
 func (stats *StatsCounter) Counter() {
@@ -178,8 +197,16 @@ func (stats *StatsCounter) statPrinter() *time.Ticker {
 	return ticker
 }
 
-func MetricsBatchWriter() {
+func backgroundWriter() {
 	for {
-
+		select {
+		case pt := <-pointChan:
+			pts[currentSample] = pt
+			currentSample++
+			if currentSample == sampleSize {
+				writePoints()
+				currentSample = 0
+			}
+		}
 	}
 }

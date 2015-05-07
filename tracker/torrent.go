@@ -151,6 +151,7 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 	return true
 }
 
+// HasPeer Checks if the peer already is a member of the peer slice for the torrent
 func (torrent *Torrent) HasPeer(peer *Peer) bool {
 	for _, p := range torrent.Peers {
 		if peer == p {
@@ -160,15 +161,19 @@ func (torrent *Torrent) HasPeer(peer *Peer) bool {
 	return false
 }
 
+// PeerCounts counts the number of seeders and leechers the torrent currently has.
+// Only active peers are counted towards the totals
 func (torrent *Torrent) PeerCounts() (int16, int16) {
 	s, l := 0, 0
 	torrent.RLock()
 	defer torrent.RUnlock()
 	for _, p := range torrent.Peers {
-		if p.IsSeeder() {
-			s++
-		} else {
-			l++
+		if p.Active {
+			if p.IsSeeder() {
+				s++
+			} else {
+				l++
+			}
 		}
 	}
 	return int16(s), int16(l)

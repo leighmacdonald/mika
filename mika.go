@@ -17,7 +17,25 @@ func VersionStr() string {
 	return fmt.Sprintf("mika/%s", Version)
 }
 
-func SetupLogger(log_level log.Level) {
-	log.SetFormatter(&log.TextFormatter{})
-	log.SetLevel(log_level)
+// SetupLogger will configure logrus to use our config
+// force_colour will enable colour codes to be used even if there is no TTY detected
+func SetupLogger(log_level string, force_colour bool) {
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:    force_colour,
+		DisableSorting: true,
+	})
+	switch log_level {
+	case "fatal":
+		log.SetLevel(log.FatalLevel)
+	case "panic":
+		log.SetLevel(log.PanicLevel)
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+	case "warn":
+		log.SetLevel(log.WarnLevel)
+	default:
+		log.SetLevel(log.InfoLevel)
+	}
 }

@@ -114,14 +114,7 @@ func main() {
 
 	conf.LoadConfig(*config_file, true)
 
-	switch conf.Config.LogLevel {
-	case "debug":
-		mika.SetupLogger(log.DebugLevel)
-	case "warn":
-		mika.SetupLogger(log.WarnLevel)
-	default:
-		mika.SetupLogger(log.InfoLevel)
-	}
+	mika.SetupLogger(conf.Config.LogLevel, conf.Config.ColourLogs)
 
 	var err error
 	mika.RavenClient, err = raven.NewClient(conf.Config.SentryDSN)

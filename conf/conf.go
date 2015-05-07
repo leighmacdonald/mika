@@ -38,6 +38,7 @@ type Configuration struct {
 	InfluxUser        string
 	InfluxPass        string
 	InfluxWriteBuffer int
+	ColourLogs        bool
 }
 
 func LoadConfig(config_file string, fail bool) {

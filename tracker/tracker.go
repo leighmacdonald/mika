@@ -7,10 +7,10 @@ import (
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/goji/httpauth"
 	"github.com/labstack/echo"
-	"log"
 	ghttp "net/http"
 	"strconv"
 	"strings"
@@ -92,6 +92,8 @@ func (t *Tracker) listenTracker() {
 	//	})
 
 	// Public tracker routes
+
+	e.Use()
 	e.Get("/:passkey/announce", t.HandleAnnounce)
 	e.Get("/:passkey/scrape", t.HandleScrape)
 
@@ -179,7 +181,7 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new 
 		t.TorrentsMutex.Lock()
 		t.Torrents[info_hash] = torrent
 		t.TorrentsMutex.Unlock()
-		util.Debug("GetTorrentByInfoHash: Added new torrent to in-memory cache:", info_hash)
+		log.Debug("GetTorrentByInfoHash: Added new torrent to in-memory cache:", info_hash)
 	}
 	return nil
 }
@@ -222,7 +224,7 @@ func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 		}
 
 		if torrent.TorrentID == 0 {
-			util.Debug("FetchTorrent: Trying to fetch info hash without valid key:", info_hash)
+			log.Debug("FetchTorrent: Trying to fetch info hash without valid key:", info_hash)
 			r.Do("DEL", fmt.Sprintf("t:t:%s", torrent.InfoHash))
 			return nil
 		}
@@ -379,22 +381,18 @@ func (t *Tracker) syncWriter() {
 	for {
 		select {
 		case payload := <-db.SyncPayloadC:
-			util.Debug("Sync payload")
 			r.Do(payload.Command, payload.Args...)
 		case user := <-SyncUserC:
-			util.Debug("sync user")
 			user.Sync(r)
 			user.Lock()
 			user.InQueue = false
 			user.Unlock()
 		case torrent := <-SyncTorrentC:
-			util.Debug("sync torrent")
 			torrent.Sync(r)
 			torrent.Lock()
 			torrent.InQueue = false
 			torrent.Unlock()
 		case peer := <-SyncPeerC:
-			util.Debug("sync peer")
 			peer.Sync(r)
 			peer.Lock()
 			peer.InQueue = false

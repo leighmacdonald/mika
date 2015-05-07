@@ -39,8 +39,8 @@ import (
 	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/tracker"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/kisielk/raven-go/raven"
-	"log"
 	"os"
 	"os/signal"
 	"runtime"
@@ -76,8 +76,7 @@ func sigHandler(s chan os.Signal) {
 	for received_signal := range s {
 		switch received_signal {
 		case syscall.SIGINT:
-			log.Println("")
-			log.Println("CAUGHT SIGINT: Shutting down!")
+			log.Warn("CAUGHT SIGINT: Shutting down!")
 			if *profile != "" {
 				log.Println("> Writing out profile info")
 				pprof.StopCPUProfile()
@@ -85,11 +84,10 @@ func sigHandler(s chan os.Signal) {
 			util.CaptureMessage("Stopped tracker")
 			os.Exit(0)
 		case syscall.SIGUSR2:
-			log.Println("")
-			log.Println("CAUGHT SIGUSR2: Reloading config")
+			log.Warn("CAUGHT SIGUSR2: Reloading config")
 			<-s
 			conf.LoadConfig(*config_file, false)
-			log.Println("> Reloaded config")
+			log.Info("> Reloaded config")
 			util.CaptureMessage("Reloaded configuration")
 		}
 	}
@@ -97,26 +95,38 @@ func sigHandler(s chan os.Signal) {
 
 // Do it
 func main() {
-	log.Println(fmt.Sprintf(cheese, mika.Version))
+	log.Info(fmt.Sprintf(cheese, mika.Version))
 
-	log.Println("Process ID:", os.Getpid())
+	log.Info("Process ID:", os.Getpid())
 
 	// Set max number of CPU cores to use
-	log.Println("Num procs(s):", *num_procs)
+	log.Info("Num procs(s):", *num_procs)
 	runtime.GOMAXPROCS(*num_procs)
 
 	if *profile != "" {
 		f, err := os.Create(*profile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Could not create profile:", err)
 		}
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+
+	conf.LoadConfig(*config_file, true)
+
+	switch conf.Config.LogLevel {
+	case "debug":
+		mika.SetupLogger(log.DebugLevel)
+	case "warn":
+		mika.SetupLogger(log.WarnLevel)
+	default:
+		mika.SetupLogger(log.InfoLevel)
+	}
+
 	var err error
 	mika.RavenClient, err = raven.NewClient(conf.Config.SentryDSN)
 	if err != nil {
-		log.Println("Could not connect to sentry")
+		log.Warn("Could not connect to sentry")
 	}
 
 	// Start stat counter
@@ -132,13 +142,11 @@ func main() {
 func init() {
 	mika.StartTime = util.Unixtime()
 	if mika.Version == "" {
-		log.Println(`[WARN] Build this binary with "make", not "go build"`)
+		log.Warn(`Build this binary with "make" or "./build.sh"", not "go build"`)
 	}
 
 	// Parse CLI args
 	flag.Parse()
-
-	conf.LoadConfig(*config_file, true)
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGUSR2, syscall.SIGINT)

@@ -6,9 +6,9 @@ import (
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/labstack/echo"
-	"log"
 	"net/http"
 	"strconv"
 )
@@ -89,14 +89,14 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) error {
 	if torrent == nil {
 		err := c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
 		if err != nil {
-			log.Println("ERR1: ", err)
+			log.Error("ERR1: ", err)
 		}
 	} else {
-		util.Debug("HandleTorrentGet: Fetched torrent", info_hash)
+		log.Debug("HandleTorrentGet: Fetched torrent", info_hash)
 		err := c.JSON(http.StatusOK, torrent)
 		if err != nil {
-			log.Println("ERR2: ", err)
-			log.Println(torrent)
+			log.Error("ERR2: ", err)
+			log.Error(torrent)
 		}
 	}
 	return nil
@@ -140,7 +140,7 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) error {
 	t.TorrentsMutex.Unlock()
 	SyncTorrentC <- torrent
 
-	log.Println("HandleTorrentAdd: Added new torrent:", payload.Name)
+	log.Info("HandleTorrentAdd: Added new torrent:", payload.Name)
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
@@ -163,7 +163,7 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) error {
 		torrent.InQueue = true
 		SyncTorrentC <- torrent
 	}
-	log.Println("HandleTorrentDel: Deleted torrent", info_hash)
+	log.Info("HandleTorrentDel: Deleted torrent", info_hash)
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
@@ -171,7 +171,7 @@ func (t *Tracker) getUser(c *echo.Context) *User {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		util.Debug("getUser: ", err)
+		log.Debug("getUser: ", err)
 		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
 		return nil
 	}
@@ -197,7 +197,7 @@ func (t *Tracker) HandleUserTorrents(c *echo.Context) error {
 	a, err := r.Do("SMEMBERS", user.KeyActive)
 
 	if err != nil {
-		log.Println("HandleUserTorrents: Failed to fetch user active", err)
+		log.Error("HandleUserTorrents: Failed to fetch user active", err)
 		c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user active torrents"})
 		return nil
 	}
@@ -205,21 +205,21 @@ func (t *Tracker) HandleUserTorrents(c *echo.Context) error {
 
 	a, err = r.Do("SMEMBERS", user.KeyHNR)
 	if err != nil {
-		log.Println("HandleUserTorrents: Failed to fetch user HNR", err)
+		log.Error("HandleUserTorrents: Failed to fetch user HNR", err)
 		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user hnr torrents"})
 	}
 	hnr_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyComplete)
 	if err != nil {
-		log.Println("HandleUserTorrents: Failed to fetch user completes", err)
+		log.Error("HandleUserTorrents: Failed to fetch user completes", err)
 		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user completed torrents"})
 	}
 	complete_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyIncomplete)
 	if err != nil {
-		log.Println("HandleUserTorrents: Failed to fetch user incompletes", err)
+		log.Error("HandleUserTorrents: Failed to fetch user incompletes", err)
 		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user incompleted torrents"})
 	}
 	incomplete_list, err := redis.Strings(a, nil)
@@ -269,7 +269,7 @@ func (t *Tracker) HandleUserCreate(c *echo.Context) error {
 	} else {
 		user.Unlock()
 	}
-	log.Println("HandleUserCreate: Created new user", fmt.Sprintf("[%d/%s]", payload.UserID, payload.Name))
+	log.Info("HandleUserCreate: Created new user", fmt.Sprintf("[%d/%s]", payload.UserID, payload.Name))
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
@@ -281,7 +281,7 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) error {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		util.Debug("HandleUserUpdate: Failed to parse user id", err)
+		log.Debug("HandleUserUpdate: Failed to parse user id", err)
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format"})
 	}
 
@@ -307,7 +307,7 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) error {
 	} else {
 		user.Unlock()
 	}
-	log.Println("HandleUserUpdate: Updated user", user_id)
+	log.Info("HandleUserUpdate: Updated user", user_id)
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
@@ -327,7 +327,7 @@ func (t *Tracker) HandleWhitelistAdd(c *echo.Context) error {
 
 	r.Do("HSET", "t:whitelist", payload.Prefix, payload.Client)
 	t.initWhitelist(r)
-	log.Println("HandleWhitelistAdd: Added new client to whitelist", payload.Prefix)
+	log.Info("HandleWhitelistAdd: Added new client to whitelist", payload.Prefix)
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
@@ -340,7 +340,7 @@ func (t *Tracker) HandleWhitelistDel(c *echo.Context) error {
 
 			r.Do("HDEL", "t:whitelist", prefix)
 			t.initWhitelist(r)
-			log.Println("HandleWhitelistDel: Deleted client from whitelist", prefix)
+			log.Info("HandleWhitelistDel: Deleted client from whitelist", prefix)
 			return c.JSON(http.StatusOK, resp_ok)
 		}
 	}
@@ -363,6 +363,6 @@ func (t *Tracker) HandleGetTorrentPeers(c *echo.Context) error {
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{})
 	}
-	util.Debug("HandleGetTorrentPeers: Got torrent peers", info_hash)
+	log.Debug("HandleGetTorrentPeers: Got torrent peers", info_hash)
 	return c.JSON(http.StatusOK, torrent.Peers)
 }

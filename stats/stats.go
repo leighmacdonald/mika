@@ -3,10 +3,9 @@ package stats
 import (
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
-	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/influxdb/influxdb/client"
 	"github.com/labstack/echo"
-	"log"
 	"net/url"
 	"sync"
 	"time"
@@ -67,10 +66,10 @@ type StatsCounter struct {
 
 func Setup(sample_size int) {
 	if sample_size <= 0 {
-		log.Fatalln("stats.Setup: InfluxWriteBuffer must be positive integer")
+		log.Fatal("stats.Setup: InfluxWriteBuffer must be positive integer")
 	}
 	if sample_size < 100 {
-		log.Println("[WARN] InfluxWriteBuffer value should generally be above 100. Currently:", sample_size)
+		log.Warn("InfluxWriteBuffer value should generally be above 100. Currently:", sample_size)
 	}
 	sampleSize = sample_size
 	StatCounts = NewStatCounter()
@@ -79,11 +78,11 @@ func Setup(sample_size int) {
 
 func NewStatCounter() *StatsCounter {
 	if conf.Config.InfluxDSN == "" {
-		log.Println("[WARN] Invalid influx dsn defined")
+		log.Warn("Invalid influx dsn defined")
 	}
 	u, err := url.Parse(conf.Config.InfluxDSN)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not parse influx dsn:", err)
 	}
 
 	conf := client.Config{
@@ -103,7 +102,7 @@ func NewStatCounter() *StatsCounter {
 		log.Fatal(err)
 	}
 
-	log.Printf("InfluxDB Happy as a Hippo! %v, %s", dur, ver)
+	log.Infof("InfluxDB Happy as a Hippo! %v, %s", dur, ver)
 
 	counter := &StatsCounter{channel: Counter}
 
@@ -156,12 +155,12 @@ func writePoints() {
 	if err != nil {
 		log.Fatal("Failed to write data points, discarding:", err)
 	} else {
-		util.Debug("Wrote samples out successfully")
+		log.Debug("Wrote samples out successfully")
 	}
 }
 
 func addPoint(pt client.Point) {
-	util.Debug("Adding point:", pt)
+	log.Debug("Adding point:", pt)
 	pointChan <- pt
 }
 
@@ -213,7 +212,7 @@ func (stats *StatsCounter) statPrinter() *time.Ticker {
 			stats.RLock()
 			req_sec := stats.Requests / 60
 			req_sec_api := stats.APIRequests / 60
-			log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
+			log.Infof("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
 				stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
 				stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec, req_sec_api)
 			stats.RUnlock()

@@ -3,9 +3,8 @@ package tracker
 import (
 	"fmt"
 	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"log"
 	"sync"
 )
 
@@ -103,7 +102,7 @@ func (t *Tracker) GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *U
 		t.UsersMutex.Lock()
 		t.Users[user_id] = user
 		t.UsersMutex.Unlock()
-		util.Debug("Added new user to in-memory cache:", user_id)
+		log.Debug("Added new user to in-memory cache:", user_id)
 		return user
 	}
 	return user

@@ -5,9 +5,9 @@ import (
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/chihaya/bencode"
 	"github.com/labstack/echo"
-	"log"
 	"net/http"
 )
 
@@ -64,7 +64,7 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 				"incomplete": torrent.Leechers,
 			}
 		} else {
-			util.Debug("Unknown hash:", info_hash)
+			log.Debug("Unknown hash:", info_hash)
 		}
 	}
 
@@ -79,7 +79,7 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 		return
 	}
 	encoded := out_bytes.String()
-	util.Debug(encoded)
+	log.Debug(encoded)
 	stats.RecordScrape(user.UserID)
 	c.String(http.StatusOK, encoded)
 }

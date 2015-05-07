@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"log"
 	"strings"
 )
 
@@ -19,23 +19,23 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 		log.Println("ReapPeer: Reaper redis conn:", r.Err().Error())
 		return
 	}
-	util.Debug("Reaping peer:", info_hash, peer_id)
+	log.Debug("Reaping peer:", info_hash, peer_id)
 
 	torrent := t.GetTorrentByInfoHash(r, info_hash, false)
 	if torrent == nil {
-		log.Println("ReapPeer: Failed to fetch torrent while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
+		log.Error("ReapPeer: Failed to fetch torrent while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
 
 	// Fetch before we set active to 0
 	peer, err := torrent.GetPeer(r, peer_id)
 	if err != nil {
-		log.Println("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
+		log.Error("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
 	user := t.GetUserByID(r, peer.UserID, false)
 	if user == nil {
-		log.Println("ReapPeer: Failed to fetch user while reaping", fmt.Sprintf("%s %d [%s]", info_hash, peer.UserID, peer_id[0:6]))
+		log.Error("ReapPeer: Failed to fetch user while reaping", fmt.Sprintf("%s %d [%s]", info_hash, peer.UserID, peer_id[0:6]))
 		return
 	}
 	torrent.DelPeer(r, peer)
@@ -45,10 +45,10 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 	r.Flush()
 	v, err := r.Receive()
 	if err != nil {
-		log.Println("ReapPeer: Tried to remove non-existant peer: ", info_hash, peer_id[0:6])
+		log.Error("ReapPeer: Tried to remove non-existant peer: ", info_hash, peer_id[0:6])
 	}
 	if v == "1" {
-		util.Debug("ReapPeer: Reaped peer successfully: ", peer_id[0:6])
+		log.Debug("ReapPeer: Reaped peer successfully: ", peer_id)
 	}
 	peer.Active = false
 	SyncPeerC <- peer
@@ -72,17 +72,17 @@ func (t *Tracker) peerStalker() {
 		switch v := psc.Receive().(type) {
 
 		case redis.Message:
-			util.Debug(string(v.Data))
+			log.Debug(string(v.Data))
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
 			if len(p) >= 4 {
 				t.ReapPeer(p[2], p[3])
 			}
 
 		case redis.Subscription:
-			util.Debug("peerStalker: Subscribed to channel:", v.Channel)
+			log.Info("peerStalker: Subscribed to channel:", v.Channel)
 
 		case error:
-			log.Println("peerStalker: Subscriber error: ", v.Error())
+			log.Error("peerStalker: Subscriber error: ", v.Error())
 		}
 	}
 }

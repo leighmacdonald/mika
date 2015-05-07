@@ -2,8 +2,8 @@ package conf
 
 import (
 	"encoding/json"
+	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
-	"log"
 	"os"
 	"sync"
 )
@@ -16,6 +16,7 @@ var (
 
 type Configuration struct {
 	Debug             bool
+	LogLevel          string
 	ListenHost        string
 	ListenHostAPI     string
 	APIUsername       string
@@ -40,10 +41,10 @@ type Configuration struct {
 }
 
 func LoadConfig(config_file string, fail bool) {
-	log.Println("Loading config:", config_file)
+	log.Info("Loading config:", config_file)
 	file, err := ioutil.ReadFile(config_file)
 	if err != nil {
-		log.Println("loadConfig: Failed to open config file:", err)
+		log.Error("loadConfig: Failed to open config file:", err)
 		if fail {
 			os.Exit(1)
 		}
@@ -51,7 +52,7 @@ func LoadConfig(config_file string, fail bool) {
 
 	temp := new(Configuration)
 	if err = json.Unmarshal(file, temp); err != nil {
-		log.Println("loadConfig: Failed to parse config: ", err)
+		log.Error("loadConfig: Failed to parse config: ", err)
 		if fail {
 			os.Exit(1)
 		}
@@ -61,7 +62,7 @@ func LoadConfig(config_file string, fail bool) {
 	configLock.Unlock()
 
 	if Config.ReapInterval <= Config.AnnIntervalMin {
-		log.Println("[WARN] ReapInterval less than AnnInterval (here be dragons!)")
-		log.Println("[WARN] This is almost certainly not what you want, fix required.")
+		log.Warn("ReapInterval less than AnnInterval (here be dragons!)")
+		log.Warn("This is almost certainly not what you want, fix required.")
 	}
 }

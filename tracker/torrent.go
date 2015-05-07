@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"log"
 	"sync"
 )
 

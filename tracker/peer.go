@@ -6,8 +6,8 @@ import (
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -138,7 +138,7 @@ func (peer *Peer) IsSeeder() bool {
 
 func (peer *Peer) AddHNR(r redis.Conn, torrent_id uint64) {
 	r.Send("SADD", fmt.Sprintf("t:u:hnr:%d", peer.UserID), torrent_id)
-	util.Debug("Added HnR:", torrent_id, peer.UserID)
+	log.Debug("Added HnR:", torrent_id, peer.UserID)
 }
 
 // Generate a compact peer field array containing the byte representations

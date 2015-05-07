@@ -1,8 +1,8 @@
 package db
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"log"
 	"time"
 )
 
@@ -29,7 +29,7 @@ type Payload struct {
 
 func NewPayload(command string, args ...interface{}) Payload {
 	if len(args) < 1 {
-		panic("Not enough arguments to make payload")
+		log.Panic("Not enough arguments to make payload")
 	}
 	return Payload{Command: command, Args: args}
 }
@@ -49,7 +49,7 @@ func Setup(host string, pass string) {
 		// Close the existing pool cleanly if it exists
 		err := Pool.Close()
 		if err != nil {
-			log.Fatalln("Cannot close existing redis pool:", err.Error())
+			log.Fatal("Cannot close existing redis pool:", err.Error())
 		}
 	}
 	pool := &redis.Pool{

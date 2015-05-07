@@ -8,9 +8,9 @@ import (
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/util"
+	log "github.com/Sirupsen/logrus"
 	"github.com/chihaya/bencode"
 	"github.com/labstack/echo"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -64,7 +64,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		log.Println("HandleAnnounce: Failed to get redis conn:", r.Err().Error())
+		log.Error("HandleAnnounce: Failed to get redis conn:", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
@@ -72,7 +72,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 
 	ann, err := NewAnnounce(c)
 	if err != nil {
-		log.Println("HandleAnnounce: Failed to parse announce:", err)
+		log.Error("HandleAnnounce: Failed to parse announce:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
@@ -82,7 +82,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 
 	user := t.GetUserByPasskey(r, passkey)
 	if user == nil {
-		log.Println("HandleAnnounce: Invalid passkey", passkey)
+		log.Debug("HandleAnnounce: Invalid passkey", passkey)
 		oopsStr(c, MSG_GENERIC_ERROR, "Invalid passkey")
 		stats.Counter <- stats.EV_INVALID_PASSKEY
 		return
@@ -92,7 +92,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		return
 	}
 	if !t.IsValidClient(r, ann.PeerID) {
-		log.Println("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID[0:6], user.UserID, user.Username))
+		log.Warn("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID[0:6], user.UserID, user.Username))
 		oops(c, MSG_INVALID_PEER_ID)
 		stats.Counter <- stats.EV_INVALID_CLIENT
 		return
@@ -100,19 +100,19 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 
 	torrent := t.GetTorrentByInfoHash(r, fmt.Sprintf("%x", ann.InfoHash), true)
 	if torrent == nil {
-		util.Debug("HandleAnnounce:", fmt.Sprintf("Torrent not found: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
+		log.Debug("HandleAnnounce:", fmt.Sprintf("Torrent not found: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return
 	} else if !torrent.Enabled {
-		util.Debug("HandleAnnounce:", fmt.Sprintf("Disabled torrent: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
+		log.Debug("HandleAnnounce:", fmt.Sprintf("Disabled torrent: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return
 	}
 	peer, err := torrent.GetPeer(r, ann.PeerID)
 	if err != nil {
-		log.Println("HandleAnnounce: Failed to fetch/create peer:", err.Error())
+		log.Error("HandleAnnounce: Failed to fetch/create peer:", err.Error())
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
@@ -219,7 +219,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 
 	er_msg_encoded := encoder.Encode(dict)
 	if er_msg_encoded != nil {
-		log.Println("HandleAnnounce:", fmt.Sprintf("Failed to encode response %s [%d/%s]", ann.InfoHash, user.UserID, user.Username))
+		log.Error("HandleAnnounce:", fmt.Sprintf("Failed to encode response %s [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		return
@@ -228,7 +228,6 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 	stats.RecordAnnounce(user.UserID)
 
 	c.String(http.StatusOK, out_bytes.String())
-
 }
 
 // Parse the query string into an AnnounceRequest struct
@@ -270,7 +269,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 		if forwarded_ip != "" {
 			ipv4_new, err := getIP(forwarded_ip)
 			if err != nil {
-				log.Println("NewAnnounce: Failed to parse header supplied IP", err)
+				log.Error("NewAnnounce: Failed to parse header supplied IP", err)
 				return nil, errors.New("Invalid ip header")
 			}
 			ipv4 = ipv4_new
@@ -279,7 +278,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 			ip_req, _ := s[0], s[1]
 			ipv4_new, err := getIP(ip_req)
 			if err != nil {
-				log.Println("NewAnnounce: Failed to parse detected IP", err)
+				log.Error("NewAnnounce: Failed to parse detected IP", err)
 				return nil, errors.New("Invalid ip hash")
 			}
 			ipv4 = ipv4_new

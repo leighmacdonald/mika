@@ -1,3 +1,4 @@
+// Package mika is a bittorrent tracker build using redis as a storage engine
 package mika
 
 import (
@@ -7,12 +8,18 @@ import (
 )
 
 var (
-	Version   string
+	// This is a special variable that is set by the go linker
+	// If you do not build the project with make, or specify the linker settings
+	// when building this will result in an empty version string
+	Version string
+
+	// Timestamp of when the program first stared up
 	StartTime int32
 
 	RavenClient *raven.Client
 )
 
+// VersionStr will return out the program name and current git version information
 func VersionStr() string {
 	return fmt.Sprintf("mika/%s", Version)
 }

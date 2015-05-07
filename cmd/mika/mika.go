@@ -49,6 +49,7 @@ import (
 )
 
 var (
+	// Mmmm cheese
 	cheese = `
                                ____________
                             __/ ///////// /|
@@ -72,6 +73,11 @@ var (
 	num_procs   = flag.Int("procs", runtime.NumCPU()-1, "Number of CPU cores to use (default: ($num_cores-1))")
 )
 
+// sigHandler watches for external signals and will act on them
+// Currently only the following signals are implemented:
+//
+// - SIGINT cleanly exists the running process
+// - SIGUSR2 reload the configuration file
 func sigHandler(s chan os.Signal) {
 	for received_signal := range s {
 		switch received_signal {
@@ -93,7 +99,7 @@ func sigHandler(s chan os.Signal) {
 	}
 }
 
-// Do it
+// main initialized all models and starts the tracker service
 func main() {
 	log.Info(fmt.Sprintf(cheese, mika.Version))
 

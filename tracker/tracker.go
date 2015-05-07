@@ -1,3 +1,4 @@
+// Package tracker provides the majority of the core bittorent tracker functionality
 package tracker
 
 import (
@@ -19,30 +20,32 @@ import (
 )
 
 var (
+	// The global tracker instance
 	Mika *Tracker
 
-	// Channels
+	// Channels used to sync models to redis
 	SyncUserC    = make(chan *User, 100)
 	SyncPeerC    = make(chan *Peer, 1000)
 	SyncTorrentC = make(chan *Torrent, 500)
 )
 
-func init() {
-
-}
-
 // Main track struct holding all the known models
 type Tracker struct {
+	// Torrents and torrent lock
 	TorrentsMutex *sync.RWMutex
 	Torrents      map[string]*Torrent
 
+	// Users and User lock
 	UsersMutex *sync.RWMutex
 	Users      map[uint64]*User
 
+	// Whitelist and whitelist lock
 	WhitelistMutex *sync.RWMutex
 	Whitelist      []string
 }
 
+// NewTracker created a new allocated Tracker instance to use. Initialize shou
+// before attempting to serve any requests
 func NewTracker() *Tracker {
 	// Alloc tracker
 	tracker := &Tracker{
@@ -70,6 +73,8 @@ func (t *Tracker) Initialize() error {
 	return nil
 }
 
+// Run starts all of the background goroutines related to managing the tracker
+// and starts the tracker and API HTTP interfaces
 func (t *Tracker) Run() {
 	go t.dbStatIndexer()
 	go t.syncWriter()
@@ -78,6 +83,9 @@ func (t *Tracker) Run() {
 	t.listenAPI()
 }
 
+// listenTracker created a new http router, configured the routes and handlers, and
+// starts the trackers HTTP server listening over HTTP. This function will not
+// start the API endpoints. See listenAPI for those.
 func (t *Tracker) listenTracker() {
 	log.Println("Loading tracker router on:", conf.Config.ListenHost)
 	// Initialize the router + middlewares
@@ -100,6 +108,7 @@ func (t *Tracker) listenTracker() {
 	e.Run(conf.Config.ListenHost)
 }
 
+// listenAPI created a new api request router and start the http server listening over TLS
 func (t *Tracker) listenAPI() {
 	log.Println("Loading API router on:", conf.Config.ListenHostAPI, "(TLS)")
 	e := echo.New()
@@ -186,8 +195,7 @@ func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new 
 	return nil
 }
 
-// Create a new torrent, fetching info from redis if exist data
-// exists.
+// FetchTorrent Creates a new torrent, merging data from redis if it exists.
 func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 	// Make new struct to use for cache
 	torrent := &Torrent{
@@ -242,7 +250,7 @@ func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
 	return torrent
 }
 
-// Fetch the client whitelist from redis and load it into memory
+// initWhitelist will fetch the client whitelist from redis and load it into memory
 func (t *Tracker) initWhitelist(r redis.Conn) {
 	t.Whitelist = []string{}
 	a, err := r.Do("HKEYS", "t:whitelist")
@@ -255,7 +263,7 @@ func (t *Tracker) initWhitelist(r redis.Conn) {
 	log.Println(fmt.Sprintf("initWhitelist: Loaded %d whitelist clients", len(t.Whitelist)))
 }
 
-// Fetch the torrents stored in redis and load them into active memory as models
+// initTorrents will fetch the torrents stored in redis and load them into active memory as models
 func (t *Tracker) initTorrents(r redis.Conn) {
 	torrent_keys_reply, err := r.Do("KEYS", "t:t:*")
 	if err != nil {
@@ -290,7 +298,7 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 	log.Println(fmt.Sprintf("initTorrents: Loaded %d torrents into memory", torrents))
 }
 
-// Load all the users into memory
+// initUsers pre loads all known users into memory from redis backend
 func (t *Tracker) initUsers(r redis.Conn) {
 	user_keys_reply, err := r.Do("KEYS", "t:u:*")
 	if err != nil {
@@ -326,7 +334,7 @@ func (t *Tracker) initUsers(r redis.Conn) {
 	log.Println(fmt.Sprintf("initUsers: Loaded %d users into memory", users))
 }
 
-// This function will periodically update the torrent sort indexes
+// dbStatIndexer when running will periodically update the torrent sort indexes
 func (t *Tracker) dbStatIndexer() {
 	log.Println("dbStatIndexer: Background indexer started")
 	r := db.Pool.Get()

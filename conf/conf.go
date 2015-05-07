@@ -15,27 +15,28 @@ var (
 )
 
 type Configuration struct {
-	Debug          bool
-	ListenHost     string
-	ListenHostAPI  string
-	APIUsername    string
-	APIPassword    string
-	RedisHost      string
-	RedisPass      string
-	RedisMaxIdle   int
-	SSLPrivateKey  string
-	SSLCert        string
-	AnnInterval    int
-	AnnIntervalMin int
-	ReapInterval   int
-	IndexInterval  int
-	HNRThreshold   int32
-	HNRMinBytes    uint64
-	SentryDSN      string
-	InfluxDSN      string
-	InfluxDB       string
-	InfluxUser     string
-	InfluxPass     string
+	Debug             bool
+	ListenHost        string
+	ListenHostAPI     string
+	APIUsername       string
+	APIPassword       string
+	RedisHost         string
+	RedisPass         string
+	RedisMaxIdle      int
+	SSLPrivateKey     string
+	SSLCert           string
+	AnnInterval       int
+	AnnIntervalMin    int
+	ReapInterval      int
+	IndexInterval     int
+	HNRThreshold      int32
+	HNRMinBytes       uint64
+	SentryDSN         string
+	InfluxDSN         string
+	InfluxDB          string
+	InfluxUser        string
+	InfluxPass        string
+	InfluxWriteBuffer int
 }
 
 func LoadConfig(config_file string, fail bool) {

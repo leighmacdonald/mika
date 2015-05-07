@@ -18,6 +18,7 @@
   "InfluxDB": "mika-dev",
   "InfluxUser": "",
   "InfluxPass": "",
+  "InfluxWriteBuffer": 1000,
   "SQLHost": "localhost",
   "SQLPort": 3306,
   "SQLDB": "dbname",

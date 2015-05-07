@@ -43,7 +43,7 @@ var (
 		EV_INVALID_CLIENT:   "ev_invalid_client",
 	}
 	pointChan     = make(chan client.Point)
-	sampleSize    = 3
+	sampleSize    = 1000
 	currentSample = 0
 	pts           = make([]client.Point, sampleSize)
 )
@@ -65,7 +65,14 @@ type StatsCounter struct {
 	APIRequestsFail uint64
 }
 
-func Setup() {
+func Setup(sample_size int) {
+	if sample_size <= 0 {
+		log.Fatalln("stats.Setup: InfluxWriteBuffer must be positive integer")
+	}
+	if sample_size < 100 {
+		log.Println("[WARN] InfluxWriteBuffer value should generally be above 100. Currently:", sample_size)
+	}
+	sampleSize = sample_size
 	StatCounts = NewStatCounter()
 	go backgroundWriter()
 }
@@ -110,7 +117,10 @@ func NewStatCounter() *StatsCounter {
 
 func RecordAnnounce(user_id uint64) {
 	p := client.Point{
-		Name: "announces",
+		Name: "announce",
+		Tags: map[string]string{
+			"version": mika.VersionStr(),
+		},
 		Fields: map[string]interface{}{
 			"user_id": user_id,
 		},
@@ -120,6 +130,22 @@ func RecordAnnounce(user_id uint64) {
 	addPoint(p)
 }
 
+func RecordScrape(user_id uint64) {
+	p := client.Point{
+		Name: "scrape",
+		Tags: map[string]string{
+			"version": mika.VersionStr(),
+		},
+		Fields: map[string]interface{}{
+			"user_id": user_id,
+		},
+		Timestamp: time.Now(),
+		Precision: "s",
+	}
+	addPoint(p)
+}
+
+// writePoints will commit the points as a batch to the backend influxdb instance
 func writePoints() {
 	bps := client.BatchPoints{
 		Points:          pts,
@@ -169,6 +195,8 @@ func (stats *StatsCounter) Counter() {
 		stats.Unlock()
 	}
 }
+
+// Records api requests
 func StatsMW(h echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		Counter <- EV_API
@@ -176,6 +204,7 @@ func StatsMW(h echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// statPrinter will periodically print out basic stat lines to standard output
 func (stats *StatsCounter) statPrinter() *time.Ticker {
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
@@ -197,6 +226,8 @@ func (stats *StatsCounter) statPrinter() *time.Ticker {
 	return ticker
 }
 
+// backgroundWriter will write out the current pts values to influxdb. We reuse the
+// existing memory everytime we flush the points out
 func backgroundWriter() {
 	for {
 		select {

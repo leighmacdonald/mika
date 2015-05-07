@@ -120,7 +120,7 @@ func main() {
 	}
 
 	// Start stat counter
-	stats.Setup()
+	stats.Setup(conf.Config.InfluxWriteBuffer)
 
 	db.Setup(conf.Config.RedisHost, conf.Config.RedisPass)
 

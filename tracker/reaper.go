@@ -35,7 +35,7 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 	}
 	user := t.GetUserByID(r, peer.UserID, false)
 	if user == nil {
-		log.Println("ReapPeer: Failed to fetch user while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
+		log.Println("ReapPeer: Failed to fetch user while reaping", fmt.Sprintf("%s %d [%s]", info_hash, peer.UserID, peer_id[0:6]))
 		return
 	}
 	torrent.DelPeer(r, peer)
@@ -45,10 +45,10 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 	r.Flush()
 	v, err := r.Receive()
 	if err != nil {
-		log.Println("ReapPeer: Tried to remove non-existant peer: ", info_hash, peer_id)
+		log.Println("ReapPeer: Tried to remove non-existant peer: ", info_hash, peer_id[0:6])
 	}
 	if v == "1" {
-		util.Debug("ReapPeer: Reaped peer successfully: ", peer_id)
+		util.Debug("ReapPeer: Reaped peer successfully: ", peer_id[0:6])
 	}
 	peer.Active = false
 	SyncPeerC <- peer

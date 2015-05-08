@@ -19,7 +19,9 @@ var (
 	RavenClient *raven.Client
 )
 
-// VersionStr will return out the program name and current git version information
+// VersionStr returns the currently running version of the application.
+// For this to function properly, the linker must set this value during
+// build time. The makefile and build scripts will do this automatically.
 func VersionStr() string {
 	return fmt.Sprintf("mika/%s", Version)
 }

@@ -29,7 +29,7 @@ type User struct {
 	KeyHNR        string   `redis:"-" json:"-"`
 }
 
-// Fetch a user_id from the supplied passkey. A return value
+// findUserID find a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
 func (t *Tracker) findUserID(passkey string) uint64 {
 	for _, user := range t.Users {
@@ -40,7 +40,7 @@ func (t *Tracker) findUserID(passkey string) uint64 {
 	return 0
 }
 
-// Create a new user instance, loading existing data from redis if it exists
+// fetchUser Create a new user instance, loading existing data from redis if it exists
 func fetchUser(r redis.Conn, user_id uint64) *User {
 	user := &User{
 		UserID:     user_id,
@@ -90,7 +90,8 @@ func (t *Tracker) GetUserByPasskey(r redis.Conn, passkey string) *User {
 	return t.GetUserByID(r, user_id, false)
 }
 
-// fetch a user from the backend database if
+// GetUserByID fetches a user from the backend database. Id auto_create is set
+// it will also make a new user if an existing one was not found.
 func (t *Tracker) GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *User {
 
 	t.UsersMutex.RLock()
@@ -124,7 +125,9 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 	}
 }
 
-// Write our bits out to redis
+// Sync will write the pertinent date out to the redis connection. Its important to
+// note that this function does not flush the changes to redis as its meant to be chained
+// with other sync functions.
 // TODO only write out what is changed
 func (user *User) Sync(r redis.Conn) {
 	r.Send(
@@ -142,6 +145,18 @@ func (user *User) Sync(r redis.Conn) {
 	)
 }
 
+// AddPeer adds a peer to a users active peer list
 func (user *User) AddPeer(peer *Peer) {
 	user.Peers = append(user.Peers, &peer)
+}
+
+// AppendIfMissing will add a new item to a slice if the item is not currently
+// a member of the slice.
+func AppendIfMissing(slice []uint64, i uint64) []uint64 {
+	for _, ele := range slice {
+		if ele == i {
+			return slice
+		}
+	}
+	return append(slice, i)
 }

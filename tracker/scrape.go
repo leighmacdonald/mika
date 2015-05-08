@@ -80,6 +80,5 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 	}
 	encoded := out_bytes.String()
 	log.Debug(encoded)
-	stats.RecordScrape(user.UserID)
 	c.String(http.StatusOK, encoded)
 }

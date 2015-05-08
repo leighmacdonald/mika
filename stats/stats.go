@@ -42,26 +42,31 @@ var (
 		EV_INVALID_CLIENT:   "ev_invalid_client",
 	}
 	pointChan     = make(chan client.Point)
-	sampleSize    = 1000
+	sampleSize    = 1
 	currentSample = 0
 	pts           = make([]client.Point, sampleSize)
 )
 
 type StatsCounter struct {
 	sync.RWMutex
-	channel         chan int
-	Requests        uint64
-	RequestsFail    uint64
-	Announce        uint64
-	UniqueUsers     uint64
-	AnnounceFail    uint64
-	Scrape          uint64
-	ScrapeFail      uint64
-	InvalidPasskey  uint64
-	InvalidInfohash uint64
-	InvalidClient   uint64
-	APIRequests     uint64
-	APIRequestsFail uint64
+	channel           chan int
+	Requests          uint64
+	RequestsFail      uint64
+	Announce          uint64
+	AnnouncePerMin    uint64
+	UniqueUsers       uint64
+	AnnounceFail      uint64
+	Scrape            uint64
+	ScrapePerMin      uint64
+	ScrapeFail        uint64
+	InvalidPasskey    uint64
+	InvalidInfohash   uint64
+	InvalidClient     uint64
+	APIRequests       uint64
+	APIRequestsPerMin uint64
+	APIRequestsFail   uint64
+	AnnounceUserIDS   []uint64
+	ScrapeUserIDS     []uint64
 }
 
 func Setup(sample_size int) {
@@ -114,14 +119,15 @@ func NewStatCounter() *StatsCounter {
 	return counter
 }
 
-func RecordAnnounce(user_id uint64) {
+func RecordAnnounces(announces uint64) {
 	p := client.Point{
 		Name: "announce",
 		Tags: map[string]string{
 			"version": mika.VersionStr(),
+			"env":     "prod",
 		},
 		Fields: map[string]interface{}{
-			"user_id": user_id,
+			"value": announces,
 		},
 		Timestamp: time.Now(),
 		Precision: "s",
@@ -129,14 +135,15 @@ func RecordAnnounce(user_id uint64) {
 	addPoint(p)
 }
 
-func RecordScrape(user_id uint64) {
+func RecordScrapes(scrapes uint64) {
 	p := client.Point{
 		Name: "scrape",
 		Tags: map[string]string{
 			"version": mika.VersionStr(),
 		},
 		Fields: map[string]interface{}{
-			"user_id": user_id,
+			"value": scrapes,
+			"env":   "prod",
 		},
 		Timestamp: time.Now(),
 		Precision: "s",
@@ -171,16 +178,19 @@ func (stats *StatsCounter) Counter() {
 		switch v {
 		case EV_API:
 			stats.APIRequests++
+			stats.APIRequestsPerMin++
 			stats.Requests++
 		case EV_API_FAIL:
 			stats.APIRequestsFail++
 		case EV_ANNOUNCE:
 			stats.Announce++
+			stats.AnnouncePerMin++
 			stats.Requests++
 		case EV_ANNOUNCE_FAIL:
 			stats.AnnounceFail++
 		case EV_SCRAPE:
 			stats.Scrape++
+			stats.ScrapePerMin++
 			stats.Requests++
 		case EV_SCRAPE_FAIL:
 			stats.ScrapeFail++
@@ -208,18 +218,23 @@ func (stats *StatsCounter) statPrinter() *time.Ticker {
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for range ticker.C {
-			time.Sleep(60 * time.Second)
 			stats.RLock()
-			req_sec := stats.Requests / 60
-			req_sec_api := stats.APIRequests / 60
-			log.Infof("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
+			req_sec := stats.AnnouncePerMin / 60
+			req_sec_api := stats.APIRequestsPerMin / 60
+			log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
 				stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
 				stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec, req_sec_api)
+
+			RecordAnnounces(stats.AnnouncePerMin)
+			RecordScrapes(stats.ScrapePerMin)
+
 			stats.RUnlock()
 			stats.Lock()
-			stats.Requests = 0
-			stats.APIRequests = 0
+			stats.APIRequestsPerMin = 0
+			stats.AnnouncePerMin = 0
+			stats.ScrapePerMin = 0
 			stats.Unlock()
+
 		}
 	}()
 	return ticker

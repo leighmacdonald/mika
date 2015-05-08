@@ -1,7 +1,6 @@
 package tracker
 
 import (
-	"errors"
 	"fmt"
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/db"
@@ -89,7 +88,7 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) error {
 	if torrent == nil {
 		err := c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
 		if err != nil {
-			log.Error("ERR1: ", err)
+			log.Error("ERR: ", err)
 		}
 	} else {
 		log.Debug("HandleTorrentGet: Fetched torrent", info_hash)
@@ -104,17 +103,21 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) error {
 
 // Add new torrents into the active torrent set
 // {torrent_id: "", info_hash: "", name: ""}
-func (t *Tracker) HandleTorrentAdd(c *echo.Context) error {
+func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	payload := &TorrentAddPayload{}
 	if err := c.Bind(payload); err != nil {
-		return err
+		log.Error("Failed to parse addtorrent payload:", err)
+		return &echo.HTTPError{Code: http.StatusBadRequest}
 	}
 	if payload.TorrentID <= 0 {
-		return errors.New("Invalid torrent id")
+		return &echo.HTTPError{Code: http.StatusBadRequest}
 	} else if len(payload.InfoHash) != 40 {
-		return errors.New("Invalid info hash")
+		return &echo.HTTPError{Code: http.StatusBadRequest}
 	} else if payload.Name == "" {
-		return errors.New("Invalid release name, cannot be empty")
+		return &echo.HTTPError{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid release name, cannot be empty",
+		}
 	}
 	r := db.Pool.Get()
 	defer r.Close()
@@ -144,7 +147,7 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) error {
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
-func (t *Tracker) HandleTorrentDel(c *echo.Context) error {
+func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
@@ -185,7 +188,7 @@ func (t *Tracker) getUser(c *echo.Context) *User {
 	return user
 }
 
-func (t *Tracker) HandleUserTorrents(c *echo.Context) error {
+func (t *Tracker) HandleUserTorrents(c *echo.Context) *echo.HTTPError {
 	user := t.getUser(c)
 	if user == nil {
 		return nil
@@ -232,7 +235,7 @@ func (t *Tracker) HandleUserTorrents(c *echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-func (t *Tracker) HandleUserGet(c *echo.Context) error {
+func (t *Tracker) HandleUserGet(c *echo.Context) *echo.HTTPError {
 	user := t.getUser(c)
 	if user != nil {
 		return c.JSON(http.StatusOK, user)
@@ -240,7 +243,7 @@ func (t *Tracker) HandleUserGet(c *echo.Context) error {
 	return nil
 }
 
-func (t *Tracker) HandleUserCreate(c *echo.Context) error {
+func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	payload := &UserCreatePayload{}
 	if err := c.Bind(payload); err != nil {
 		return err
@@ -273,7 +276,7 @@ func (t *Tracker) HandleUserCreate(c *echo.Context) error {
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
-func (t *Tracker) HandleUserUpdate(c *echo.Context) error {
+func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	payload := &UserUpdatePayload{}
 	if err := c.Bind(payload); err != nil {
 		return err
@@ -347,11 +350,11 @@ func (t *Tracker) HandleWhitelistDel(c *echo.Context) error {
 	return c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
 }
 
-func (t *Tracker) HandleGetTorrentPeer(c *echo.Context) error {
+func (t *Tracker) HandleGetTorrentPeer(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, ResponseErr{"Nope! :("})
 }
 
-func (t *Tracker) HandleGetTorrentPeers(c *echo.Context) error {
+func (t *Tracker) HandleGetTorrentPeers(c *echo.Context) *echo.HTTPError {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {

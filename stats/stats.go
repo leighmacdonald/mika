@@ -206,11 +206,9 @@ func (stats *StatsCounter) Counter() {
 }
 
 // Records api requests
-func StatsMW(h echo.HandlerFunc) echo.HandlerFunc {
-	return func(c *echo.Context) error {
-		Counter <- EV_API
-		return nil
-	}
+func StatsMW(c *echo.Context) {
+	Counter <- EV_API
+
 }
 
 // statPrinter will periodically print out basic stat lines to standard output

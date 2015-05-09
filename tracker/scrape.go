@@ -33,7 +33,7 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 		return
 	}
 
-	passkey := c.Param("passkey")
+	passkey := c.P(0)
 
 	user := t.GetUserByPasskey(r, passkey)
 	if user == nil {

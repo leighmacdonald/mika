@@ -1,3 +1,4 @@
+// Package stats provides functionality for recording and displaying metrics
 package stats
 
 import (

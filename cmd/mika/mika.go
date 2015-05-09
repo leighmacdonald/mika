@@ -28,6 +28,7 @@
 // tcp-backlog 65536
 //
 
+// Package mika is the executable of mika
 package main
 
 import (

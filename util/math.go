@@ -1,3 +1,4 @@
+// Package util provides general utility functions shared by the other modules
 package util
 
 // math.Max for uint64

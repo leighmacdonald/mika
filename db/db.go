@@ -1,3 +1,4 @@
+// Package db provides basic interfaces and function to interact with the redis backend
 package db
 
 import (
@@ -27,6 +28,7 @@ type Payload struct {
 	Args    []interface{}
 }
 
+// NewPayload creates a new redis payload
 func NewPayload(command string, args ...interface{}) Payload {
 	if len(args) < 1 {
 		log.Panic("Not enough arguments to make payload")
@@ -34,16 +36,17 @@ func NewPayload(command string, args ...interface{}) Payload {
 	return Payload{Command: command, Args: args}
 }
 
-//
+// Container to hold payloads to be written in batches
 type BulkPayload struct {
 	Payloads []Payload
 }
 
+// AddPayload add a new payload item to the batch
 func (db *BulkPayload) AddPayload(payload ...Payload) {
 	db.Payloads = append(db.Payloads, payload...)
-
 }
 
+// Setup will instantiate a new connection pool using the credentials supplied
 func Setup(host string, pass string) {
 	if Pool != nil {
 		// Close the existing pool cleanly if it exists

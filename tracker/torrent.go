@@ -31,6 +31,8 @@ type Torrent struct {
 	MultiDn         float64 `redis:"multi_dn" json:"-"`
 }
 
+// NewTorrent allocates and returns a new Torrent instance pointer with all
+// the minimum value required to operated in place
 func NewTorrent(info_hash string, name string, torrent_id uint64) *Torrent {
 	torrent := &Torrent{
 		Name:            name,
@@ -46,6 +48,9 @@ func NewTorrent(info_hash string, name string, torrent_id uint64) *Torrent {
 	return torrent
 }
 
+// MergeDB will pull the torrent details from redis and overwrite the currently
+// stored valued in the Torrent instance. This should only be called when initializing
+// a torrent for the first time in the applications lifetime, such as during initialization.
 func (torrent *Torrent) MergeDB(r redis.Conn) error {
 	torrent_reply, err := r.Do("HGETALL", torrent.TorrentKey)
 	if err != nil {
@@ -72,6 +77,7 @@ func (torrent *Torrent) MergeDB(r redis.Conn) error {
 	return nil
 }
 
+// Update handles updating the stored values according to a users announce request
 func (torrent *Torrent) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
 	s, l := torrent.PeerCounts()
 	torrent.Lock()
@@ -86,6 +92,7 @@ func (torrent *Torrent) Update(announce *AnnounceRequest, upload_diff, download_
 	torrent.Unlock()
 }
 
+// Sync writes the torrent data to redis for permanent storage
 func (torrent *Torrent) Sync(r redis.Conn) {
 	r.Send(
 		"HMSET", torrent.TorrentKey,
@@ -105,6 +112,8 @@ func (torrent *Torrent) Sync(r redis.Conn) {
 	)
 }
 
+// findPeer locates a peer currently in the torrents swarm and returns
+// the peer pointer if found.
 func (torrent *Torrent) findPeer(peer_id string) *Peer {
 	torrent.RLock()
 	defer torrent.RUnlock()
@@ -116,11 +125,18 @@ func (torrent *Torrent) findPeer(peer_id string) *Peer {
 	return nil
 }
 
+// Delete marks the torrent as disabled and prevent any further action
+// against it from normal user requests. The torrent is not removed from
+// active memory when deleted.
 func (torrent *Torrent) Delete(reason string) {
+	torrent.Lock()
 	torrent.Enabled = false
 	torrent.Reason = reason
+	torrent.Unlock()
 }
 
+// DelReason returns the deletion reason if it was set for a torrent. If not
+// set a default reason is returned
 func (torrent *Torrent) DelReason() string {
 	if torrent.Reason == "" {
 		return "Torrent deleted"
@@ -129,7 +145,7 @@ func (torrent *Torrent) DelReason() string {
 	}
 }
 
-// Add a peer to a torrents active peer_id list
+// AddPeer inserts a new peer into the torrents active peer list
 func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 	torrent.Lock()
 	torrent.Peers = append(torrent.Peers, peer)
@@ -145,7 +161,7 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 	return true
 }
 
-// Remove a peer from a torrents active peer_id list
+// DelPeer removed the peer from the torrent and marks it inactive
 func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 	torrent.RLock()
 	defer torrent.RUnlock()
@@ -196,7 +212,7 @@ func (torrent *Torrent) PeerCounts() (int16, int16) {
 	return int16(s), int16(l)
 }
 
-// Get an array of peers for the torrent
+// GetPeers returns a slice of up to max_peers from the current torrent
 func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
 	return torrent.Peers[0:util.UMin(uint64(len(torrent.Peers)), uint64(max_peers))]
 }

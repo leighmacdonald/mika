@@ -1,3 +1,4 @@
+// Package conf provides handling of loading and reading of JSON based config files
 package conf
 
 import (
@@ -15,32 +16,81 @@ var (
 )
 
 type Configuration struct {
-	Debug             bool
-	LogLevel          string
-	ListenHost        string
-	ListenHostAPI     string
-	APIUsername       string
-	APIPassword       string
-	RedisHost         string
-	RedisPass         string
-	RedisMaxIdle      int
-	SSLPrivateKey     string
-	SSLCert           string
-	AnnInterval       int
-	AnnIntervalMin    int
-	ReapInterval      int
-	IndexInterval     int
-	HNRThreshold      int32
-	HNRMinBytes       uint64
-	SentryDSN         string
-	InfluxDSN         string
-	InfluxDB          string
-	InfluxUser        string
-	InfluxPass        string
+	// Enabled debug functions
+	Debug bool
+
+	// A loglevel to use "info", "error", "warn", "debug", "fatal", "panic"
+	LogLevel string
+
+	// URI for the tracker listen host :34000
+	ListenHost string
+
+	// URI for the api listen host :34001
+	ListenHostAPI string
+
+	// Username required to use api, empty string for none
+	APIUsername string
+
+	// Password required to use api, empty string for none
+	APIPassword string
+
+	// Redis hostname
+	RedisHost string
+
+	// Redis password, empty string for none
+	RedisPass string
+
+	// Maximum amount of idle redis connection to allow to idle
+	RedisMaxIdle int
+
+	// Path to the SSL private key
+	SSLPrivateKey string
+
+	// Path to the SSL CA cert
+	SSLCert string
+
+	// Announce interval sent to clients
+	AnnInterval int
+
+	// Minimum announce interval sent to clients
+	AnnIntervalMin int
+
+	// How long to wait until reaping a pear after an announce
+	ReapInterval int
+
+	// How often to index the torrent seeder/leecher counts
+	IndexInterval int
+
+	// How much seeding time is required to remove hnr
+	HNRThreshold int32
+
+	// Minimum amount of bytes need to allow HNR to occur
+	HNRMinBytes uint64
+
+	// Full DSN for Sentry
+	SentryDSN string
+
+	// Full DSN for InfluxDB metric reporting
+	InfluxDSN string
+
+	// Influx database to write points to
+	InfluxDB string
+
+	// Influx user
+	InfluxUser string
+
+	// Influx password
+	InfluxPass string
+
+	// Number of points to buffer before writing the data to influxdb
 	InfluxWriteBuffer int
-	ColourLogs        bool
+
+	// Use colours log output
+	ColourLogs bool
 }
 
+// LoadConfig reads in a json based config file from the path provided and updated
+// the currently active application configuration
 func LoadConfig(config_file string, fail bool) {
 	log.Info("Loading config:", config_file)
 	file, err := ioutil.ReadFile(config_file)

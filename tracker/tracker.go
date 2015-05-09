@@ -242,7 +242,7 @@ func (tracker *Tracker) dbStatIndexer() {
 	}
 }
 
-// Handle writing out new data to the redis db in a queued manner
+// syncWriter Handles writing out new data to the redis db in a queued manner
 // Only items with the .InQueue flag set to false should be added.
 // TODO channel as param
 func (tracker *Tracker) syncWriter() {

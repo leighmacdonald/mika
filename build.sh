@@ -27,6 +27,7 @@ do
     pushd ${GOPATH}/src/${repo} &> /dev/null
         echo "Checking out $repo @ $version"
         git fetch
+        git pull
         git checkout ${version}
     popd &> /dev/null
 done

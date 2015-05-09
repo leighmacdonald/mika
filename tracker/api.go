@@ -82,9 +82,9 @@ func (t *Tracker) HandleUptime(c *echo.Context) {
 	c.String(http.StatusOK, fmt.Sprintf("%d", util.Unixtime()-mika.StartTime))
 }
 
-func (t *Tracker) HandleTorrentGet(c *echo.Context) error {
+func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
-	torrent := t.GetTorrentByInfoHash(nil, info_hash, false)
+	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
 		err := c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
 		if err != nil {
@@ -119,28 +119,22 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 			Message: "Invalid release name, cannot be empty",
 		}
 	}
-	r := db.Pool.Get()
-	defer r.Close()
 
-	torrent := t.GetTorrentByInfoHash(r, payload.InfoHash, false)
-	t.TorrentsMutex.Lock()
-	if torrent != nil {
+	torrent := t.FindTorrentByInfoHash(payload.InfoHash)
+	if torrent == nil {
+		// Add a new one
+		torrent = NewTorrent(payload.InfoHash, payload.Name, payload.TorrentID)
+		t.AddTorrent(torrent)
+	} else {
+		// Update our existing one
+		// Note only a few entries can be updated at the moment
+		t.TorrentsMutex.Lock()
 		torrent.Enabled = true
 		torrent.Name = payload.Name
 		torrent.TorrentID = payload.TorrentID
-	} else {
-		torrent = &Torrent{
-			InfoHash:  payload.InfoHash,
-			Name:      payload.Name,
-			TorrentID: payload.TorrentID,
-			Enabled:   true,
-			Peers:     []*Peer{},
-			MultiUp:   1.0,
-			MultiDn:   1.0,
-		}
-		t.Torrents[payload.InfoHash] = torrent
+		t.TorrentsMutex.Unlock()
 	}
-	t.TorrentsMutex.Unlock()
+
 	SyncTorrentC <- torrent
 
 	log.Info("HandleTorrentAdd: Added new torrent:", payload.Name)
@@ -148,14 +142,8 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 }
 
 func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
-	r := db.Pool.Get()
-	defer r.Close()
-	if r.Err() != nil {
-		return c.JSON(http.StatusInternalServerError, ResponseErr{})
-	}
-
 	info_hash := c.Param("info_hash")
-	torrent := t.GetTorrentByInfoHash(r, info_hash, false)
+	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id"})
 	}
@@ -251,19 +239,17 @@ func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	if payload.Passkey == "" || payload.UserID <= 0 {
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
 	}
-	r := db.Pool.Get()
-	defer r.Close()
-	user := t.GetUserByID(r, payload.UserID, false)
+
+	user := t.FindUserByID(payload.UserID)
 
 	if user != nil {
 		return c.JSON(http.StatusConflict, ResponseErr{"User exists"})
 	}
 
-	user = t.GetUserByID(r, payload.UserID, true)
+	user = NewUser(payload.UserID)
 	user.Lock()
 	user.Passkey = payload.Passkey
 	user.CanLeech = payload.CanLeech
-	user.Enabled = true
 	user.Username = payload.Name
 	if !user.InQueue {
 		user.InQueue = true
@@ -355,14 +341,8 @@ func (t *Tracker) HandleGetTorrentPeer(c *echo.Context) *echo.HTTPError {
 }
 
 func (t *Tracker) HandleGetTorrentPeers(c *echo.Context) *echo.HTTPError {
-	r := db.Pool.Get()
-	defer r.Close()
-	if r.Err() != nil {
-		return c.JSON(http.StatusInternalServerError, ResponseErr{})
-	}
-
 	info_hash := c.Param("info_hash")
-	torrent := t.GetTorrentByInfoHash(r, info_hash, false)
+	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
 		return c.JSON(http.StatusNotFound, ResponseErr{})
 	}

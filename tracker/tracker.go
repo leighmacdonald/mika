@@ -1,18 +1,13 @@
-// Package tracker provides the majority of the core bittorent tracker functionality
+// Package tracker provides the majority of the core bittorrent tracker functionality
 package tracker
 
 import (
-	"crypto/tls"
 	"fmt"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"github.com/goji/httpauth"
-	"github.com/labstack/echo"
-	ghttp "net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,8 +39,8 @@ type Tracker struct {
 	Whitelist      []string
 }
 
-// NewTracker created a new allocated Tracker instance to use. Initialize shou
-// before attempting to serve any requests
+// NewTracker created a new allocated Tracker instance to use. Initialize() should
+// before attempting to serve any requests.
 func NewTracker() *Tracker {
 	// Alloc tracker
 	tracker := &Tracker{
@@ -61,109 +56,25 @@ func NewTracker() *Tracker {
 }
 
 // Load the models into memory from redis
-func (t *Tracker) Initialize() error {
+func (tracker *Tracker) Initialize() error {
 	log.Println("Initialize: Initializing models in memory...")
 	r := db.Pool.Get()
 	defer r.Close()
 
-	t.initWhitelist(r)
-	t.initUsers(r)
-	t.initTorrents(r)
+	tracker.initWhitelist(r)
+	tracker.initUsers(r)
+	tracker.initTorrents(r)
 
 	return nil
-}
-
-// Run starts all of the background goroutines related to managing the tracker
-// and starts the tracker and API HTTP interfaces
-func (t *Tracker) Run() {
-	go t.dbStatIndexer()
-	go t.syncWriter()
-	go t.peerStalker()
-	go t.listenTracker()
-	t.listenAPI()
-}
-
-// listenTracker created a new http router, configured the routes and handlers, and
-// starts the trackers HTTP server listening over HTTP. This function will not
-// start the API endpoints. See listenAPI for those.
-func (t *Tracker) listenTracker() {
-	log.Println("Loading tracker router on:", conf.Config.ListenHost)
-	// Initialize the router + middlewares
-	e := echo.New()
-	e.MaxParam(1)
-
-	//	e.HTTPErrorHandler(func(code int, err error, c *echo.Context) {
-	//		log.Println("--------")
-	//		log.Println(err)
-	//		c.JSON(code, ResponseErr{err.Error()})
-	//		return
-	//	})
-
-	// Public tracker routes
-
-	e.Use()
-	e.Get("/:passkey/announce", t.HandleAnnounce)
-	e.Get("/:passkey/scrape", t.HandleScrape)
-
-	e.Run(conf.Config.ListenHost)
-}
-
-// listenAPI created a new api request router and start the http server listening over TLS
-func (t *Tracker) listenAPI() {
-	log.Println("Loading API router on:", conf.Config.ListenHostAPI, "(TLS)")
-	e := echo.New()
-	e.MaxParam(1)
-	api := e.Group("/api")
-
-	e.Use(stats.StatsMW)
-
-	// Optionally enabled BasicAuth over the TLS only API
-	if conf.Config.APIUsername == "" || conf.Config.APIPassword == "" {
-		log.Println("[WARN] No credentials set for API. All users granted access.")
-	} else {
-		api.Use(httpauth.SimpleBasicAuth(conf.Config.APIUsername, conf.Config.APIPassword))
-	}
-
-	api.Get("/version", t.HandleVersion)
-	api.Get("/uptime", t.HandleUptime)
-
-	api.Get("/torrent/:info_hash", t.HandleTorrentGet)
-	api.Post("/torrent", t.HandleTorrentAdd)
-	api.Get("/torrent/:info_hash/peers", t.HandleGetTorrentPeers)
-	api.Delete("/torrent/:info_hash", t.HandleTorrentDel)
-
-	api.Post("/user", t.HandleUserCreate)
-	api.Get("/user/:user_id", t.HandleUserGet)
-	api.Post("/user/:user_id", t.HandleUserUpdate)
-	api.Get("/user/:user_id/torrents", t.HandleUserTorrents)
-
-	api.Post("/whitelist", t.HandleWhitelistAdd)
-	api.Delete("/whitelist/:prefix", t.HandleWhitelistDel)
-	tls_config := &tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-		},
-	}
-	if conf.Config.SSLCert == "" || conf.Config.SSLPrivateKey == "" {
-		log.Fatalln("SSL config keys not set in config!")
-	}
-	srv := ghttp.Server{TLSConfig: tls_config, Addr: conf.Config.ListenHostAPI, Handler: e}
-	log.Fatal(srv.ListenAndServeTLS(conf.Config.SSLCert, conf.Config.SSLPrivateKey))
 }
 
 // Fetch a torrents data from the database and return a Torrent struct.
 // If the torrent doesn't exist in the database a new skeleton Torrent
 // instance will be returned.
-func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool) *Torrent {
-	t.TorrentsMutex.RLock()
-	defer t.TorrentsMutex.RUnlock()
-	for _, torrent := range t.Torrents {
+func (tracker *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool) *Torrent {
+	tracker.TorrentsMutex.RLock()
+	defer tracker.TorrentsMutex.RUnlock()
+	for _, torrent := range tracker.Torrents {
 		if torrent.TorrentID == torrent_id {
 			return torrent
 		}
@@ -174,97 +85,52 @@ func (t *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool)
 // Fetch the stores torrent_id that corresponds to the info_hash supplied
 // as a GET value. If the info_hash doesn't return an id we consider the torrent
 // either soft-deleted or non-existent
-func (t *Tracker) GetTorrentByInfoHash(r redis.Conn, info_hash string, make_new bool) *Torrent {
+func (tracker *Tracker) FindTorrentByInfoHash(info_hash string) *Torrent {
 	info_hash = strings.ToLower(info_hash)
-	t.TorrentsMutex.RLock()
-	torrent, exists := t.Torrents[info_hash]
-	t.TorrentsMutex.RUnlock()
-	if exists {
-		return torrent
-	}
-	if make_new {
-		torrent = t.FetchTorrent(r, info_hash)
-		if torrent == nil {
-			return nil
-		}
-		t.TorrentsMutex.Lock()
-		t.Torrents[info_hash] = torrent
-		t.TorrentsMutex.Unlock()
-		log.Debug("GetTorrentByInfoHash: Added new torrent to in-memory cache:", info_hash)
-	}
-	return nil
-}
-
-// FetchTorrent Creates a new torrent, merging data from redis if it exists.
-func (t *Tracker) FetchTorrent(r redis.Conn, info_hash string) *Torrent {
-	// Make new struct to use for cache
-	torrent := &Torrent{
-		InfoHash: info_hash,
-		Name:     "",
-		Enabled:  true,
-		Peers:    []*Peer{},
-		MultiUp:  1.0,
-		MultiDn:  1.0,
-	}
-	key := fmt.Sprintf("t:t:%s", info_hash)
-	exists_reply, err := r.Do("EXISTS", key)
-	exists, err := redis.Bool(exists_reply, err)
-	if err != nil {
-		exists = false
-	}
-	if exists {
-		torrent_reply, err := r.Do("HGETALL", key)
-		if err != nil {
-			log.Println(fmt.Sprintf("FetchTorrent: Failed to get torrent from redis [%s]", key), err)
-			return nil
-		}
-
-		values, err := redis.Values(torrent_reply, nil)
-		if err != nil {
-			log.Println("FetchTorrent: Failed to parse torrent reply: ", err)
-			return nil
-		}
-
-		err = redis.ScanStruct(values, torrent)
-		if err != nil {
-			log.Println("FetchTorrent: Torrent scanstruct failure", err)
-			return nil
-		}
-
-		if torrent.TorrentID == 0 {
-			log.Debug("FetchTorrent: Trying to fetch info hash without valid key:", info_hash)
-			r.Do("DEL", fmt.Sprintf("t:t:%s", torrent.InfoHash))
-			return nil
-		}
-	}
-	// Reset counts since we cant guarantee the accuracy after restart
-	// TODO allow reloading of peer/seed counts if a maximum time has not elapsed
-	// since the last startup.
-	torrent.Seeders = 0
-	torrent.Leechers = 0
-
-	// Make these once and save the results in mem
-	torrent.TorrentKey = fmt.Sprintf("t:t:%s", info_hash)
-	torrent.TorrentPeersKey = fmt.Sprintf("t:tpeers:%s", info_hash)
-
+	tracker.TorrentsMutex.RLock()
+	torrent, _ := tracker.Torrents[info_hash]
+	tracker.TorrentsMutex.RUnlock()
 	return torrent
 }
 
+func (tracker *Tracker) AddTorrent(torrent *Torrent) {
+	tracker.TorrentsMutex.Lock()
+	tracker.Torrents[torrent.InfoHash] = torrent
+	tracker.TorrentsMutex.Unlock()
+	log.Debug("GetTorrentByInfoHash: Added new torrent to in-memory cache:", torrent.InfoHash)
+}
+
+// GetUserByID fetches a user from the backend database. Id auto_create is set
+// it will also make a new user if an existing one was not found.
+func (tracker *Tracker) FindUserByID(user_id uint64) *User {
+	tracker.UsersMutex.RLock()
+	user, _ := tracker.Users[user_id]
+	tracker.UsersMutex.RUnlock()
+	return user
+}
+
+func (tracker *Tracker) AddUser(user *User) {
+	tracker.UsersMutex.Lock()
+	tracker.Users[user.UserID] = user
+	tracker.UsersMutex.Unlock()
+	log.Debug("Added new user to memory:", user.UserID)
+}
+
 // initWhitelist will fetch the client whitelist from redis and load it into memory
-func (t *Tracker) initWhitelist(r redis.Conn) {
-	t.Whitelist = []string{}
+func (tracker *Tracker) initWhitelist(r redis.Conn) {
+	tracker.Whitelist = []string{}
 	a, err := r.Do("HKEYS", "t:whitelist")
 
 	if err != nil {
 		log.Println("initWhitelist: Failed to fetch whitelist", err)
 		return
 	}
-	t.Whitelist, err = redis.Strings(a, nil)
-	log.Println(fmt.Sprintf("initWhitelist: Loaded %d whitelist clients", len(t.Whitelist)))
+	tracker.Whitelist, err = redis.Strings(a, nil)
+	log.Println(fmt.Sprintf("initWhitelist: Loaded %d whitelist clients", len(tracker.Whitelist)))
 }
 
 // initTorrents will fetch the torrents stored in redis and load them into active memory as models
-func (t *Tracker) initTorrents(r redis.Conn) {
+func (tracker *Tracker) initTorrents(r redis.Conn) {
 	torrent_keys_reply, err := r.Do("KEYS", "t:t:*")
 	if err != nil {
 		log.Println("initTorrents: Failed to get torrent from redis", err)
@@ -283,14 +149,15 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 		if len(pcs) != 3 || len(pcs[2]) != 40 {
 			continue
 		}
-		torrent := t.FetchTorrent(r, pcs[2])
+		torrent := NewTorrent(pcs[2], "", 0)
+		// torrent := t.FindTorrentByInfoHash(pcs[2])
 		if torrent != nil {
-			t.TorrentsMutex.Lock()
-			t.Torrents[torrent.InfoHash] = torrent
-			t.TorrentsMutex.Unlock()
+			torrent.MergeDB(r)
+			tracker.AddTorrent(torrent)
 			torrents++
 		} else {
-			// Drop keys we don't have valid id's'for
+			// Drop keys we don't have valid ids for
+			log.Warn("initTorrents: Unknown key:", torrent_key)
 			r.Do("DEL", torrent_key)
 		}
 	}
@@ -299,7 +166,7 @@ func (t *Tracker) initTorrents(r redis.Conn) {
 }
 
 // initUsers pre loads all known users into memory from redis backend
-func (t *Tracker) initUsers(r redis.Conn) {
+func (tracker *Tracker) initUsers(r redis.Conn) {
 	user_keys_reply, err := r.Do("KEYS", "t:u:*")
 	if err != nil {
 		log.Println("initUsers: Failed to get torrent from redis", err)
@@ -322,20 +189,20 @@ func (t *Tracker) initUsers(r redis.Conn) {
 			// Other key type probably
 			continue
 		}
-		user := fetchUser(r, user_id)
-		if user != nil {
-			t.UsersMutex.Lock()
-			t.Users[user_id] = user
-			t.UsersMutex.Unlock()
-			users++
-		}
+
+		// TODO add passkey/username in addition to user_id
+		user := NewUser(user_id)
+		user.MergeDB(r)
+		tracker.AddUser(user)
+
+		users++
 	}
 
 	log.Println(fmt.Sprintf("initUsers: Loaded %d users into memory", users))
 }
 
 // dbStatIndexer when running will periodically update the torrent sort indexes
-func (t *Tracker) dbStatIndexer() {
+func (tracker *Tracker) dbStatIndexer() {
 	log.Println("dbStatIndexer: Background indexer started")
 	r := db.Pool.Get()
 	defer r.Close()
@@ -352,16 +219,16 @@ func (t *Tracker) dbStatIndexer() {
 
 	for {
 		time.Sleep(time.Duration(conf.Config.IndexInterval) * time.Second)
-		t.TorrentsMutex.RLock()
-		for _, torrent := range t.Torrents {
-			t.TorrentsMutex.RLock()
+		tracker.TorrentsMutex.RLock()
+		for _, torrent := range tracker.Torrents {
+			tracker.TorrentsMutex.RLock()
 			leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
 			seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
 			snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
-			t.TorrentsMutex.RUnlock()
+			tracker.TorrentsMutex.RUnlock()
 			count++
 		}
-		t.TorrentsMutex.RUnlock()
+		tracker.TorrentsMutex.RUnlock()
 		if count > 0 {
 			r.Send("ZADD", key_leechers, leecher_args)
 			r.Send("ZADD", key_seeders, seeder_args)
@@ -378,7 +245,7 @@ func (t *Tracker) dbStatIndexer() {
 // Handle writing out new data to the redis db in a queued manner
 // Only items with the .InQueue flag set to false should be added.
 // TODO channel as param
-func (t *Tracker) syncWriter() {
+func (tracker *Tracker) syncWriter() {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
@@ -411,4 +278,17 @@ func (t *Tracker) syncWriter() {
 			log.Println("syncWriter: Failed to flush connection:", err)
 		}
 	}
+}
+
+// Checked if the clients peer_id prefix matches the client prefixes
+// stored in the white lists
+func (tracker *Tracker) IsValidClient(peer_id string) bool {
+	for _, client_prefix := range tracker.Whitelist {
+		if strings.HasPrefix(peer_id, client_prefix) {
+			return true
+		}
+	}
+
+	log.Println("IsValidClient: Got non-whitelisted client:", peer_id)
+	return false
 }

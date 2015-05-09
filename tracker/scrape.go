@@ -35,14 +35,23 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 
 	passkey := c.P(0)
 
-	user := t.GetUserByPasskey(r, passkey)
-	if user == nil {
+	user_id := t.findUserID(passkey)
+
+	if user_id == 0 {
 		log.Println("HandleScrape: Invalid passkey supplied:", passkey)
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_INVALID_PASSKEY
 		return
 	}
-
+	user := t.FindUserByID(user_id)
+	if !user.CanLeech {
+		oopsStr(c, MSG_GENERIC_ERROR, "Leech not allowed")
+		return
+	}
+	if !user.Enabled {
+		oopsStr(c, MSG_INVALID_INFO_HASH, "User disabled")
+		return
+	}
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		util.CaptureMessage(err.Error())
@@ -56,7 +65,7 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 	resp := make(bencode.Dict, len(q.InfoHashes))
 
 	for _, info_hash := range q.InfoHashes {
-		torrent := t.GetTorrentByInfoHash(r, info_hash, false)
+		torrent := t.FindTorrentByInfoHash(info_hash)
 		if torrent != nil {
 			resp[info_hash] = bencode.Dict{
 				"complete":   torrent.Seeders,

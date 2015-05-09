@@ -21,26 +21,21 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 	}
 	log.Debug("Reaping peer:", info_hash, peer_id)
 
-	torrent := t.GetTorrentByInfoHash(r, info_hash, false)
+	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
 		log.Error("ReapPeer: Failed to fetch torrent while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
 
 	// Fetch before we set active to 0
-	peer, err := torrent.GetPeer(r, peer_id)
-	if err != nil {
+	peer := torrent.findPeer(peer_id)
+	if peer == nil {
 		log.Error("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
-		return
-	}
-	user := t.GetUserByID(r, peer.UserID, false)
-	if user == nil {
-		log.Error("ReapPeer: Failed to fetch user while reaping", fmt.Sprintf("%s %d [%s]", info_hash, peer.UserID, peer_id[0:6]))
 		return
 	}
 	torrent.DelPeer(r, peer)
 
-	r.Send("SREM", user.KeyActive, peer.PeerID)
+	r.Send("SREM", peer.User.KeyActive, peer.PeerID)
 
 	r.Flush()
 	v, err := r.Receive()
@@ -52,7 +47,6 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 	}
 	peer.Active = false
 	SyncPeerC <- peer
-
 }
 
 // This is a goroutine that will watch for peer key expiry events and

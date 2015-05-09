@@ -9,37 +9,36 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"net"
-	"strings"
 	"sync"
 )
 
 type Peer struct {
 	db.Queued
 	sync.RWMutex
-	SpeedUP        float64 `redis:"speed_up" json:"speed_up"`
-	SpeedDN        float64 `redis:"speed_dn" json:"speed_dn"`
-	SpeedUPMax     float64 `redis:"speed_up" json:"speed_up_max"`
-	SpeedDNMax     float64 `redis:"speed_dn" json:"speed_dn_max"`
-	Uploaded       uint64  `redis:"uploaded" json:"uploaded"`
-	Downloaded     uint64  `redis:"downloaded" json:"downloaded"`
-	UploadedLast   uint64  `redis:"-" json:"-"`
-	DownloadedLast uint64  `redis:"-" json:"-"`
-	Corrupt        uint64  `redis:"corrupt" json:"corrupt"`
-	IP             string  `redis:"ip" json:"ip"`
-	Port           uint64  `redis:"port" json:"port"`
-	Left           uint64  `redis:"left" json:"left"`
-	Announces      uint64  `redis:"announces" json:"announces"`
-	TotalTime      uint32  `redis:"total_time" json:"total_time"`
-	AnnounceLast   int32   `redis:"last_announce" json:"last_announce"`
-	AnnounceFirst  int32   `redis:"first_announce" json:"first_announce"`
-	New            bool    `redis:"new" json:"-"`
-	PeerID         string  `redis:"peer_id" json:"peer_id"`
-	Active         bool    `redis:"active"  json:"active"`
-	Username       string  `redis:"username"  json:"username"`
-	UserID         uint64  `redis:"user_id"  json:"user_id"`
-	TorrentID      uint64  `redis:"torrent_id" json:"torrent_id"`
-	KeyPeer        string  `redis:"-" json:"-"`
-	KeyTimer       string  `redis:"-" json:"-"`
+	SpeedUP        float64  `redis:"speed_up" json:"speed_up"`
+	SpeedDN        float64  `redis:"speed_dn" json:"speed_dn"`
+	SpeedUPMax     float64  `redis:"speed_up" json:"speed_up_max"`
+	SpeedDNMax     float64  `redis:"speed_dn" json:"speed_dn_max"`
+	Uploaded       uint64   `redis:"uploaded" json:"uploaded"`
+	Downloaded     uint64   `redis:"downloaded" json:"downloaded"`
+	UploadedLast   uint64   `redis:"-" json:"-"`
+	DownloadedLast uint64   `redis:"-" json:"-"`
+	Corrupt        uint64   `redis:"corrupt" json:"corrupt"`
+	IP             string   `redis:"ip" json:"ip"`
+	Port           uint64   `redis:"port" json:"port"`
+	Left           uint64   `redis:"left" json:"left"`
+	Announces      uint64   `redis:"announces" json:"announces"`
+	TotalTime      uint32   `redis:"total_time" json:"total_time"`
+	AnnounceLast   int32    `redis:"last_announce" json:"last_announce"`
+	AnnounceFirst  int32    `redis:"first_announce" json:"first_announce"`
+	New            bool     `redis:"new" json:"-"`
+	PeerID         string   `redis:"peer_id" json:"peer_id"`
+	Active         bool     `redis:"active"  json:"active"`
+	Username       string   `redis:"username"  json:"username"`
+	User           *User    `redis:"-"  json:"-"`
+	Torrent        *Torrent `redis:"-" json:"-"`
+	KeyPeer        string   `redis:"-" json:"-"`
+	KeyTimer       string   `redis:"-" json:"-"`
 }
 
 // Update the stored values with the data from an announce
@@ -97,13 +96,6 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	return ul_diff, dl_diff
 }
 
-func (peer *Peer) SetUserID(user_id uint64, username string) {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.UserID = user_id
-	peer.Username = username
-}
-
 func (peer *Peer) Sync(r redis.Conn) {
 	r.Send(
 		"HMSET", peer.KeyPeer,
@@ -122,9 +114,9 @@ func (peer *Peer) Sync(r redis.Conn) {
 		"downloaded", peer.Downloaded,
 		"corrupt", peer.Corrupt,
 		"username", peer.Username,
-		"user_id", peer.UserID, // Shouldn't need to be here
+		"user_id", peer.User.UserID, // Shouldn't need to be here
 		"peer_id", peer.PeerID, // Shouldn't need to be here
-		"torrent_id", peer.TorrentID, // Shouldn't need to be here
+		"torrent_id", peer.Torrent.TorrentID, // Shouldn't need to be here
 	)
 }
 
@@ -134,11 +126,6 @@ func (peer *Peer) IsHNR() bool {
 
 func (peer *Peer) IsSeeder() bool {
 	return peer.Left == 0
-}
-
-func (peer *Peer) AddHNR(r redis.Conn, torrent_id uint64) {
-	r.Send("SADD", fmt.Sprintf("t:u:hnr:%d", peer.UserID), torrent_id)
-	log.Debug("Added HnR:", torrent_id, peer.UserID)
 }
 
 // Generate a compact peer field array containing the byte representations
@@ -160,60 +147,43 @@ func MakeCompactPeers(peers []*Peer, skip_id string) []byte {
 	return out_buf.Bytes()
 }
 
-// Generate a new instance of a peer from the redis reply if data is contained
-// within, otherwise just return a default value peer
-func MakePeer(redis_reply interface{}, torrent_id uint64, info_hash string, peer_id string) (*Peer, error) {
+// NewPeer created a new peer with the minimum attributes needed
+func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *User) *Peer {
 	peer := &Peer{
 		PeerID:        peer_id,
 		Active:        false,
-		Announces:     0,
-		SpeedUP:       0,
-		SpeedDN:       0,
-		SpeedUPMax:    0,
-		SpeedDNMax:    0,
-		Uploaded:      0,
-		Downloaded:    0,
-		Left:          0,
-		Corrupt:       0,
-		Username:      "",
-		IP:            "127.0.0.1",
-		Port:          0,
+		IP:            ip,
+		Port:          port,
 		AnnounceFirst: util.Unixtime(),
 		AnnounceLast:  util.Unixtime(),
-		TotalTime:     0,
-		UserID:        0,
-		TorrentID:     torrent_id,
-		KeyPeer:       fmt.Sprintf("t:p:%s:%s", info_hash, peer_id),
-		KeyTimer:      fmt.Sprintf("t:ptimeout:%s:%s", info_hash, peer_id),
+		User:          user,
+		Torrent:       torrent,
+		KeyPeer:       fmt.Sprintf("t:p:%s:%s", torrent.InfoHash, peer_id),
+		KeyTimer:      fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, peer_id),
 	}
+	return peer
+}
 
-	values, err := redis.Values(redis_reply, nil)
+// MergeDB will apply the data stored in the db to the peer instance
+// Should generally only be called on startup since it will overwrite
+// existing data stored in the active peer instance.
+func (peer *Peer) MergeDB(r redis.Conn) error {
+	peer_reply, err := r.Do("HGETALL", peer.KeyPeer)
+	if err != nil {
+		log.Println("GetPeer: Error executing peer fetch query: ", err)
+		return err
+	}
+	values, err := redis.Values(peer_reply, nil)
 	if err != nil {
 		log.Println("makePeer: Failed to parse peer reply: ", err)
-		return peer, err_parse_reply
+		return err_parse_reply
 	}
 	if values != nil {
 		err := redis.ScanStruct(values, peer)
 		if err != nil {
 			log.Println("makePeer: Failed to scan peer struct: ", err)
-			return peer, err_cast_reply
-		} else {
-			peer.PeerID = peer_id
+			return err_cast_reply
 		}
 	}
-	return peer, nil
-}
-
-// Checked if the clients peer_id prefix matches the client prefixes
-// stored in the white lists
-func (t *Tracker) IsValidClient(r redis.Conn, peer_id string) bool {
-
-	for _, client_prefix := range t.Whitelist {
-		if strings.HasPrefix(peer_id, client_prefix) {
-			return true
-		}
-	}
-
-	log.Println("IsValidClient: Got non-whitelisted client:", peer_id)
-	return false
+	return nil
 }

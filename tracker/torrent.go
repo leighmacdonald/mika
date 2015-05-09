@@ -6,6 +6,7 @@ import (
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"strings"
 	"sync"
 )
 
@@ -28,6 +29,47 @@ type Torrent struct {
 	Peers           []*Peer `redis:"-" json:"-"`
 	MultiUp         float64 `redis:"multi_up" json:"-"`
 	MultiDn         float64 `redis:"multi_dn" json:"-"`
+}
+
+func NewTorrent(info_hash string, name string, torrent_id uint64) *Torrent {
+	torrent := &Torrent{
+		Name:            name,
+		InfoHash:        strings.ToLower(info_hash),
+		TorrentKey:      fmt.Sprintf("t:t:%s", info_hash),
+		TorrentPeersKey: fmt.Sprintf("t:tpeers:%s", info_hash),
+		Enabled:         true,
+		Peers:           []*Peer{},
+		TorrentID:       torrent_id,
+		MultiUp:         1.0,
+		MultiDn:         1.0,
+	}
+	return torrent
+}
+
+func (torrent *Torrent) MergeDB(r redis.Conn) error {
+	torrent_reply, err := r.Do("HGETALL", torrent.TorrentKey)
+	if err != nil {
+		log.Println(fmt.Sprintf("FetchTorrent: Failed to get torrent from redis [%s]", torrent.TorrentKey), err)
+		return err
+	}
+
+	values, err := redis.Values(torrent_reply, nil)
+	if err != nil {
+		log.Println("FetchTorrent: Failed to parse torrent reply: ", err)
+		return err
+	}
+
+	err = redis.ScanStruct(values, torrent)
+	if err != nil {
+		log.Println("FetchTorrent: Torrent scanstruct failure", err)
+		return err
+	}
+
+	if torrent.TorrentID == 0 {
+		log.Debug("FetchTorrent: Trying to fetch info hash without valid key:", torrent.InfoHash)
+		r.Do("DEL", fmt.Sprintf("t:t:%s", torrent.InfoHash))
+	}
+	return nil
 }
 
 func (torrent *Torrent) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
@@ -87,34 +129,12 @@ func (torrent *Torrent) DelReason() string {
 	}
 }
 
-// Fetch an existing peers data if it exists, other wise generate a
-// new peer with default data values. The data is parsed into a Peer
-// struct and returned.
-func (torrent *Torrent) GetPeer(r redis.Conn, peer_id string) (*Peer, error) {
-	peer := torrent.findPeer(peer_id)
-	if peer == nil {
-		peer_reply, err := r.Do("HGETALL", fmt.Sprintf("t:t:%s:%s", torrent.InfoHash, peer_id))
-		if err != nil {
-			log.Println("GetPeer: Error executing peer fetch query: ", err)
-			return nil, err
-		}
-		peer, err = MakePeer(peer_reply, torrent.TorrentID, torrent.InfoHash, peer_id)
-		if err != nil {
-			return nil, err
-		}
-
-		torrent.Lock()
-		torrent.Peers = append(torrent.Peers, peer)
-		torrent.Unlock()
-	}
-	return peer, nil
-}
-
 // Add a peer to a torrents active peer_id list
 func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
+	torrent.Lock()
 	torrent.Peers = append(torrent.Peers, peer)
-
-	v, err := r.Do("SADD", fmt.Sprintf("t:tp:%s", torrent.InfoHash), peer.PeerID)
+	torrent.Unlock()
+	v, err := r.Do("SADD", torrent.TorrentPeersKey, peer.PeerID)
 	if err != nil {
 		log.Println("AddPeer: Error executing peer fetch query: ", err)
 		return false
@@ -143,9 +163,6 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 	r.Send("SREM", torrent.TorrentPeersKey, peer.PeerID)
 
 	peer.Lock()
-	if peer.IsHNR() {
-		peer.AddHNR(r, torrent.TorrentID)
-	}
 	peer.Active = false
 	peer.Unlock()
 	return true

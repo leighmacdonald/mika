@@ -80,25 +80,32 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 
 	passkey := c.P(0) // eat a dick
 
-	user := t.GetUserByPasskey(r, passkey)
-	if user == nil {
-		log.Debug("HandleAnnounce: Invalid passkey", passkey)
-		oopsStr(c, MSG_GENERIC_ERROR, "Invalid passkey")
+	user_id := t.findUserID(passkey)
+
+	if user_id == 0 {
+		log.Println("HandleScrape: Invalid passkey supplied:", passkey)
+		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_INVALID_PASSKEY
 		return
 	}
+	user := t.FindUserByID(user_id)
 	if !user.CanLeech && ann.Left > 0 {
-		oopsStr(c, MSG_GENERIC_ERROR, "Leech Disabled")
+		oopsStr(c, MSG_GENERIC_ERROR, "Leech not allowed")
 		return
 	}
-	if !t.IsValidClient(r, ann.PeerID) {
+	if !user.Enabled {
+		oopsStr(c, MSG_INVALID_INFO_HASH, "User disabled")
+		return
+	}
+
+	if !t.IsValidClient(ann.PeerID) {
 		log.Warn("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID[0:6], user.UserID, user.Username))
 		oops(c, MSG_INVALID_PEER_ID)
 		stats.Counter <- stats.EV_INVALID_CLIENT
 		return
 	}
 
-	torrent := t.GetTorrentByInfoHash(r, fmt.Sprintf("%x", ann.InfoHash), true)
+	torrent := t.FindTorrentByInfoHash(fmt.Sprintf("%x", ann.InfoHash))
 	if torrent == nil {
 		log.Debug("HandleAnnounce:", fmt.Sprintf("Torrent not found: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
@@ -110,14 +117,17 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return
 	}
-	peer, err := torrent.GetPeer(r, ann.PeerID)
-	if err != nil {
-		log.Error("HandleAnnounce: Failed to fetch/create peer:", err.Error())
-		oops(c, MSG_GENERIC_ERROR)
-		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		return
+	peer := torrent.findPeer(ann.PeerID)
+	if peer == nil {
+		peer = NewPeer(ann.PeerID, ann.IPv4.String(), ann.Port, torrent, user)
+		peer.MergeDB(r)
+		if !torrent.AddPeer(r, peer) {
+			log.Error("HandleAnnounce: Failed to fetch/create peer:", err.Error())
+			oops(c, MSG_GENERIC_ERROR)
+			stats.Counter <- stats.EV_ANNOUNCE_FAIL
+			return
+		}
 	}
-	peer.SetUserID(user.UserID, user.Username) //where to put this/handle this cleaner?
 
 	// user update MUST happen after peer update since we rely on the old dl/ul values
 	ul, dl := peer.Update(ann)
@@ -144,7 +154,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		r.Send("DEL", peer.KeyTimer)
 
 		if peer.IsHNR() {
-			peer.AddHNR(r, torrent.TorrentID)
+			user.AddHNR(r, torrent.TorrentID)
 		}
 	} else if ann.Event == COMPLETED {
 

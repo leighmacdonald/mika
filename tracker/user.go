@@ -40,73 +40,46 @@ func (t *Tracker) findUserID(passkey string) uint64 {
 	return 0
 }
 
-// fetchUser Create a new user instance, loading existing data from redis if it exists
-func fetchUser(r redis.Conn, user_id uint64) *User {
-	user := &User{
-		UserID:     user_id,
-		Announces:  0,
-		Corrupt:    0,
-		Uploaded:   0,
-		Enabled:    true,
-		Downloaded: 0,
-		Snatches:   0,
-		Passkey:    "",
-		Username:   "",
-		CanLeech:   true,
-		Peers:      make([]**Peer, 1),
-		UserKey:    fmt.Sprintf("t:u:%d", user_id),
-	}
-
+func (user *User) MergeDB(r redis.Conn) error {
 	user_reply, err := r.Do("HGETALL", user.UserKey)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	values, err := redis.Values(user_reply, nil)
 	if err != nil {
 		log.Println("fetchUser: Failed to parse user reply: ", err)
-		return nil
+		return err
 	}
 
 	err = redis.ScanStruct(values, user)
 	if err != nil {
 		log.Println("fetchUser: Failed to scan redis values:", err)
-		return nil
+		return err
 	}
+	return nil
+}
 
-	user.KeyActive = fmt.Sprintf("t:u:active:%d", user_id)
-	user.KeyIncomplete = fmt.Sprintf("t:u:incomplete:%d", user_id)
-	user.KeyComplete = fmt.Sprintf("t:u:complete:%d", user_id)
-	user.KeyHNR = fmt.Sprintf("t:u:hnr:%d", user_id)
-
+// NewUser makes a new user instance
+// TODO require the username/passkey
+func NewUser(user_id uint64) *User {
+	user := &User{
+		UserID:        user_id,
+		Enabled:       true,
+		CanLeech:      true,
+		Peers:         make([]**Peer, 1),
+		UserKey:       fmt.Sprintf("t:u:%d", user_id),
+		KeyActive:     fmt.Sprintf("t:u:active:%d", user_id),
+		KeyIncomplete: fmt.Sprintf("t:u:incomplete:%d", user_id),
+		KeyComplete:   fmt.Sprintf("t:u:complete:%d", user_id),
+		KeyHNR:        fmt.Sprintf("t:u:hnr:%d", user_id),
+	}
 	return user
 }
 
-func (t *Tracker) GetUserByPasskey(r redis.Conn, passkey string) *User {
-	user_id := t.findUserID(passkey)
-	if user_id == 0 {
-		return nil
-	}
-	return t.GetUserByID(r, user_id, false)
-}
-
-// GetUserByID fetches a user from the backend database. Id auto_create is set
-// it will also make a new user if an existing one was not found.
-func (t *Tracker) GetUserByID(r redis.Conn, user_id uint64, auto_create bool) *User {
-
-	t.UsersMutex.RLock()
-	user, exists := t.Users[user_id]
-	t.UsersMutex.RUnlock()
-
-	if !exists && auto_create {
-		user = fetchUser(r, user_id)
-		t.UsersMutex.Lock()
-		t.Users[user_id] = user
-		t.UsersMutex.Unlock()
-		log.Debug("Added new user to in-memory cache:", user_id)
-		return user
-	}
-	return user
+func (user *User) AddHNR(r redis.Conn, torrent_id uint64) {
+	r.Send("SADD", user.KeyHNR, torrent_id)
+	log.Debug("Added HnR:", torrent_id, user.UserID)
 }
 
 // Update user stats from announce request

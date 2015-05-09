@@ -314,10 +314,10 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
-func (t *Tracker) HandleWhitelistAdd(c *echo.Context) error {
+func (t *Tracker) HandleWhitelistAdd(c *echo.Context) *echo.HTTPError {
 	payload := &WhitelistAddPayload{}
 	if err := c.Bind(payload); err != nil {
-		return err
+		return &echo.HTTPError{Code: http.StatusBadRequest}
 	}
 	for _, prefix := range t.Whitelist {
 		if prefix == payload.Prefix {
@@ -334,7 +334,7 @@ func (t *Tracker) HandleWhitelistAdd(c *echo.Context) error {
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
-func (t *Tracker) HandleWhitelistDel(c *echo.Context) error {
+func (t *Tracker) HandleWhitelistDel(c *echo.Context) *echo.HTTPError {
 	prefix := c.Param("prefix")
 	for _, p := range t.Whitelist {
 		if p == prefix {

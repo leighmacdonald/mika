@@ -7,4 +7,4 @@ pushd src/git.totdev.in/totv
 ln -s ${GOPATH} mika
 popd
 cp config.json.dist config.json
-./build.sh
+./build.sh -u

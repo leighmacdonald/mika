@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sync"
+	"time"
 )
 
 var (
@@ -83,7 +84,7 @@ type Configuration struct {
 	InfluxPass string
 
 	// Number of points to buffer before writing the data to influxdb
-	InfluxWriteBuffer int
+	InfluxWriteTimer time.Duration
 
 	// Use colours log output
 	ColourLogs bool

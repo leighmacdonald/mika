@@ -2,12 +2,12 @@
 package stats
 
 import (
-	"git.totdev.in/totv/mika"
-	"git.totdev.in/totv/mika/conf"
 	log "github.com/Sirupsen/logrus"
-	"github.com/influxdb/influxdb/client"
-	"github.com/labstack/echo"
-	"net/url"
+	"github.com/rcrowley/go-metrics"
+	//	golog "log"
+	"math/rand"
+	"net"
+	//	"os"
 	"sync"
 	"time"
 )
@@ -29,7 +29,6 @@ const (
 var (
 	Counter      = make(chan int)
 	StatCounts   *StatsCounter
-	influxDB     *client.Client
 	metric_names = map[int]string{
 		EV_STARTUP:          "ev_startup",
 		EV_ANNOUNCE:         "ev_announce",
@@ -42,77 +41,93 @@ var (
 		EV_INVALID_INFOHASH: "ev_invalid_info_hash",
 		EV_INVALID_CLIENT:   "ev_invalid_client",
 	}
-	pointChan     = make(chan client.Point)
-	sampleSize    = 1
-	currentSample = 0
-	pts           = make([]client.Point, sampleSize)
+	registry metrics.Registry
 )
 
 type StatsCounter struct {
 	sync.RWMutex
 	channel           chan int
-	Requests          uint64
-	RequestsFail      uint64
-	Announce          uint64
-	AnnouncePerMin    uint64
-	UniqueUsers       uint64
-	AnnounceFail      uint64
-	Scrape            uint64
-	ScrapePerMin      uint64
-	ScrapeFail        uint64
-	InvalidPasskey    uint64
-	InvalidInfohash   uint64
-	InvalidClient     uint64
-	APIRequests       uint64
-	APIRequestsPerMin uint64
-	APIRequestsFail   uint64
+	Requests          metrics.Counter
+	RequestsFail      metrics.Counter
+	Announce          metrics.Counter
+	AnnouncePerMin    metrics.GaugeFloat64
+	UniqueUsers       metrics.Counter
+	AnnounceFail      metrics.Counter
+	Scrape            metrics.Counter
+	ScrapePerMin      metrics.GaugeFloat64
+	ScrapeFail        metrics.Counter
+	InvalidPasskey    metrics.Counter
+	InvalidInfohash   metrics.Counter
+	InvalidClient     metrics.Counter
+	APIRequests       metrics.Counter
+	APIRequestsPerMin metrics.GaugeFloat64
+	APIRequestsFail   metrics.Counter
 	AnnounceUserIDS   []uint64
 	ScrapeUserIDS     []uint64
 }
 
-func Setup(sample_size int) {
-	if sample_size <= 0 {
+func Setup(host, user, pass, database string, interval time.Duration) {
+
+	registry = metrics.NewRegistry()
+
+	if interval <= 0 {
 		log.Fatal("stats.Setup: InfluxWriteBuffer must be positive integer")
 	}
-	if sample_size < 100 {
-		log.Warn("InfluxWriteBuffer value should generally be above 100. Currently:", sample_size)
+	if interval < 100 {
+		log.Warn("InfluxWriteBuffer value should generally be above 100. Currently:", interval)
 	}
-	sampleSize = sample_size
-	StatCounts = NewStatCounter()
-	go backgroundWriter()
+
+	StatCounts = NewStatCounter(registry)
+
+	addr, _ := net.ResolveTCPAddr("tcp", "localhost:2003")
+	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "metrics", addr)
+
+	//	go influxdb.Influxdb(metrics.DefaultRegistry, interval, &influxdb.Config{
+	//		Host:     host,
+	//		Database: database,
+	//		Username: user,
+	//		Password: pass,
+	//	})
+	//go metrics.Log(registry, interval, golog.New(os.Stdout, "metrics: ", golog.Lmicroseconds))
 }
 
-func NewStatCounter() *StatsCounter {
-	if conf.Config.InfluxDSN == "" {
-		log.Warn("Invalid influx dsn defined")
+func NewStatCounter(registry metrics.Registry) *StatsCounter {
+	counter := &StatsCounter{
+		channel:           Counter,
+		Requests:          metrics.NewCounter(),
+		RequestsFail:      metrics.NewCounter(),
+		Announce:          metrics.NewCounter(),
+		AnnouncePerMin:    metrics.NewGaugeFloat64(),
+		UniqueUsers:       metrics.NewCounter(),
+		AnnounceFail:      metrics.NewCounter(),
+		Scrape:            metrics.NewCounter(),
+		ScrapePerMin:      metrics.NewGaugeFloat64(),
+		ScrapeFail:        metrics.NewCounter(),
+		InvalidPasskey:    metrics.NewCounter(),
+		InvalidInfohash:   metrics.NewCounter(),
+		InvalidClient:     metrics.NewCounter(),
+		APIRequests:       metrics.NewCounter(),
+		APIRequestsPerMin: metrics.NewGaugeFloat64(),
+		APIRequestsFail:   metrics.NewCounter(),
 	}
-	u, err := url.Parse(conf.Config.InfluxDSN)
-	if err != nil {
-		log.Fatal("Could not parse influx dsn:", err)
-	}
+	registry.Register("req_ok", counter.Requests)
+	registry.Register("req_err", counter.RequestsFail)
+	registry.Register("users_permin", counter.UniqueUsers)
+	registry.Register("announce", counter.Announce)
+	registry.Register("announce_permin", counter.AnnouncePerMin)
+	registry.Register("announce_err", counter.AnnounceFail)
+	registry.Register("scrape_ok", counter.Scrape)
+	registry.Register("scrape_permin", counter.ScrapePerMin)
+	registry.Register("scrape_err", counter.ScrapeFail)
+	registry.Register("invalid_passkey", counter.InvalidPasskey)
+	registry.Register("invalid_infohash", counter.InvalidInfohash)
+	registry.Register("invalid_client", counter.InvalidClient)
+	registry.Register("api_ok", counter.APIRequests)
+	registry.Register("api_permin", counter.APIRequestsPerMin)
+	registry.Register("api_err", counter.APIRequestsFail)
 
-	conf := client.Config{
-		URL:       *u,
-		Username:  conf.Config.InfluxUser,
-		Password:  conf.Config.InfluxPass,
-		UserAgent: mika.VersionStr(),
-	}
-
-	con, err := client.NewClient(conf)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	dur, ver, err := con.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Infof("InfluxDB Happy as a Hippo! %v, %s", dur, ver)
-
-	counter := &StatsCounter{channel: Counter}
-
-	influxDB = con
+	metrics.RegisterRuntimeMemStats(registry)
+	go metrics.CaptureRuntimeMemStats(registry, 5e9)
 
 	go counter.Counter()
 	go counter.statPrinter()
@@ -120,96 +135,36 @@ func NewStatCounter() *StatsCounter {
 	return counter
 }
 
-func RecordAnnounces(announces uint64) {
-	p := client.Point{
-		Name: "announce",
-		Tags: map[string]string{
-			"version": mika.VersionStr(),
-			"env":     "prod",
-		},
-		Fields: map[string]interface{}{
-			"value": announces,
-		},
-		Timestamp: time.Now(),
-		Precision: "s",
-	}
-	addPoint(p)
-}
-
-func RecordScrapes(scrapes uint64) {
-	p := client.Point{
-		Name: "scrape",
-		Tags: map[string]string{
-			"version": mika.VersionStr(),
-		},
-		Fields: map[string]interface{}{
-			"value": scrapes,
-			"env":   "prod",
-		},
-		Timestamp: time.Now(),
-		Precision: "s",
-	}
-	addPoint(p)
-}
-
-// writePoints will commit the points as a batch to the backend influxdb instance
-func writePoints() {
-	bps := client.BatchPoints{
-		Points:          pts,
-		Database:        "mika",
-		RetentionPolicy: "default",
-	}
-	_, err := influxDB.Write(bps)
-	if err != nil {
-		log.Fatal("Failed to write data points, discarding:", err)
-	} else {
-		log.Debug("Wrote samples out successfully")
-	}
-}
-
-func addPoint(pt client.Point) {
-	log.Debug("Adding point:", pt)
-	pointChan <- pt
-}
-
 func (stats *StatsCounter) Counter() {
 	for {
 		v := <-stats.channel
-		stats.Lock()
 		switch v {
 		case EV_API:
-			stats.APIRequests++
-			stats.APIRequestsPerMin++
-			stats.Requests++
+			stats.APIRequests.Inc(1)
+			stats.APIRequestsPerMin.Update(rand.Float64())
+			stats.Requests.Inc(1)
 		case EV_API_FAIL:
-			stats.APIRequestsFail++
+			stats.APIRequestsFail.Inc(1)
 		case EV_ANNOUNCE:
-			stats.Announce++
-			stats.AnnouncePerMin++
-			stats.Requests++
+			stats.Announce.Inc(1)
+			stats.AnnouncePerMin.Update(rand.Float64())
+			stats.Requests.Inc(1)
 		case EV_ANNOUNCE_FAIL:
-			stats.AnnounceFail++
+			stats.AnnounceFail.Inc(1)
 		case EV_SCRAPE:
-			stats.Scrape++
-			stats.ScrapePerMin++
-			stats.Requests++
+			stats.Scrape.Inc(1)
+			stats.ScrapePerMin.Update(rand.Float64())
+			stats.Requests.Inc(1)
 		case EV_SCRAPE_FAIL:
-			stats.ScrapeFail++
+			stats.ScrapeFail.Inc(1)
 		case EV_INVALID_INFOHASH:
-			stats.InvalidInfohash++
+			stats.InvalidInfohash.Inc(1)
 		case EV_INVALID_PASSKEY:
-			stats.InvalidPasskey++
+			stats.InvalidPasskey.Inc(1)
 		case EV_INVALID_CLIENT:
-			stats.InvalidClient++
+			stats.InvalidClient.Inc(1)
 		}
-		stats.Unlock()
 	}
-}
-
-// Records api requests
-func StatsMW(c *echo.Context) {
-	Counter <- EV_API
-
 }
 
 // statPrinter will periodically print out basic stat lines to standard output
@@ -218,39 +173,22 @@ func (stats *StatsCounter) statPrinter() *time.Ticker {
 	go func() {
 		for range ticker.C {
 			stats.RLock()
-			req_sec := stats.AnnouncePerMin / 60
-			req_sec_api := stats.APIRequestsPerMin / 60
+			req_sec := stats.Announce.Count() / 60
+			req_sec_api := stats.APIRequests.Count() / 60
 			log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
-				stats.Announce, stats.AnnounceFail, stats.Scrape, stats.ScrapeFail,
-				stats.InvalidPasskey, stats.InvalidInfohash, stats.InvalidClient, req_sec, req_sec_api)
+				stats.Announce.Count(), stats.AnnounceFail.Count(), stats.Scrape.Count(), stats.ScrapeFail.Count(),
+				stats.InvalidPasskey.Count(), stats.InvalidInfohash.Count(), stats.InvalidClient.Count(), req_sec, req_sec_api)
 
-			RecordAnnounces(stats.AnnouncePerMin)
-			RecordScrapes(stats.ScrapePerMin)
+			//			RecordAnnounces(stats.AnnouncePerMin)
+			//			RecordScrapes(stats.ScrapePerMin)
 
 			stats.RUnlock()
-			stats.Lock()
-			stats.APIRequestsPerMin = 0
-			stats.AnnouncePerMin = 0
-			stats.ScrapePerMin = 0
-			stats.Unlock()
+
+			stats.APIRequestsPerMin.Update(0)
+			stats.AnnouncePerMin.Update(0)
+			stats.ScrapePerMin.Update(0)
 
 		}
 	}()
 	return ticker
-}
-
-// backgroundWriter will write out the current pts values to influxdb. We reuse the
-// existing memory everytime we flush the points out
-func backgroundWriter() {
-	for {
-		select {
-		case pt := <-pointChan:
-			pts[currentSample] = pt
-			currentSample++
-			if currentSample == sampleSize {
-				writePoints()
-				currentSample = 0
-			}
-		}
-	}
 }

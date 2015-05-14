@@ -13,7 +13,7 @@ then
         "github.com/kisielk/raven-go/raven|master"
         "github.com/labstack/echo|v0.0.12"
         "github.com/julienschmidt/httprouter|master"
-        "github.com/rcrowley/go-metrics/influxdb|master"
+        "github.com/rcrowley/go-metrics|master"
         "github.com/Sirupsen/logrus|master"
         "github.com/goji/param|master"
         "github.com/influxdb/influxdb/client|v0.8.8"

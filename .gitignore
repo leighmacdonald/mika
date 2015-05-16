@@ -31,3 +31,7 @@ config.json
 
 key_ca
 key_priv
+
+bin
+src
+*.pyc

@@ -90,7 +90,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	peer.AnnounceLast = cur_time
 	if announce.Event == STOPPED {
 		peer.Active = false
-		peer.AnnounceFirst == 0
+		peer.AnnounceFirst = 0
 	}
 
 	return ul_diff, dl_diff

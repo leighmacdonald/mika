@@ -57,7 +57,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 		ul_diff = peer.UploadedLast - announce.Uploaded
 		dl_diff = peer.DownloadedLast - announce.Downloaded
 		peer.Uploaded += ul_diff
-		peer.Downloaded = dl_diff
+		peer.Downloaded += dl_diff
 	}
 
 	peer.UploadedLast = announce.Uploaded

@@ -53,7 +53,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	dl_diff := uint64(0)
 
 	// We only record the difference from the first announce
-	if peer.AnnounceFirst != 0 && announce.Event != STARTED {
+	if peer.AnnounceFirst != 0 && peer.AnnounceLast != 0 && announce.Event != STARTED {
 		ul_diff = announce.Uploaded - peer.UploadedLast
 		ul_diff = announce.Downloaded - peer.DownloadedLast
 		peer.Uploaded += ul_diff
@@ -84,9 +84,15 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
+	if peer.AnnounceFirst == 0 {
+		peer.AnnounceFirst = cur_time
+	}
+	peer.AnnounceLast = cur_time
 	if announce.Event == STOPPED {
 		peer.Active = false
+		peer.AnnounceFirst == 0
 	}
+
 	return ul_diff, dl_diff
 }
 

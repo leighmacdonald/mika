@@ -15,7 +15,6 @@ type User struct {
 	Enabled       bool     `redis:"enabled" json:"enabled"`
 	Uploaded      uint64   `redis:"uploaded" json:"uploaded"`
 	Downloaded    uint64   `redis:"downloaded" json:"downloaded"`
-	Corrupt       uint64   `redis:"corrupt" json:"corrupt"`
 	Snatches      uint32   `redis:"snatches" json:"snatches"`
 	Passkey       string   `redis:"passkey" json:"passkey"`
 	UserKey       string   `redis:"-" json:"key"`
@@ -66,6 +65,8 @@ func NewUser(user_id uint64) *User {
 	user := &User{
 		UserID:        user_id,
 		Enabled:       true,
+		Uploaded:      0,
+		Downloaded:    0,
 		CanLeech:      true,
 		Peers:         make([]**Peer, 1),
 		UserKey:       fmt.Sprintf("t:u:%d", user_id),
@@ -90,7 +91,6 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 		// Ignore downloaded value when starting
 		user.Uploaded += uint64(float64(upload_diff) * multi_up)
 		user.Downloaded += uint64(float64(download_diff) * multi_dn)
-		user.Corrupt += announce.Corrupt
 	}
 	user.Announces++
 	if announce.Event == COMPLETED {
@@ -108,7 +108,6 @@ func (user *User) Sync(r redis.Conn) {
 		"user_id", user.UserID,
 		"uploaded", user.Uploaded,
 		"downloaded", user.Downloaded,
-		"corrupt", user.Corrupt,
 		"snatches", user.Snatches,
 		"announces", user.Announces,
 		"can_leech", user.CanLeech,

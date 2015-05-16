@@ -13,30 +13,26 @@ import (
 type Peer struct {
 	db.Queued
 	sync.RWMutex
-	SpeedUP        float64  `redis:"speed_up" json:"speed_up"`
-	SpeedDN        float64  `redis:"speed_dn" json:"speed_dn"`
-	SpeedUPMax     float64  `redis:"speed_up" json:"speed_up_max"`
-	SpeedDNMax     float64  `redis:"speed_dn" json:"speed_dn_max"`
-	Uploaded       uint64   `redis:"uploaded" json:"uploaded"`
-	Downloaded     uint64   `redis:"downloaded" json:"downloaded"`
-	UploadedLast   uint64   `redis:"-" json:"-"`
-	DownloadedLast uint64   `redis:"-" json:"-"`
-	Corrupt        uint64   `redis:"corrupt" json:"corrupt"`
-	IP             string   `redis:"ip" json:"ip"`
-	Port           uint64   `redis:"port" json:"port"`
-	Left           uint64   `redis:"left" json:"left"`
-	Announces      uint64   `redis:"announces" json:"announces"`
-	TotalTime      uint32   `redis:"total_time" json:"total_time"`
-	AnnounceLast   int32    `redis:"last_announce" json:"last_announce"`
-	AnnounceFirst  int32    `redis:"first_announce" json:"first_announce"`
-	New            bool     `redis:"new" json:"-"`
-	PeerID         string   `redis:"peer_id" json:"peer_id"`
-	Active         bool     `redis:"active"  json:"active"`
-	Username       string   `redis:"username"  json:"username"`
-	User           *User    `redis:"-"  json:"-"`
-	Torrent        *Torrent `redis:"-" json:"-"`
-	KeyPeer        string   `redis:"-" json:"-"`
-	KeyTimer       string   `redis:"-" json:"-"`
+	SpeedUP       float64  `redis:"speed_up" json:"speed_up"`
+	SpeedDN       float64  `redis:"speed_dn" json:"speed_dn"`
+	SpeedUPMax    float64  `redis:"speed_up" json:"speed_up_max"`
+	SpeedDNMax    float64  `redis:"speed_dn" json:"speed_dn_max"`
+	Uploaded      uint64   `redis:"uploaded" json:"uploaded"`
+	Downloaded    uint64   `redis:"downloaded" json:"downloaded"`
+	IP            string   `redis:"ip" json:"ip"`
+	Port          uint64   `redis:"port" json:"port"`
+	Left          uint64   `redis:"left" json:"left"`
+	Announces     uint64   `redis:"announces" json:"announces"`
+	TotalTime     uint32   `redis:"total_time" json:"total_time"`
+	AnnounceLast  int32    `redis:"last_announce" json:"last_announce"`
+	AnnounceFirst int32    `redis:"first_announce" json:"first_announce"`
+	PeerID        string   `redis:"peer_id" json:"peer_id"`
+	Active        bool     `redis:"active"  json:"active"`
+	Username      string   `redis:"username"  json:"username"`
+	User          *User    `redis:"-"  json:"-"`
+	Torrent       *Torrent `redis:"-" json:"-"`
+	KeyPeer       string   `redis:"-" json:"-"`
+	KeyTimer      string   `redis:"-" json:"-"`
 }
 
 // Update the stored values with the data from an announce
@@ -50,17 +46,15 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	var ul_diff, dl_diff uint64
 
 	// We only record the difference from the first announce
-	if peer.AnnounceFirst != 0 && peer.AnnounceLast != 0 && announce.Event != STARTED {
-		if announce.Uploaded > peer.Uploaded {
-			ul_diff = announce.Uploaded - peer.Uploaded
-		}
-		if announce.Downloaded > peer.Downloaded {
-			dl_diff = announce.Downloaded - peer.Downloaded
-		}
+	if announce.Uploaded > peer.Uploaded {
+		ul_diff = announce.Uploaded - peer.Uploaded
+	}
+	if announce.Downloaded > peer.Downloaded {
+		dl_diff = announce.Downloaded - peer.Downloaded
 	}
 
-	peer.UploadedLast = announce.Uploaded
-	peer.DownloadedLast = announce.Downloaded
+	ul_diff = 0
+	dl_diff = 0
 
 	peer.IP = announce.IPv4.String()
 	peer.Port = announce.Port

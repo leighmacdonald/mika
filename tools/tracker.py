@@ -129,6 +129,7 @@ class TrackerClient(object):
         keys = [k for k in self._redis.keys("t:u:*")]
         for k in keys:
             try:
+                k = k.decode()
                 data = self._redis.hgetall(k)
                 user = {
                     'passkey': data.get(b'passkey', "ERROR: PASSKEY NOT SET"),

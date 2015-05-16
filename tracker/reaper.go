@@ -30,7 +30,7 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 	// Fetch before we set active to 0
 	peer := torrent.findPeer(peer_id)
 	if peer == nil {
-		log.Error("ReapPeer: Failed to fetch peer while reaping", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
+		log.Error("ReapPeer: Failed to fetch peer while reaping ", fmt.Sprintf("%s [%s]", info_hash, peer_id[0:6]))
 		return
 	}
 	torrent.DelPeer(r, peer)

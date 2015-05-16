@@ -120,18 +120,12 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 	peer := torrent.findPeer(ann.PeerID)
 	if peer == nil {
 		peer = NewPeer(ann.PeerID, ann.IPv4.String(), ann.Port, torrent, user)
-		peer.MergeDB(r)
-		if !torrent.AddPeer(r, peer) {
-			log.Error("HandleAnnounce: Failed to fetch/create peer:", err.Error())
-			oops(c, MSG_GENERIC_ERROR)
-			stats.Counter <- stats.EV_ANNOUNCE_FAIL
-			return
-		}
+		torrent.AddPeer(r, peer)
 	}
 
 	// user update MUST happen after peer update since we rely on the old dl/ul values
 	ul, dl := peer.Update(ann)
-	torrent.Update(ann, ul, dl)
+	torrent.Update(ann)
 	user.Update(ann, ul, dl, torrent.MultiUp, torrent.MultiDn)
 
 	if ann.Event == STOPPED {
@@ -182,8 +176,6 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 
 	if ann.Event != STOPPED {
 
-		peer.Active = true
-
 		// Add peer to torrent active peers
 		r.Send("SADD", torrent.TorrentPeersKey, ann.PeerID)
 
@@ -198,10 +190,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 	r.Flush()
 
 	peer.AnnounceLast = util.Unixtime()
-	if !peer.InQueue {
-		peer.InQueue = true
-		SyncPeerC <- peer
-	}
+
 	if !torrent.InQueue {
 		torrent.InQueue = true
 		SyncTorrentC <- torrent

@@ -78,12 +78,10 @@ func (torrent *Torrent) MergeDB(r redis.Conn) error {
 }
 
 // Update handles updating the stored values according to a users announce request
-func (torrent *Torrent) Update(announce *AnnounceRequest, upload_diff, download_diff uint64) {
+func (torrent *Torrent) Update(announce *AnnounceRequest) {
 	s, l := torrent.PeerCounts()
 	torrent.Lock()
 	torrent.Announces++
-	torrent.Uploaded += upload_diff
-	torrent.Downloaded += download_diff
 	torrent.Seeders = s
 	torrent.Leechers = l
 	if announce.Event == COMPLETED {
@@ -177,10 +175,6 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 	}
 
 	r.Send("SREM", torrent.TorrentPeersKey, peer.PeerID)
-
-	peer.Lock()
-	peer.Active = false
-	peer.Unlock()
 	return true
 }
 

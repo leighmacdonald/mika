@@ -6,8 +6,6 @@ import (
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
-	log "github.com/Sirupsen/logrus"
-	"github.com/garyburd/redigo/redis"
 	"net"
 	"sync"
 )
@@ -49,15 +47,16 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	peer.PeerID = announce.PeerID
 	peer.Announces++
 
-	ul_diff := uint64(0)
-	dl_diff := uint64(0)
+	var ul_diff, dl_diff uint64
 
 	// We only record the difference from the first announce
 	if peer.AnnounceFirst != 0 && peer.AnnounceLast != 0 && announce.Event != STARTED {
-		ul_diff = announce.Uploaded - peer.UploadedLast
-		ul_diff = announce.Downloaded - peer.DownloadedLast
-		peer.Uploaded += ul_diff
-		peer.Downloaded += dl_diff
+		if announce.Uploaded > peer.Uploaded {
+			ul_diff = announce.Uploaded - peer.Uploaded
+		}
+		if announce.Downloaded > peer.Downloaded {
+			dl_diff = announce.Downloaded - peer.Downloaded
+		}
 	}
 
 	peer.UploadedLast = announce.Uploaded
@@ -65,7 +64,6 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 
 	peer.IP = announce.IPv4.String()
 	peer.Port = announce.Port
-	peer.Corrupt = announce.Corrupt
 	peer.Left = announce.Left
 	peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
 	peer.SpeedDN = util.EstSpeed(peer.AnnounceLast, cur_time, dl_diff)
@@ -78,46 +76,26 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 
 	// Must be active to have a real time delta
 	if peer.Active && peer.AnnounceLast > 0 {
-		time_diff := uint64(util.Unixtime() - peer.AnnounceLast)
+		time_diff := uint64(cur_time - peer.AnnounceLast)
 		// Ignore long periods of inactivity
 		if time_diff < (uint64(conf.Config.AnnInterval) * 4) {
 			peer.TotalTime += uint32(time_diff)
 		}
 	}
+
 	if peer.AnnounceFirst == 0 {
 		peer.AnnounceFirst = cur_time
 	}
 	peer.AnnounceLast = cur_time
+
 	if announce.Event == STOPPED {
 		peer.Active = false
 		peer.AnnounceFirst = 0
+	} else {
+		peer.Active = true
 	}
 
 	return ul_diff, dl_diff
-}
-
-func (peer *Peer) Sync(r redis.Conn) {
-	r.Send(
-		"HMSET", peer.KeyPeer,
-		"ip", peer.IP,
-		"port", peer.Port,
-		"left", peer.Left,
-		"first_announce", peer.AnnounceFirst,
-		"last_announce", peer.AnnounceLast,
-		"total_time", peer.TotalTime,
-		"speed_up", peer.SpeedUP,
-		"speed_dn", peer.SpeedDN,
-		"speed_up_max", peer.SpeedUPMax,
-		"speed_dn_max", peer.SpeedDNMax,
-		"active", peer.Active,
-		"uploaded", peer.Uploaded,
-		"downloaded", peer.Downloaded,
-		"corrupt", peer.Corrupt,
-		"username", peer.Username,
-		"user_id", peer.User.UserID, // Shouldn't need to be here
-		"peer_id", peer.PeerID, // Shouldn't need to be here
-		"torrent_id", peer.Torrent.TorrentID, // Shouldn't need to be here
-	)
 }
 
 func (peer *Peer) IsHNR() bool {
@@ -162,28 +140,4 @@ func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *Use
 		KeyTimer:      fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, peer_id),
 	}
 	return peer
-}
-
-// MergeDB will apply the data stored in the db to the peer instance
-// Should generally only be called on startup since it will overwrite
-// existing data stored in the active peer instance.
-func (peer *Peer) MergeDB(r redis.Conn) error {
-	peer_reply, err := r.Do("HGETALL", peer.KeyPeer)
-	if err != nil {
-		log.Println("GetPeer: Error executing peer fetch query: ", err)
-		return err
-	}
-	values, err := redis.Values(peer_reply, nil)
-	if err != nil {
-		log.Println("makePeer: Failed to parse peer reply: ", err)
-		return err_parse_reply
-	}
-	if values != nil {
-		err := redis.ScanStruct(values, peer)
-		if err != nil {
-			log.Println("makePeer: Failed to scan peer struct: ", err)
-			return err_cast_reply
-		}
-	}
-	return nil
 }

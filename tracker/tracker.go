@@ -267,11 +267,6 @@ func (tracker *Tracker) syncWriter() {
 			torrent.Lock()
 			torrent.InQueue = false
 			torrent.Unlock()
-		case peer := <-SyncPeerC:
-			peer.Sync(r)
-			peer.Lock()
-			peer.InQueue = false
-			peer.Unlock()
 		}
 		err := r.Flush()
 		if err != nil {

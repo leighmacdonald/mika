@@ -1,7 +1,7 @@
 """
 Simple client to interact with the backend tracker instance.
 """
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 import requests
 import redis
 from redis.exceptions import ResponseError
@@ -139,8 +139,10 @@ class TrackerClient(object):
                     'enabled': data.get(b'enabled', b"0").decode()
                 }
                 users.append(user)
+            except ResponseError:
+                print("Dropping erroneous key: {}".format(k))
+                self._redis.delete(k)
             except Exception as err:
-
                 print(err)
                 print(data)
                 print(k)

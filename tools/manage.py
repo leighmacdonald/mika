@@ -1,4 +1,5 @@
 #!/bin/env python2
+from __future__ import unicode_literals
 import binascii
 import json
 import argparse
@@ -97,12 +98,22 @@ def get_tracker():
     return tracker.TrackerClient(config['ListenHostAPI'], *config['RedisHost'].split(":"))
 
 
-def wipe_torrent_uldl(**args):
+def wipe_torrent_stats(**args):
     redis_conn = make_redis()
     for tor in get_tracker().torrent_get_all_redis():
         key = "t:t:{}".format(tor[b'info_hash'].decode())
         redis_conn.hset(key, "downloaded", 0)
         redis_conn.hset(key, "uploaded", 0)
+
+
+def wipe_user_stats(**args):
+    redis_conn = make_redis()
+    for user in get_tracker().users_get_all_redis():
+        key = "t:u:{}".format(user['user_id'])
+        redis_conn.hset(key, "downloaded", 0)
+        redis_conn.hset(key, "uploaded", 0)
+        redis_conn.hset(key, "corrupt", 0)
+        redis_conn.hset(key, "snatches", 0)
 
 
 def torrents_list(**args):
@@ -163,8 +174,12 @@ def parse_args():
     cleanup_cmd.add_argument("-d", "--delete", action="store_true", help="Deleted the keys from redis")
     cleanup_cmd.set_defaults(func=tracker_cleanup)
 
-    wipetorstats_cmd = subparsers.add_parser("wipetorstats", help="List torrents stored in redis")
-    wipetorstats_cmd.set_defaults(func=wipe_torrent_uldl)
+    wipetorstats_cmd = subparsers.add_parser("wipetorstats", help="Wipe all transfer/snatch counts from *ALL* torrents")
+    wipetorstats_cmd.set_defaults(func=wipe_torrent_stats)
+
+    wipeuserstats_cmd = subparsers.add_parser("wipeuserstats",
+                                              help="Wipe all transfer/snatch counts from *ALL* users. DONT BE A HERO.")
+    wipeuserstats_cmd.set_defaults(func=wipe_user_stats)
 
 
     return vars(parser.parse_args())

@@ -64,7 +64,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	peer.DownloadedLast = announce.Downloaded
 
 	peer.IP = announce.IPv4.String()
-	peer.Port =  announce.Port
+	peer.Port = announce.Port
 	peer.Corrupt = announce.Corrupt
 	peer.Left = announce.Left
 	peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
@@ -92,25 +92,25 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 
 func (peer *Peer) Sync(r redis.Conn) {
 	r.Send(
-	"HMSET", peer.KeyPeer,
-	"ip", peer.IP,
-	"port", peer.Port,
-	"left", peer.Left,
-	"first_announce", peer.AnnounceFirst,
-	"last_announce", peer.AnnounceLast,
-	"total_time", peer.TotalTime,
-	"speed_up", peer.SpeedUP,
-	"speed_dn", peer.SpeedDN,
-	"speed_up_max", peer.SpeedUPMax,
-	"speed_dn_max", peer.SpeedDNMax,
-	"active", peer.Active,
-	"uploaded", peer.Uploaded,
-	"downloaded", peer.Downloaded,
-	"corrupt", peer.Corrupt,
-	"username", peer.Username,
-	"user_id", peer.User.UserID, // Shouldn't need to be here
-	"peer_id", peer.PeerID, // Shouldn't need to be here
-	"torrent_id", peer.Torrent.TorrentID, // Shouldn't need to be here
+		"HMSET", peer.KeyPeer,
+		"ip", peer.IP,
+		"port", peer.Port,
+		"left", peer.Left,
+		"first_announce", peer.AnnounceFirst,
+		"last_announce", peer.AnnounceLast,
+		"total_time", peer.TotalTime,
+		"speed_up", peer.SpeedUP,
+		"speed_dn", peer.SpeedDN,
+		"speed_up_max", peer.SpeedUPMax,
+		"speed_dn_max", peer.SpeedDNMax,
+		"active", peer.Active,
+		"uploaded", peer.Uploaded,
+		"downloaded", peer.Downloaded,
+		"corrupt", peer.Corrupt,
+		"username", peer.Username,
+		"user_id", peer.User.UserID, // Shouldn't need to be here
+		"peer_id", peer.PeerID, // Shouldn't need to be here
+		"torrent_id", peer.Torrent.TorrentID, // Shouldn't need to be here
 	)
 }
 

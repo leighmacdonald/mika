@@ -141,8 +141,9 @@ class TrackerClient(object):
                 }
                 users.append(user)
             except ResponseError:
-                print("Dropping erroneous key: {}".format(k))
-                self._redis.delete(k)
+                # print("Dropping erroneous key: {}".format(k))
+                # self._redis.delete(k)
+                pass
             except Exception as err:
                 print(err)
                 print(data)

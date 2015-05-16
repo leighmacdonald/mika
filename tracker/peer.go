@@ -53,9 +53,9 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	dl_diff := uint64(0)
 
 	// We only record the difference from the first announce
-	if peer.Active && announce.Event != STARTED {
-		ul_diff = peer.UploadedLast - announce.Uploaded
-		dl_diff = peer.DownloadedLast - announce.Downloaded
+	if peer.AnnounceFirst != 0 && announce.Event != STARTED {
+		ul_diff = announce.Uploaded - peer.UploadedLast
+		ul_diff = announce.Downloaded - peer.DownloadedLast
 		peer.Uploaded += ul_diff
 		peer.Downloaded += dl_diff
 	}
@@ -148,7 +148,7 @@ func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *Use
 		Active:        false,
 		IP:            ip,
 		Port:          port,
-		AnnounceFirst: util.Unixtime(),
+		AnnounceFirst: 0,
 		AnnounceLast:  util.Unixtime(),
 		User:          user,
 		Torrent:       torrent,

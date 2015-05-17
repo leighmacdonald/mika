@@ -8,4 +8,4 @@ ln -s ${GOPATH} mika
 popd
 cp config.json.dist config.json
 ./update.sh
-make && make vet && make test
+make && make test

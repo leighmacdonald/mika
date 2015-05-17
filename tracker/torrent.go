@@ -26,9 +26,9 @@ type Torrent struct {
 	TorrentPeersKey string  `redis:"-" json:"-"`
 	Enabled         bool    `redis:"enabled" json:"enabled"`
 	Reason          string  `redis:"reason" json:"reason"`
-	Peers           []*Peer `redis:"-" json:"-"`
-	MultiUp         float64 `redis:"multi_up" json:"-"`
-	MultiDn         float64 `redis:"multi_dn" json:"-"`
+	Peers           []*Peer `redis:"-" json:"peers"`
+	MultiUp         float64 `redis:"multi_up" json:"multi_up"`
+	MultiDn         float64 `redis:"multi_dn" json:"multi_dn"`
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all

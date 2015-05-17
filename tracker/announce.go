@@ -78,13 +78,26 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		return
 	}
 
+	info_hash_hex := fmt.Sprintf("%x", ann.InfoHash)
+	log.WithFields(log.Fields{
+		"ih":    info_hash_hex[0:6],
+		"ip":    ann.IPv4,
+		"port":  ann.Port,
+		"up":    util.Bytes(ann.Uploaded),
+		"dn":    util.Bytes(ann.Downloaded),
+		"left":  util.Bytes(ann.Left),
+		"event": ann.Event,
+	}).Debug("Announce event")
+
 	passkey := c.P(0) // eat a dick
 
 	user_id := t.findUserID(passkey)
 
 	if user_id == 0 {
-		log.Println("HandleScrape: Invalid passkey supplied:", passkey)
-		oops(c, MSG_GENERIC_ERROR)
+		log.WithFields(log.Fields{
+			"passkey": passkey,
+		}).Warn("Invalid passkey supplied")
+		oopsStr(c, MSG_GENERIC_ERROR, "Invalid passkey")
 		stats.Counter <- stats.EV_INVALID_PASSKEY
 		return
 	}
@@ -99,20 +112,32 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 	}
 
 	if !t.IsValidClient(ann.PeerID) {
-		log.Warn("HandleAnnounce:", fmt.Sprintf("Invalid Client %s [%d/%s]", ann.PeerID[0:6], user.UserID, user.Username))
-		oops(c, MSG_INVALID_PEER_ID)
+		log.WithFields(log.Fields{
+			"user_id":   user.UserID,
+			"user_name": user.Username,
+			"peer_id":   ann.PeerID[0:6],
+		}).Warn("Invalid Client")
+		oopsStr(c, MSG_INVALID_PEER_ID, "Invalid client, see: wiki")
 		stats.Counter <- stats.EV_INVALID_CLIENT
 		return
 	}
 
-	torrent := t.FindTorrentByInfoHash(fmt.Sprintf("%x", ann.InfoHash))
+	torrent := t.FindTorrentByInfoHash(info_hash_hex)
 	if torrent == nil {
-		log.Debug("HandleAnnounce:", fmt.Sprintf("Torrent not found: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
+		log.WithFields(log.Fields{
+			"user_id":   user.UserID,
+			"user_name": user.Username,
+			"info_hash": ann.InfoHash,
+		}).Debug("Torrent not found")
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return
 	} else if !torrent.Enabled {
-		log.Debug("HandleAnnounce:", fmt.Sprintf("Disabled torrent: %x [%d/%s]", ann.InfoHash, user.UserID, user.Username))
+		log.WithFields(log.Fields{
+			"user_id":   user.UserID,
+			"user_name": user.Username,
+			"info_hash": ann.InfoHash,
+		}).Debug("Disabled torrent")
 		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return

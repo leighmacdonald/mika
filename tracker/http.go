@@ -3,7 +3,6 @@ package tracker
 import (
 	"crypto/tls"
 	"git.totdev.in/totv/mika/conf"
-	//"git.totdev.in/totv/mika/stats"
 	log "github.com/Sirupsen/logrus"
 	"github.com/goji/httpauth"
 	"github.com/labstack/echo"
@@ -24,7 +23,11 @@ func (t *Tracker) Run() {
 // starts the trackers HTTP server listening over HTTP. This function will not
 // start the API endpoints. See listenAPI for those.
 func (t *Tracker) listenTracker() {
-	log.Println("Loading tracker router on:", conf.Config.ListenHost)
+	log.WithFields(log.Fields{
+		"listen_host": conf.Config.ListenHost,
+		"tls":         true,
+	}).Info("Loading Tracker route handlers")
+
 	// Initialize the router + middlewares
 	e := echo.New()
 	e.MaxParam(1)
@@ -38,16 +41,18 @@ func (t *Tracker) listenTracker() {
 
 // listenAPI created a new api request router and start the http server listening over TLS
 func (t *Tracker) listenAPI() {
-	log.Println("Loading API router on:", conf.Config.ListenHostAPI, "(TLS)")
+	log.WithFields(log.Fields{
+		"listen_host": conf.Config.ListenHostAPI,
+		"tls":         true,
+	}).Info("Loading API route handlers")
+
 	e := echo.New()
 	e.MaxParam(1)
 	api := e.Group("/api")
 
-	// e.Use(stats.StatsMW)
-
 	// Optionally enabled BasicAuth over the TLS only API
 	if conf.Config.APIUsername == "" || conf.Config.APIPassword == "" {
-		log.Println("[WARN] No credentials set for API. All users granted access.")
+		log.Warn("No credentials set for API. All users granted access.")
 	} else {
 		api.Use(httpauth.SimpleBasicAuth(conf.Config.APIUsername, conf.Config.APIPassword))
 	}

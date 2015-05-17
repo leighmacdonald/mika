@@ -175,12 +175,17 @@ func (stats *StatsCounter) statPrinter() *time.Ticker {
 			stats.RLock()
 			req_sec := stats.Announce.Count() / 60
 			req_sec_api := stats.APIRequests.Count() / 60
-			log.Printf("Ann: %d/%d Scr: %d/%d InvPK: %d InvIH: %d InvCL: %d Req/s: %d ApiReq/s: %d",
-				stats.Announce.Count(), stats.AnnounceFail.Count(), stats.Scrape.Count(), stats.ScrapeFail.Count(),
-				stats.InvalidPasskey.Count(), stats.InvalidInfohash.Count(), stats.InvalidClient.Count(), req_sec, req_sec_api)
-
-			//			RecordAnnounces(stats.AnnouncePerMin)
-			//			RecordScrapes(stats.ScrapePerMin)
+			log.WithFields(log.Fields{
+				"ann_total":   stats.Announce.Count(),
+				"ann_err":     stats.AnnounceFail.Count(),
+				"scr_total":   stats.Scrape.Count(),
+				"scr_err":     stats.ScrapeFail.Count(),
+				"inv_pk":      stats.InvalidPasskey.Count(),
+				"inv_ih":      stats.InvalidInfohash.Count(),
+				"inv_cl":      stats.InvalidClient.Count(),
+				"req_sec_trk": req_sec,
+				"req_sec_api": req_sec_api,
+			}).Info("Periodic Stats")
 
 			stats.RUnlock()
 

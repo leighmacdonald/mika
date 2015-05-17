@@ -80,7 +80,10 @@ func NewUser(user_id uint64) *User {
 
 func (user *User) AddHNR(r redis.Conn, torrent_id uint64) {
 	r.Send("SADD", user.KeyHNR, torrent_id)
-	log.Debug("Added HnR:", torrent_id, user.UserID)
+	log.WithFields(log.Fields{
+		"torrent_id": torrent_id,
+		"user_id": user.UserID,
+	}).Debug("Added new HnR to user")
 }
 
 // Update user stats from announce request

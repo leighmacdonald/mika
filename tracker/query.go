@@ -87,12 +87,7 @@ func (q *Query) Uint64(key string) (uint64, error) {
 	if !exists {
 		return 0, errors.New("value does not exist for key: " + key)
 	}
-
-	val, err := strconv.ParseUint(str, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return val, nil
+	return strconv.ParseUint(str, 10, 64)
 }
 
 // Parse the num want from the announce request, replacing with our

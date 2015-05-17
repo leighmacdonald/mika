@@ -1,6 +1,11 @@
 // Package util provides general utility functions shared by the other modules
 package util
 
+import (
+	"fmt"
+	"math"
+)
+
 // math.Max for uint64
 func UMax(a, b uint64) uint64 {
 	if a > b {
@@ -25,4 +30,39 @@ func EstSpeed(start_time int32, last_time int32, bytes_sent uint64) float64 {
 		return 0.0
 	}
 	return float64(bytes_sent) / (float64(last_time) - float64(start_time))
+}
+
+func LogN(n, b float64) float64 {
+	return math.Log(n) / math.Log(b)
+}
+
+func humanizeBytes(s uint64, base float64, sizes []string) string {
+	if s < 10 {
+		return fmt.Sprintf("%dB", s)
+	}
+	e := math.Floor(LogN(float64(s), base))
+	suffix := sizes[int(e)]
+	val := math.Floor(float64(s)/math.Pow(base, e)*10+0.5) / 10
+	f := "%.0f%s"
+	if val < 10 {
+		f = "%.1f%s"
+	}
+
+	return fmt.Sprintf(f, val, suffix)
+}
+
+// Bytes produces a human readable representation of an SI size.
+//
+// Bytes(82854982) -> 83MB
+func Bytes(s uint64) string {
+	sizes := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
+	return humanizeBytes(s, 1000, sizes)
+}
+
+// IBytes produces a human readable representation of an IEC size.
+//
+// IBytes(82854982) -> 79MiB
+func IBytes(s uint64) string {
+	sizes := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
+	return humanizeBytes(s, 1024, sizes)
 }

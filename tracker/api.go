@@ -106,7 +106,10 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	payload := &TorrentAddPayload{}
 	if err := c.Bind(payload); err != nil {
-		log.Error("Failed to parse addtorrent payload:", err)
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+		}).Error("Failed to parse addtorrent payload")
+
 		return &echo.HTTPError{Code: http.StatusBadRequest}
 	}
 	if payload.TorrentID <= 0 {
@@ -128,16 +131,21 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	} else {
 		// Update our existing one
 		// Note only a few entries can be updated at the moment
-		t.TorrentsMutex.Lock()
+		torrent.Lock()
 		torrent.Enabled = true
 		torrent.Name = payload.Name
 		torrent.TorrentID = payload.TorrentID
-		t.TorrentsMutex.Unlock()
+		torrent.Unlock()
 	}
 
 	SyncTorrentC <- torrent
 
-	log.Info("HandleTorrentAdd: Added new torrent:", payload.Name)
+	log.WithFields(log.Fields{
+		"fn": "HandleTorrentAdd",
+		"name": payload.Name,
+		"info_hash": payload.InfoHash,
+	}).Info("Added new torrent successfully")
+
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
@@ -145,6 +153,10 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
+		log.WithFields(log.Fields{
+			"fn": "HandleTorrentDel",
+			"info_hash": info_hash,
+		}).Warn("Tried to delete invalid torrent")
 		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id"})
 	}
 	torrent.Lock()
@@ -154,7 +166,11 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 		torrent.InQueue = true
 		SyncTorrentC <- torrent
 	}
-	log.Info("HandleTorrentDel: Deleted torrent", info_hash)
+	log.WithFields(log.Fields{
+		"fn": "HandleTorrentDel",
+		"info_hash": info_hash,
+	}).Info("Deleted torrent successfully")
+
 	return c.JSON(http.StatusOK, resp_ok)
 }
 

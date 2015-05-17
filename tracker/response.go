@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"bytes"
-	"errors"
 	"github.com/chihaya/bencode"
 	"github.com/labstack/echo"
 )
@@ -43,9 +42,6 @@ var (
 		MSG_MALFORMED_REQUEST:       "Malformed request",
 		MSG_GENERIC_ERROR:           "Generic Error :(",
 	}
-
-	err_parse_reply = errors.New("Failed to parse reply")
-	err_cast_reply  = errors.New("Failed to cast reply into type")
 )
 
 // Output a bencoded error code to the torrent client using

@@ -2,7 +2,6 @@
 package tracker
 
 import (
-	"fmt"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
@@ -57,7 +56,9 @@ func NewTracker() *Tracker {
 
 // Load the models into memory from redis
 func (tracker *Tracker) Initialize() error {
-	log.Println("Initialize: Initializing models in memory...")
+	log.WithFields(log.Fields{
+		"peer_id": "Initialize",
+	}).Info("Initializing models in memory.")
 	r := db.Pool.Get()
 	defer r.Close()
 
@@ -97,7 +98,10 @@ func (tracker *Tracker) AddTorrent(torrent *Torrent) {
 	tracker.TorrentsMutex.Lock()
 	tracker.Torrents[torrent.InfoHash] = torrent
 	tracker.TorrentsMutex.Unlock()
-	log.Debug("GetTorrentByInfoHash: Added new torrent to in-memory cache:", torrent.InfoHash)
+	log.WithFields(log.Fields{
+		"info_hash": torrent.InfoHash,
+		"fn":        "AddTorrent",
+	}).Info("Registered new torrent in tracker")
 }
 
 // GetUserByID fetches a user from the backend database. Id auto_create is set
@@ -113,7 +117,11 @@ func (tracker *Tracker) AddUser(user *User) {
 	tracker.UsersMutex.Lock()
 	tracker.Users[user.UserID] = user
 	tracker.UsersMutex.Unlock()
-	log.Debug("Added new user to memory:", user.UserID)
+	log.WithFields(log.Fields{
+		"user_id":   user.UserID,
+		"user_name": user.Username,
+		"fn":        "AddUser",
+	}).Info("Added new user to tracker")
 }
 
 // initWhitelist will fetch the client whitelist from redis and load it into memory
@@ -122,23 +130,34 @@ func (tracker *Tracker) initWhitelist(r redis.Conn) {
 	a, err := r.Do("HKEYS", "t:whitelist")
 
 	if err != nil {
-		log.Println("initWhitelist: Failed to fetch whitelist", err)
+		log.WithFields(log.Fields{
+			"fn": "initWhitelist",
+		}).Error("Failed to fetch whitelist", err)
 		return
 	}
 	tracker.Whitelist, err = redis.Strings(a, nil)
-	log.Println(fmt.Sprintf("initWhitelist: Loaded %d whitelist clients", len(tracker.Whitelist)))
+	log.WithFields(log.Fields{
+		"total_clients": len(tracker.Whitelist),
+		"fn":            "initWhitelist",
+	}).Info("Loaded whitelist clients")
 }
 
 // initTorrents will fetch the torrents stored in redis and load them into active memory as models
 func (tracker *Tracker) initTorrents(r redis.Conn) {
 	torrent_keys_reply, err := r.Do("KEYS", "t:t:*")
 	if err != nil {
-		log.Println("initTorrents: Failed to get torrent from redis", err)
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"fn":  "initTorrents",
+		}).Error("Failed to get torrent from redis")
 		return
 	}
 	torrent_keys, err := redis.Strings(torrent_keys_reply, nil)
 	if err != nil {
-		log.Println("initTorrents: Failed to parse torrent keys reply: ", err)
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"fn":  "initTorrents",
+		}).Error("Failed to parse torrent keys reply")
 		return
 	}
 	torrents := 0
@@ -157,24 +176,35 @@ func (tracker *Tracker) initTorrents(r redis.Conn) {
 			torrents++
 		} else {
 			// Drop keys we don't have valid ids for
-			log.Warn("initTorrents: Unknown key:", torrent_key)
+			log.WithFields(log.Fields{
+				"fn":  "initTorrents",
+				"key": torrent_key,
+			}).Warn("Unknown key, deleting..")
 			r.Do("DEL", torrent_key)
 		}
 	}
-
-	log.Println(fmt.Sprintf("initTorrents: Loaded %d torrents into memory", torrents))
+	log.WithFields(log.Fields{
+		"count": torrents,
+		"fn":    "initTorrents",
+	}).Info("Loaded torrents into memory")
 }
 
 // initUsers pre loads all known users into memory from redis backend
 func (tracker *Tracker) initUsers(r redis.Conn) {
 	user_keys_reply, err := r.Do("KEYS", "t:u:*")
 	if err != nil {
-		log.Println("initUsers: Failed to get torrent from redis", err)
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"fn":  "initUsers",
+		}).Error("Failed to get torrent from redis")
 		return
 	}
 	user_keys, err := redis.Strings(user_keys_reply, nil)
 	if err != nil {
-		log.Println("initUsers: Failed to parse peer reply: ", err)
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"fn":  "initUsers",
+		}).Error("Failed to parse peer reply")
 		return
 	}
 	users := 0
@@ -198,12 +228,17 @@ func (tracker *Tracker) initUsers(r redis.Conn) {
 		users++
 	}
 
-	log.Println(fmt.Sprintf("initUsers: Loaded %d users into memory", users))
+	log.WithFields(log.Fields{
+		"count": users,
+		"fn":    "initUsers",
+	}).Info("Loaded users into memory")
 }
 
 // dbStatIndexer when running will periodically update the torrent sort indexes
 func (tracker *Tracker) dbStatIndexer() {
-	log.Println("dbStatIndexer: Background indexer started")
+	log.WithFields(log.Fields{
+		"fn": "dbStatIndexer",
+	}).Info("Background indexer started")
 	r := db.Pool.Get()
 	defer r.Close()
 
@@ -270,7 +305,9 @@ func (tracker *Tracker) syncWriter() {
 		}
 		err := r.Flush()
 		if err != nil {
-			log.Println("syncWriter: Failed to flush connection:", err)
+			log.WithFields(log.Fields{
+				"fn": "syncWriter",
+			}).Error("Failed to flush connection:", err.Error())
 		}
 	}
 }
@@ -284,6 +321,10 @@ func (tracker *Tracker) IsValidClient(peer_id string) bool {
 		}
 	}
 
-	log.Println("IsValidClient: Got non-whitelisted client:", peer_id)
+	log.WithFields(log.Fields{
+		"fn":      "IsValidClient",
+		"peer_id": peer_id[0:6],
+	}).Warn("Got non-whitelisted client")
+
 	return false
 }

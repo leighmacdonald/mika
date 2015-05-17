@@ -214,8 +214,6 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 	}
 	r.Flush()
 
-	peer.AnnounceLast = util.Unixtime()
-
 	if !torrent.InQueue {
 		torrent.InQueue = true
 		SyncTorrentC <- torrent

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"git.totdev.in/totv/mika/conf"
-	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"net"
@@ -12,28 +11,58 @@ import (
 )
 
 type Peer struct {
-	db.Queued
 	sync.RWMutex
-	SpeedUP       float64  `redis:"speed_up" json:"speed_up"`
-	SpeedDN       float64  `redis:"speed_dn" json:"speed_dn"`
-	SpeedUPMax    float64  `redis:"speed_up" json:"speed_up_max"`
-	SpeedDNMax    float64  `redis:"speed_dn" json:"speed_dn_max"`
-	Uploaded      uint64   `redis:"uploaded" json:"uploaded"`
-	Downloaded    uint64   `redis:"downloaded" json:"downloaded"`
-	IP            string   `redis:"ip" json:"ip"`
-	Port          uint64   `redis:"port" json:"port"`
-	Left          uint64   `redis:"left" json:"left"`
-	Announces     uint64   `redis:"announces" json:"announces"`
-	TotalTime     uint32   `redis:"total_time" json:"total_time"`
-	AnnounceLast  int32    `redis:"last_announce" json:"last_announce"`
-	AnnounceFirst int32    `redis:"first_announce" json:"first_announce"`
-	PeerID        string   `redis:"peer_id" json:"peer_id"`
-	Active        bool     `redis:"active"  json:"active"`
-	Username      string   `redis:"username"  json:"username"`
-	User          *User    `redis:"-"  json:"-"`
-	Torrent       *Torrent `redis:"-" json:"-"`
-	KeyPeer       string   `redis:"-" json:"-"`
-	KeyTimer      string   `redis:"-" json:"-"`
+
+	// Current speed up, bytes/sec
+	SpeedUP float64 `redis:"speed_up" json:"speed_up"`
+
+	// Current speed dn, bytes/sec
+	SpeedDN float64 `redis:"speed_dn" json:"speed_dn"`
+
+	// Max recorded up speed, bytes/sec
+	SpeedUPMax float64 `redis:"speed_up" json:"speed_up_max"`
+
+	// Max recorded dn speed, bytes/sec
+	SpeedDNMax float64 `redis:"speed_dn" json:"speed_dn_max"`
+
+	// Total amount uploaded as reported by client
+	Uploaded uint64 `redis:"uploaded" json:"uploaded"`
+
+	// Total amount downloaded as reported by client
+	Downloaded uint64 `redis:"downloaded" json:"downloaded"`
+
+	// Clients IPv4 Address detected automatically, does not use client supplied value
+	IP string `redis:"ip" json:"ip"`
+
+	// Clients reported port
+	Port uint64 `redis:"port" json:"port"`
+
+	// Clients reported bytes left of the download
+	Left uint64 `redis:"left" json:"left"`
+
+	// Total number of announces the peer has made
+	Announces uint64 `redis:"announces" json:"announces"`
+
+	// Total active swarm participation time
+	TotalTime uint32 `redis:"total_time" json:"total_time"`
+
+	// Last announce timestamp
+	AnnounceLast int32 `redis:"last_announce" json:"last_announce"`
+
+	// First announce timestamp
+	AnnounceFirst int32 `redis:"first_announce" json:"first_announce"`
+
+	// Peer id, reported by client. Must have white-listed prefix
+	PeerID string `redis:"peer_id" json:"peer_id"`
+
+	User     *User    `redis:"-"  json:"-"`
+	Torrent  *Torrent `redis:"-" json:"-"`
+	KeyPeer  string   `redis:"-" json:"-"`
+	KeyTimer string   `redis:"-" json:"-"`
+}
+
+func (peer *Peer) IsNew() bool {
+	return peer.AnnounceLast == 0
 }
 
 // Update the stored values with the data from an announce
@@ -46,13 +75,17 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 
 	var ul_diff, dl_diff uint64
 
-	// We only record the difference from the first announce
-	if announce.Uploaded > peer.Uploaded {
-		ul_diff = announce.Uploaded - peer.Uploaded
+	if !peer.IsNew() {
+		// We only record the difference from the first announce
+		if announce.Uploaded > peer.Uploaded {
+			ul_diff = announce.Uploaded - peer.Uploaded
+		}
+		if announce.Downloaded > peer.Downloaded {
+			dl_diff = announce.Downloaded - peer.Downloaded
+		}
 	}
-	if announce.Downloaded > peer.Downloaded {
-		dl_diff = announce.Downloaded - peer.Downloaded
-	}
+	peer.Uploaded = announce.Uploaded
+	peer.Downloaded = announce.Downloaded
 	if ul_diff > 0 || dl_diff > 0 {
 		log.WithFields(log.Fields{
 			"ul_diff":   util.Bytes(ul_diff),
@@ -77,7 +110,7 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	}
 
 	// Must be active to have a real time delta
-	if peer.Active && peer.AnnounceLast > 0 {
+	if !peer.IsNew() {
 		time_diff := uint64(cur_time - peer.AnnounceLast)
 		// Ignore long periods of inactivity
 		if time_diff < (uint64(conf.Config.AnnInterval) * 4) {
@@ -85,17 +118,10 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 		}
 	}
 
-	if peer.AnnounceFirst == 0 {
+	if peer.IsNew() {
 		peer.AnnounceFirst = cur_time
 	}
 	peer.AnnounceLast = cur_time
-
-	if announce.Event == STOPPED {
-		peer.Active = false
-		peer.AnnounceFirst = 0
-	} else {
-		peer.Active = true
-	}
 
 	return ul_diff, dl_diff
 }
@@ -131,14 +157,12 @@ func MakeCompactPeers(peers []*Peer, skip_id string) []byte {
 func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *User) *Peer {
 	peer := &Peer{
 		PeerID:        peer_id,
-		Active:        false,
 		IP:            ip,
 		Port:          port,
 		AnnounceFirst: 0,
-		AnnounceLast:  util.Unixtime(),
+		AnnounceLast:  0,
 		User:          user,
 		Torrent:       torrent,
-		KeyPeer:       fmt.Sprintf("t:p:%s:%s", torrent.InfoHash, peer_id),
 		KeyTimer:      fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, peer_id),
 	}
 	return peer

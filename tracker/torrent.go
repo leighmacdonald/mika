@@ -220,12 +220,10 @@ func (torrent *Torrent) PeerCounts() (int16, int16) {
 	torrent.RLock()
 	defer torrent.RUnlock()
 	for _, p := range torrent.Peers {
-		if p.Active {
-			if p.IsSeeder() {
-				s++
-			} else {
-				l++
-			}
+		if p.IsSeeder() {
+			s++
+		} else {
+			l++
 		}
 	}
 	return int16(s), int16(l)

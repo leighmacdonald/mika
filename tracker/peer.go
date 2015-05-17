@@ -53,12 +53,14 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	if announce.Downloaded > peer.Downloaded {
 		dl_diff = announce.Downloaded - peer.Downloaded
 	}
-	log.WithFields(log.Fields{
-		"ul_diff": util.Bytes(ul_diff),
-		"dl_diff": util.Bytes(dl_diff),
-		"peer_id": peer.PeerID[0:6],
-	}).Debug("Peer stat changes")
-
+	if ul_diff > 0 || dl_diff > 0 {
+		log.WithFields(log.Fields{
+			"ul_diff":   util.Bytes(ul_diff),
+			"dl_diff":   util.Bytes(dl_diff),
+			"user_name": peer.User.Username,
+			"peer_id":   peer.PeerID[0:8],
+		}).Info("Peer stat changes")
+	}
 	ul_diff = 0
 	dl_diff = 0
 

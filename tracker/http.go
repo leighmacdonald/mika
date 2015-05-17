@@ -25,7 +25,7 @@ func (t *Tracker) Run() {
 func (t *Tracker) listenTracker() {
 	log.WithFields(log.Fields{
 		"listen_host": conf.Config.ListenHost,
-		"tls":         true,
+		"tls":         false,
 	}).Info("Loading Tracker route handlers")
 
 	// Initialize the router + middlewares

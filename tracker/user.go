@@ -113,9 +113,6 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 		uploaded_new := user.Uploaded + uint64(float64(upload_diff)*multi_up)
 		downloaded_new := user.Downloaded + uint64(float64(download_diff)*multi_dn)
 
-		user.Uploaded = uploaded_new
-		user.Downloaded = downloaded_new
-
 		if upload_diff > 0 || download_diff > 0 {
 			log.WithFields(log.Fields{
 				"ul_old":       util.Bytes(user.Uploaded),
@@ -129,6 +126,9 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 				"fn":           "Update",
 			}).Info("User stat changes")
 		}
+
+		user.Uploaded = uploaded_new
+		user.Downloaded = downloaded_new
 	}
 	user.Announces++
 	if announce.Event == COMPLETED {

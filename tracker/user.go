@@ -42,18 +42,31 @@ func (t *Tracker) findUserID(passkey string) uint64 {
 func (user *User) MergeDB(r redis.Conn) error {
 	user_reply, err := r.Do("HGETALL", user.UserKey)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"fn":      "MergeDB",
+			"err":     err.Error(),
+			"user_id": user.UserID,
+		}).Error("Failed to fetch user data from db")
 		return err
 	}
 
 	values, err := redis.Values(user_reply, nil)
 	if err != nil {
-		log.Println("fetchUser: Failed to parse user reply: ", err)
+		log.WithFields(log.Fields{
+			"fn":      "MergeDB",
+			"err":     err.Error(),
+			"user_id": user.UserID,
+		}).Error("Failed to parse user reply")
 		return err
 	}
 
 	err = redis.ScanStruct(values, user)
 	if err != nil {
-		log.Println("fetchUser: Failed to scan redis values:", err)
+		log.WithFields(log.Fields{
+			"fn":      "MergeDB",
+			"err":     err.Error(),
+			"user_id": user.UserID,
+		}).Error("Failed to scan redis values")
 		return err
 	}
 	return nil

@@ -54,24 +54,40 @@ func NewTorrent(info_hash string, name string, torrent_id uint64) *Torrent {
 func (torrent *Torrent) MergeDB(r redis.Conn) error {
 	torrent_reply, err := r.Do("HGETALL", torrent.TorrentKey)
 	if err != nil {
-		log.Println(fmt.Sprintf("FetchTorrent: Failed to get torrent from redis [%s]", torrent.TorrentKey), err)
+		log.WithFields(log.Fields{
+			"key": torrent.TorrentKey,
+			"err": err.Error(),
+			"fn":  "MergeDB",
+		}).Error("Failed to get torrent from redis")
 		return err
 	}
 
 	values, err := redis.Values(torrent_reply, nil)
 	if err != nil {
-		log.Println("FetchTorrent: Failed to parse torrent reply: ", err)
+		log.WithFields(log.Fields{
+			"key": torrent.TorrentKey,
+			"err": err.Error(),
+			"fn":  "MergeDB",
+		}).Error("Failed to parse torrent reply")
 		return err
 	}
 
 	err = redis.ScanStruct(values, torrent)
 	if err != nil {
-		log.Println("FetchTorrent: Torrent scanstruct failure", err)
+		log.WithFields(log.Fields{
+			"key": torrent.TorrentKey,
+			"err": err.Error(),
+			"fn":  "MergeDB",
+		}).Error("Torrent scanstruct failure")
 		return err
 	}
 
 	if torrent.TorrentID == 0 {
-		log.Debug("FetchTorrent: Trying to fetch info hash without valid key:", torrent.InfoHash)
+		log.WithFields(log.Fields{
+			"key": torrent.TorrentKey,
+			"err": err.Error(),
+			"fn":  "MergeDB",
+		}).Error("Trying to fetch info hash without valid key")
 		r.Do("DEL", fmt.Sprintf("t:t:%s", torrent.InfoHash))
 	}
 	return nil
@@ -150,11 +166,16 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 	torrent.Unlock()
 	v, err := r.Do("SADD", torrent.TorrentPeersKey, peer.PeerID)
 	if err != nil {
-		log.Println("AddPeer: Error executing peer fetch query: ", err)
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"fn":  "AddPeer",
+		}).Error("Error executing peer fetch query")
 		return false
 	}
 	if v == "0" {
-		log.Println("AddPeer: Tried to add peer to set with existing element")
+		log.WithFields(log.Fields{
+			"fn": "AddPeer",
+		}).Warn("Tried to add peer to set with existing element")
 	}
 	return true
 }
@@ -169,6 +190,10 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 				torrent.Peers = nil
 			} else {
 				torrent.Peers = append(torrent.Peers[:i], torrent.Peers[i+1:]...)
+				log.WithFields(log.Fields{
+					"info_hash": torrent.InfoHash,
+					"fn":        "DelPeer",
+				}).Debug("Removed peer from torrent")
 			}
 			break
 		}

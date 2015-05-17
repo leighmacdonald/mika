@@ -4,7 +4,6 @@ package tracker
 import (
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"strconv"
@@ -284,8 +283,10 @@ func (tracker *Tracker) syncWriter() {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		util.CaptureMessage(r.Err().Error())
-		log.Println("SyncWriter: Failed to get redis conn:", r.Err().Error())
+		log.WithFields(log.Fields{
+			"fn":  "syncWriter",
+			"err": r.Err().Error(),
+		}).Fatal("Failed to get redis conn")
 		return
 	}
 	for {

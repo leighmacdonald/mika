@@ -105,8 +105,24 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 	defer user.Unlock()
 	if announce.Event != STARTED {
 		// Ignore downloaded value when starting
-		user.Uploaded += uint64(float64(upload_diff) * multi_up)
-		user.Downloaded += uint64(float64(download_diff) * multi_dn)
+		upload_diff_multi := uint64(float64(upload_diff) * multi_up)
+		download_diff_multi := uint64(float64(download_diff) * multi_dn)
+		uploaded_new := user.Uploaded + uint64(float64(upload_diff) * multi_up)
+		downloaded_new := user.Downloaded + uint64(float64(download_diff) * multi_dn)
+		if upload_diff > 0 || download_diff > 0 {
+			log.WithFields(log.Fields{
+				"ul_old":       user.Uploaded,
+				"ul_diff":      upload_diff,
+				"ul_diff_mult": upload_diff_multi,
+				"ul_new":       upload_diff,
+				"dl_old":       user.Downloaded,
+				"dl_diff":      download_diff,
+				"dl_diff_mult": download_diff_multi,
+				"fn":           "Update",
+			}).Debug("Removed peer from torrent")
+		}
+		user.Uploaded = uploaded_new
+		user.Downloaded = downloaded_new
 	}
 	user.Announces++
 	if announce.Event == COMPLETED {

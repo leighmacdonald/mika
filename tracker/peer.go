@@ -86,20 +86,6 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	}
 	peer.Uploaded = announce.Uploaded
 	peer.Downloaded = announce.Downloaded
-	if ul_diff > 0 || dl_diff > 0 {
-		log.WithFields(log.Fields{
-			"ul_diff":   util.Bytes(ul_diff),
-			"dl_diff":   util.Bytes(dl_diff),
-			"user_name": peer.User.Username,
-			"peer_id":   peer.PeerID[0:8],
-		}).Info("Peer stat changes")
-	}
-	ul_diff = 0
-	dl_diff = 0
-
-	peer.IP = announce.IPv4.String()
-	peer.Port = announce.Port
-	peer.Left = announce.Left
 	peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
 	peer.SpeedDN = util.EstSpeed(peer.AnnounceLast, cur_time, dl_diff)
 	if peer.SpeedUP > peer.SpeedUPMax {
@@ -108,6 +94,22 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	if peer.SpeedDN > peer.SpeedDNMax {
 		peer.SpeedDNMax = peer.SpeedDN
 	}
+	if ul_diff > 0 || dl_diff > 0 {
+		log.WithFields(log.Fields{
+			"ul_diff":      util.Bytes(ul_diff),
+			"dl_diff":      util.Bytes(dl_diff),
+			"user_name":    peer.User.Username,
+			"peer_id":      peer.PeerID[0:8],
+			"speed_up":     peer.SpeedUP,
+			"speed_dn":     peer.SpeedDN,
+			"speed_up_max": peer.SpeedUPMax,
+			"speed_dn_max": peer.SpeedDNMax,
+		}).Info("Peer stat changes")
+	}
+
+	peer.IP = announce.IPv4.String()
+	peer.Port = announce.Port
+	peer.Left = announce.Left
 
 	// Must be active to have a real time delta
 	if !peer.IsNew() {

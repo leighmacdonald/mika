@@ -93,10 +93,16 @@ type Configuration struct {
 // LoadConfig reads in a json based config file from the path provided and updated
 // the currently active application configuration
 func LoadConfig(config_file string, fail bool) {
-	log.Info("Loading config:", config_file)
+	log.WithFields(log.Fields{
+		"config_file": config_file,
+	}).Info("Loading config")
+
 	file, err := ioutil.ReadFile(config_file)
 	if err != nil {
-		log.Error("loadConfig: Failed to open config file:", err)
+		log.WithFields(log.Fields{
+			"err":         err.Error(),
+			"config_file": config_file,
+		}).Fatal("Failed to open config file")
 		if fail {
 			os.Exit(1)
 		}

@@ -31,7 +31,10 @@ type Payload struct {
 // NewPayload creates a new redis payload
 func NewPayload(command string, args ...interface{}) Payload {
 	if len(args) < 1 {
-		log.Panic("Not enough arguments to make payload")
+		log.WithFields(log.Fields{
+			"command": command,
+			"args":    args,
+		}).Panic("Not enough arguments to make payload")
 	}
 	return Payload{Command: command, Args: args}
 }
@@ -52,7 +55,9 @@ func Setup(host string, pass string) {
 		// Close the existing pool cleanly if it exists
 		err := Pool.Close()
 		if err != nil {
-			log.Fatal("Cannot close existing redis pool:", err.Error())
+			log.WithFields(log.Fields{
+				"err": err.Error(),
+			}).Fatal("Cannot close existing redis pool")
 		}
 	}
 	pool := &redis.Pool{
@@ -62,11 +67,17 @@ func Setup(host string, pass string) {
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", host)
 			if err != nil {
+				log.WithFields(log.Fields{
+					"err": err.Error(),
+				}).Error("Failed to connect to redis")
 				return nil, err
 			}
 			if pass != "" {
 				if _, err := c.Do("AUTH", pass); err != nil {
 					c.Close()
+					log.WithFields(log.Fields{
+						"err": err.Error(),
+					}).Fatal("Invalid redis password supplied")
 					return nil, err
 				}
 			}

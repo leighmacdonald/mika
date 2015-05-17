@@ -88,14 +88,21 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 	if torrent == nil {
 		err := c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
 		if err != nil {
-			log.Error("ERR: ", err)
+			log.WithFields(log.Fields{
+				"err": err.Message,
+				"fn":  "HandleTorrentGet",
+			}).Error("Failed to encode error")
 		}
 	} else {
-		log.Debug("HandleTorrentGet: Fetched torrent", info_hash)
+		log.WithFields(log.Fields{
+			"info_hash": info_hash,
+		}).Debug("Fetched torrent successfully")
 		err := c.JSON(http.StatusOK, torrent)
 		if err != nil {
-			log.Error("ERR2: ", err)
-			log.Error(torrent)
+			log.WithFields(log.Fields{
+				"err": err.Message,
+				"fn":  "HandleTorrentGet",
+			}).Error("Failed to encode torrent")
 		}
 	}
 	return nil
@@ -113,10 +120,22 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 		return &echo.HTTPError{Code: http.StatusBadRequest}
 	}
 	if payload.TorrentID <= 0 {
+		log.WithFields(log.Fields{
+			"err": "Invalid torrent id <0",
+			"fn":  "HandleTorrentGet",
+		}).Error("Payload requirements not met")
 		return &echo.HTTPError{Code: http.StatusBadRequest}
 	} else if len(payload.InfoHash) != 40 {
+		log.WithFields(log.Fields{
+			"err": "Invalid info_hash len != 40",
+			"fn":  "HandleTorrentGet",
+		}).Error("Payload requirements not met")
 		return &echo.HTTPError{Code: http.StatusBadRequest}
 	} else if payload.Name == "" {
+		log.WithFields(log.Fields{
+			"err": "Invalid name: empty",
+			"fn":  "HandleTorrentGet",
+		}).Error("Payload requirements not met")
 		return &echo.HTTPError{
 			Code:    http.StatusBadRequest,
 			Message: "Invalid release name, cannot be empty",
@@ -178,7 +197,10 @@ func (t *Tracker) getUser(c *echo.Context) *User {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		log.Debug("getUser: ", err)
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"fn":  "getUser",
+		}).Warn("Invalid user id, malformed")
 		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
 		return nil
 	}
@@ -186,6 +208,9 @@ func (t *Tracker) getUser(c *echo.Context) *User {
 	user, exists := t.Users[user_id]
 	t.UsersMutex.RUnlock()
 	if !exists {
+		log.WithFields(log.Fields{
+			"fn": "getUser",
+		}).Warn("Invalid user id, not found")
 		c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
 		return nil
 	}
@@ -250,15 +275,27 @@ func (t *Tracker) HandleUserGet(c *echo.Context) *echo.HTTPError {
 func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	payload := &UserCreatePayload{}
 	if err := c.Bind(payload); err != nil {
+		log.WithFields(log.Fields{
+			"fn":  "HandleUserCreate",
+			"err": err.Message,
+		}).Error("Failed to parse user create json payload")
 		return err
 	}
 	if payload.Passkey == "" || payload.UserID <= 0 {
+		log.WithFields(log.Fields{
+			"fn":      "HandleUserCreate",
+			"passkey": payload.Passkey,
+			"user_id": payload.UserID,
+		}).Error("Invalud passkey or userid")
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
 	}
 
 	user := t.FindUserByID(payload.UserID)
 
 	if user != nil {
+		log.WithFields(log.Fields{
+			"fn": "HandleUserCreate",
+		}).Warn("Tried to add duplicate user")
 		return c.JSON(http.StatusConflict, ResponseErr{"User exists"})
 	}
 
@@ -281,12 +318,19 @@ func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	payload := &UserUpdatePayload{}
 	if err := c.Bind(payload); err != nil {
+		log.WithFields(log.Fields{
+			"fn":  "HandleUserUpdate",
+			"err": err.Message,
+		}).Error("Failed to parse user update json payload")
 		return err
 	}
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		log.Debug("HandleUserUpdate: Failed to parse user id", err)
+		log.WithFields(log.Fields{
+			"fn":  "HandleUserUpdate",
+			"err": err.Error(),
+		}).Error("Failed to parse user id")
 		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format"})
 	}
 
@@ -294,6 +338,9 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	user, exists := t.Users[user_id]
 	t.UsersMutex.RUnlock()
 	if !exists {
+		log.WithFields(log.Fields{
+			"fn": "HandleUserUpdate",
+		}).Error("User not found, cannot update")
 		return c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
 	}
 
@@ -312,13 +359,20 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	} else {
 		user.Unlock()
 	}
-	log.Info("HandleUserUpdate: Updated user", user_id)
+	log.WithFields(log.Fields{
+		"fn":      "HandleUserUpdate",
+		"user_id": user_id,
+	}).Info("Updated user successfully")
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
 func (t *Tracker) HandleWhitelistAdd(c *echo.Context) *echo.HTTPError {
 	payload := &WhitelistAddPayload{}
 	if err := c.Bind(payload); err != nil {
+		log.WithFields(log.Fields{
+			"fn":  "HandleWhitelistAdd",
+			"err": err.Message,
+		}).Error("Failed to parse whitelist add json payload")
 		return &echo.HTTPError{Code: http.StatusBadRequest}
 	}
 	for _, prefix := range t.Whitelist {
@@ -332,7 +386,10 @@ func (t *Tracker) HandleWhitelistAdd(c *echo.Context) *echo.HTTPError {
 
 	r.Do("HSET", "t:whitelist", payload.Prefix, payload.Client)
 	t.initWhitelist(r)
-	log.Info("HandleWhitelistAdd: Added new client to whitelist", payload.Prefix)
+	log.WithFields(log.Fields{
+		"fn":     "HandleWhitelistAdd",
+		"client": payload.Prefix,
+	}).Info("Added new client to whitelist")
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
@@ -345,11 +402,18 @@ func (t *Tracker) HandleWhitelistDel(c *echo.Context) *echo.HTTPError {
 
 			r.Do("HDEL", "t:whitelist", prefix)
 			t.initWhitelist(r)
-			log.Info("HandleWhitelistDel: Deleted client from whitelist", prefix)
+			log.WithFields(log.Fields{
+				"prefix": prefix,
+				"fn":     "HandleWhitelistDel",
+			}).Info("Deleted client from whitelist successfully")
 			return c.JSON(http.StatusOK, resp_ok)
 		}
 	}
-	return c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
+	log.WithFields(log.Fields{
+		"prefix": prefix,
+		"fn":     "HandleWhitelistDel",
+	}).Error("Tried to remove unknown client prefix")
+	return c.JSON(http.StatusNotFound, ResponseErr{"Client prefix not Found"})
 }
 
 func (t *Tracker) HandleGetTorrentPeer(c *echo.Context) *echo.HTTPError {
@@ -360,8 +424,15 @@ func (t *Tracker) HandleGetTorrentPeers(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
+		log.WithFields(log.Fields{
+			"info_hash": info_hash,
+			"fn":        "HandleGetTorrentPeers",
+		}).Error("Requested unknown info_hash")
 		return c.JSON(http.StatusNotFound, ResponseErr{})
 	}
-	log.Debug("HandleGetTorrentPeers: Got torrent peers", info_hash)
+	log.WithFields(log.Fields{
+		"info_hash": info_hash,
+		"fn":        "HandleGetTorrentPeers",
+	}).Debug("Got torrent peers successfully")
 	return c.JSON(http.StatusOK, torrent.Peers)
 }

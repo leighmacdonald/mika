@@ -101,10 +101,10 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 			"dl_diff":      util.Bytes(dl_diff),
 			"user_name":    peer.User.Username,
 			"peer_id":      peer.PeerID[0:8],
-			"speed_up":     fmt.Sprintf("s%/s", uint64(util.Bytes(peer.SpeedUP))),
-			"speed_dn":     fmt.Sprintf("s%/s", uint64(util.Bytes(peer.SpeedDN))),
-			"speed_up_max": fmt.Sprintf("s%/s", uint64(util.Bytes(peer.SpeedUPMax))),
-			"speed_dn_max": fmt.Sprintf("s%/s", uint64(util.Bytes(peer.SpeedDNMax))),
+			"speed_up":     fmt.Sprintf("%s/s", util.Bytes(uint64(peer.SpeedUP))),
+			"speed_dn":     fmt.Sprintf("%s/s", util.Bytes(uint64(peer.SpeedDN))),
+			"speed_up_max": fmt.Sprintf("%s/s", util.Bytes(uint64(peer.SpeedUPMax))),
+			"speed_dn_max": fmt.Sprintf("%s/s", util.Bytes(uint64(peer.SpeedDNMax))),
 		}).Info("Peer stat changes")
 	}
 

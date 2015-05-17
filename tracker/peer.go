@@ -83,11 +83,12 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 		if announce.Downloaded > peer.Downloaded {
 			dl_diff = announce.Downloaded - peer.Downloaded
 		}
+		peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
+		peer.SpeedDN = util.EstSpeed(peer.AnnounceLast, cur_time, dl_diff)
 	}
 	peer.Uploaded = announce.Uploaded
 	peer.Downloaded = announce.Downloaded
-	peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
-	peer.SpeedDN = util.EstSpeed(peer.AnnounceLast, cur_time, dl_diff)
+
 	if peer.SpeedUP > peer.SpeedUPMax {
 		peer.SpeedUPMax = peer.SpeedUP
 	}

@@ -3,6 +3,7 @@ package tracker
 import (
 	"fmt"
 	"git.totdev.in/totv/mika/db"
+	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"sync"
@@ -104,25 +105,30 @@ func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff u
 	user.Lock()
 	defer user.Unlock()
 	if announce.Event != STARTED {
-		// Ignore downloaded value when starting
+		// Apply multipliers
 		upload_diff_multi := uint64(float64(upload_diff) * multi_up)
 		download_diff_multi := uint64(float64(download_diff) * multi_dn)
+
+		// Get new totals
 		uploaded_new := user.Uploaded + uint64(float64(upload_diff)*multi_up)
 		downloaded_new := user.Downloaded + uint64(float64(download_diff)*multi_dn)
+
+		user.Uploaded = uploaded_new
+		user.Downloaded = downloaded_new
+
 		if upload_diff > 0 || download_diff > 0 {
 			log.WithFields(log.Fields{
-				"ul_old":       user.Uploaded,
-				"ul_diff":      upload_diff,
-				"ul_diff_mult": upload_diff_multi,
-				"ul_new":       upload_diff,
-				"dl_old":       user.Downloaded,
-				"dl_diff":      download_diff,
-				"dl_diff_mult": download_diff_multi,
+				"ul_old":       util.Bytes(user.Uploaded),
+				"ul_diff":      util.Bytes(upload_diff),
+				"ul_diff_mult": util.Bytes(upload_diff_multi),
+				"ul_new":       util.Bytes(uploaded_new),
+				"dl_old":       util.Bytes(user.Downloaded),
+				"dl_diff":      util.Bytes(download_diff),
+				"dl_diff_mult": util.Bytes(download_diff_multi),
+				"dl_new":       util.Bytes(downloaded_new),
 				"fn":           "Update",
 			}).Info("User stat changes")
 		}
-		user.Uploaded = uploaded_new
-		user.Downloaded = downloaded_new
 	}
 	user.Announces++
 	if announce.Event == COMPLETED {

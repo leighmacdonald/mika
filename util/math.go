@@ -29,7 +29,7 @@ func EstSpeed(start_time int32, last_time int32, bytes_sent uint64) float64 {
 	if start_time <= 0 || last_time <= 0 || bytes_sent == 0 || last_time < start_time {
 		return 0.0
 	}
-	return float64(bytes_sent) / (float64(last_time) - float64(start_time))
+	return RoundPlus(float64(bytes_sent)/(float64(last_time)-float64(start_time)), 2)
 }
 
 func LogN(n, b float64) float64 {
@@ -65,4 +65,13 @@ func Bytes(s uint64) string {
 func IBytes(s uint64) string {
 	sizes := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
 	return humanizeBytes(s, 1024, sizes)
+}
+
+func Round(f float64) float64 {
+	return math.Floor(f + .5)
+}
+
+func RoundPlus(f float64, places int) float64 {
+	shift := math.Pow(10, float64(places))
+	return Round(f*shift) / shift
 }

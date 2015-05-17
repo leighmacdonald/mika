@@ -5,28 +5,32 @@ GOFLAGS = -ldflags "-X git.totdev.in/totv/mika.Version `git rev-parse --short HE
 all: build
 
 deps:
-	@go get -v github.com/chihaya/bencode
-	@go get -v github.com/garyburd/redigo/redis
-	@go get -v github.com/kisielk/raven-go/raven
-	@go get -v github.com/labstack/echo
-	@go get -v github.com/influxdb/influxdb/client
-	@go get -v github.com/goji/httpauth
+	@./update.sh
 
-build:
-	@go fmt ./...
+vet:
+	@go vet . ./...
+
+fmt:
+	@go fmt . ./...
+
+build: fmt
 	@go build $(GOFLAGS) cmd/mika/mika.go
 
-install:
-	@go get $(GOFLAGS) ./...
+run:
+	@go run $(GOFLAGS) cmd/mika/mika.go
+
+install: deps
+	@go install $(GOFLAGS) ./...
 
 test:
-	@go test $(GOFLAGS) -cover ./util ./tracker ./cmd/mika ./conf ./db ./stats ./
+	@go test $(GOFLAGS) -cover . ./...
 
 cover: install
-	@go test -coverprofile=coverage.out $(GOFLAGS) */*_test.go && go tool cover -html=coverage.out
+	@go test -coverprofile=coverage.out $(GOFLAGS) */*_test.go
+	@go tool cover -html=coverage.out
 
 bench: install
-	@go test -run=NONE -bench=. $(GOFLAGS) ./...
+	@go test -run=NONE -bench=. $(GOFLAGS) . ./...
 
 clean:
 	@go clean $(GOFLAGS) -i

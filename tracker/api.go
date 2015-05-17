@@ -107,7 +107,7 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	payload := &TorrentAddPayload{}
 	if err := c.Bind(payload); err != nil {
 		log.WithFields(log.Fields{
-			"err": err.Error(),
+			"err": err.Message,
 		}).Error("Failed to parse addtorrent payload")
 
 		return &echo.HTTPError{Code: http.StatusBadRequest}
@@ -141,8 +141,8 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	SyncTorrentC <- torrent
 
 	log.WithFields(log.Fields{
-		"fn": "HandleTorrentAdd",
-		"name": payload.Name,
+		"fn":        "HandleTorrentAdd",
+		"name":      payload.Name,
 		"info_hash": payload.InfoHash,
 	}).Info("Added new torrent successfully")
 
@@ -154,7 +154,7 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
 		log.WithFields(log.Fields{
-			"fn": "HandleTorrentDel",
+			"fn":        "HandleTorrentDel",
 			"info_hash": info_hash,
 		}).Warn("Tried to delete invalid torrent")
 		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id"})
@@ -167,7 +167,7 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 		SyncTorrentC <- torrent
 	}
 	log.WithFields(log.Fields{
-		"fn": "HandleTorrentDel",
+		"fn":        "HandleTorrentDel",
 		"info_hash": info_hash,
 	}).Info("Deleted torrent successfully")
 

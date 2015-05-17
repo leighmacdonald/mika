@@ -82,7 +82,7 @@ func (user *User) AddHNR(r redis.Conn, torrent_id uint64) {
 	r.Send("SADD", user.KeyHNR, torrent_id)
 	log.WithFields(log.Fields{
 		"torrent_id": torrent_id,
-		"user_id": user.UserID,
+		"user_id":    user.UserID,
 	}).Debug("Added new HnR to user")
 }
 

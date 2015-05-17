@@ -308,7 +308,7 @@ func (tracker *Tracker) syncWriter() {
 		if err != nil {
 			log.WithFields(log.Fields{
 				"fn": "syncWriter",
-			}).Error("Failed to flush connection:", err.Error())
+			}).Fatal("Failed to flush connection:", err.Error())
 		}
 	}
 }

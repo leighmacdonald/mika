@@ -266,7 +266,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 		event = STARTED
 	case "stopped":
 		event = STOPPED
-	case "complete":
+	case "completed":
 		event = COMPLETED
 	}
 

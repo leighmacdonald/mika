@@ -101,6 +101,13 @@ func (torrent *Torrent) Update(announce *AnnounceRequest) {
 	torrent.Seeders = s
 	torrent.Leechers = l
 	if announce.Event == COMPLETED {
+		torrent.Snatches = torrent.Snatches + 1
+		log.WithFields(log.Fields{
+			"fn":      "Update",
+			"name": torrent.Name,
+			"info_hash": torrent.InfoHash,
+			"snatches": torrent.Snatches,
+		}).Info("Snatch registered")
 		torrent.Snatches++
 	}
 	torrent.Unlock()

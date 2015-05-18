@@ -119,18 +119,16 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 		if time_diff < (uint64(conf.Config.AnnInterval) * 4) {
 			peer.TotalTime += uint32(time_diff)
 		}
-	}
-
-	if peer.IsNew() {
 		peer.AnnounceFirst = cur_time
 	}
+
 	peer.AnnounceLast = cur_time
 
 	return ul_diff, dl_diff
 }
 
 func (peer *Peer) IsHNR() bool {
-	return peer.Downloaded > conf.Config.HNRMinBytes && peer.Left > 0 && peer.TotalTime < uint32(conf.Config.HNRThreshold)
+	return peer.Downloaded > conf.Config.HNRMinBytes && peer.IsSeeder() && peer.TotalTime < uint32(conf.Config.HNRThreshold)
 }
 
 func (peer *Peer) IsSeeder() bool {

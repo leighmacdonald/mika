@@ -1,4 +1,4 @@
-#!/bin/env python2
+#!python3
 from __future__ import unicode_literals
 import binascii
 import json

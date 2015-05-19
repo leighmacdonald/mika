@@ -1,23 +1,20 @@
 package tracker
 
 import (
+	"errors"
 	"fmt"
+	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"github.com/labstack/echo"
 	"net/http"
 	"strconv"
 )
 
 type ResponseOK struct {
 	Msg string `json:"message"`
-}
-
-type ResponseErr struct {
-	Err string `json:"error"`
 }
 
 type UserPayload struct {
@@ -70,28 +67,69 @@ type WhitelistAddPayload struct {
 	Client string `json:"client"`
 }
 
+type APIErrorResponse struct {
+	Code    int    `json:"code"`
+	Error   string `json:"error"`
+	Message string `json:"message"`
+}
+
+type APIError struct {
+	Code    int
+	Message string
+	Error   error
+	Fields  log.Fields
+}
+
+func NewApiError(err *echo.HTTPError) *APIErrorResponse {
+	return &APIErrorResponse{
+		Code:    err.Code,
+		Error:   err.Error.Error(),
+		Message: err.Message,
+	}
+}
+
 var (
 	resp_ok = ResponseOK{"ok"}
 )
 
-func (t *Tracker) HandleVersion(c *echo.Context) {
-	c.String(http.StatusOK, mika.VersionStr())
+func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
+	ctx := log.WithFields(http_error.Fields)
+	if http_error.Level == log.WarnLevel {
+		if http_error.Error != nil {
+			ctx.Warn(http_error.Error.Error())
+		} else {
+			ctx.Warn(http_error.Message)
+		}
+	} else {
+		if http_error.Error != nil {
+			ctx.Error(http_error.Error.Error())
+		} else {
+			ctx.Error(http_error.Message)
+		}
+	}
+
+	if http_error.Code == 0 {
+		http_error.Code = http.StatusInternalServerError
+	}
+	err_resp := NewApiError(http_error)
+	c.JSON(http_error.Code, err_resp)
 }
 
-func (t *Tracker) HandleUptime(c *echo.Context) {
-	c.String(http.StatusOK, fmt.Sprintf("%d", util.Unixtime()-mika.StartTime))
+func (t *Tracker) HandleVersion(c *echo.Context) *echo.HTTPError {
+	return c.String(http.StatusOK, mika.VersionStr())
+}
+
+func (t *Tracker) HandleUptime(c *echo.Context) *echo.HTTPError {
+	return c.String(http.StatusOK, fmt.Sprintf("%d", util.Unixtime()-mika.StartTime))
 }
 
 func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
-		err := c.JSON(http.StatusNotFound, ResponseErr{"Unknown info hash"})
-		if err != nil {
-			log.WithFields(log.Fields{
-				"err": err.Message,
-				"fn":  "HandleTorrentGet",
-			}).Error("Failed to encode error")
+		return &echo.HTTPError{
+			Code:    http.StatusNotFound,
+			Message: "Invalid info hash supplied",
 		}
 	} else {
 		log.WithFields(log.Fields{
@@ -99,10 +137,14 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 		}).Debug("Fetched torrent successfully")
 		err := c.JSON(http.StatusOK, torrent)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"err": err.Message,
-				"fn":  "HandleTorrentGet",
-			}).Error("Failed to encode torrent")
+			return &echo.HTTPError{
+				Code:    http.StatusInternalServerError,
+				Error:   err.Error,
+				Message: "Failed to encode torrent data",
+				Fields: log.Fields{
+					"fn": "HandleTorrentGet",
+				},
+			}
 		}
 	}
 	return nil
@@ -113,35 +155,29 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	payload := &TorrentAddPayload{}
 	if err := c.Bind(payload); err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Message,
-		}).Error("Failed to parse addtorrent payload")
-
-		return &echo.HTTPError{Code: http.StatusBadRequest}
-	}
-	if payload.TorrentID <= 0 {
-		log.WithFields(log.Fields{
-			"err": "Invalid torrent id <0",
-			"fn":  "HandleTorrentGet",
-		}).Error("Payload requirements not met")
-		return &echo.HTTPError{Code: http.StatusBadRequest}
-	} else if len(payload.InfoHash) != 40 {
-		log.WithFields(log.Fields{
-			"err": "Invalid info_hash len != 40",
-			"fn":  "HandleTorrentGet",
-		}).Error("Payload requirements not met")
-		return &echo.HTTPError{Code: http.StatusBadRequest}
-	} else if payload.Name == "" {
-		log.WithFields(log.Fields{
-			"err": "Invalid name: empty",
-			"fn":  "HandleTorrentGet",
-		}).Error("Payload requirements not met")
 		return &echo.HTTPError{
 			Code:    http.StatusBadRequest,
-			Message: "Invalid release name, cannot be empty",
+			Error:   err.Error,
+			Message: "Failed to parse payload",
+			Fields:  log.Fields{"fn": "HandleTorrentGet"},
 		}
 	}
-
+	var err_msg error
+	if payload.TorrentID <= 0 {
+		err_msg = errors.New("Invalid torrent id < 0")
+	} else if len(payload.InfoHash) != 40 {
+		err_msg = errors.New("Invalid info_hash len != 40")
+	} else if payload.Name == "" {
+		err_msg = errors.New("Invalid release name, cannot be empty")
+	}
+	if err_msg != nil {
+		return &echo.HTTPError{
+			Code:    http.StatusBadRequest,
+			Error:   err_msg,
+			Message: "Payload requirements not met",
+			Fields:  log.Fields{"fn": "HandleTorrentGet"},
+		}
+	}
 	torrent := t.FindTorrentByInfoHash(payload.InfoHash)
 	if torrent == nil {
 		// Add a new one
@@ -172,11 +208,12 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
-		log.WithFields(log.Fields{
-			"fn":        "HandleTorrentDel",
-			"info_hash": info_hash,
-		}).Warn("Tried to delete invalid torrent")
-		return c.JSON(http.StatusNotFound, ResponseErr{"Invalid torrent_id"})
+		return &echo.HTTPError{
+			Code:    http.StatusNotFound,
+			Fields:  log.Fields{"fn": "HandleTorrentDel", "info_hash": info_hash},
+			Error:   errors.New("Unknown torrent_id supplied"),
+			Message: "Tried to delete invalid torrent",
+		}
 	}
 	torrent.Lock()
 	torrent.Enabled = false
@@ -193,7 +230,7 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
-func (t *Tracker) getUser(c *echo.Context) *User {
+func (t *Tracker) getUser(c *echo.Context) (*User, error) {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
@@ -201,26 +238,27 @@ func (t *Tracker) getUser(c *echo.Context) *User {
 			"err": err.Error(),
 			"fn":  "getUser",
 		}).Warn("Invalid user id, malformed")
-		c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
-		return nil
+
+		return nil, errors.New("Invalid user id")
 	}
 	t.UsersMutex.RLock()
 	user, exists := t.Users[user_id]
 	t.UsersMutex.RUnlock()
 	if !exists {
-		log.WithFields(log.Fields{
-			"fn": "getUser",
-		}).Warn("Invalid user id, not found")
-		c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
-		return nil
+		return nil, errors.New("User not found")
 	}
-	return user
+	return user, nil
 }
 
 func (t *Tracker) HandleUserTorrents(c *echo.Context) *echo.HTTPError {
-	user := t.getUser(c)
-	if user == nil {
-		return nil
+	user, err := t.getUser(c)
+	if err != nil {
+		return &echo.HTTPError{
+			Code:    http.StatusNotFound,
+			Error:   err,
+			Message: "Failed to find user",
+			Fields:  log.Fields{"fn": "getUser"},
+		}
 	}
 	response := UserTorrentsResponse{}
 	r := db.Pool.Get()
@@ -229,30 +267,45 @@ func (t *Tracker) HandleUserTorrents(c *echo.Context) *echo.HTTPError {
 	a, err := r.Do("SMEMBERS", user.KeyActive)
 
 	if err != nil {
-		log.Error("HandleUserTorrents: Failed to fetch user active", err)
-		c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user active torrents"})
-		return nil
+		return &echo.HTTPError{
+			Code:    http.StatusInternalServerError,
+			Message: "Could not fetch active torrents",
+			Error:   err,
+			Fields:  log.Fields{"fn": "HandleUserTorrents"},
+		}
 	}
 	active_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyHNR)
 	if err != nil {
-		log.Error("HandleUserTorrents: Failed to fetch user HNR", err)
-		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user hnr torrents"})
+		return &echo.HTTPError{
+			Code:    http.StatusInternalServerError,
+			Message: "Could not fetch active hnr's",
+			Error:   err,
+			Fields:  log.Fields{"fn": "HandleUserTorrents"},
+		}
 	}
 	hnr_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyComplete)
 	if err != nil {
-		log.Error("HandleUserTorrents: Failed to fetch user completes", err)
-		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user completed torrents"})
+		return &echo.HTTPError{
+			Code:    http.StatusInternalServerError,
+			Message: "Could not fetch complete torrents",
+			Error:   err,
+			Fields:  log.Fields{"fn": "HandleUserTorrents"},
+		}
 	}
 	complete_list, err := redis.Strings(a, nil)
 
 	a, err = r.Do("SMEMBERS", user.KeyIncomplete)
 	if err != nil {
-		log.Error("HandleUserTorrents: Failed to fetch user incompletes", err)
-		return c.JSON(http.StatusInternalServerError, ResponseErr{"Error fetching user incompleted torrents"})
+		return &echo.HTTPError{
+			Code:    http.StatusInternalServerError,
+			Message: "Could not fetch incomplete torrents",
+			Error:   err,
+			Fields:  log.Fields{"fn": "HandleUserTorrents"},
+		}
 	}
 	incomplete_list, err := redis.Strings(a, nil)
 
@@ -265,38 +318,49 @@ func (t *Tracker) HandleUserTorrents(c *echo.Context) *echo.HTTPError {
 }
 
 func (t *Tracker) HandleUserGet(c *echo.Context) *echo.HTTPError {
-	user := t.getUser(c)
-	if user != nil {
-		return c.JSON(http.StatusOK, user)
+	user, err := t.getUser(c)
+	if err != nil {
+		return &echo.HTTPError{
+			Code:    http.StatusNotFound,
+			Error:   err,
+			Message: "Could not fetch user",
+			Fields:  log.Fields{"fn": "HandleUserGet"},
+		}
 	}
-	return nil
+	return c.JSON(http.StatusOK, user)
 }
 
 func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	payload := &UserCreatePayload{}
 	if err := c.Bind(payload); err != nil {
-		log.WithFields(log.Fields{
-			"fn":  "HandleUserCreate",
-			"err": err.Message,
-		}).Error("Failed to parse user create json payload")
-		return err
+		return &echo.HTTPError{
+			Code:    http.StatusBadRequest,
+			Error:   err.Error,
+			Message: "Failed to parse user create json payload",
+			Fields:  log.Fields{"fn": "HandleUserCreate"},
+		}
 	}
 	if payload.Passkey == "" || payload.UserID <= 0 {
-		log.WithFields(log.Fields{
-			"fn":      "HandleUserCreate",
-			"passkey": payload.Passkey,
-			"user_id": payload.UserID,
-		}).Error("Invalud passkey or userid")
-		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id"})
+		return &echo.HTTPError{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid passkey or userid",
+			Fields: log.Fields{
+				"fn":      "HandleUserCreate",
+				"passkey": payload.Passkey,
+				"user_id": payload.UserID,
+			},
+		}
 	}
 
 	user := t.FindUserByID(payload.UserID)
 
 	if user != nil {
-		log.WithFields(log.Fields{
-			"fn": "HandleUserCreate",
-		}).Warn("Tried to add duplicate user")
-		return c.JSON(http.StatusConflict, ResponseErr{"User exists"})
+		return &echo.HTTPError{
+			Fields: log.Fields{"fn": "HandleUserCreate"},
+			Code:   http.StatusConflict,
+			Error:  errors.New("Tried to add duplicate user"),
+			Level:  log.WarnLevel,
+		}
 	}
 
 	user = NewUser(payload.UserID)
@@ -311,37 +375,45 @@ func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	} else {
 		user.Unlock()
 	}
-	log.Info("HandleUserCreate: Created new user", fmt.Sprintf("[%d/%s]", payload.UserID, payload.Name))
+	log.WithFields(log.Fields{
+		"fn":        "HandleUserCreate",
+		"user_name": payload.Name,
+		"user_id":   payload.UserID,
+	}).Info("Created new user successfully")
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
 func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	payload := &UserUpdatePayload{}
 	if err := c.Bind(payload); err != nil {
-		log.WithFields(log.Fields{
-			"fn":  "HandleUserUpdate",
-			"err": err.Message,
-		}).Error("Failed to parse user update json payload")
-		return err
+		return &echo.HTTPError{
+			Fields:  log.Fields{"fn": "HandleUserUpdate"},
+			Message: "Failed to parse user update json payload",
+			Error:   err.Error,
+			Code:    http.StatusBadRequest,
+		}
 	}
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"fn":  "HandleUserUpdate",
-			"err": err.Error(),
-		}).Error("Failed to parse user id")
-		return c.JSON(http.StatusBadRequest, ResponseErr{"Invalid user id format"})
+		return &echo.HTTPError{
+			Message: "Failed to parse user update request",
+			Error:   err,
+			Code:    http.StatusBadRequest,
+			Fields:  log.Fields{"fn": "HandleUserUpdate"},
+		}
 	}
 
 	t.UsersMutex.RLock()
 	user, exists := t.Users[user_id]
 	t.UsersMutex.RUnlock()
 	if !exists {
-		log.WithFields(log.Fields{
-			"fn": "HandleUserUpdate",
-		}).Error("User not found, cannot update")
-		return c.JSON(http.StatusNotFound, ResponseErr{"User not Found"})
+		return &echo.HTTPError{
+			Code:    http.StatusNotFound,
+			Fields:  log.Fields{"fn": "HandleUserUpdate"},
+			Message: "User not found, cannot continue",
+			Level:   log.WarnLevel,
+		}
 	}
 
 	user.Lock()
@@ -369,11 +441,15 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 func (t *Tracker) HandleWhitelistAdd(c *echo.Context) *echo.HTTPError {
 	payload := &WhitelistAddPayload{}
 	if err := c.Bind(payload); err != nil {
-		log.WithFields(log.Fields{
-			"fn":  "HandleWhitelistAdd",
-			"err": err.Message,
-		}).Error("Failed to parse whitelist add json payload")
-		return &echo.HTTPError{Code: http.StatusBadRequest}
+		return &echo.HTTPError{
+			Code: http.StatusBadRequest,
+			Fields: log.Fields{
+				"fn":  "HandleWhitelistAdd",
+				"err": err.Message,
+			},
+			Message: "Failed to parse whitelist add json payload",
+			Error:   err.Error,
+		}
 	}
 	for _, prefix := range t.Whitelist {
 		if prefix == payload.Prefix {
@@ -409,26 +485,35 @@ func (t *Tracker) HandleWhitelistDel(c *echo.Context) *echo.HTTPError {
 			return c.JSON(http.StatusOK, resp_ok)
 		}
 	}
-	log.WithFields(log.Fields{
-		"prefix": prefix,
-		"fn":     "HandleWhitelistDel",
-	}).Error("Tried to remove unknown client prefix")
-	return c.JSON(http.StatusNotFound, ResponseErr{"Client prefix not Found"})
+	return &echo.HTTPError{
+		Fields:  log.Fields{"prefix": prefix, "fn": "HandleWhitelistDel"},
+		Level:   log.WarnLevel,
+		Error:   errors.New("Tried to remove unknown client prefix"),
+		Message: "Failed to remove client from whitelist",
+		Code:    http.StatusNotFound,
+	}
 }
 
 func (t *Tracker) HandleGetTorrentPeer(c *echo.Context) *echo.HTTPError {
-	return c.JSON(http.StatusOK, ResponseErr{"Nope! :("})
+	return &echo.HTTPError{
+		Code:    http.StatusNotFound,
+		Message: "Hi! :)",
+	}
 }
 
 func (t *Tracker) HandleGetTorrentPeers(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
-		log.WithFields(log.Fields{
-			"info_hash": info_hash,
-			"fn":        "HandleGetTorrentPeers",
-		}).Error("Requested unknown info_hash")
-		return c.JSON(http.StatusNotFound, ResponseErr{})
+		return &echo.HTTPError{
+			Code: http.StatusNotFound,
+			Fields: log.Fields{
+				"info_hash": info_hash,
+				"fn":        "HandleGetTorrentPeers",
+			},
+			Message: "Could not fetch peers from torrent",
+			Error:   errors.New("Requested unknown info_hash"),
+		}
 	}
 	log.WithFields(log.Fields{
 		"info_hash": info_hash,

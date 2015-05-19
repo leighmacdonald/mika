@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/chihaya/bencode"
-	"github.com/labstack/echo"
 	"net"
 	"net/http"
 	"strings"
@@ -59,7 +59,7 @@ func getIP(ip_str string) (net.IP, error) {
 
 // Route handler for the /announce endpoint
 // Here be dragons
-func (t *Tracker) HandleAnnounce(c *echo.Context) {
+func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 	stats.Counter <- stats.EV_ANNOUNCE
 	r := db.Pool.Get()
 	defer r.Close()
@@ -67,7 +67,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		log.Error("HandleAnnounce: Failed to get redis conn:", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		return
+		return nil
 	}
 
 	ann, err := NewAnnounce(c)
@@ -75,7 +75,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		log.Error("HandleAnnounce: Failed to parse announce:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		return
+		return nil
 	}
 
 	info_hash_hex := fmt.Sprintf("%x", ann.InfoHash)
@@ -99,16 +99,16 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		}).Warn("Invalid passkey supplied")
 		oopsStr(c, MSG_GENERIC_ERROR, "Invalid passkey")
 		stats.Counter <- stats.EV_INVALID_PASSKEY
-		return
+		return nil
 	}
 	user := t.FindUserByID(user_id)
 	if !user.CanLeech && ann.Left > 0 {
 		oopsStr(c, MSG_GENERIC_ERROR, "Leech not allowed")
-		return
+		return nil
 	}
 	if !user.Enabled {
 		oopsStr(c, MSG_INVALID_INFO_HASH, "User disabled")
-		return
+		return nil
 	}
 
 	if !t.IsValidClient(ann.PeerID) {
@@ -119,7 +119,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		}).Warn("Invalid Client")
 		oopsStr(c, MSG_INVALID_PEER_ID, "Invalid client, see: wiki")
 		stats.Counter <- stats.EV_INVALID_CLIENT
-		return
+		return nil
 	}
 
 	torrent := t.FindTorrentByInfoHash(info_hash_hex)
@@ -131,7 +131,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		}).Debug("Torrent not found")
 		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		stats.Counter <- stats.EV_INVALID_INFOHASH
-		return
+		return nil
 	} else if !torrent.Enabled {
 		log.WithFields(log.Fields{
 			"user_id":   user.UserID,
@@ -140,7 +140,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		}).Debug("Disabled torrent")
 		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
 		stats.Counter <- stats.EV_INVALID_INFOHASH
-		return
+		return nil
 	}
 	peer := torrent.findPeer(ann.PeerID)
 	if peer == nil {
@@ -244,10 +244,11 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) {
 		log.Error("HandleAnnounce:", fmt.Sprintf("Failed to encode response %s [%d/%s]", ann.InfoHash, user.UserID, user.Username))
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		return
+		return nil
 	}
 
 	c.String(http.StatusOK, out_bytes.String())
+	return nil
 }
 
 // Parse the query string into an AnnounceRequest struct

@@ -2,12 +2,12 @@ package tracker
 
 import (
 	"bytes"
+	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/chihaya/bencode"
-	"github.com/labstack/echo"
 	"net/http"
 )
 
@@ -21,7 +21,7 @@ type ScrapeResponse struct {
 
 // Route handler for the /scrape requests
 // /scrape?info_hash=f%5bs%de06%19%d3ET%cc%81%bd%e5%0dZ%84%7f%f3%da
-func (t *Tracker) HandleScrape(c *echo.Context) {
+func (t *Tracker) HandleScrape(c *echo.Context) *echo.HTTPError {
 	stats.Counter <- stats.EV_SCRAPE
 	r := db.Pool.Get()
 	defer r.Close()
@@ -30,7 +30,7 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 		log.Println("HandleScrape: Cannot connect to redis", r.Err().Error())
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return
+		return nil
 	}
 
 	passkey := c.P(0)
@@ -41,16 +41,16 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 		log.Println("HandleScrape: Invalid passkey supplied:", passkey)
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_INVALID_PASSKEY
-		return
+		return nil
 	}
 	user := t.FindUserByID(user_id)
 	if !user.CanLeech {
 		oopsStr(c, MSG_GENERIC_ERROR, "Leech not allowed")
-		return
+		return nil
 	}
 	if !user.Enabled {
 		oopsStr(c, MSG_INVALID_INFO_HASH, "User disabled")
-		return
+		return nil
 	}
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
@@ -58,7 +58,7 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 		log.Println("HandleScrape: Failed to parse scrape qs:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return
+		return nil
 	}
 
 	// Todo limit scrape to N torrents
@@ -85,9 +85,10 @@ func (t *Tracker) HandleScrape(c *echo.Context) {
 		log.Println("HandleScrape: Failed to encode scrape response:", err)
 		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return
+		return nil
 	}
 	encoded := out_bytes.String()
 	log.Debug(encoded)
 	c.String(http.StatusOK, encoded)
+	return nil
 }

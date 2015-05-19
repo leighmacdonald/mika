@@ -10,7 +10,7 @@ deps=(
     "github.com/chihaya/bencode|master"
     "github.com/garyburd/redigo/redis|master"
     "github.com/kisielk/raven-go/raven|master"
-    "github.com/labstack/echo|v0.0.12"
+    "git.totdev.in/totv/echo.git|master"
     "github.com/julienschmidt/httprouter|master"
     "github.com/rcrowley/go-metrics|master"
     "github.com/Sirupsen/logrus|master"

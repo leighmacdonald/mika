@@ -2,10 +2,10 @@ package tracker
 
 import (
 	"crypto/tls"
+	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika/conf"
 	log "github.com/Sirupsen/logrus"
 	"github.com/goji/httpauth"
-	"github.com/labstack/echo"
 	ghttp "net/http"
 )
 
@@ -48,6 +48,7 @@ func (t *Tracker) listenAPI() {
 
 	e := echo.New()
 	e.MaxParam(1)
+	e.HTTPErrorHandler(APIErrorHandler)
 	api := e.Group("/api")
 
 	// Optionally enabled BasicAuth over the TLS only API

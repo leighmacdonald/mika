@@ -18,7 +18,6 @@ var (
 
 	// Channels used to sync models to redis
 	SyncUserC    = make(chan *User, 100)
-	SyncPeerC    = make(chan *Peer, 1000)
 	SyncTorrentC = make(chan *Torrent, 500)
 )
 

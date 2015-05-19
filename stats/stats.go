@@ -42,7 +42,7 @@ var (
 		EV_INVALID_PASSKEY:  "invalid_passkey",
 		EV_INVALID_INFOHASH: "invalid_infohash",
 		EV_INVALID_CLIENT:   "invalid_client",
-		EV_ERROR:            "invalid_client",
+		EV_ERROR:            "error",
 	}
 	registry metrics.Registry
 )

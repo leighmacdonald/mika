@@ -90,6 +90,7 @@ func LoadConfig(config_file string, fail bool) {
 	file, err := ioutil.ReadFile(config_file)
 	if err != nil {
 		log.WithFields(log.Fields{
+			"fn":          "LoadConfig",
 			"err":         err.Error(),
 			"config_file": config_file,
 		}).Fatal("Failed to open config file")
@@ -100,7 +101,11 @@ func LoadConfig(config_file string, fail bool) {
 
 	temp := new(Configuration)
 	if err = json.Unmarshal(file, temp); err != nil {
-		log.Error("loadConfig: Failed to parse config: ", err)
+		log.WithFields(log.Fields{
+			"fn":          "LoadConfig",
+			"err":         err.Error(),
+			"config_file": config_file,
+		}).Error("Failed to parse config file, cannot continue")
 		if fail {
 			os.Exit(1)
 		}

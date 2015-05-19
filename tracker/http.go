@@ -7,7 +7,43 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/goji/httpauth"
 	ghttp "net/http"
+	"net/http"
 )
+
+type (
+	APIErrorResponse struct {
+		Code    int    `json:"code"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+)
+
+// TrackerErrorHandler is used as the default error handler for API requests
+// in the echo router. The function requires the use of the forked echo router
+// available at git@git.totdev.in:totv/echo.git because we are passing more information
+// than the standard HTTPError used.
+func TrackerErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
+	ctx := log.WithFields(http_error.Fields)
+	if http_error.Level == log.WarnLevel {
+		if http_error.Error != nil {
+			ctx.Warn(http_error.Error.Error())
+		} else {
+			ctx.Warn(http_error.Message)
+		}
+	} else {
+		if http_error.Error != nil {
+			ctx.Error(http_error.Error.Error())
+		} else {
+			ctx.Error(http_error.Message)
+		}
+	}
+
+	if http_error.Code == 0 {
+		http_error.Code = http.StatusInternalServerError
+	}
+
+	c.String(http_error.Code, http_error.Message)
+}
 
 // Run starts all of the background goroutines related to managing the tracker
 // and starts the tracker and API HTTP interfaces
@@ -32,6 +68,10 @@ func (t *Tracker) listenTracker() {
 	e := echo.New()
 	e.MaxParam(1)
 
+	// Register our custom error handler that will emit bencoded error messages
+	// suitable for returning to bittorrent clients
+	e.HTTPErrorHandler(TrackerErrorHandler)
+
 	// Public tracker routes
 	e.Get("/:passkey/announce", t.HandleAnnounce)
 	e.Get("/:passkey/scrape", t.HandleScrape)
@@ -48,7 +88,10 @@ func (t *Tracker) listenAPI() {
 
 	e := echo.New()
 	e.MaxParam(1)
+
+	// Register our custom error handler that will emit JSON based messages
 	e.HTTPErrorHandler(APIErrorHandler)
+
 	api := e.Group("/api")
 
 	// Optionally enabled BasicAuth over the TLS only API

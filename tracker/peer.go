@@ -61,6 +61,7 @@ type Peer struct {
 	KeyTimer string   `redis:"-" json:"-"`
 }
 
+// IsNew checks if the peer is making its first announce request
 func (peer *Peer) IsNew() bool {
 	return peer.AnnounceLast == 0
 }

@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"errors"
-	"fmt"
 	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/db"
@@ -11,87 +10,97 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"net/http"
 	"strconv"
+	"syscall"
 )
 
-type ResponseOK struct {
-	Msg string `json:"message"`
-}
-
-type UserPayload struct {
-	UserID uint64 `json:"user_id"`
-}
-
-type UserCreatePayload struct {
-	UserPayload
-	Passkey  string `json:"passkey"`
-	CanLeech bool   `json:"can_leech"`
-	Name     string `json:"name"`
-}
-
-type UserUpdatePayload struct {
-	UserPayload
-	UserCreatePayload
-	CanLeech   bool   `json:"can_leech"`
-	Downloaded uint64 `json:"downloaded"`
-	Uploaded   uint64 `json:"uploaded"`
-	Enabled    bool   `json:"enabled"`
-}
-
-type TorrentPayload struct {
-	TorrentID uint64 `json:"torrent_id"`
-}
-
-type TorrentAddPayload struct {
-	TorrentPayload
-	InfoHash string `json:"info_hash"`
-	Name     string `json:"name"`
-}
-
-type UserTorrentsResponse struct {
-	Active     []string `json:"active"`
-	HNR        []string `json:"hnr"`
-	Complete   []string `json:"complete"`
-	Incomplete []string `json:"incomplete"`
-}
-
-type TorrentDelPayload struct {
-	TorrentPayload
-	Reason string
-}
-type WhitelistPayload struct {
-	Prefix string `json:"prefix"`
-}
-
-type WhitelistAddPayload struct {
-	WhitelistPayload
-	Client string `json:"client"`
-}
-
-type APIErrorResponse struct {
-	Code    int    `json:"code"`
-	Error   string `json:"error"`
-	Message string `json:"message"`
-}
-
-type APIError struct {
-	Code    int
-	Message string
-	Error   error
-	Fields  log.Fields
-}
-
-func NewApiError(err *echo.HTTPError) *APIErrorResponse {
-	return &APIErrorResponse{
-		Code:    err.Code,
-		Error:   err.Error.Error(),
-		Message: err.Message,
+type (
+	ResponseOK struct {
+		Msg string `json:"message"`
 	}
-}
+
+	VersionResponse struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	}
+
+	UptimeResponse struct {
+		Process int32 `json:"process"`
+		System  int32 `json:"system"`
+	}
+
+	UserPayload struct {
+		UserID uint64 `json:"user_id"`
+	}
+
+	UserCreatePayload struct {
+		UserPayload
+		Passkey  string `json:"passkey"`
+		CanLeech bool   `json:"can_leech"`
+		Name     string `json:"name"`
+	}
+
+	UserUpdatePayload struct {
+		UserPayload
+		UserCreatePayload
+		CanLeech   bool   `json:"can_leech"`
+		Downloaded uint64 `json:"downloaded"`
+		Uploaded   uint64 `json:"uploaded"`
+		Enabled    bool   `json:"enabled"`
+	}
+
+	TorrentPayload struct {
+		TorrentID uint64 `json:"torrent_id"`
+	}
+
+	TorrentAddPayload struct {
+		TorrentPayload
+		InfoHash string `json:"info_hash"`
+		Name     string `json:"name"`
+	}
+
+	UserTorrentsResponse struct {
+		Active     []string `json:"active"`
+		HNR        []string `json:"hnr"`
+		Complete   []string `json:"complete"`
+		Incomplete []string `json:"incomplete"`
+	}
+
+	TorrentDelPayload struct {
+		TorrentPayload
+		Reason string
+	}
+	WhitelistPayload struct {
+		Prefix string `json:"prefix"`
+	}
+
+	WhitelistAddPayload struct {
+		WhitelistPayload
+		Client string `json:"client"`
+	}
+
+	APIErrorResponse struct {
+		Code    int    `json:"code"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+)
 
 var (
 	resp_ok = ResponseOK{"ok"}
 )
 
+// NewApiError creates a new error model based on the HTTPError stuct values passed in
+func NewApiError(err *echo.HTTPError) *APIErrorResponse {
+	return &APIErrorResponse{
+		Error:   err.Error.Error(),
+		Message: err.Message,
+	}
+}
+
+// APIErrorHandler is used as the default error handler for API requests
+// in the echo router. The function requires the use of the forked echo router
+// available at git@git.totdev.in:totv/echo.git because we are passing more information
+// than the standard HTTPError used.
 func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
 	ctx := log.WithFields(http_error.Fields)
 	if http_error.Level == log.WarnLevel {
@@ -115,14 +124,30 @@ func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
 	c.JSON(http_error.Code, err_resp)
 }
 
+// HandleVersion returns the current running version
 func (t *Tracker) HandleVersion(c *echo.Context) *echo.HTTPError {
-	return c.String(http.StatusOK, mika.VersionStr())
+	return c.JSON(http.StatusOK, VersionResponse{Name: "mika", Version: mika.Version})
 }
 
+// HandleUptime returns the current process uptime
 func (t *Tracker) HandleUptime(c *echo.Context) *echo.HTTPError {
-	return c.String(http.StatusOK, fmt.Sprintf("%d", util.Unixtime()-mika.StartTime))
+	info := &syscall.Sysinfo_t{}
+	err := syscall.Sysinfo(info)
+	if err != nil {
+		return &echo.HTTPError{
+			Code:    http.StatusInternalServerError,
+			Fields:  log.Fields{"fn": "HandleUptime"},
+			Error:   err,
+			Message: "Error trying to fetch sysinfo",
+		}
+	}
+	return c.JSON(http.StatusOK, UptimeResponse{
+		Process: util.Unixtime() - mika.StartTime,
+		System:  int32(info.Uptime),
+	})
 }
 
+// HandleTorrentGet will find and return the requested torrent.
 func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)
@@ -150,7 +175,7 @@ func (t *Tracker) HandleTorrentGet(c *echo.Context) *echo.HTTPError {
 	return nil
 }
 
-// Add new torrents into the active torrent set
+// HandleTorrentAdd Adds new torrents into the active torrent set
 // {torrent_id: "", info_hash: "", name: ""}
 func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	payload := &TorrentAddPayload{}
@@ -204,6 +229,8 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
+// HandleTorrentDel will allow the deletion of torrents from the currently active set
+// This will not remove the torrent, but instead mark it as deleted.
 func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)
@@ -230,6 +257,8 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
+// getUser is a simple shared function used to fetch the user from a context
+// instance automatically.
 func (t *Tracker) getUser(c *echo.Context) (*User, error) {
 	user_id_str := c.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
@@ -250,6 +279,8 @@ func (t *Tracker) getUser(c *echo.Context) (*User, error) {
 	return user, nil
 }
 
+// HandleUserTorrents fetches the current set of torrents attached to a user.
+// This returns a collection of snatched/hnr/incomplete/complete torrent_ids
 func (t *Tracker) HandleUserTorrents(c *echo.Context) *echo.HTTPError {
 	user, err := t.getUser(c)
 	if err != nil {
@@ -317,6 +348,8 @@ func (t *Tracker) HandleUserTorrents(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, response)
 }
 
+// HandleUserGet Returns the current representation of the user data struct for
+// the requested user_id if available.
 func (t *Tracker) HandleUserGet(c *echo.Context) *echo.HTTPError {
 	user, err := t.getUser(c)
 	if err != nil {
@@ -330,6 +363,9 @@ func (t *Tracker) HandleUserGet(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, user)
 }
 
+// HandleUserCreate facilitates the adding of new users into the trackers memory.
+// Mika does not check redis for valid users on each request, so this function
+// must be used to add new users into a running system.
 func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	payload := &UserCreatePayload{}
 	if err := c.Bind(payload); err != nil {
@@ -383,6 +419,8 @@ func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
+// HandleUserUpdate will update an existing users data. This is usually used to change
+// a users passkey without reloading the instance.
 func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	payload := &UserUpdatePayload{}
 	if err := c.Bind(payload); err != nil {
@@ -438,6 +476,8 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusOK, resp_ok)
 }
 
+// HandleWhitelistAdd facilitates adding new torrent client prefixes to the
+// allowed client whitelist
 func (t *Tracker) HandleWhitelistAdd(c *echo.Context) *echo.HTTPError {
 	payload := &WhitelistAddPayload{}
 	if err := c.Bind(payload); err != nil {
@@ -469,6 +509,8 @@ func (t *Tracker) HandleWhitelistAdd(c *echo.Context) *echo.HTTPError {
 	return c.JSON(http.StatusCreated, resp_ok)
 }
 
+// HandleWhitelistDel will remove an existing torrent client prefix from the
+// active whitelist.
 func (t *Tracker) HandleWhitelistDel(c *echo.Context) *echo.HTTPError {
 	prefix := c.Param("prefix")
 	for _, p := range t.Whitelist {
@@ -494,6 +536,7 @@ func (t *Tracker) HandleWhitelistDel(c *echo.Context) *echo.HTTPError {
 	}
 }
 
+// HandleGetTorrentPeer Fetch details for a specific peer of a torrent
 func (t *Tracker) HandleGetTorrentPeer(c *echo.Context) *echo.HTTPError {
 	return &echo.HTTPError{
 		Code:    http.StatusNotFound,
@@ -501,6 +544,7 @@ func (t *Tracker) HandleGetTorrentPeer(c *echo.Context) *echo.HTTPError {
 	}
 }
 
+// HandleGetTorrentPeers returns all peers for a given info_hash
 func (t *Tracker) HandleGetTorrentPeers(c *echo.Context) *echo.HTTPError {
 	info_hash := c.Param("info_hash")
 	torrent := t.FindTorrentByInfoHash(info_hash)

@@ -19,7 +19,7 @@ type ScrapeResponse struct {
 	Files []bencode.Dict
 }
 
-// Route handler for the /scrape requests
+// HandleScrape is the route handler for the /scrape requests
 // /scrape?info_hash=f%5bs%de06%19%d3ET%cc%81%bd%e5%0dZ%84%7f%f3%da
 func (t *Tracker) HandleScrape(c *echo.Context) *echo.HTTPError {
 	stats.Counter <- stats.EV_SCRAPE

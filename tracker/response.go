@@ -44,27 +44,22 @@ var (
 	}
 )
 
-// Output a bencoded error code to the torrent client using
+// oops will output a bencoded error code to the torrent client using
 // a preset message code constant
 func oops(c *echo.Context, msg_code int) {
 	c.String(msg_code, responseError(resp_msg[msg_code]))
 }
 
-// Output a bencoded error code to the torrent client using
-// a preset message code constant
+// oopsStr will output a bencoded error code to the torrent client using
+// a supplied custom message string
 func oopsStr(c *echo.Context, msg_code int, msg string) {
 	c.String(msg_code, responseError(msg))
 }
 
-// Generate a bencoded error response for the torrent client to
+// responseError generates a bencoded error response for the torrent client to
 // parse and display to the user
 func responseError(message string) string {
 	var out_bytes bytes.Buffer
-	//	var er_msg = ErrorResponse{FailReason: message}
-	//	er_msg_encoded := bencode.Marshal(&out_bytes)
-	//	if er_msg_encoded != nil {
-	//		return "."
-	//	}
 	bencoder := bencode.NewEncoder(&out_bytes)
 	bencoder.Encode(bencode.Dict{
 		"failure reason": message,

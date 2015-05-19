@@ -48,7 +48,7 @@ type AnnounceResponse struct {
 	Peers       string `bencode:"peers"`
 }
 
-// Parse and return a IP from a string
+// getIP Parses and returns a IP from a string
 func getIP(ip_str string) (net.IP, error) {
 	ip := net.ParseIP(ip_str)
 	if ip != nil {
@@ -57,7 +57,7 @@ func getIP(ip_str string) (net.IP, error) {
 	return nil, errors.New("Failed to parse ip")
 }
 
-// Route handler for the /announce endpoint
+// HandleAnnounce is the handler for the /announce endpoint
 // Here be dragons
 func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 	stats.Counter <- stats.EV_ANNOUNCE
@@ -247,8 +247,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 		return nil
 	}
 
-	c.String(http.StatusOK, out_bytes.String())
-	return nil
+	return c.String(http.StatusOK, out_bytes.String())
 }
 
 // Parse the query string into an AnnounceRequest struct

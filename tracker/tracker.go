@@ -52,7 +52,7 @@ func NewTracker() *Tracker {
 	return tracker
 }
 
-// Load the models into memory from redis
+// Initialize loads the models into memory from redis.
 func (tracker *Tracker) Initialize() error {
 	log.WithFields(log.Fields{
 		"peer_id": "Initialize",
@@ -67,7 +67,7 @@ func (tracker *Tracker) Initialize() error {
 	return nil
 }
 
-// Fetch a torrents data from the database and return a Torrent struct.
+// GetTorrentByID will fetch torrent data from the database and return a Torrent struct.
 // If the torrent doesn't exist in the database a new skeleton Torrent
 // instance will be returned.
 func (tracker *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new bool) *Torrent {
@@ -81,7 +81,7 @@ func (tracker *Tracker) GetTorrentByID(r redis.Conn, torrent_id uint64, make_new
 	return nil
 }
 
-// Fetch the stores torrent_id that corresponds to the info_hash supplied
+// FindTorrentByInfoHash will fetch the torrent_id that corresponds to the info_hash supplied
 // as a GET value. If the info_hash doesn't return an id we consider the torrent
 // either soft-deleted or non-existent
 func (tracker *Tracker) FindTorrentByInfoHash(info_hash string) *Torrent {
@@ -92,6 +92,8 @@ func (tracker *Tracker) FindTorrentByInfoHash(info_hash string) *Torrent {
 	return torrent
 }
 
+// AddTorrent adds a new torrent to the tracker, allowing users to make requests
+// using its info_hash
 func (tracker *Tracker) AddTorrent(torrent *Torrent) {
 	tracker.TorrentsMutex.Lock()
 	tracker.Torrents[torrent.InfoHash] = torrent
@@ -111,6 +113,7 @@ func (tracker *Tracker) FindUserByID(user_id uint64) *User {
 	return user
 }
 
+// AddUser adds a new user into the known user list of the tracker
 func (tracker *Tracker) AddUser(user *User) {
 	tracker.UsersMutex.Lock()
 	tracker.Users[user.UserID] = user

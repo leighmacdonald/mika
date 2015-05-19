@@ -66,7 +66,7 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 	}
 }
 
-// This is a goroutine that will watch for peer key expiry events and
+// peerStalker is a goroutine that will watch for peer key expiry events and
 // act on them, removing them from the active peer lists
 func (t *Tracker) peerStalker() {
 	r := db.Pool.Get()

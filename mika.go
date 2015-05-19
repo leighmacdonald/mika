@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/kisielk/raven-go/raven"
+	"time"
 )
 
 var (
@@ -47,4 +48,8 @@ func SetupLogger(log_level string, force_colour bool) {
 	default:
 		log.SetLevel(log.InfoLevel)
 	}
+}
+
+func init() {
+	StartTime = int32(time.Now().Unix())
 }

@@ -9,7 +9,6 @@ deps=(
     "golang.org/x/tools/cmd/cover|master"
     "github.com/chihaya/bencode|master"
     "github.com/garyburd/redigo/redis|master"
-    "github.com/labstack/echo|master"
     "github.com/kisielk/raven-go/raven|master"
     "git.totdev.in/totv/echo.git|master"
     "github.com/julienschmidt/httprouter|master"

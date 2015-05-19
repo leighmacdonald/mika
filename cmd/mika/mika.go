@@ -130,13 +130,7 @@ func main() {
 	}
 
 	// Start stat counter
-	stats.Setup(
-		conf.Config.InfluxDSN,
-		conf.Config.InfluxUser,
-		conf.Config.InfluxPass,
-		conf.Config.InfluxDB,
-		conf.Config.InfluxWriteTimer,
-	)
+	stats.Setup(conf.Config.MetricsDSN)
 
 	db.Setup(conf.Config.RedisHost, conf.Config.RedisPass)
 

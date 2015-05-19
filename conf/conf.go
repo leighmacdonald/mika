@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"sync"
-	"time"
 )
 
 var (
@@ -71,20 +70,11 @@ type Configuration struct {
 	// Full DSN for Sentry
 	SentryDSN string
 
-	// Full DSN for InfluxDB metric reporting
-	InfluxDSN string
+	// Full DSN for graphite metric reporting eg: "localhost:2003"
+	MetricsDSN string
 
-	// Influx database to write points to
-	InfluxDB string
-
-	// Influx user
-	InfluxUser string
-
-	// Influx password
-	InfluxPass string
-
-	// Number of points to buffer before writing the data to influxdb
-	InfluxWriteTimer time.Duration
+	// Wait time before writing the data to graphite
+	//	MetricsWriteTimer time.Duration
 
 	// Use colours log output
 	ColourLogs bool

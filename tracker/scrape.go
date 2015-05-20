@@ -5,7 +5,6 @@ import (
 	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
-	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/chihaya/bencode"
 	"net/http"
@@ -26,11 +25,13 @@ func (t *Tracker) HandleScrape(c *echo.Context) *echo.HTTPError {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		util.CaptureMessage(r.Err().Error())
-		log.Println("HandleScrape: Cannot connect to redis", r.Err().Error())
-		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"fn": "HandleScrape"},
+			Message: "Internal error :(",
+			Error:   r.Err(),
+		}
 	}
 
 	passkey := c.P(0)
@@ -38,27 +39,40 @@ func (t *Tracker) HandleScrape(c *echo.Context) *echo.HTTPError {
 	user_id := t.findUserID(passkey)
 
 	if user_id == 0 {
-		log.Println("HandleScrape: Invalid passkey supplied:", passkey)
-		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_INVALID_PASSKEY
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"fn": "HandleScrape"},
+			Message: "Invalid passkey",
+		}
 	}
 	user := t.FindUserByID(user_id)
 	if !user.CanLeech {
-		oopsStr(c, MSG_GENERIC_ERROR, "Leech not allowed")
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"fn": "HandleScrape"},
+			Message: "Leech not allowed",
+			Level:   log.DebugLevel,
+		}
 	}
 	if !user.Enabled {
-		oopsStr(c, MSG_INVALID_INFO_HASH, "User disabled")
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"fn": "HandleScrape"},
+			Message: "User disabled",
+			Level:   log.DebugLevel,
+		}
 	}
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
-		util.CaptureMessage(err.Error())
-		log.Println("HandleScrape: Failed to parse scrape qs:", err)
-		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"fn": "HandleScrape"},
+			Message: "Could not parse request",
+			Level:   log.ErrorLevel,
+			Error:   err,
+		}
 	}
 
 	// Todo limit scrape to N torrents
@@ -81,14 +95,16 @@ func (t *Tracker) HandleScrape(c *echo.Context) *echo.HTTPError {
 	encoder := bencode.NewEncoder(&out_bytes)
 	err = encoder.Encode(resp)
 	if err != nil {
-		util.CaptureMessage(err.Error())
-		log.Println("HandleScrape: Failed to encode scrape response:", err)
-		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"fn": "HandleScrape"},
+			Message: "Failed to encode scrape response",
+			Level:   log.ErrorLevel,
+			Error:   err,
+		}
 	}
 	encoded := out_bytes.String()
 	log.Debug(encoded)
-	c.String(http.StatusOK, encoded)
-	return nil
+	return c.String(http.StatusOK, encoded)
 }

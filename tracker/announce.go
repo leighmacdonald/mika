@@ -64,18 +64,28 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		log.Error("HandleAnnounce: Failed to get redis conn:", r.Err().Error())
-		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Message: "Internal error, HALP",
+			Error:   r.Err(),
+			Fields:  log.Fields{"fn": "HandleAnnounce"},
+		}
 	}
 
 	ann, err := NewAnnounce(c)
 	if err != nil {
-		log.Error("HandleAnnounce: Failed to parse announce:", err)
-		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Message: "Failed to parse announce",
+			Error:   r.Err(),
+			Fields: log.Fields{
+				"fn":        "HandleAnnounce",
+				"remote_ip": c.Request.RemoteAddr,
+				"uri":       c.Request.RequestURI,
+			},
+		}
 	}
 
 	info_hash_hex := fmt.Sprintf("%x", ann.InfoHash)
@@ -94,53 +104,65 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 	user_id := t.findUserID(passkey)
 
 	if user_id == 0 {
-		log.WithFields(log.Fields{
-			"passkey": passkey,
-		}).Warn("Invalid passkey supplied")
-		oopsStr(c, MSG_GENERIC_ERROR, "Invalid passkey")
 		stats.Counter <- stats.EV_INVALID_PASSKEY
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"passkey": passkey},
+			Message: "Invalid passkey supplied",
+		}
 	}
 	user := t.FindUserByID(user_id)
 	if !user.CanLeech && ann.Left > 0 {
-		oopsStr(c, MSG_GENERIC_ERROR, "Leech not allowed")
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_GENERIC_ERROR,
+			Fields:  log.Fields{"passkey": passkey},
+			Message: "Leeching not allowed for user",
+		}
 	}
 	if !user.Enabled {
-		oopsStr(c, MSG_INVALID_INFO_HASH, "User disabled")
-		return nil
+		return &echo.HTTPError{
+			Code:    MSG_INVALID_INFO_HASH,
+			Fields:  log.Fields{"passkey": passkey},
+			Message: "User disabled",
+		}
 	}
 
 	if !t.IsValidClient(ann.PeerID) {
-		log.WithFields(log.Fields{
-			"user_id":   user.UserID,
-			"user_name": user.Username,
-			"peer_id":   ann.PeerID[0:6],
-		}).Warn("Invalid Client")
-		oopsStr(c, MSG_INVALID_PEER_ID, "Invalid client, see: wiki")
 		stats.Counter <- stats.EV_INVALID_CLIENT
-		return nil
+		return &echo.HTTPError{
+			Code: MSG_INVALID_PEER_ID,
+			Fields: log.Fields{
+				"user_id":   user.UserID,
+				"user_name": user.Username,
+				"peer_id":   ann.PeerID[0:8],
+			},
+			Message: "Banned client, check wiki for whitelisted clients",
+		}
 	}
 
 	torrent := t.FindTorrentByInfoHash(info_hash_hex)
 	if torrent == nil {
-		log.WithFields(log.Fields{
-			"user_id":   user.UserID,
-			"user_name": user.Username,
-			"info_hash": ann.InfoHash,
-		}).Debug("Torrent not found")
-		oops(c, MSG_INFO_HASH_NOT_FOUND)
 		stats.Counter <- stats.EV_INVALID_INFOHASH
-		return nil
+		return &echo.HTTPError{
+			Code: MSG_INFO_HASH_NOT_FOUND,
+			Fields: log.Fields{
+				"user_id":   user.UserID,
+				"user_name": user.Username,
+				"info_hash": ann.InfoHash,
+			},
+			Message: "Torrent not found, try TPB",
+		}
 	} else if !torrent.Enabled {
-		log.WithFields(log.Fields{
-			"user_id":   user.UserID,
-			"user_name": user.Username,
-			"info_hash": ann.InfoHash,
-		}).Debug("Disabled torrent")
-		oopsStr(c, MSG_INFO_HASH_NOT_FOUND, torrent.DelReason())
 		stats.Counter <- stats.EV_INVALID_INFOHASH
-		return nil
+		return &echo.HTTPError{
+			Code: MSG_INFO_HASH_NOT_FOUND,
+			Fields: log.Fields{
+				"user_id":   user.UserID,
+				"user_name": user.Username,
+				"info_hash": ann.InfoHash,
+			},
+			Message: torrent.DelReason(),
+		}
 	}
 	peer := torrent.findPeer(ann.PeerID)
 	if peer == nil {
@@ -241,10 +263,17 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 
 	er_msg_encoded := encoder.Encode(dict)
 	if er_msg_encoded != nil {
-		log.Error("HandleAnnounce:", fmt.Sprintf("Failed to encode response %s [%d/%s]", ann.InfoHash, user.UserID, user.Username))
-		oops(c, MSG_GENERIC_ERROR)
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		return nil
+		return &echo.HTTPError{
+			Code: MSG_GENERIC_ERROR,
+			Fields: log.Fields{
+				"user_id":   user.UserID,
+				"user_name": user.Username,
+				"info_hash": ann.InfoHash,
+			},
+			Message: "Internal error",
+			Error:   er_msg_encoded,
+		}
 	}
 
 	return c.String(http.StatusOK, out_bytes.String())
@@ -307,7 +336,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	port, err := q.Uint64("port")
 	if err != nil || port < 1024 || port > 65535 {
-		return nil, errors.New("Invalid port")
+		return nil, errors.New("Invalid port, must be between 1024 and 65535")
 	}
 
 	left, err := q.Uint64("left")

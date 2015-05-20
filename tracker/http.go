@@ -6,8 +6,8 @@ import (
 	"git.totdev.in/totv/mika/conf"
 	log "github.com/Sirupsen/logrus"
 	"github.com/goji/httpauth"
-	ghttp "net/http"
 	"net/http"
+	ghttp "net/http"
 )
 
 type (
@@ -18,31 +18,39 @@ type (
 	}
 )
 
-// TrackerErrorHandler is used as the default error handler for API requests
+// NewApiError creates a new error model based on the HTTPError stuct values passed in
+func NewApiError(err *echo.HTTPError) *APIErrorResponse {
+	return &APIErrorResponse{
+		Error:   err.Error.Error(),
+		Message: err.Message,
+	}
+}
+
+// APIErrorHandler is used as the default error handler for API requests
 // in the echo router. The function requires the use of the forked echo router
 // available at git@git.totdev.in:totv/echo.git because we are passing more information
 // than the standard HTTPError used.
-func TrackerErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
-	ctx := log.WithFields(http_error.Fields)
-	if http_error.Level == log.WarnLevel {
-		if http_error.Error != nil {
-			ctx.Warn(http_error.Error.Error())
-		} else {
-			ctx.Warn(http_error.Message)
-		}
-	} else {
-		if http_error.Error != nil {
-			ctx.Error(http_error.Error.Error())
-		} else {
-			ctx.Error(http_error.Message)
-		}
-	}
+func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
+	http_error.Log()
 
 	if http_error.Code == 0 {
 		http_error.Code = http.StatusInternalServerError
 	}
+	err_resp := NewApiError(http_error)
+	c.JSON(http_error.Code, err_resp)
+}
 
-	c.String(http_error.Code, http_error.Message)
+// TrackerErrorHandler is used as the default error handler for tracker requests
+// the error is returned to the client as a bencoded error string as defined in the
+// bittorrent specs.
+func TrackerErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
+	http_error.Log()
+
+	if http_error.Code == 0 {
+		http_error.Code = MSG_GENERIC_ERROR
+	}
+
+	c.String(http_error.Code, responseError(http_error.Message))
 }
 
 // Run starts all of the background goroutines related to managing the tracker
@@ -89,7 +97,7 @@ func (t *Tracker) listenAPI() {
 	e := echo.New()
 	e.MaxParam(1)
 
-	// Register our custom error handler that will emit JSON based messages
+	// Register our custom error handler that will emit JSON based error messages
 	e.HTTPErrorHandler(APIErrorHandler)
 
 	api := e.Group("/api")

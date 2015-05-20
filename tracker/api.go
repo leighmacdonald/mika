@@ -77,52 +77,11 @@ type (
 		WhitelistPayload
 		Client string `json:"client"`
 	}
-
-	APIErrorResponse struct {
-		Code    int    `json:"code"`
-		Error   string `json:"error"`
-		Message string `json:"message"`
-	}
 )
 
 var (
 	resp_ok = ResponseOK{"ok"}
 )
-
-// NewApiError creates a new error model based on the HTTPError stuct values passed in
-func NewApiError(err *echo.HTTPError) *APIErrorResponse {
-	return &APIErrorResponse{
-		Error:   err.Error.Error(),
-		Message: err.Message,
-	}
-}
-
-// APIErrorHandler is used as the default error handler for API requests
-// in the echo router. The function requires the use of the forked echo router
-// available at git@git.totdev.in:totv/echo.git because we are passing more information
-// than the standard HTTPError used.
-func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
-	ctx := log.WithFields(http_error.Fields)
-	if http_error.Level == log.WarnLevel {
-		if http_error.Error != nil {
-			ctx.Warn(http_error.Error.Error())
-		} else {
-			ctx.Warn(http_error.Message)
-		}
-	} else {
-		if http_error.Error != nil {
-			ctx.Error(http_error.Error.Error())
-		} else {
-			ctx.Error(http_error.Message)
-		}
-	}
-
-	if http_error.Code == 0 {
-		http_error.Code = http.StatusInternalServerError
-	}
-	err_resp := NewApiError(http_error)
-	c.JSON(http_error.Code, err_resp)
-}
 
 // HandleVersion returns the current running version
 func (t *Tracker) HandleVersion(c *echo.Context) *echo.HTTPError {
@@ -218,6 +177,7 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 		torrent.Unlock()
 	}
 
+	// Queue torrent to be written out to redis
 	SyncTorrentC <- torrent
 
 	log.WithFields(log.Fields{

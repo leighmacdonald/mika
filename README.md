@@ -1,7 +1,5 @@
 # Mika
 
-[![build status](http://ci.totdev.in/projects/2/status.png?ref=master)](http://ci.totdev.in/projects/2?ref=master)
-
 A torrent tracker written in the Go programming language and using redis
 as a backend database.
 

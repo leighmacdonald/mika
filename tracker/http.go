@@ -20,9 +20,16 @@ type (
 
 // NewApiError creates a new error model based on the HTTPError stuct values passed in
 func NewApiError(err *echo.HTTPError) *APIErrorResponse {
-	return &APIErrorResponse{
-		Error:   err.Error.Error(),
-		Message: err.Message,
+	if err.Error != nil {
+		return &APIErrorResponse{
+			Error:   err.Error.Error(),
+			Message: err.Message,
+		}
+	} else {
+		return &APIErrorResponse{
+			Error:   err.Message,
+			Message: err.Message,
+		}
 	}
 }
 

@@ -18,10 +18,10 @@ import (
 
 // Announce types
 const (
-	STOPPED   = iota
-	STARTED   = iota
-	COMPLETED = iota
-	ANNOUNCE  = iota
+	STOPPED = iota
+	STARTED
+	COMPLETED
+	ANNOUNCE
 )
 
 // Represents an announce received from the bittorrent client
@@ -144,22 +144,24 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 	if torrent == nil {
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return &echo.HTTPError{
-			Code: MSG_INFO_HASH_NOT_FOUND,
+			Level: log.DebugLevel,
+			Code:  MSG_INFO_HASH_NOT_FOUND,
 			Fields: log.Fields{
 				"user_id":   user.UserID,
 				"user_name": user.Username,
-				"info_hash": ann.InfoHash,
+				"info_hash": info_hash_hex,
 			},
 			Message: "Torrent not found, try TPB",
 		}
 	} else if !torrent.Enabled {
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		return &echo.HTTPError{
-			Code: MSG_INFO_HASH_NOT_FOUND,
+			Level: log.DebugLevel,
+			Code:  MSG_INFO_HASH_NOT_FOUND,
 			Fields: log.Fields{
 				"user_id":   user.UserID,
 				"user_name": user.Username,
-				"info_hash": ann.InfoHash,
+				"info_hash": info_hash_hex,
 			},
 			Message: torrent.DelReason(),
 		}
@@ -269,7 +271,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 			Fields: log.Fields{
 				"user_id":   user.UserID,
 				"user_name": user.Username,
-				"info_hash": ann.InfoHash,
+				"info_hash": info_hash_hex,
 			},
 			Message: "Internal error",
 			Error:   er_msg_encoded,

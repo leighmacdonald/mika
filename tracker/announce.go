@@ -285,7 +285,7 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
-		return nil, err
+		return q, err
 	}
 
 	compact := q.Params["compact"] != "0"
@@ -305,12 +305,12 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	info_hash, exists := q.Params["info_hash"]
 	if !exists {
-		return nil, errors.New("Info hash not supplied")
+		return q, errors.New("Info hash not supplied")
 	}
 
 	peerID, exists := q.Params["peer_id"]
 	if !exists {
-		return nil, errors.New("Peer id not supplied")
+		return q, errors.New("Peer id not supplied")
 	}
 
 	ipv4, err := getIP(q.Params["ip"])
@@ -321,7 +321,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 			ipv4_new, err := getIP(forwarded_ip)
 			if err != nil {
 				log.Error("NewAnnounce: Failed to parse header supplied IP", err)
-				return nil, errors.New("Invalid ip header")
+				return q, errors.New("Invalid ip header")
 			}
 			ipv4 = ipv4_new
 		} else {
@@ -330,7 +330,7 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 			ipv4_new, err := getIP(ip_req)
 			if err != nil {
 				log.Error("NewAnnounce: Failed to parse detected IP", err)
-				return nil, errors.New("Invalid ip hash")
+				return q, errors.New("Invalid ip hash")
 			}
 			ipv4 = ipv4_new
 		}
@@ -338,12 +338,12 @@ func NewAnnounce(c *echo.Context) (*AnnounceRequest, error) {
 
 	port, err := q.Uint64("port")
 	if err != nil || port < 1024 || port > 65535 {
-		return nil, errors.New("Invalid port, must be between 1024 and 65535")
+		return q, errors.New("Invalid port, must be between 1024 and 65535")
 	}
 
 	left, err := q.Uint64("left")
 	if err != nil {
-		return nil, errors.New("No left value")
+		return q, errors.New("No left value")
 	} else {
 		left = util.UMax(0, left)
 	}

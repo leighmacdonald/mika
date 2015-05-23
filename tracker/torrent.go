@@ -6,6 +6,7 @@ import (
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"math"
 	"strings"
 	"sync"
 )
@@ -16,8 +17,8 @@ type Torrent struct {
 	Name            string  `redis:"name" json:"name"`
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
 	InfoHash        string  `redis:"info_hash" json:"info_hash"`
-	Seeders         int16   `redis:"seeders" json:"seeders"`
-	Leechers        int16   `redis:"leechers" json:"leechers"`
+	Seeders         int     `redis:"seeders" json:"seeders"`
+	Leechers        int     `redis:"leechers" json:"leechers"`
 	Snatches        int16   `redis:"snatches" json:"snatches"`
 	Announces       uint64  `redis:"announces" json:"announces"`
 	Uploaded        uint64  `redis:"uploaded" json:"uploaded"`
@@ -221,7 +222,7 @@ func (torrent *Torrent) HasPeer(peer *Peer) bool {
 
 // PeerCounts counts the number of seeders and leechers the torrent currently has.
 // Only active peers are counted towards the totals
-func (torrent *Torrent) PeerCounts() (int16, int16) {
+func (torrent *Torrent) PeerCounts() (int, int) {
 	s, l := 0, 0
 	torrent.RLock()
 	defer torrent.RUnlock()
@@ -232,10 +233,44 @@ func (torrent *Torrent) PeerCounts() (int16, int16) {
 			l++
 		}
 	}
-	return int16(s), int16(l)
+	return s, l
 }
 
-// GetPeers returns a slice of up to max_peers from the current torrent
+// GetPeers returns a slice of up to max_peers from the current torrent. If the
+// total peers available is less than the max peers all peers will be returned. Otherwise
+// the peers are split 80/20 (leechers/seeders). If those numbers can't be met, the leecher counts are relaxed
+// so that seeders can fill their spots.
 func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
-	return torrent.Peers[0:util.UMin(uint64(len(torrent.Peers)), uint64(max_peers))]
+	torrent.RLock()
+	defer torrent.RUnlock()
+	if len(torrent.Peers) > max_peers {
+		// Calculate the initial quantities we want
+		max_leechers := int(math.Ceil(float64(max_peers) * 0.2))
+		max_seeders := int(max_peers) - max_leechers
+
+		// If we don't have enough leechers too meet the requirements, add some more seeders
+		_, leechers := torrent.PeerCounts()
+		if max_leechers > leechers {
+			max_seeders += max_leechers - leechers
+			max_leechers = leechers
+		}
+
+		peers := []*Peer{}
+		found_seeders, found_leechers := 0, 0
+		for _, peer := range torrent.Peers {
+			if peer.IsSeeder() && max_seeders > found_seeders {
+				peers = append(peers, peer)
+				found_seeders++
+			} else if max_leechers > found_leechers {
+				peers = append(peers, peer)
+				found_leechers++
+			}
+			if len(peers) == max_peers {
+				break
+			}
+		}
+		return peers
+	} else {
+		return torrent.Peers[0:util.UMin(uint64(len(torrent.Peers)), uint64(max_peers))]
+	}
 }

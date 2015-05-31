@@ -10,6 +10,32 @@ import (
 	"sync"
 )
 
+// PeerDiff holds the changed values for a peer in an announce.
+type PeerDiff struct {
+	User    *User
+	Torrent *Torrent
+
+	// Max recorded up speed, bytes/sec
+	SpeedUPMax float64
+
+	// Max recorded dn speed, bytes/sec
+	SpeedDNMax float64
+
+	// Total amount uploaded as reported by client
+	UploadDiff uint64
+
+	// Total amount downloaded as reported by client
+	DownloadDiff uint64
+
+	// Total time in seconds the peer has been active on the torrent.
+	SeedTime uint64
+}
+
+func (peer_diff *PeerDiff) Key() string {
+	return fmt.Sprintf("t:usertorrent:%d:%d", peer_diff.User.UserID, peer_diff.Torrent.TorrentID)
+}
+
+// Peer represents a single unique peer in a swarm
 type Peer struct {
 	sync.RWMutex
 
@@ -67,22 +93,21 @@ func (peer *Peer) IsNew() bool {
 }
 
 // Update the stored values with the data from an announce
-func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
-	peer.Lock()
-	defer peer.Unlock()
+func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff) {
+	var ul_diff, dl_diff uint64
 	cur_time := util.Unixtime()
+	peer.Lock()
 	peer.PeerID = announce.PeerID
 	peer.Announces++
-
-	var ul_diff, dl_diff uint64
-
 	if !peer.IsNew() {
-		// We only record the difference from the first announce
+		// We only record the difference from the first announce we receive
 		if announce.Uploaded > peer.Uploaded {
 			ul_diff = announce.Uploaded - peer.Uploaded
+			peer_diff.UploadDiff = ul_diff
 		}
 		if announce.Downloaded > peer.Downloaded {
 			dl_diff = announce.Downloaded - peer.Downloaded
+			peer_diff.DownloadDiff = dl_diff
 		}
 		peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
 		peer.SpeedDN = util.EstSpeed(peer.AnnounceLast, cur_time, dl_diff)
@@ -92,9 +117,11 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 
 	if peer.SpeedUP > peer.SpeedUPMax {
 		peer.SpeedUPMax = peer.SpeedUP
+		peer_diff.SpeedUPMax = peer.SpeedUP
 	}
 	if peer.SpeedDN > peer.SpeedDNMax {
 		peer.SpeedDNMax = peer.SpeedDN
+		peer_diff.SpeedDNMax = peer.SpeedDN
 	}
 	if ul_diff > 0 || dl_diff > 0 {
 		log.WithFields(log.Fields{
@@ -113,19 +140,21 @@ func (peer *Peer) Update(announce *AnnounceRequest) (uint64, uint64) {
 	peer.Port = announce.Port
 	peer.Left = announce.Left
 
-	// Must be active to have a real time delta
+	time_diff := uint64(0)
+
+	// Must be active (have announced at least once) to have a real time delta
 	if !peer.IsNew() {
-		time_diff := uint64(cur_time - peer.AnnounceLast)
+		time_diff = uint64(cur_time - peer.AnnounceLast)
 		// Ignore long periods of inactivity
 		if time_diff < (uint64(conf.Config.AnnInterval) * 4) {
 			peer.TotalTime += uint32(time_diff)
+			peer_diff.SeedTime = time_diff
 		}
 		peer.AnnounceFirst = cur_time
 	}
 
 	peer.AnnounceLast = cur_time
-
-	return ul_diff, dl_diff
+	peer.Unlock()
 }
 
 func (peer *Peer) IsHNR() bool {

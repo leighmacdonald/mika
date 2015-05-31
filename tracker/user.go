@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+// t:usertorrent:<user_id>:<torrent_id> ->
+//    first_ann, last_ann, uploaded, downloaded, seed_time, speed_up_max, speed_dn_max
 type User struct {
 	db.Queued
 	sync.RWMutex
@@ -101,28 +103,29 @@ func (user *User) AddHNR(r redis.Conn, torrent_id uint64) {
 }
 
 // Update user stats from announce request
-func (user *User) Update(announce *AnnounceRequest, upload_diff, download_diff uint64, multi_up, multi_dn float64) {
+func (user *User) Update(announce *AnnounceRequest, peer_diff *PeerDiff, multi_up, multi_dn float64) {
 	user.Lock()
 	defer user.Unlock()
 	if announce.Event != STARTED {
-		// Apply multipliers
-		upload_diff_multi := uint64(float64(upload_diff) * multi_up)
-		download_diff_multi := uint64(float64(download_diff) * multi_dn)
+		// Apply multipliers to get value we will actually record
+		upload_diff_multi := uint64(float64(peer_diff.UploadDiff) * multi_up)
+		download_diff_multi := uint64(float64(peer_diff.DownloadDiff) * multi_dn)
 
 		// Get new totals
-		uploaded_new := user.Uploaded + uint64(float64(upload_diff)*multi_up)
-		downloaded_new := user.Downloaded + uint64(float64(download_diff)*multi_dn)
+		uploaded_new := user.Uploaded + upload_diff_multi
+		downloaded_new := user.Downloaded + download_diff_multi
 
-		if upload_diff > 0 || download_diff > 0 {
+		if peer_diff.UploadDiff > 0 || peer_diff.DownloadDiff > 0 {
 			log.WithFields(log.Fields{
 				"ul_old":       util.Bytes(user.Uploaded),
-				"ul_diff":      util.Bytes(upload_diff),
+				"ul_diff":      util.Bytes(peer_diff.UploadDiff),
 				"ul_diff_mult": util.Bytes(upload_diff_multi),
 				"ul_new":       util.Bytes(uploaded_new),
 				"dl_old":       util.Bytes(user.Downloaded),
-				"dl_diff":      util.Bytes(download_diff),
+				"dl_diff":      util.Bytes(peer_diff.DownloadDiff),
 				"dl_diff_mult": util.Bytes(download_diff_multi),
 				"dl_new":       util.Bytes(downloaded_new),
+				"user":         user.Username,
 				"fn":           "Update",
 			}).Info("User stat changes")
 		}
@@ -155,6 +158,14 @@ func (user *User) Sync(r redis.Conn) {
 	)
 }
 
+func (user *User) SyncPeerDiff(r redis.Conn, peer_diff PeerDiff, torrent_id uint64) {
+	key := peer_diff.Key()
+	r.Send("HMSET", key, "speed_up_max", peer_diff.SpeedUPMax, "speed_dn_max", peer_diff.SpeedDNMax)
+	r.Send("HINCRBY", key, "downloaded", peer_diff.DownloadDiff)
+	r.Send("HINCRBY", key, "uploaded", peer_diff.UploadDiff)
+	r.Send("HINCRBY", key, "seed_time", peer_diff.SeedTime)
+}
+
 // AddPeer adds a peer to a users active peer list
 func (user *User) AddPeer(peer *Peer) {
 	user.Peers = append(user.Peers, &peer)
@@ -169,4 +180,13 @@ func AppendIfMissing(slice []uint64, i uint64) []uint64 {
 		}
 	}
 	return append(slice, i)
+}
+
+func CalculateBonus(time_spent uint64, uploaded uint64, seeders uint64) float64 {
+	time_spent_f := float64(time_spent) / 3600.0
+	if seeders == 0 {
+		seeders = 1
+	}
+	upload := (float64(uploaded) / 1024.0 / 1024.0 / 1024.0) + 1
+	return (upload + ((time_spent_f+1)*5)*(10/float64(seeders))) / 1000
 }

@@ -172,10 +172,11 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 		torrent.AddPeer(r, peer)
 	}
 
+	peer_diff := PeerDiff{User: user, Torrent: torrent}
 	// user update MUST happen after peer update since we rely on the old dl/ul values
-	ul, dl := peer.Update(ann)
+	peer.Update(ann, &peer_diff)
 	torrent.Update(ann)
-	user.Update(ann, ul, dl, torrent.MultiUp, torrent.MultiDn)
+	user.Update(ann, &peer_diff, torrent.MultiUp, torrent.MultiDn)
 
 	if ann.Event == STOPPED {
 		torrent.DelPeer(r, peer)

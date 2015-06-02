@@ -15,11 +15,17 @@ var (
 )
 
 type DBEntity interface {
-	Sync(r redis.Conn) bool
+	InQueue() bool
+	SetInQueue(bool)
+	Sync(r redis.Conn)
+	Lock()
+	Unlock()
 }
 
-type Queued struct {
-	InQueue bool `redis:"-" json:"-"`
+type Queued interface {
+	InQueue() bool
+	SetInQueue(bool)
+	Sync(r redis.Conn)
 }
 
 // Defined a single payload to send to the backend data store (redis)

@@ -239,13 +239,13 @@ func (t *Tracker) HandleAnnounce(c *echo.Context) *echo.HTTPError {
 	}
 	r.Flush()
 
-	if !torrent.InQueue {
-		torrent.InQueue = true
-		SyncTorrentC <- torrent
+	if !torrent.InQueue() {
+		torrent.SetInQueue(true)
+		SyncEntityC <- torrent
 	}
-	if !user.InQueue {
-		user.InQueue = true
-		SyncUserC <- user
+	if !user.InQueue() {
+		user.SetInQueue(true)
+		SyncEntityC <- user
 	}
 
 	dict := bencode.Dict{

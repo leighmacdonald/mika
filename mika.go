@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/kisielk/raven-go/raven"
+	"math/rand"
 	"time"
 )
 
@@ -51,5 +52,9 @@ func SetupLogger(log_level string, force_colour bool) {
 }
 
 func init() {
+	// Make sure we get random numbers in the application
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	// Recorded to calculate app uptime
 	StartTime = int32(time.Now().Unix())
 }

@@ -178,7 +178,7 @@ func (t *Tracker) HandleTorrentAdd(c *echo.Context) *echo.HTTPError {
 	}
 
 	// Queue torrent to be written out to redis
-	SyncTorrentC <- torrent
+	SyncEntityC <- torrent
 
 	log.WithFields(log.Fields{
 		"fn":        "HandleTorrentAdd",
@@ -202,19 +202,23 @@ func (t *Tracker) HandleTorrentDel(c *echo.Context) *echo.HTTPError {
 			Message: "Tried to delete invalid torrent",
 		}
 	}
-	torrent.Lock()
-	torrent.Enabled = false
-	torrent.Unlock()
-	if !torrent.InQueue {
-		torrent.InQueue = true
-		SyncTorrentC <- torrent
-	}
-	log.WithFields(log.Fields{
-		"fn":        "HandleTorrentDel",
-		"info_hash": info_hash,
-	}).Info("Deleted torrent successfully")
 
-	return c.JSON(http.StatusOK, resp_ok)
+	if t.DelTorrent(torrent) {
+
+		if !torrent.InQueue() {
+			torrent.SetInQueue(true)
+			SyncEntityC <- torrent
+		}
+
+		return c.JSON(http.StatusOK, resp_ok)
+	} else {
+		return &echo.HTTPError{
+			Code:    http.StatusNotFound,
+			Fields:  log.Fields{"fn": "HandleTorrentDel", "info_hash": info_hash},
+			Error:   errors.New("Cannot re-disable a disabled torrent"),
+			Message: "Cannot re-disable a disabled torrent",
+		}
+	}
 }
 
 // getUser is a simple shared function used to fetch the user from a context
@@ -364,10 +368,10 @@ func (t *Tracker) HandleUserCreate(c *echo.Context) *echo.HTTPError {
 	user.Passkey = payload.Passkey
 	user.CanLeech = payload.CanLeech
 	user.Username = payload.Name
-	if !user.InQueue {
-		user.InQueue = true
+	if !user.InQueue() {
+		user.SetInQueue(true)
 		user.Unlock()
-		SyncUserC <- user
+		SyncEntityC <- user
 	} else {
 		user.Unlock()
 	}
@@ -422,10 +426,10 @@ func (t *Tracker) HandleUserUpdate(c *echo.Context) *echo.HTTPError {
 	user.CanLeech = payload.CanLeech
 	user.Enabled = payload.Enabled
 
-	if !user.InQueue {
-		user.InQueue = true
+	if !user.InQueue() {
+		user.SetInQueue(true)
 		user.Unlock()
-		SyncUserC <- user
+		SyncEntityC <- user
 	} else {
 		user.Unlock()
 	}

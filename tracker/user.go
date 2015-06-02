@@ -158,7 +158,7 @@ func (user *User) Sync(r redis.Conn) {
 	)
 }
 
-func (user *User) SyncPeerDiff(r redis.Conn, peer_diff PeerDiff, torrent_id uint64) {
+func (peer_diff *PeerDiff) Sync(r redis.Conn) {
 	key := peer_diff.Key()
 	r.Send("HMSET", key, "speed_up_max", peer_diff.SpeedUPMax, "speed_dn_max", peer_diff.SpeedDNMax)
 	r.Send("HINCRBY", key, "downloaded", peer_diff.DownloadDiff)

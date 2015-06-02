@@ -17,8 +17,9 @@ var (
 	Mika *Tracker
 
 	// Channels used to sync models to redis
-	SyncUserC    = make(chan *User, 100)
-	SyncTorrentC = make(chan *Torrent, 500)
+	//	SyncUserC    = make(chan *User, 100)
+	//	SyncTorrentC = make(chan *Torrent, 500)
+	SyncEntityC = make(chan db.DBEntity, 500)
 )
 
 // Main track struct holding all the known models
@@ -102,6 +103,22 @@ func (tracker *Tracker) AddTorrent(torrent *Torrent) {
 		"info_hash": torrent.InfoHash,
 		"fn":        "AddTorrent",
 	}).Info("Registered new torrent in tracker")
+}
+
+func (Tracker *Tracker) DelTorrent(torrent *Torrent) bool {
+	if torrent.Enabled {
+		torrent.Lock()
+		torrent.Enabled = false
+		torrent.Unlock()
+		log.WithFields(log.Fields{
+			"fn":        "DelTorrent",
+			"info_hash": torrent.InfoHash,
+		}).Info("Deleted torrent successfully")
+		return true
+	} else {
+		return false
+	}
+
 }
 
 // GetUserByID fetches a user from the backend database. Id auto_create is set
@@ -295,16 +312,21 @@ func (tracker *Tracker) syncWriter() {
 		select {
 		case payload := <-db.SyncPayloadC:
 			r.Do(payload.Command, payload.Args...)
-		case user := <-SyncUserC:
-			user.Sync(r)
-			user.Lock()
-			user.InQueue = false
-			user.Unlock()
-		case torrent := <-SyncTorrentC:
-			torrent.Sync(r)
-			torrent.Lock()
-			torrent.InQueue = false
-			torrent.Unlock()
+			//		case user := <-SyncUserC:
+			//			user.Sync(r)
+			//			user.Lock()
+			//			user.InQueue = false
+			//			user.Unlock()
+			//		case torrent := <-SyncTorrentC:
+			//			torrent.Sync(r)
+			//			torrent.Lock()
+			//			torrent.InQueue = false
+			//			torrent.Unlock()
+		case entity := <-SyncEntityC:
+			entity.Sync(r)
+			entity.Lock()
+			entity.SetInQueue(false)
+			entity.Unlock()
 		}
 		err := r.Flush()
 		if err != nil {

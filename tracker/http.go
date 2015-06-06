@@ -80,19 +80,12 @@ func (t *Tracker) listenTracker() {
 		"tls":         false,
 	}).Info("Loading Tracker route handlers")
 
-	// Initialize the router + middlewares
-	e := echo.New()
-	e.MaxParam(1)
+	router := gin.Default()
 
-	// Register our custom error handler that will emit bencoded error messages
-	// suitable for returning to bittorrent clients
-	e.HTTPErrorHandler(TrackerErrorHandler)
+	router.GET("/:passkey/announce", t.HandleAnnounce)
+	router.GET("/:passkey/scrape", t.HandleScrape)
 
-	// Public tracker routes
-	e.Get("/:passkey/announce", t.HandleAnnounce)
-	e.Get("/:passkey/scrape", t.HandleScrape)
-
-	e.Run(conf.Config.ListenHost)
+	router.Run(conf.Config.ListenHost)
 }
 
 func errMeta(status int, message string, fields logrus.Fields, level logrus.Level) gin.H {

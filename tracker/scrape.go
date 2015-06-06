@@ -2,11 +2,12 @@ package tracker
 
 import (
 	"bytes"
-	"git.totdev.in/totv/echo.git"
+	"errors"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
 	log "github.com/Sirupsen/logrus"
 	"github.com/chihaya/bencode"
+	"github.com/gin-gonic/gin"
 	"net/http"
 )
 
@@ -20,59 +21,64 @@ type ScrapeResponse struct {
 
 // HandleScrape is the route handler for the /scrape requests
 // /scrape?info_hash=f%5bs%de06%19%d3ET%cc%81%bd%e5%0dZ%84%7f%f3%da
-func (t *Tracker) HandleScrape(c *echo.Context) *echo.HTTPError {
+func (t *Tracker) HandleScrape(c *gin.Context) {
 	stats.Counter <- stats.EV_SCRAPE
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return &echo.HTTPError{
-			Code:    MSG_GENERIC_ERROR,
-			Fields:  log.Fields{"fn": "HandleScrape"},
-			Message: "Internal error :(",
-			Error:   r.Err(),
-		}
+		c.Error(r.Err()).SetMeta(errMeta(
+			MSG_GENERIC_ERROR,
+			"Internal error :(",
+			log.Fields{"fn": "HandleScrape"},
+			log.ErrorLevel,
+		))
+		return
 	}
 
-	passkey := c.P(0)
+	passkey := c.Param("passkey")
 
 	user_id := t.findUserID(passkey)
 
 	if user_id == 0 {
 		stats.Counter <- stats.EV_INVALID_PASSKEY
-		return &echo.HTTPError{
-			Code:    MSG_GENERIC_ERROR,
-			Fields:  log.Fields{"fn": "HandleScrape"},
-			Message: "Invalid passkey",
-		}
+		c.Error(errors.New("Invalid torrent")).SetMeta(errMeta(
+			MSG_GENERIC_ERROR,
+			"Invalid passkey",
+			log.Fields{"fn": "HandleScrape"},
+			log.ErrorLevel,
+		))
+		return
 	}
 	user := t.FindUserByID(user_id)
 	if !user.CanLeech {
-		return &echo.HTTPError{
-			Code:    MSG_GENERIC_ERROR,
-			Fields:  log.Fields{"fn": "HandleScrape"},
-			Message: "Leech not allowed",
-			Level:   log.DebugLevel,
-		}
+		c.Error(errors.New("Leech not allowed")).SetMeta(errMeta(
+			MSG_GENERIC_ERROR,
+			"Leech not allowed",
+			log.Fields{"fn": "HandleScrape"},
+			log.DebugLevel,
+		))
+		return
 	}
 	if !user.Enabled {
-		return &echo.HTTPError{
-			Code:    MSG_GENERIC_ERROR,
-			Fields:  log.Fields{"fn": "HandleScrape"},
-			Message: "User disabled",
-			Level:   log.DebugLevel,
-		}
+		c.Error(errors.New("User disabled")).SetMeta(errMeta(
+			MSG_GENERIC_ERROR,
+			"User disabled",
+			log.Fields{"fn": "HandleScrape"},
+			log.DebugLevel,
+		))
+		return
 	}
 	q, err := QueryStringParser(c.Request.RequestURI)
 	if err != nil {
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return &echo.HTTPError{
-			Code:    MSG_GENERIC_ERROR,
-			Fields:  log.Fields{"fn": "HandleScrape"},
-			Message: "Could not parse request",
-			Level:   log.ErrorLevel,
-			Error:   err,
-		}
+		c.Error(err).SetMeta(errMeta(
+			MSG_GENERIC_ERROR,
+			"Could not parse request",
+			log.Fields{"fn": "HandleScrape"},
+			log.ErrorLevel,
+		))
+		return
 	}
 
 	// Todo limit scrape to N torrents
@@ -96,15 +102,15 @@ func (t *Tracker) HandleScrape(c *echo.Context) *echo.HTTPError {
 	err = encoder.Encode(resp)
 	if err != nil {
 		stats.Counter <- stats.EV_SCRAPE_FAIL
-		return &echo.HTTPError{
-			Code:    MSG_GENERIC_ERROR,
-			Fields:  log.Fields{"fn": "HandleScrape"},
-			Message: "Failed to encode scrape response",
-			Level:   log.ErrorLevel,
-			Error:   err,
-		}
+		c.Error(err).SetMeta(errMeta(
+			MSG_GENERIC_ERROR,
+			"Failed to encode scrape response",
+			log.Fields{"fn": "HandleScrape"},
+			log.ErrorLevel,
+		))
+		return
 	}
 	encoded := out_bytes.String()
 	log.Debug(encoded)
-	return c.String(http.StatusOK, encoded)
+	c.String(http.StatusOK, encoded)
 }

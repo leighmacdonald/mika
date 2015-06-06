@@ -15,7 +15,6 @@ deps=(
     "github.com/rcrowley/go-metrics|master"
     "github.com/Sirupsen/logrus|master"
     "github.com/goji/param|master"
-    "github.com/goji/httpauth|master"
 )
 pushd &> /dev/null
 for dep in "${deps[@]}"

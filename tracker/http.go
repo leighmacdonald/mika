@@ -4,8 +4,9 @@ import (
 	"crypto/tls"
 	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika/conf"
+	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
-	"github.com/goji/httpauth"
+	"github.com/gin-gonic/gin"
 	"net/http"
 	ghttp "net/http"
 )
@@ -94,6 +95,15 @@ func (t *Tracker) listenTracker() {
 	e.Run(conf.Config.ListenHost)
 }
 
+func errMeta(status int, message string, fields logrus.Fields, level logrus.Level) gin.H {
+	return gin.H{
+		"status":  status,
+		"message": message,
+		"fields":  fields,
+		"level":   level,
+	}
+}
+
 // listenAPI created a new api request router and start the http server listening over TLS
 func (t *Tracker) listenAPI() {
 	log.WithFields(log.Fields{
@@ -101,36 +111,32 @@ func (t *Tracker) listenAPI() {
 		"tls":         true,
 	}).Info("Loading API route handlers")
 
-	e := echo.New()
-	e.MaxParam(1)
+	router := gin.Default()
+	//	var handler *gin.RouterGroup
+	//	// Optionally enabled BasicAuth over the TLS only API
+	//	if conf.Config.APIUsername == "" || conf.Config.APIPassword == "" {
+	//		log.Warn("No credentials set for API. All users granted access.")
+	//	} else {
+	//		handler = router.Group("/api", gin.BasicAuth(gin.Accounts{
+	//			conf.Config.APIUsername: conf.Config.APIPassword,
+	//		}))
+	//	}
+	api := router.Group("/api")
+	api.GET("/version", t.HandleVersion)
+	api.GET("/uptime", t.HandleUptime)
+	api.GET("/torrent/:info_hash", t.HandleTorrentGet)
+	api.POST("/torrent", t.HandleTorrentAdd)
+	api.GET("/torrent/:info_hash/peers", t.HandleGetTorrentPeers)
+	api.DELETE("/torrent/:info_hash", t.HandleTorrentDel)
 
-	// Register our custom error handler that will emit JSON based error messages
-	e.HTTPErrorHandler(APIErrorHandler)
+	api.POST("/user", t.HandleUserCreate)
+	api.GET("/user/:user_id", t.HandleUserGet)
+	api.POST("/user/:user_id", t.HandleUserUpdate)
+	api.GET("/user/:user_id/torrents", t.HandleUserTorrents)
 
-	api := e.Group("/api")
+	api.POST("/whitelist", t.HandleWhitelistAdd)
+	api.DELETE("/whitelist/:prefix", t.HandleWhitelistDel)
 
-	// Optionally enabled BasicAuth over the TLS only API
-	if conf.Config.APIUsername == "" || conf.Config.APIPassword == "" {
-		log.Warn("No credentials set for API. All users granted access.")
-	} else {
-		api.Use(httpauth.SimpleBasicAuth(conf.Config.APIUsername, conf.Config.APIPassword))
-	}
-
-	api.Get("/version", t.HandleVersion)
-	api.Get("/uptime", t.HandleUptime)
-
-	api.Get("/torrent/:info_hash", t.HandleTorrentGet)
-	api.Post("/torrent", t.HandleTorrentAdd)
-	api.Get("/torrent/:info_hash/peers", t.HandleGetTorrentPeers)
-	api.Delete("/torrent/:info_hash", t.HandleTorrentDel)
-
-	api.Post("/user", t.HandleUserCreate)
-	api.Get("/user/:user_id", t.HandleUserGet)
-	api.Post("/user/:user_id", t.HandleUserUpdate)
-	api.Get("/user/:user_id/torrents", t.HandleUserTorrents)
-
-	api.Post("/whitelist", t.HandleWhitelistAdd)
-	api.Delete("/whitelist/:prefix", t.HandleWhitelistDel)
 	tls_config := &tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
@@ -145,6 +151,6 @@ func (t *Tracker) listenAPI() {
 	if conf.Config.SSLCert == "" || conf.Config.SSLPrivateKey == "" {
 		log.Fatalln("SSL config keys not set in config!")
 	}
-	srv := ghttp.Server{TLSConfig: tls_config, Addr: conf.Config.ListenHostAPI, Handler: e}
+	srv := ghttp.Server{TLSConfig: tls_config, Addr: conf.Config.ListenHostAPI, Handler: router}
 	log.Fatal(srv.ListenAndServeTLS(conf.Config.SSLCert, conf.Config.SSLPrivateKey))
 }

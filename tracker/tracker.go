@@ -312,21 +312,12 @@ func (tracker *Tracker) syncWriter() {
 		select {
 		case payload := <-db.SyncPayloadC:
 			r.Do(payload.Command, payload.Args...)
-			//		case user := <-SyncUserC:
-			//			user.Sync(r)
-			//			user.Lock()
-			//			user.InQueue = false
-			//			user.Unlock()
-			//		case torrent := <-SyncTorrentC:
-			//			torrent.Sync(r)
-			//			torrent.Lock()
-			//			torrent.InQueue = false
-			//			torrent.Unlock()
 		case entity := <-SyncEntityC:
 			entity.Sync(r)
-			entity.Lock()
+			// Maybe not needed to lock?
+			entity.AcquireLock()
 			entity.SetInQueue(false)
-			entity.Unlock()
+			entity.ReleaseLock()
 		}
 		err := r.Flush()
 		if err != nil {

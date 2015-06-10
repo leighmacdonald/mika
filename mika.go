@@ -4,7 +4,6 @@ package mika
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/kisielk/raven-go/raven"
 	"math/rand"
 	"time"
 )
@@ -17,8 +16,6 @@ var (
 
 	// Timestamp of when the program first stared up
 	StartTime int32
-
-	RavenClient *raven.Client
 )
 
 // VersionStr returns the currently running version of the application.

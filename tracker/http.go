@@ -2,13 +2,12 @@ package tracker
 
 import (
 	"crypto/tls"
-	"git.totdev.in/totv/echo.git"
 	"git.totdev.in/totv/mika/conf"
 	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	ghttp "net/http"
+	//	"reflect"
 )
 
 type (
@@ -20,45 +19,71 @@ type (
 )
 
 // NewApiError creates a new error model based on the HTTPError stuct values passed in
-func NewApiError(err *echo.HTTPError) *APIErrorResponse {
-	if err.Error != nil {
-		return &APIErrorResponse{
-			Error:   err.Error.Error(),
-			Message: err.Message,
-		}
-	} else {
-		return &APIErrorResponse{
-			Error:   err.Message,
-			Message: err.Message,
-		}
-	}
-}
+//func NewApiError(err *echo.HTTPError) *APIErrorResponse {
+//	if err.Error != nil {
+//		return &APIErrorResponse{
+//			Error:   err.Error.Error(),
+//			Message: err.Message,
+//		}
+//	} else {
+//		return &APIErrorResponse{
+//			Error:   err.Message,
+//			Message: err.Message,
+//		}
+//	}
+//}
 
 // APIErrorHandler is used as the default error handler for API requests
 // in the echo router. The function requires the use of the forked echo router
 // available at git@git.totdev.in:totv/echo.git because we are passing more information
 // than the standard HTTPError used.
-func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
-	http_error.Log()
-
-	if http_error.Code == 0 {
-		http_error.Code = http.StatusInternalServerError
-	}
-	err_resp := NewApiError(http_error)
-	c.JSON(http_error.Code, err_resp)
-}
+//func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
+//	http_error.Log()
+//
+//	if http_error.Code == 0 {
+//		http_error.Code = http.StatusInternalServerError
+//	}
+//	err_resp := NewApiError(http_error)
+//	c.JSON(http_error.Code, err_resp)
+//}
 
 // TrackerErrorHandler is used as the default error handler for tracker requests
 // the error is returned to the client as a bencoded error string as defined in the
 // bittorrent specs.
-func TrackerErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
-	http_error.Log()
+//func TrackerErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
+//	http_error.Log()
+//
+//	if http_error.Code == 0 {
+//		http_error.Code = MSG_GENERIC_ERROR
+//	}
+//
+//	c.String(http_error.Code, responseError(http_error.Message))
+//}
 
-	if http_error.Code == 0 {
-		http_error.Code = MSG_GENERIC_ERROR
+func handleApiErrors(c *gin.Context) {
+	// Execute the handlers, recording any errors to be process below
+	c.Next()
+
+	error_returned := c.Errors.ByType(gin.ErrorTypePublic).Last()
+
+	//	if error_returned.Meta != nil {
+	//		value := reflect.ValueOf(error_returned.Meta)
+	//		switch value.Kind() {
+	//		case reflect.Struct:
+	//			return error_returned.Meta
+	//		case reflect.Map:
+	//			for _, key := range value.MapKeys() {
+	//				json[key.String()] = value.MapIndex(key).Interface()
+	//			}
+	//		default:
+	//			json["meta"] = msg.Meta
+	//		}
+	//	}
+
+	// TODO handle private/public errors separately, like sentry output for priv errors
+	if error_returned != nil && error_returned.Meta != nil {
+		c.JSON(500, error_returned.Meta)
 	}
-
-	c.String(http_error.Code, responseError(http_error.Message))
 }
 
 // Run starts all of the background goroutines related to managing the tracker
@@ -114,6 +139,9 @@ func (t *Tracker) listenAPI() {
 	//			conf.Config.APIUsername: conf.Config.APIPassword,
 	//		}))
 	//	}
+
+	router.Use(handleApiErrors)
+
 	api := router.Group("/api")
 	api.GET("/version", t.HandleVersion)
 	api.GET("/uptime", t.HandleUptime)
@@ -144,6 +172,6 @@ func (t *Tracker) listenAPI() {
 	if conf.Config.SSLCert == "" || conf.Config.SSLPrivateKey == "" {
 		log.Fatalln("SSL config keys not set in config!")
 	}
-	srv := ghttp.Server{TLSConfig: tls_config, Addr: conf.Config.ListenHostAPI, Handler: router}
+	srv := http.Server{TLSConfig: tls_config, Addr: conf.Config.ListenHostAPI, Handler: router}
 	log.Fatal(srv.ListenAndServeTLS(conf.Config.SSLCert, conf.Config.SSLPrivateKey))
 }

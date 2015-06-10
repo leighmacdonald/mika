@@ -122,6 +122,7 @@ func (t *Tracker) HandleTorrentGet(c *gin.Context) {
 			},
 			log.ErrorLevel,
 		))
+		return
 	} else {
 		log.WithFields(log.Fields{
 			"info_hash": info_hash,
@@ -424,7 +425,7 @@ func (t *Tracker) HandleUserUpdate(c *gin.Context) {
 	t.UsersMutex.RLock()
 	user, exists := t.Users[user_id]
 	t.UsersMutex.RUnlock()
-	if !exists {
+	if !exists || user == nil {
 		c.Error(errors.New("Invalid user")).SetMeta(errMeta(
 			http.StatusNotFound,
 			"User not found, cannot continue",

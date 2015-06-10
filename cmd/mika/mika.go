@@ -11,8 +11,8 @@
 // net.ipv4.tcp_sack=1                   # enable selective acknowledgements
 // net.ipv4.tcp_timestamps=1             # needed for selective acknowledgements
 // net.ipv4.tcp_window_scaling=1         # scale the network window
-// net.ipv4.tcp_congestion_control=cubic # better congestion algorythm
-// net.ipv4.tcp_syncookies=1             # enable syn cookied
+// net.ipv4.tcp_congestion_control=cubic # better congestion algorithm
+// net.ipv4.tcp_syncookies=1             # enable syn cookies
 // net.ipv4.tcp_tw_recycle=1             # recycle sockets quickly
 // net.ipv4.tcp_max_syn_backlog=NUMBER   # backlog setting
 // net.core.somaxconn=10000              # up the number of connections per port
@@ -41,7 +41,7 @@ import (
 	"git.totdev.in/totv/mika/tracker"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
-	"github.com/kisielk/raven-go/raven"
+	"github.com/Sirupsen/logrus/hooks/sentry"
 	"os"
 	"os/signal"
 	"runtime"
@@ -102,6 +102,7 @@ func sigHandler(s chan os.Signal) {
 
 // main initialized all models and starts the tracker service
 func main() {
+
 	log.Info(fmt.Sprintf(cheese, mika.Version))
 
 	log.Info("Process ID:", os.Getpid())
@@ -121,13 +122,18 @@ func main() {
 
 	conf.LoadConfig(*config_file, true)
 
-	mika.SetupLogger(conf.Config.LogLevel, conf.Config.ColourLogs)
+	logger := log.New()
+	hook, err := logrus_sentry.NewSentryHook(conf.Config.SentryDSN, []log.Level{
+		log.PanicLevel,
+		log.FatalLevel,
+		log.ErrorLevel,
+	})
 
-	var err error
-	mika.RavenClient, err = raven.NewClient(conf.Config.SentryDSN)
-	if err != nil {
-		log.Warn("Could not connect to sentry")
+	if err == nil {
+		logger.Hooks.Add(hook)
 	}
+
+	mika.SetupLogger(conf.Config.LogLevel, conf.Config.ColourLogs)
 
 	// Start stat counter
 	stats.Setup(conf.Config.MetricsDSN)

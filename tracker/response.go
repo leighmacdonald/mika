@@ -2,8 +2,8 @@ package tracker
 
 import (
 	"bytes"
-	"git.totdev.in/totv/echo.git"
 	"github.com/chihaya/bencode"
+	"github.com/gin-gonic/gin"
 )
 
 type ErrorResponse struct {
@@ -46,13 +46,13 @@ var (
 
 // oops will output a bencoded error code to the torrent client using
 // a preset message code constant
-func oops(c *echo.Context, msg_code int) {
+func oops(c *gin.Context, msg_code int) {
 	c.String(msg_code, responseError(resp_msg[msg_code]))
 }
 
 // oopsStr will output a bencoded error code to the torrent client using
 // a supplied custom message string
-func oopsStr(c *echo.Context, msg_code int, msg string) {
+func oopsStr(c *gin.Context, msg_code int, msg string) {
 	c.String(msg_code, responseError(msg))
 }
 

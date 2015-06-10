@@ -12,8 +12,9 @@ import (
 // t:usertorrent:<user_id>:<torrent_id> ->
 //    first_ann, last_ann, uploaded, downloaded, seed_time, speed_up_max, speed_dn_max
 type User struct {
-	db.Queued
+	db.DBEntity
 	sync.RWMutex
+	Queued        bool     `redis:"-" json:"-"`
 	UserID        uint64   `redis:"user_id" json:"user_id"`
 	Enabled       bool     `redis:"enabled" json:"enabled"`
 	Uploaded      uint64   `redis:"uploaded" json:"uploaded"`
@@ -90,6 +91,7 @@ func NewUser(user_id uint64) *User {
 		KeyIncomplete: fmt.Sprintf("t:u:incomplete:%d", user_id),
 		KeyComplete:   fmt.Sprintf("t:u:complete:%d", user_id),
 		KeyHNR:        fmt.Sprintf("t:u:hnr:%d", user_id),
+		Queued:        false,
 	}
 	return user
 }
@@ -189,4 +191,8 @@ func CalculateBonus(time_spent uint64, uploaded uint64, seeders uint64) float64 
 	}
 	upload := (float64(uploaded) / 1024.0 / 1024.0 / 1024.0) + 1
 	return (upload + ((time_spent_f+1)*5)*(10/float64(seeders))) / 1000
+}
+
+func InQueue(u *User) bool {
+	return u.Queued
 }

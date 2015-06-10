@@ -12,7 +12,7 @@ import (
 )
 
 type Torrent struct {
-	db.Queued
+	db.DBEntity
 	sync.RWMutex
 	Name            string  `redis:"name" json:"name"`
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`
@@ -30,6 +30,14 @@ type Torrent struct {
 	Peers           []*Peer `redis:"-" json:"peers"`
 	MultiUp         float64 `redis:"multi_up" json:"multi_up"`
 	MultiDn         float64 `redis:"multi_dn" json:"multi_dn"`
+}
+
+func AcquireLock(torrent *Torrent) {
+	torrent.Lock()
+}
+
+func ReleaseUnlock(torrent *Torrent) {
+	torrent.Unlock()
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all

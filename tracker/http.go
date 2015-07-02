@@ -7,7 +7,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	//	"reflect"
 )
 
 type (
@@ -64,25 +63,19 @@ func handleApiErrors(c *gin.Context) {
 	// Execute the handlers, recording any errors to be process below
 	c.Next()
 
-	error_returned := c.Errors.ByType(gin.ErrorTypePublic).Last()
+	error_returned := c.Errors.Last()
 
-	//	if error_returned.Meta != nil {
-	//		value := reflect.ValueOf(error_returned.Meta)
-	//		switch value.Kind() {
-	//		case reflect.Struct:
-	//			return error_returned.Meta
-	//		case reflect.Map:
-	//			for _, key := range value.MapKeys() {
-	//				json[key.String()] = value.MapIndex(key).Interface()
-	//			}
-	//		default:
-	//			json["meta"] = msg.Meta
-	//		}
-	//	}
+	meta := error_returned.JSON().(gin.H)
+
+	status := 500
+	custom_status, found := meta["status"]
+	if found {
+		status = custom_status.(int)
+	}
 
 	// TODO handle private/public errors separately, like sentry output for priv errors
 	if error_returned != nil && error_returned.Meta != nil {
-		c.JSON(500, error_returned.Meta)
+		c.JSON(status, meta)
 	}
 }
 

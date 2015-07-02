@@ -47,6 +47,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"syscall"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -121,6 +122,12 @@ func main() {
 	}
 
 	conf.LoadConfig(*config_file, true)
+
+	if conf.Config.Debug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	logger := log.New()
 	hook, err := logrus_sentry.NewSentryHook(conf.Config.SentryDSN, []log.Level{

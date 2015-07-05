@@ -12,8 +12,8 @@ import (
 // t:usertorrent:<user_id>:<torrent_id> ->
 //    first_ann, last_ann, uploaded, downloaded, seed_time, speed_up_max, speed_dn_max
 type User struct {
-	db.DBEntity
-	sync.RWMutex
+	db.DBEntity   `redis:"-" json:"-"`
+	sync.RWMutex  `redis:"-" json:"-"`
 	Queued        bool     `redis:"-" json:"-"`
 	UserID        uint64   `redis:"user_id" json:"user_id"`
 	Enabled       bool     `redis:"enabled" json:"enabled"`

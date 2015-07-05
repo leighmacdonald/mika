@@ -4,6 +4,7 @@
   "RedisHost": "localhost:6379",
   "RedisPass": "",
   "RedisMaxIdle": 500,
+  "RedisDB": 0,
   "SSLPrivateKey": "key_priv",
   "SSLCert": "key_ca",
   "ListenHostAPI": ":34001",

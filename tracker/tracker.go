@@ -102,7 +102,7 @@ func (tracker *Tracker) AddTorrent(torrent *Torrent) {
 	log.WithFields(log.Fields{
 		"info_hash": torrent.InfoHash,
 		"fn":        "AddTorrent",
-	}).Info("Registered new torrent in tracker")
+	}).Debug("Registered new torrent in tracker")
 }
 
 func (Tracker *Tracker) DelTorrent(torrent *Torrent) bool {
@@ -313,11 +313,8 @@ func (tracker *Tracker) syncWriter() {
 		case payload := <-db.SyncPayloadC:
 			r.Do(payload.Command, payload.Args...)
 		case entity := <-SyncEntityC:
+			log.Debugln("Syncing:", entity)
 			entity.Sync(r)
-			// Maybe not needed to lock?
-			entity.AcquireLock()
-			entity.SetInQueue(false)
-			entity.ReleaseLock()
 		}
 		err := r.Flush()
 		if err != nil {

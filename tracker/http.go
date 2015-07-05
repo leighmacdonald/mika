@@ -60,22 +60,25 @@ type (
 //}
 
 func handleApiErrors(c *gin.Context) {
-	// Execute the handlers, recording any errors to be process below
+	// Execute the next handler, recording any errors to be process below
 	c.Next()
 
 	error_returned := c.Errors.Last()
+	if error_returned != nil {
+		meta := error_returned.JSON().(gin.H)
 
-	meta := error_returned.JSON().(gin.H)
+		status := 500
+		custom_status, found := meta["status"]
+		if found {
+			status = custom_status.(int)
+		}
 
-	status := 500
-	custom_status, found := meta["status"]
-	if found {
-		status = custom_status.(int)
-	}
+		log.Errorln(error_returned)
 
-	// TODO handle private/public errors separately, like sentry output for priv errors
-	if error_returned != nil && error_returned.Meta != nil {
-		c.JSON(status, meta)
+		// TODO handle private/public errors separately, like sentry output for priv errors
+		if error_returned != nil && error_returned.Meta != nil {
+			c.JSON(status, meta)
+		}
 	}
 }
 

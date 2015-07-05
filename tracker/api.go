@@ -122,7 +122,6 @@ func (t *Tracker) HandleTorrentGet(c *gin.Context) {
 			},
 			log.ErrorLevel,
 		))
-		return
 	} else {
 		log.WithFields(log.Fields{
 			"info_hash": info_hash,

@@ -43,6 +43,9 @@ type Configuration struct {
 	// Maximum amount of idle redis connection to allow to idle
 	RedisMaxIdle int
 
+	// Redis database number to use
+	RedisDB int
+
 	// Path to the SSL private key
 	SSLPrivateKey string
 

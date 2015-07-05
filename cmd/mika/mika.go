@@ -42,12 +42,12 @@ import (
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/Sirupsen/logrus/hooks/sentry"
+	"github.com/gin-gonic/gin"
 	"os"
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
 	"syscall"
-	"github.com/gin-gonic/gin"
 )
 
 var (

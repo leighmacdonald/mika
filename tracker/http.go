@@ -73,8 +73,6 @@ func handleApiErrors(c *gin.Context) {
 			status = custom_status.(int)
 		}
 
-		log.Errorln(error_returned)
-
 		// TODO handle private/public errors separately, like sentry output for priv errors
 		if error_returned != nil && error_returned.Meta != nil {
 			c.JSON(status, meta)
@@ -149,6 +147,7 @@ func (t *Tracker) listenAPI() {
 	api.POST("/user", t.HandleUserCreate)
 	api.GET("/user/:user_id", t.HandleUserGet)
 	api.POST("/user/:user_id", t.HandleUserUpdate)
+	api.DELETE("/user/:user_id", t.HandleUserDel)
 	api.GET("/user/:user_id/torrents", t.HandleUserTorrents)
 
 	api.POST("/whitelist", t.HandleWhitelistAdd)

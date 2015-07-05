@@ -97,13 +97,13 @@ func (tracker *Tracker) HandleUptime(c *gin.Context) {
 			log.Fields{"fn": "HandleUptime"},
 			log.ErrorLevel,
 		))
-		return
+	} else {
+		//noinspection GoUnresolvedReference
+		c.JSON(http.StatusOK, UptimeResponse{
+			Process: util.Unixtime() - mika.StartTime,
+			System:  int32(info.Uptime),
+		})
 	}
-	//noinspection GoUnresolvedReference
-	c.JSON(http.StatusOK, UptimeResponse{
-		Process: util.Unixtime() - mika.StartTime,
-		System:  int32(info.Uptime),
-	})
 }
 
 // HandleTorrentGet will find and return the requested torrent.
@@ -130,6 +130,9 @@ func (tracker *Tracker) HandleTorrentGet(c *gin.Context) {
 
 // HandleTorrentAdd Adds new torrents into the active torrent set
 // {torrent_id: "", info_hash: "", name: ""}
+//
+// If the info_hash already exists the torrent_id and name are instead
+// updated to reflect the supplied values.
 func (tracker *Tracker) HandleTorrentAdd(c *gin.Context) {
 	payload := &TorrentAddPayload{}
 	if err := c.Bind(payload); err != nil {
@@ -195,11 +198,11 @@ func (tracker *Tracker) HandleTorrentAdd(c *gin.Context) {
 
 // HandleTorrentDel will allow the deletion of torrents from the currently active set
 // This will not remove the torrent, but instead mark it as deleted.
-func (tracker *Tracker) HandleTorrentDel(c *gin.Context) {
-	info_hash := c.Param("info_hash")
+func (tracker *Tracker) HandleTorrentDel(ctx *gin.Context) {
+	info_hash := ctx.Param("info_hash")
 	torrent := tracker.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
-		c.Error(errors.New("Unknown torrent_id supplied")).SetMeta(errMeta(
+		ctx.Error(errors.New("Unknown torrent_id supplied")).SetMeta(errMeta(
 			http.StatusNotFound,
 			"Tried to delete invalid torrent",
 			log.Fields{"fn": "HandleTorrentDel", "info_hash": info_hash},
@@ -209,11 +212,9 @@ func (tracker *Tracker) HandleTorrentDel(c *gin.Context) {
 	}
 
 	if tracker.DelTorrent(torrent) {
-		SyncEntityC <- torrent
-
-		c.JSON(http.StatusOK, resp_ok)
+		ctx.JSON(http.StatusOK, resp_ok)
 	} else {
-		c.Error(errors.New("Cannot re-disable a disabled torrent")).SetMeta(errMeta(
+		ctx.Error(errors.New("Cannot re-disable a disabled torrent")).SetMeta(errMeta(
 			http.StatusNotFound,
 			"Cannot re-disable a disabled torrent",
 			log.Fields{"fn": "HandleTorrentDel", "info_hash": info_hash},
@@ -225,8 +226,8 @@ func (tracker *Tracker) HandleTorrentDel(c *gin.Context) {
 
 // getUser is a simple shared function used to fetch the user from a context
 // instance automatically.
-func (tracker *Tracker) getUser(c *gin.Context) (*User, error) {
-	user_id_str := c.Param("user_id")
+func (tracker *Tracker) getUser(ctx *gin.Context) (*User, error) {
+	user_id_str := ctx.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -247,10 +248,10 @@ func (tracker *Tracker) getUser(c *gin.Context) (*User, error) {
 
 // HandleUserTorrents fetches the current set of torrents attached to a user.
 // This returns a collection of snatched/hnr/incomplete/complete torrent_ids
-func (tracker *Tracker) HandleUserTorrents(c *gin.Context) {
-	user, err := tracker.getUser(c)
+func (tracker *Tracker) HandleUserTorrents(ctx *gin.Context) {
+	user, err := tracker.getUser(ctx)
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusNotFound,
 			"Failed to find user",
 			log.Fields{"fn": "HandleUserTorrents"},
@@ -265,7 +266,7 @@ func (tracker *Tracker) HandleUserTorrents(c *gin.Context) {
 	a, err := r.Do("SMEMBERS", user.KeyActive)
 
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusInternalServerError,
 			"Could not fetch active torrents",
 			log.Fields{"fn": "HandleUserTorrents"},
@@ -277,7 +278,7 @@ func (tracker *Tracker) HandleUserTorrents(c *gin.Context) {
 
 	a, err = r.Do("SMEMBERS", user.KeyHNR)
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusInternalServerError,
 			"Could not fetch active hnr's",
 			log.Fields{"fn": "HandleUserTorrents"},
@@ -289,7 +290,7 @@ func (tracker *Tracker) HandleUserTorrents(c *gin.Context) {
 
 	a, err = r.Do("SMEMBERS", user.KeyComplete)
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusInternalServerError,
 			"Could not fetch complete torrents",
 			log.Fields{"fn": "HandleUserTorrents"},
@@ -301,7 +302,7 @@ func (tracker *Tracker) HandleUserTorrents(c *gin.Context) {
 
 	a, err = r.Do("SMEMBERS", user.KeyIncomplete)
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusInternalServerError,
 			"Could not fetch incomplete torrents",
 			log.Fields{"fn": "HandleUserTorrents"},
@@ -316,15 +317,15 @@ func (tracker *Tracker) HandleUserTorrents(c *gin.Context) {
 	response.Incomplete = incomplete_list
 	response.Complete = complete_list
 
-	c.JSON(http.StatusOK, response)
+	ctx.JSON(http.StatusOK, response)
 }
 
 // HandleUserGet Returns the current representation of the user data struct for
 // the requested user_id if available.
-func (tracker *Tracker) HandleUserGet(c *gin.Context) {
-	user, err := tracker.getUser(c)
+func (tracker *Tracker) HandleUserGet(ctx *gin.Context) {
+	user, err := tracker.getUser(ctx)
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusNotFound,
 			"Could not fetch user",
 			log.Fields{"fn": "HandleUserGet"},
@@ -332,16 +333,31 @@ func (tracker *Tracker) HandleUserGet(c *gin.Context) {
 		))
 		return
 	}
-	c.JSON(http.StatusOK, user)
+	ctx.JSON(http.StatusOK, user)
+}
+
+func (tracker *Tracker) HandleUserDel(ctx *gin.Context) {
+	user, err := tracker.getUser(ctx)
+	if err != nil {
+		ctx.Error(err).SetMeta(errMeta(
+			http.StatusNotFound,
+			"Could not fetch user",
+			log.Fields{"fn": "HandleUserGet"},
+			log.ErrorLevel,
+		))
+		return
+	}
+	tracker.DelUser(user)
+	ctx.JSON(http.StatusOK, resp_ok)
 }
 
 // HandleUserCreate facilitates the adding of new users into the trackers memory.
 // Mika does not check redis for valid users on each request, so this function
 // must be used to add new users into a running system.
-func (tracker *Tracker) HandleUserCreate(c *gin.Context) {
+func (tracker *Tracker) HandleUserCreate(ctx *gin.Context) {
 	payload := &UserCreatePayload{}
-	if err := c.Bind(payload); err != nil {
-		c.Error(err).SetMeta(errMeta(
+	if err := ctx.Bind(payload); err != nil {
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusBadRequest,
 			"Failed to parse user create json payload",
 			log.Fields{"fn": "HandleUserCreate"},
@@ -350,7 +366,7 @@ func (tracker *Tracker) HandleUserCreate(c *gin.Context) {
 		return
 	}
 	if payload.Passkey == "" || payload.UserID <= 0 {
-		c.Error(errors.New("Invalid passkey or userid")).SetMeta(errMeta(
+		ctx.Error(errors.New("Invalid passkey or userid")).SetMeta(errMeta(
 			http.StatusBadRequest,
 			"Invalid passkey or userid",
 			log.Fields{
@@ -366,7 +382,7 @@ func (tracker *Tracker) HandleUserCreate(c *gin.Context) {
 	user := tracker.FindUserByID(payload.UserID)
 
 	if user != nil {
-		c.Error(errors.New("Tried to add duplicate user")).SetMeta(errMeta(
+		ctx.Error(errors.New("Tried to add duplicate user")).SetMeta(errMeta(
 			http.StatusConflict,
 			"Tried to add duplicate user",
 			log.Fields{"fn": "HandleUserCreate"},
@@ -380,19 +396,18 @@ func (tracker *Tracker) HandleUserCreate(c *gin.Context) {
 	user.Passkey = payload.Passkey
 	user.CanLeech = payload.CanLeech
 	user.Username = payload.Name
-	if !user.InQueue() {
-		user.SetInQueue(true)
-		user.Unlock()
-		SyncEntityC <- user
-	} else {
-		user.Unlock()
-	}
+	user.Unlock()
+
+	SyncEntityC <- user
+
+	tracker.AddUser(user)
+
 	log.WithFields(log.Fields{
 		"fn":        "HandleUserCreate",
 		"user_name": payload.Name,
 		"user_id":   payload.UserID,
 	}).Info("Created new user successfully")
-	c.JSON(http.StatusOK, resp_ok)
+	ctx.JSON(http.StatusOK, resp_ok)
 }
 
 // HandleUserUpdate will update an existing users data. This is usually used to change
@@ -402,10 +417,10 @@ func (tracker *Tracker) HandleUserCreate(c *gin.Context) {
 // initially, your copy of the current data will become out of date upon the next announce or
 // periodic update for that user. If you do not update before that happens you may lose
 // user stats for that specific delta.
-func (tracker *Tracker) HandleUserUpdate(c *gin.Context) {
+func (tracker *Tracker) HandleUserUpdate(ctx *gin.Context) {
 	payload := &UserUpdatePayload{}
-	if err := c.Bind(payload); err != nil {
-		c.Error(err).SetMeta(errMeta(
+	if err := ctx.Bind(payload); err != nil {
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusBadRequest,
 			"Failed to parse user update json payload",
 			log.Fields{"fn": "HandleUserUpdate"},
@@ -413,10 +428,10 @@ func (tracker *Tracker) HandleUserUpdate(c *gin.Context) {
 		))
 		return
 	}
-	user_id_str := c.Param("user_id")
+	user_id_str := ctx.Param("user_id")
 	user_id, err := strconv.ParseUint(user_id_str, 10, 64)
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusBadRequest,
 			"Failed to parse user update request",
 			log.Fields{"fn": "HandleUserUpdate"},
@@ -429,7 +444,7 @@ func (tracker *Tracker) HandleUserUpdate(c *gin.Context) {
 	user, exists := tracker.Users[user_id]
 	tracker.UsersMutex.RUnlock()
 	if !exists || user == nil {
-		c.Error(errors.New("Invalid user")).SetMeta(errMeta(
+		ctx.Error(errors.New("Invalid user")).SetMeta(errMeta(
 			http.StatusNotFound,
 			"User not found, cannot continue",
 			log.Fields{"fn": "HandleUserUpdate"},
@@ -453,15 +468,15 @@ func (tracker *Tracker) HandleUserUpdate(c *gin.Context) {
 		"fn":      "HandleUserUpdate",
 		"user_id": user_id,
 	}).Info("Updated user successfully")
-	c.JSON(http.StatusAccepted, resp_ok)
+	ctx.JSON(http.StatusAccepted, resp_ok)
 }
 
 // HandleWhitelistAdd facilitates adding new torrent client prefixes to the
 // allowed client whitelist
-func (tracker *Tracker) HandleWhitelistAdd(c *gin.Context) {
+func (tracker *Tracker) HandleWhitelistAdd(ctx *gin.Context) {
 	payload := &WhitelistAddPayload{}
-	if err := c.Bind(payload); err != nil {
-		c.Error(err).SetMeta(errMeta(
+	if err := ctx.Bind(payload); err != nil {
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusBadRequest,
 			"Failed to parse whitelist add json payload",
 			log.Fields{"fn": "HandleWhitelistAdd"},
@@ -471,7 +486,7 @@ func (tracker *Tracker) HandleWhitelistAdd(c *gin.Context) {
 	}
 	for _, prefix := range tracker.Whitelist {
 		if prefix == payload.Prefix {
-			c.JSON(http.StatusConflict, resp_ok)
+			ctx.JSON(http.StatusConflict, resp_ok)
 			return
 		}
 	}
@@ -485,13 +500,13 @@ func (tracker *Tracker) HandleWhitelistAdd(c *gin.Context) {
 		"fn":     "HandleWhitelistAdd",
 		"client": payload.Prefix,
 	}).Info("Added new client to whitelist")
-	c.JSON(http.StatusCreated, resp_ok)
+	ctx.JSON(http.StatusCreated, resp_ok)
 }
 
 // HandleWhitelistDel will remove an existing torrent client prefix from the
 // active whitelist.
-func (tracker *Tracker) HandleWhitelistDel(c *gin.Context) {
-	prefix := c.Param("prefix")
+func (tracker *Tracker) HandleWhitelistDel(ctx *gin.Context) {
+	prefix := ctx.Param("prefix")
 	for _, p := range tracker.Whitelist {
 		if p == prefix {
 			r := db.Pool.Get()
@@ -503,10 +518,10 @@ func (tracker *Tracker) HandleWhitelistDel(c *gin.Context) {
 				"prefix": prefix,
 				"fn":     "HandleWhitelistDel",
 			}).Info("Deleted client from whitelist successfully")
-			c.JSON(http.StatusOK, resp_ok)
+			ctx.JSON(http.StatusOK, resp_ok)
 		}
 	}
-	c.Error(errors.New("Tried to delete unknown client prefix")).SetMeta(errMeta(
+	ctx.Error(errors.New("Tried to delete unknown client prefix")).SetMeta(errMeta(
 		http.StatusNotFound,
 		"Tried to delete unknown client prefix",
 		log.Fields{"fn": "HandleWhitelistDel", "prefix": prefix},
@@ -519,11 +534,11 @@ func (tracker *Tracker) HandleGetTorrentPeer(c *gin.Context) {
 }
 
 // HandleGetTorrentPeers returns all peers for a given info_hash
-func (tracker *Tracker) HandleGetTorrentPeers(c *gin.Context) {
-	info_hash := c.Param("info_hash")
+func (tracker *Tracker) HandleGetTorrentPeers(ctx *gin.Context) {
+	info_hash := ctx.Param("info_hash")
 	torrent := tracker.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
-		c.Error(errors.New("Invalid torrent")).SetMeta(errMeta(
+		ctx.Error(errors.New("Invalid torrent")).SetMeta(errMeta(
 			http.StatusNotFound,
 			"Invalid torrent",
 			log.Fields{"fn": "HandleGetTorrentPeers", "info_hash": info_hash},
@@ -535,5 +550,5 @@ func (tracker *Tracker) HandleGetTorrentPeers(c *gin.Context) {
 		"info_hash": info_hash,
 		"fn":        "HandleGetTorrentPeers",
 	}).Debug("Got torrent peers successfully")
-	c.JSON(http.StatusOK, torrent.Peers)
+	ctx.JSON(http.StatusOK, torrent.Peers)
 }

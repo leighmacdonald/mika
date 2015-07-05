@@ -105,7 +105,7 @@ func (tracker *Tracker) AddTorrent(torrent *Torrent) {
 	}).Debug("Registered new torrent in tracker")
 }
 
-func (Tracker *Tracker) DelTorrent(torrent *Torrent) bool {
+func (tracker *Tracker) DelTorrent(torrent *Torrent) bool {
 	if torrent.Enabled {
 		torrent.Lock()
 		torrent.Enabled = false
@@ -114,11 +114,21 @@ func (Tracker *Tracker) DelTorrent(torrent *Torrent) bool {
 			"fn":        "DelTorrent",
 			"info_hash": torrent.InfoHash,
 		}).Info("Deleted torrent successfully")
+		SyncEntityC <- torrent
 		return true
 	} else {
 		return false
 	}
+}
 
+func (tracker *Tracker) DelUser(user *User) {
+	tracker.UsersMutex.Lock()
+	delete(tracker.Users, user.UserID)
+	tracker.UsersMutex.Unlock()
+	log.WithFields(log.Fields{
+		"fn":      "tracker.DelUser",
+		"user_id": user.UserID,
+	}).Info("Deleted user successfully")
 }
 
 // GetUserByID fetches a user from the backend database. Id auto_create is set
@@ -321,6 +331,8 @@ func (tracker *Tracker) syncWriter() {
 			log.WithFields(log.Fields{
 				"fn": "syncWriter",
 			}).Fatal("Failed to flush connection:", err.Error())
+		} else {
+			log.Debugln("Synced entity successfully")
 		}
 	}
 }

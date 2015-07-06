@@ -7,6 +7,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"sync"
+	"time"
+	"math/rand"
 )
 
 // t:usertorrent:<user_id>:<torrent_id> ->
@@ -30,6 +32,7 @@ type User struct {
 	KeyIncomplete string   `redis:"-" json:"-"`
 	KeyComplete   string   `redis:"-" json:"-"`
 	KeyHNR        string   `redis:"-" json:"-"`
+	Scheduler     *time.Ticker `redis:"-" json:"-"`
 }
 
 // findUserID find a user_id from the supplied passkey. A return value
@@ -43,6 +46,22 @@ func (t *Tracker) findUserID(passkey string) uint64 {
 	return 0
 }
 
+
+func (user *User) scheduler(ticker *time.Ticker) {
+	// Randomize the scheduler start time to make sure everyone isn't updating at the exact
+	// same moment.
+	time.Sleep(time.Millisecond * time.Duration(rand.Intn(60)))
+	for range user.Scheduler.C {
+		log.WithFields(log.Fields{
+			"fn": "schedualer",
+			"user_id": user.UserID,
+		}).Debug("User scheduler executed")
+	}
+}
+
+// MergeDB will update the user instance with the currently active data
+// from the backend redis database. This will simple overwrite and existing
+// data in the user instance.
 func (user *User) MergeDB(r redis.Conn) error {
 	user_reply, err := r.Do("HGETALL", user.UserKey)
 	if err != nil {
@@ -92,7 +111,11 @@ func NewUser(user_id uint64) *User {
 		KeyComplete:   fmt.Sprintf("t:u:complete:%d", user_id),
 		KeyHNR:        fmt.Sprintf("t:u:hnr:%d", user_id),
 		Queued:        false,
+		Scheduler:     time.NewTicker(time.Minute * 15),
 	}
+
+	go user.scheduler(user.Scheduler)
+
 	return user
 }
 
@@ -191,8 +214,4 @@ func CalculateBonus(time_spent uint64, uploaded uint64, seeders uint64) float64 
 	}
 	upload := (float64(uploaded) / 1024.0 / 1024.0 / 1024.0) + 1
 	return (upload + ((time_spent_f+1)*5)*(10/float64(seeders))) / 1000
-}
-
-func InQueue(u *User) bool {
-	return u.Queued
 }

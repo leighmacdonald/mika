@@ -99,7 +99,7 @@ func (t *Tracker) listenTracker() {
 		"tls":         false,
 	}).Info("Loading Tracker route handlers")
 
-	router := gin.Default()
+	router := NewRouter()
 
 	router.GET("/:passkey/announce", t.HandleAnnounce)
 	router.GET("/:passkey/scrape", t.HandleScrape)
@@ -116,6 +116,14 @@ func errMeta(status int, message string, fields logrus.Fields, level logrus.Leve
 	}
 }
 
+// NewRouter creates and returns a newly configured router instance using
+// the default middleware handlers.
+func NewRouter() *gin.Engine{
+	router := gin.New()
+	router.Use(gin.Recovery())
+	return router
+}
+
 // listenAPI created a new api request router and start the http server listening over TLS
 func (t *Tracker) listenAPI() {
 	log.WithFields(log.Fields{
@@ -123,20 +131,21 @@ func (t *Tracker) listenAPI() {
 		"tls":         true,
 	}).Info("Loading API route handlers")
 
-	router := gin.Default()
-	//	var handler *gin.RouterGroup
-	//	// Optionally enabled BasicAuth over the TLS only API
-	//	if conf.Config.APIUsername == "" || conf.Config.APIPassword == "" {
-	//		log.Warn("No credentials set for API. All users granted access.")
-	//	} else {
-	//		handler = router.Group("/api", gin.BasicAuth(gin.Accounts{
-	//			conf.Config.APIUsername: conf.Config.APIPassword,
-	//		}))
-	//	}
-
+	router := NewRouter()
 	router.Use(handleApiErrors)
 
-	api := router.Group("/api")
+	var api *gin.RouterGroup
+
+	// Optionally enabled BasicAuth over the TLS only API
+	if conf.Config.APIUsername == "" || conf.Config.APIPassword == "" {
+		log.Warn("No credentials set for API. All users granted access.")
+		api = router.Group("/api")
+	} else {
+		api = router.Group("/api", gin.BasicAuth(gin.Accounts{
+			conf.Config.APIUsername: conf.Config.APIPassword,
+		}))
+	}
+
 	api.GET("/version", t.HandleVersion)
 	api.GET("/uptime", t.HandleUptime)
 	api.GET("/torrent/:info_hash", t.HandleTorrentGet)

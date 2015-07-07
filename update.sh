@@ -14,7 +14,7 @@ deps=(
     "github.com/Sirupsen/logrus|master"
     "github.com/goji/param|master"
     "github.com/gin-gonic/gin|master"
-    "github.com/getsentry/raven-go|master"q
+    "github.com/getsentry/raven-go|master"
 )
 
 pushd &> /dev/null

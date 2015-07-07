@@ -6,9 +6,9 @@ import (
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"math/rand"
 	"sync"
 	"time"
-	"math/rand"
 )
 
 // t:usertorrent:<user_id>:<torrent_id> ->
@@ -16,23 +16,26 @@ import (
 type User struct {
 	db.DBEntity   `redis:"-" json:"-"`
 	sync.RWMutex  `redis:"-" json:"-"`
-	Queued        bool     `redis:"-" json:"-"`
-	UserID        uint64   `redis:"user_id" json:"user_id"`
-	Enabled       bool     `redis:"enabled" json:"enabled"`
-	Uploaded      uint64   `redis:"uploaded" json:"uploaded"`
-	Downloaded    uint64   `redis:"downloaded" json:"downloaded"`
-	Snatches      uint32   `redis:"snatches" json:"snatches"`
-	Passkey       string   `redis:"passkey" json:"passkey"`
-	UserKey       string   `redis:"-" json:"key"`
-	Username      string   `redis:"username" json:"username"`
-	CanLeech      bool     `redis:"can_leech" json:"can_leech"`
-	Announces     uint64   `redis:"announces" json:"announces"`
-	Peers         []**Peer `redis:"-" json:"-"`
-	KeyActive     string   `redis:"-" json:"-"`
-	KeyIncomplete string   `redis:"-" json:"-"`
-	KeyComplete   string   `redis:"-" json:"-"`
-	KeyHNR        string   `redis:"-" json:"-"`
+	Queued        bool         `redis:"-" json:"-"`
+	UserID        uint64       `redis:"user_id" json:"user_id"`
+	Enabled       bool         `redis:"enabled" json:"enabled"`
+	Uploaded      uint64       `redis:"uploaded" json:"uploaded"`
+	Downloaded    uint64       `redis:"downloaded" json:"downloaded"`
+	Snatches      uint32       `redis:"snatches" json:"snatches"`
+	Passkey       string       `redis:"passkey" json:"passkey"`
+	UserKey       string       `redis:"-" json:"key"`
+	Username      string       `redis:"username" json:"username"`
+	CanLeech      bool         `redis:"can_leech" json:"can_leech"`
+	Announces     uint64       `redis:"announces" json:"announces"`
+	Peers         []*Peer      `redis:"-" json:"-"`
+	KeyActive     string       `redis:"-" json:"-"`
+	KeyIncomplete string       `redis:"-" json:"-"`
+	KeyComplete   string       `redis:"-" json:"-"`
+	KeyHNR        string       `redis:"-" json:"-"`
 	Scheduler     *time.Ticker `redis:"-" json:"-"`
+
+	// Active torrent set. Does not include historical or recently reaped peers.
+	torrents []*Torrent
 }
 
 // findUserID find a user_id from the supplied passkey. A return value
@@ -46,14 +49,13 @@ func (t *Tracker) findUserID(passkey string) uint64 {
 	return 0
 }
 
-
 func (user *User) scheduler(ticker *time.Ticker) {
 	// Randomize the scheduler start time to make sure everyone isn't updating at the exact
 	// same moment.
 	time.Sleep(time.Millisecond * time.Duration(rand.Intn(60)))
 	for range user.Scheduler.C {
 		log.WithFields(log.Fields{
-			"fn": "schedualer",
+			"fn":      "schedualer",
 			"user_id": user.UserID,
 		}).Debug("User scheduler executed")
 	}
@@ -104,7 +106,7 @@ func NewUser(user_id uint64) *User {
 		Uploaded:      0,
 		Downloaded:    0,
 		CanLeech:      true,
-		Peers:         make([]**Peer, 1),
+		Peers:         make([]*Peer, 1),
 		UserKey:       fmt.Sprintf("t:u:%d", user_id),
 		KeyActive:     fmt.Sprintf("t:u:active:%d", user_id),
 		KeyIncomplete: fmt.Sprintf("t:u:incomplete:%d", user_id),
@@ -183,6 +185,22 @@ func (user *User) Sync(r redis.Conn) {
 	)
 }
 
+// Join registeres a user into a
+func (user *User) Join(torrent *Torrent) bool {
+	for _, known_torrent := range user.torrents {
+		if known_torrent == torrent {
+			return false
+		}
+	}
+	log.WithFields(log.Fields{
+		"fn":        "user.Join",
+		"user_id":   user.UserID,
+		"info_hash": torrent.InfoHash,
+	}).Debug("User joined swarm")
+	user.torrents = append(user.torrents, torrent)
+	return true
+}
+
 func (peer_diff *PeerDiff) Sync(r redis.Conn) {
 	key := peer_diff.Key()
 	r.Send("HMSET", key, "speed_up_max", peer_diff.SpeedUPMax, "speed_dn_max", peer_diff.SpeedDNMax)
@@ -191,22 +209,31 @@ func (peer_diff *PeerDiff) Sync(r redis.Conn) {
 	r.Send("HINCRBY", key, "seed_time", peer_diff.SeedTime)
 }
 
-// AddPeer adds a peer to a users active peer list
+// AddPeer adds a peer to a users active peer list if it doesn't already exist
 func (user *User) AddPeer(peer *Peer) {
-	user.Peers = append(user.Peers, &peer)
+	if !user.HasPeer(peer) {
+		user.Peers = append(user.Peers, peer)
+	}
 }
 
-// AppendIfMissing will add a new item to a slice if the item is not currently
-// a member of the slice.
-func AppendIfMissing(slice []uint64, i uint64) []uint64 {
-	for _, ele := range slice {
-		if ele == i {
-			return slice
+// HasPeer will check for a existing peer already regisered with the user
+// Ideally there should only be 1 peer/user, but allowing multiple clients
+// means we need to track them.
+func (user *User) HasPeer(peer *Peer) bool {
+	for _, p := range user.Peers {
+		if peer == p {
+			return true
 		}
 	}
-	return append(slice, i)
+	return false
 }
 
+// CalculateBonus will return the bonus value for the parameters given.
+//
+// time_spend - Total time the user has spent seeding a torrent. This must account for the
+//              non-active time as well.
+// uploaded - Amount uploaded in total bytes for the torrent
+// seeders - Current seeder count of the torrent
 func CalculateBonus(time_spent uint64, uploaded uint64, seeders uint64) float64 {
 	time_spent_f := float64(time_spent) / 3600.0
 	if seeders == 0 {

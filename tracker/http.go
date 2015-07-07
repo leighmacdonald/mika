@@ -17,21 +17,6 @@ type (
 	}
 )
 
-// NewApiError creates a new error model based on the HTTPError stuct values passed in
-//func NewApiError(err *echo.HTTPError) *APIErrorResponse {
-//	if err.Error != nil {
-//		return &APIErrorResponse{
-//			Error:   err.Error.Error(),
-//			Message: err.Message,
-//		}
-//	} else {
-//		return &APIErrorResponse{
-//			Error:   err.Message,
-//			Message: err.Message,
-//		}
-//	}
-//}
-
 // APIErrorHandler is used as the default error handler for API requests
 // in the echo router. The function requires the use of the forked echo router
 // available at git@git.totdev.in:totv/echo.git because we are passing more information
@@ -118,7 +103,7 @@ func errMeta(status int, message string, fields logrus.Fields, level logrus.Leve
 
 // NewRouter creates and returns a newly configured router instance using
 // the default middleware handlers.
-func NewRouter() *gin.Engine{
+func NewRouter() *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	return router

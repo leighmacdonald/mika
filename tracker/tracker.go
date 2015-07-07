@@ -121,6 +121,10 @@ func (tracker *Tracker) DelTorrent(torrent *Torrent) bool {
 	}
 }
 
+// DeleteUser will completely remove the user from the trackers memory. This is different
+// than disabling users which should still be known to the system.
+//
+// TODO Make sure other references are dropped so GC can take over.
 func (tracker *Tracker) DelUser(user *User) {
 	tracker.UsersMutex.Lock()
 	delete(tracker.Users, user.UserID)

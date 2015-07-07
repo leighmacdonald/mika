@@ -9,12 +9,12 @@ deps=(
     "golang.org/x/tools/cmd/cover|master"
     "github.com/chihaya/bencode|master"
     "github.com/garyburd/redigo/redis|master"
-    "git.totdev.in/totv/echo.git|master"
     "github.com/julienschmidt/httprouter|master"
     "github.com/rcrowley/go-metrics|master"
     "github.com/Sirupsen/logrus|master"
     "github.com/goji/param|master"
     "github.com/gin-gonic/gin|master"
+    "github.com/getsentry/raven-go|master"q
 )
 
 pushd &> /dev/null
@@ -29,7 +29,7 @@ do
     pushd ${GOPATH}/src/${repo} &> /dev/null
         echo "Checking out $repo @ $version"
         git fetch
-        git pull origin ${version}
         git checkout ${version}
+        git pull origin ${version}
     popd &> /dev/null
 done

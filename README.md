@@ -3,6 +3,9 @@
 A torrent tracker written in the Go programming language and using redis
 as a backend database.
 
+This tracker is notably different from others like chihaya in that it caters specifically
+to private tracker needs.
+
 
 ## Features
 
@@ -41,8 +44,7 @@ We also need to generate SSL keys for the API listener as follows:
     
 The tracker does not currently gracefully reconnect everything when it looses connection
  to its redis backend. If you ever restart redis, make sure to restart mika as well until
- this issue is resolved.
-    
+ this issue is resolved.    
 ### Compiling
 
 If building a binary from source you will need a Go 1.4+ SDK installed.

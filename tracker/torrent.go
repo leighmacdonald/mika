@@ -40,6 +40,7 @@ func ReleaseUnlock(torrent *Torrent) {
 	torrent.Unlock()
 }
 
+
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
 func NewTorrent(info_hash string, name string, torrent_id uint64) *Torrent {
@@ -176,8 +177,12 @@ func (torrent *Torrent) DelReason() string {
 
 // AddPeer inserts a new peer into the torrents active peer list
 func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
+	if torrent.HasPeer(peer) {
+		return false
+	}
 	torrent.Lock()
 	torrent.Peers = append(torrent.Peers, peer)
+	peer.User.Join(torrent)
 	torrent.Unlock()
 	v, err := r.Do("SADD", torrent.TorrentPeersKey, peer.PeerID)
 	if err != nil {
@@ -220,6 +225,8 @@ func (torrent *Torrent) DelPeer(r redis.Conn, peer *Peer) bool {
 
 // HasPeer Checks if the peer already is a member of the peer slice for the torrent
 func (torrent *Torrent) HasPeer(peer *Peer) bool {
+	torrent.RLock()
+	defer torrent.RUnlock()
 	for _, p := range torrent.Peers {
 		if peer == p {
 			return true
@@ -233,7 +240,6 @@ func (torrent *Torrent) HasPeer(peer *Peer) bool {
 func (torrent *Torrent) PeerCounts() (int, int) {
 	s, l := 0, 0
 	torrent.RLock()
-	defer torrent.RUnlock()
 	for _, p := range torrent.Peers {
 		if p.IsSeeder() {
 			s++
@@ -241,6 +247,7 @@ func (torrent *Torrent) PeerCounts() (int, int) {
 			l++
 		}
 	}
+	torrent.RUnlock()
 	return s, l
 }
 

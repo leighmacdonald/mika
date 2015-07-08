@@ -59,13 +59,13 @@ func getIP(ip_str string) (net.IP, error) {
 
 // HandleAnnounce is the handler for the /announce endpoint
 // Here be dragons
-func (t *Tracker) HandleAnnounce(c *gin.Context) {
+func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	stats.Counter <- stats.EV_ANNOUNCE
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		c.Error(r.Err()).SetMeta(errMeta(
+		ctx.Error(r.Err()).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Internal error, HALP",
 			log.Fields{"fn": "HandleAnnounce"},
@@ -74,16 +74,16 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		return
 	}
 
-	ann, err := NewAnnounce(c)
+	ann, err := NewAnnounce(ctx)
 	if err != nil {
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Failed to parse announce",
 			log.Fields{
 				"fn":        "HandleAnnounce",
-				"remote_ip": c.Request.RemoteAddr,
-				"uri":       c.Request.RequestURI,
+				"remote_ip": ctx.Request.RemoteAddr,
+				"uri":       ctx.Request.RequestURI,
 			},
 			log.ErrorLevel,
 		))
@@ -101,13 +101,13 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		"event": ann.Event,
 	}).Debug("Announce event")
 
-	passkey := c.Param("passkey") // eat a dick
+	passkey := ctx.Param("passkey") // eat a dick
 
-	user_id := t.findUserID(passkey)
+	user_id := tracker.findUserID(passkey)
 
 	if user_id == 0 {
 		stats.Counter <- stats.EV_INVALID_PASSKEY
-		c.Error(errors.New("Invalid passkey")).SetMeta(errMeta(
+		ctx.Error(errors.New("Invalid passkey")).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Invalid passkey supplied",
 			log.Fields{"fn": "HandleAnnounce", "passkey": passkey},
@@ -115,9 +115,9 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		))
 		return
 	}
-	user := t.FindUserByID(user_id)
+	user := tracker.FindUserByID(user_id)
 	if !user.CanLeech && ann.Left > 0 {
-		c.Error(errors.New("Leech disabled for user")).SetMeta(errMeta(
+		ctx.Error(errors.New("Leech disabled for user")).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Leeching not allowed for user",
 			log.Fields{"fn": "HandleAnnounce", "passkey": passkey},
@@ -126,7 +126,7 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		return
 	}
 	if !user.Enabled {
-		c.Error(errors.New("Disabled user")).SetMeta(errMeta(
+		ctx.Error(errors.New("Disabled user")).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"User disabled",
 			log.Fields{"fn": "HandleAnnounce", "passkey": passkey},
@@ -135,9 +135,9 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		return
 	}
 
-	if !t.IsValidClient(ann.PeerID) {
+	if !tracker.IsValidClient(ann.PeerID) {
 		stats.Counter <- stats.EV_INVALID_CLIENT
-		c.Error(errors.New("Banned client")).SetMeta(errMeta(
+		ctx.Error(errors.New("Banned client")).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Banned client, check wiki for whitelisted clients",
 			log.Fields{
@@ -151,10 +151,10 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		return
 	}
 
-	torrent := t.FindTorrentByInfoHash(info_hash_hex)
+	torrent := tracker.FindTorrentByInfoHash(info_hash_hex)
 	if torrent == nil {
 		stats.Counter <- stats.EV_INVALID_INFOHASH
-		c.Error(errors.New("Invalid info hash")).SetMeta(errMeta(
+		ctx.Error(errors.New("Invalid info hash")).SetMeta(errMeta(
 			MSG_INFO_HASH_NOT_FOUND,
 			"Torrent not found, try TPB",
 			log.Fields{
@@ -167,7 +167,7 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		))
 	} else if !torrent.Enabled {
 		stats.Counter <- stats.EV_INVALID_INFOHASH
-		c.Error(errors.New("Torrent not enabled")).SetMeta(errMeta(
+		ctx.Error(errors.New("Torrent not enabled")).SetMeta(errMeta(
 			MSG_INFO_HASH_NOT_FOUND,
 			torrent.DelReason(),
 			log.Fields{
@@ -280,7 +280,7 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 	er_msg_encoded := encoder.Encode(dict)
 	if er_msg_encoded != nil {
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
-		c.Error(er_msg_encoded).SetMeta(errMeta(
+		ctx.Error(er_msg_encoded).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Internal error",
 			log.Fields{
@@ -294,12 +294,12 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 		return
 	}
 
-	c.String(http.StatusOK, out_bytes.String())
+	ctx.String(http.StatusOK, out_bytes.String())
 }
 
 // Parse the query string into an AnnounceRequest struct
-func NewAnnounce(c *gin.Context) (*AnnounceRequest, error) {
-	q, err := QueryStringParser(c.Request.RequestURI)
+func NewAnnounce(ctx *gin.Context) (*AnnounceRequest, error) {
+	q, err := QueryStringParser(ctx.Request.RequestURI)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +332,7 @@ func NewAnnounce(c *gin.Context) (*AnnounceRequest, error) {
 	ipv4, err := getIP(q.Params["ip"])
 	if err != nil {
 		// Look for forwarded ip in header then default to remote address
-		forwarded_ip := c.Request.Header.Get("X-Forwarded-For")
+		forwarded_ip := ctx.Request.Header.Get("X-Forwarded-For")
 		if forwarded_ip != "" {
 			ipv4_new, err := getIP(forwarded_ip)
 			if err != nil {
@@ -341,7 +341,7 @@ func NewAnnounce(c *gin.Context) (*AnnounceRequest, error) {
 			}
 			ipv4 = ipv4_new
 		} else {
-			s := strings.Split(c.Request.RemoteAddr, ":")
+			s := strings.Split(ctx.Request.RemoteAddr, ":")
 			ip_req, _ := s[0], s[1]
 			ipv4_new, err := getIP(ip_req)
 			if err != nil {

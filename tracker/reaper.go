@@ -10,7 +10,7 @@ import (
 
 // Will mark a torrent peer as inactive and remove them
 // from the torrents active peer_id set
-func (t *Tracker) ReapPeer(info_hash, peer_id string) {
+func (tracker *Tracker) ReapPeer(info_hash, peer_id string) {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
@@ -25,7 +25,7 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 
 	log.WithFields(log.Fields{"peer_id": peer_id[0:6], "info_hash": info_hash}).Info("Reaping peer")
 
-	torrent := t.FindTorrentByInfoHash(info_hash)
+	torrent := tracker.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
 		log.WithFields(log.Fields{
 			"peer_id":   peer_id[0:6],
@@ -68,7 +68,7 @@ func (t *Tracker) ReapPeer(info_hash, peer_id string) {
 
 // peerStalker is a goroutine that will watch for peer key expiry events and
 // act on them, removing them from the active peer lists
-func (t *Tracker) peerStalker() {
+func (tracker *Tracker) peerStalker() {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
@@ -91,7 +91,7 @@ func (t *Tracker) peerStalker() {
 			}).Debug("Got key expire event")
 			p := strings.SplitN(string(v.Data[:]), ":", 5)
 			if len(p) >= 4 {
-				t.ReapPeer(p[2], p[3])
+				tracker.ReapPeer(p[2], p[3])
 			}
 
 		case redis.Subscription:

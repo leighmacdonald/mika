@@ -2,7 +2,7 @@
 package tracker
 
 import (
-	"git.totdev.in/totv/mika/conf"
+	//	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
@@ -20,6 +20,10 @@ var (
 	//	SyncUserC    = make(chan *User, 100)
 	//	SyncTorrentC = make(chan *Torrent, 500)
 	SyncEntityC = make(chan db.DBEntity, 500)
+
+	key_leechers = "t:i:leechers"
+	key_seeders  = "t:i:seeders"
+	key_snatches = "t:i:snatches"
 )
 
 // Main track struct holding all the known models
@@ -35,6 +39,8 @@ type Tracker struct {
 	// Whitelist and whitelist lock
 	WhitelistMutex *sync.RWMutex
 	Whitelist      []string
+
+	stopChan chan bool
 }
 
 // NewTracker created a new allocated Tracker instance to use. Initialize() should
@@ -48,6 +54,7 @@ func NewTracker() *Tracker {
 		UsersMutex:     new(sync.RWMutex),
 		Whitelist:      []string{},
 		WhitelistMutex: new(sync.RWMutex),
+		stopChan:       make(chan bool),
 	}
 
 	return tracker
@@ -66,6 +73,10 @@ func (tracker *Tracker) Initialize() error {
 	tracker.initTorrents(r)
 
 	return nil
+}
+
+func (tracker *Tracker) Shutdown() {
+	tracker.stopChan <- true
 }
 
 // GetTorrentByID will fetch torrent data from the database and return a Torrent struct.
@@ -267,16 +278,12 @@ func (tracker *Tracker) initUsers(r redis.Conn) {
 }
 
 // dbStatIndexer when running will periodically update the torrent sort indexes
-func (tracker *Tracker) dbStatIndexer() {
+func (tracker *Tracker) dbStatIndexer(stop_chan chan bool) {
 	log.WithFields(log.Fields{
 		"fn": "dbStatIndexer",
 	}).Info("Background indexer started")
 	r := db.Pool.Get()
 	defer r.Close()
-
-	key_leechers := "t:i:leechers"
-	key_seeders := "t:i:seeders"
-	key_snatches := "t:i:snatches"
 
 	count := 0
 
@@ -284,35 +291,43 @@ func (tracker *Tracker) dbStatIndexer() {
 	seeder_args := []uint64{}
 	snatch_args := []uint64{}
 
+	ticker := time.NewTicker(time.Second * 120)
+
 	for {
-		time.Sleep(time.Duration(conf.Config.IndexInterval) * time.Second)
-		tracker.TorrentsMutex.RLock()
-		for _, torrent := range tracker.Torrents {
+		select {
+		case <-ticker.C:
 			tracker.TorrentsMutex.RLock()
-			leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
-			seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
-			snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
+			for _, torrent := range tracker.Torrents {
+				tracker.TorrentsMutex.RLock()
+				leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
+				seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
+				snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
+				tracker.TorrentsMutex.RUnlock()
+				count++
+			}
 			tracker.TorrentsMutex.RUnlock()
-			count++
+			if count > 0 {
+				r.Send("ZADD", key_leechers, leecher_args)
+				r.Send("ZADD", key_seeders, seeder_args)
+				r.Send("ZADD", key_snatches, snatch_args)
+				r.Flush()
+				leecher_args = leecher_args[:0]
+				seeder_args = seeder_args[:0]
+				snatch_args = snatch_args[:0]
+			}
+			count = 0
+		case <-stop_chan:
+			ticker.Stop()
+			log.Debugln("dbStatIndexer received stop chan signal")
+			return
 		}
-		tracker.TorrentsMutex.RUnlock()
-		if count > 0 {
-			r.Send("ZADD", key_leechers, leecher_args)
-			r.Send("ZADD", key_seeders, seeder_args)
-			r.Send("ZADD", key_snatches, snatch_args)
-			r.Flush()
-			leecher_args = leecher_args[:0]
-			seeder_args = seeder_args[:0]
-			snatch_args = snatch_args[:0]
-		}
-		count = 0
 	}
 }
 
 // syncWriter Handles writing out new data to the redis db in a queued manner
 // Only items with the .InQueue flag set to false should be added.
 // TODO channel as param
-func (tracker *Tracker) syncWriter() {
+func (tracker *Tracker) syncWriter(stop_chan chan bool) {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
@@ -329,6 +344,10 @@ func (tracker *Tracker) syncWriter() {
 		case entity := <-SyncEntityC:
 			log.Debugln("Syncing:", entity)
 			entity.Sync(r)
+		case <-stop_chan:
+			// Make sure we flush the remaining queued entries before exiting
+			r.Flush()
+			return
 		}
 		err := r.Flush()
 		if err != nil {

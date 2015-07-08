@@ -67,12 +67,18 @@ func handleApiErrors(ctx *gin.Context) {
 
 // Run starts all of the background goroutines related to managing the tracker
 // and starts the tracker and API HTTP interfaces
-func (tracker *Tracker) Run() {
-	go tracker.dbStatIndexer()
-	go tracker.syncWriter()
+func (tracker *Tracker) Run(stop_chan chan bool) {
+
+	go tracker.dbStatIndexer(stop_chan)
+	go tracker.syncWriter(stop_chan)
 	go tracker.peerStalker()
 	go tracker.listenTracker()
-	tracker.listenAPI()
+	go tracker.listenAPI()
+
+	select {
+	case <-stop_chan:
+		log.Info("Exiting on stop chan signal")
+	}
 }
 
 // listenTracker created a new http router, configured the routes and handlers, and

@@ -17,32 +17,9 @@ type (
 	}
 )
 
-// APIErrorHandler is used as the default error handler for API requests
-// in the echo router. The function requires the use of the forked echo router
-// available at git@git.totdev.in:totv/echo.git because we are passing more information
-// than the standard HTTPError used.
-//func APIErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
-//	http_error.Log()
-//
-//	if http_error.Code == 0 {
-//		http_error.Code = http.StatusInternalServerError
-//	}
-//	err_resp := NewApiError(http_error)
-//	c.JSON(http_error.Code, err_resp)
-//}
-
-// TrackerErrorHandler is used as the default error handler for tracker requests
+// handleTrackerErrors is used as the default error handler for tracker requests
 // the error is returned to the client as a bencoded error string as defined in the
 // bittorrent specs.
-//func TrackerErrorHandler(http_error *echo.HTTPError, c *echo.Context) {
-//	http_error.Log()
-//
-//	if http_error.Code == 0 {
-//		http_error.Code = MSG_GENERIC_ERROR
-//	}
-//
-//	c.String(http_error.Code, responseError(http_error.Message))
-//}
 func handleTrackerErrors(ctx *gin.Context) {
 	ctx.Next()
 
@@ -50,7 +27,7 @@ func handleTrackerErrors(ctx *gin.Context) {
 	if error_returned != nil {
 		meta := error_returned.JSON().(gin.H)
 
-		status := 500
+		status := MSG_GENERIC_ERROR
 		custom_status, found := meta["status"]
 		if found {
 			status = custom_status.(int)
@@ -61,6 +38,7 @@ func handleTrackerErrors(ctx *gin.Context) {
 	}
 }
 
+// APIErrorHandler is used as the default error handler for API requests
 func handleApiErrors(ctx *gin.Context) {
 	// Execute the next handler, recording any errors to be process below
 	ctx.Next()
@@ -69,7 +47,7 @@ func handleApiErrors(ctx *gin.Context) {
 	if error_returned != nil {
 		meta := error_returned.JSON().(gin.H)
 
-		status := 500
+		status := status
 		custom_status, found := meta["status"]
 		if found {
 			status = custom_status.(int)

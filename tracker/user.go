@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"git.totdev.in/totv/mika/conf"
 )
 
 // t:usertorrent:<user_id>:<torrent_id> ->
@@ -52,7 +53,10 @@ func (t *Tracker) findUserID(passkey string) uint64 {
 func (user *User) scheduler(ticker *time.Ticker) {
 	// Randomize the scheduler start time to make sure everyone isn't updating at the exact
 	// same moment.
-	time.Sleep(time.Millisecond * time.Duration(rand.Intn(60)))
+	//
+	// The updates are randomized across the time duration of the reap interval to spread
+	// the updates at least semi evenly
+	time.Sleep(time.Second * time.Duration(rand.Intn(conf.Configuration.ReapInterval)))
 	for range user.Scheduler.C {
 		log.WithFields(log.Fields{
 			"fn":      "schedualer",

@@ -109,7 +109,7 @@ func NewRouter() *gin.Engine {
 	return router
 }
 
-// listenAPI created a new api request router and start the http server listening over TLS
+// listenAPI creates a new api request router and start the http server listening over TLS
 func (t *Tracker) listenAPI() {
 	log.WithFields(log.Fields{
 		"listen_host": conf.Config.ListenHostAPI,

@@ -59,12 +59,10 @@ func (tracker *Tracker) Initialize() error {
 		"peer_id": "Initialize",
 	}).Info("Initializing models in memory.")
 	r := db.Pool.Get()
-	defer r.Close()
-
 	tracker.initWhitelist(r)
 	tracker.initUsers(r)
 	tracker.initTorrents(r)
-
+	r.Close()
 	return nil
 }
 

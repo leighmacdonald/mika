@@ -181,8 +181,8 @@ func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 	}
 	torrent.Lock()
 	torrent.Peers = append(torrent.Peers, peer)
-	peer.User.Join(torrent)
 	torrent.Unlock()
+	peer.User.Join(torrent)
 	v, err := r.Do("SADD", torrent.TorrentPeersKey, peer.PeerID)
 	if err != nil {
 		log.WithFields(log.Fields{

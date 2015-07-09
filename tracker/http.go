@@ -43,6 +43,23 @@ type (
 //
 //	c.String(http_error.Code, responseError(http_error.Message))
 //}
+func handleTrackerErrors(ctx *gin.Context) {
+	ctx.Next()
+
+	error_returned := ctx.Errors.Last()
+	if error_returned != nil {
+		meta := error_returned.JSON().(gin.H)
+
+		status := 500
+		custom_status, found := meta["status"]
+		if found {
+			status = custom_status.(int)
+		}
+		log.Debug(meta)
+		// TODO handle private/public errors separately, like sentry output for priv errors
+		oops(ctx, status)
+	}
+}
 
 func handleApiErrors(ctx *gin.Context) {
 	// Execute the next handler, recording any errors to be process below
@@ -59,7 +76,7 @@ func handleApiErrors(ctx *gin.Context) {
 		}
 
 		// TODO handle private/public errors separately, like sentry output for priv errors
-		if error_returned != nil && error_returned.Meta != nil {
+		if error_returned.Meta != nil {
 			ctx.JSON(status, meta)
 		}
 	}
@@ -91,7 +108,7 @@ func (tracker *Tracker) listenTracker() {
 	}).Info("Loading Tracker route handlers")
 
 	router := NewRouter()
-
+	router.Use(handleTrackerErrors)
 	router.GET("/:passkey/announce", tracker.HandleAnnounce)
 	router.GET("/:passkey/scrape", tracker.HandleScrape)
 
@@ -114,7 +131,6 @@ func NewRouter() *gin.Engine {
 	router.Use(gin.Recovery())
 	return router
 }
-
 
 // listenAPI creates a new api request router and start the http server listening over TLS
 func (tracker *Tracker) listenAPI() {

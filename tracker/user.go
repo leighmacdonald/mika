@@ -235,7 +235,7 @@ func (user *User) HasPeer(peer *Peer) bool {
 // CalculateBonus will return the bonus value for the parameters given.
 //
 // time_spend - Total time the user has spent seeding a torrent. This must account for the
-//              non-active time as well.
+// non-active time as well.
 // uploaded - Amount uploaded in total bytes for the torrent
 // seeders - Current seeder count of the torrent
 func CalculateBonus(time_spent uint64, uploaded uint64, seeders uint64) float64 {

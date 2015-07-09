@@ -529,10 +529,6 @@ func (tracker *Tracker) HandleWhitelistDel(ctx *gin.Context) {
 	))
 }
 
-// HandleGetTorrentPeer Fetch details for a specific peer of a torrent
-func (tracker *Tracker) HandleGetTorrentPeer(ctx *gin.Context) {
-}
-
 // HandleGetTorrentPeers returns all peers for a given info_hash
 func (tracker *Tracker) HandleGetTorrentPeers(ctx *gin.Context) {
 	info_hash := ctx.Param("info_hash")

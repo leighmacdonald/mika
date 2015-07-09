@@ -177,6 +177,7 @@ func (torrent *Torrent) DelReason() string {
 // AddPeer inserts a new peer into the torrents active peer list
 func (torrent *Torrent) AddPeer(r redis.Conn, peer *Peer) bool {
 	if torrent.HasPeer(peer) {
+		log.Warn("Tried to add duplicate peer")
 		return false
 	}
 	torrent.Lock()

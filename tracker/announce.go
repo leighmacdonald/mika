@@ -181,8 +181,9 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	}
 	peer := torrent.findPeer(ann.PeerID)
 	if peer == nil {
+		log.Debug("No existing peer found")
 		peer = NewPeer(ann.PeerID, ann.IPv4.String(), ann.Port, torrent, user)
-		torrent.AddPeer(r, peer)
+		// torrent.AddPeer(r, peer)
 	}
 
 	peer_diff := PeerDiff{User: user, Torrent: torrent}
@@ -192,6 +193,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	user.Update(ann, &peer_diff, torrent.MultiUp, torrent.MultiDn)
 
 	if ann.Event == STOPPED {
+		log.Debug("Removing peer due to stop announce")
 		torrent.DelPeer(r, peer)
 	} else {
 		if !torrent.HasPeer(peer) {

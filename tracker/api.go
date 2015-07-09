@@ -82,16 +82,16 @@ var (
 )
 
 // HandleVersion returns the current running version
-func (t *Tracker) HandleVersion(c *gin.Context) {
-	c.JSON(http.StatusOK, VersionResponse{Name: "mika", Version: mika.Version})
+func (tracker *Tracker) HandleVersion(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, VersionResponse{Name: "mika", Version: mika.Version})
 }
 
 // HandleUptime returns the current process uptime
-func (tracker *Tracker) HandleUptime(c *gin.Context) {
+func (tracker *Tracker) HandleUptime(ctx *gin.Context) {
 	info := &syscall.Sysinfo_t{}
 	err := syscall.Sysinfo(info)
 	if err != nil {
-		c.Error(err).SetMeta(errMeta(
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusInternalServerError,
 			"Error trying to fetch sysinfo",
 			log.Fields{"fn": "HandleUptime"},
@@ -99,7 +99,7 @@ func (tracker *Tracker) HandleUptime(c *gin.Context) {
 		))
 	} else {
 		//noinspection GoUnresolvedReference
-		c.JSON(http.StatusOK, UptimeResponse{
+		ctx.JSON(http.StatusOK, UptimeResponse{
 			Process: util.Unixtime() - mika.StartTime,
 			System:  int32(info.Uptime),
 		})
@@ -107,11 +107,11 @@ func (tracker *Tracker) HandleUptime(c *gin.Context) {
 }
 
 // HandleTorrentGet will find and return the requested torrent.
-func (tracker *Tracker) HandleTorrentGet(c *gin.Context) {
-	info_hash := c.Param("info_hash")
+func (tracker *Tracker) HandleTorrentGet(ctx *gin.Context) {
+	info_hash := ctx.Param("info_hash")
 	torrent := tracker.FindTorrentByInfoHash(info_hash)
 	if torrent == nil {
-		c.Error(errors.New("Invalid info hash supplied")).SetMeta(errMeta(
+		ctx.Error(errors.New("Invalid info hash supplied")).SetMeta(errMeta(
 			http.StatusNotFound,
 			"Invalid info hash supplied",
 			log.Fields{
@@ -124,7 +124,7 @@ func (tracker *Tracker) HandleTorrentGet(c *gin.Context) {
 		log.WithFields(log.Fields{
 			"info_hash": info_hash,
 		}).Debug("Fetched torrent successfully")
-		c.JSON(http.StatusOK, torrent)
+		ctx.JSON(http.StatusOK, torrent)
 	}
 }
 
@@ -133,10 +133,10 @@ func (tracker *Tracker) HandleTorrentGet(c *gin.Context) {
 //
 // If the info_hash already exists the torrent_id and name are instead
 // updated to reflect the supplied values.
-func (tracker *Tracker) HandleTorrentAdd(c *gin.Context) {
+func (tracker *Tracker) HandleTorrentAdd(ctx *gin.Context) {
 	payload := &TorrentAddPayload{}
-	if err := c.Bind(payload); err != nil {
-		c.Error(err).SetMeta(errMeta(
+	if err := ctx.Bind(payload); err != nil {
+		ctx.Error(err).SetMeta(errMeta(
 			http.StatusBadRequest,
 			"Failed to parse payload",
 			log.Fields{
@@ -155,7 +155,7 @@ func (tracker *Tracker) HandleTorrentAdd(c *gin.Context) {
 		err_msg = errors.New("Invalid release name, cannot be empty")
 	}
 	if err_msg != nil {
-		c.Error(err_msg).SetMeta(errMeta(
+		ctx.Error(err_msg).SetMeta(errMeta(
 			http.StatusBadRequest,
 			"Payload requirements not met",
 			log.Fields{
@@ -192,7 +192,7 @@ func (tracker *Tracker) HandleTorrentAdd(c *gin.Context) {
 		"info_hash": payload.InfoHash,
 	}).Info("Added new torrent successfully")
 
-	c.JSON(status, ResponseOK{"ok"})
+	ctx.JSON(status, ResponseOK{"ok"})
 
 }
 
@@ -530,7 +530,7 @@ func (tracker *Tracker) HandleWhitelistDel(ctx *gin.Context) {
 }
 
 // HandleGetTorrentPeer Fetch details for a specific peer of a torrent
-func (tracker *Tracker) HandleGetTorrentPeer(c *gin.Context) {
+func (tracker *Tracker) HandleGetTorrentPeer(ctx *gin.Context) {
 }
 
 // HandleGetTorrentPeers returns all peers for a given info_hash

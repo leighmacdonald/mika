@@ -41,8 +41,8 @@ type User struct {
 
 // findUserID find a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
-func (t *Tracker) findUserID(passkey string) uint64 {
-	for _, user := range t.Users {
+func (tracker *Tracker) findUserID(passkey string) uint64 {
+	for _, user := range tracker.Users {
 		if user.Passkey == passkey {
 			return user.UserID
 		}

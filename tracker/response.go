@@ -46,14 +46,14 @@ var (
 
 // oops will output a bencoded error code to the torrent client using
 // a preset message code constant
-func oops(c *gin.Context, msg_code int) {
-	c.String(msg_code, responseError(resp_msg[msg_code]))
+func oops(ctx *gin.Context, msg_code int) {
+	ctx.String(msg_code, responseError(resp_msg[msg_code]))
 }
 
 // oopsStr will output a bencoded error code to the torrent client using
 // a supplied custom message string
-func oopsStr(c *gin.Context, msg_code int, msg string) {
-	c.String(msg_code, responseError(msg))
+func oopsStr(ctx *gin.Context, msg_code int, msg string) {
+	ctx.String(msg_code, responseError(msg))
 }
 
 // responseError generates a bencoded error response for the torrent client to

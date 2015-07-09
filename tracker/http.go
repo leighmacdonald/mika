@@ -47,7 +47,7 @@ func handleApiErrors(ctx *gin.Context) {
 	if error_returned != nil {
 		meta := error_returned.JSON().(gin.H)
 
-		status := status
+		status := 500
 		custom_status, found := meta["status"]
 		if found {
 			status = custom_status.(int)

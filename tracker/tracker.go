@@ -314,7 +314,7 @@ func (tracker *Tracker) dbStatIndexer() {
 				snatch_args = snatch_args[:0]
 			}
 			count = 0
-		case <-tracker.stopChan:
+		case <-tracker.stopChan  :
 			ticker.Stop()
 			log.Debugln("dbStatIndexer received stop chan signal")
 			return

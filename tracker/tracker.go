@@ -276,7 +276,7 @@ func (tracker *Tracker) initUsers(r redis.Conn) {
 }
 
 // dbStatIndexer when running will periodically update the torrent sort indexes
-func (tracker *Tracker) dbStatIndexer(stop_chan chan bool) {
+func (tracker *Tracker) dbStatIndexer() {
 	log.WithFields(log.Fields{
 		"fn": "dbStatIndexer",
 	}).Info("Background indexer started")
@@ -314,7 +314,7 @@ func (tracker *Tracker) dbStatIndexer(stop_chan chan bool) {
 				snatch_args = snatch_args[:0]
 			}
 			count = 0
-		case <-stop_chan:
+		case <-tracker.stopChan:
 			ticker.Stop()
 			log.Debugln("dbStatIndexer received stop chan signal")
 			return
@@ -325,7 +325,7 @@ func (tracker *Tracker) dbStatIndexer(stop_chan chan bool) {
 // syncWriter Handles writing out new data to the redis db in a queued manner
 // Only items with the .InQueue flag set to false should be added.
 // TODO channel as param
-func (tracker *Tracker) syncWriter(stop_chan chan bool) {
+func (tracker *Tracker) syncWriter() {
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
@@ -342,7 +342,7 @@ func (tracker *Tracker) syncWriter(stop_chan chan bool) {
 		case entity := <-SyncEntityC:
 			log.Debugln("Syncing:", entity)
 			entity.Sync(r)
-		case <-stop_chan:
+		case <-tracker.stopChan:
 			// Make sure we flush the remaining queued entries before exiting
 			r.Flush()
 			return

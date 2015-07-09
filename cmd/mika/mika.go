@@ -149,7 +149,7 @@ func main() {
 
 	tracker.Mika = tracker.NewTracker()
 	tracker.Mika.Initialize()
-	tracker.Mika.Run(stop_chan)
+	tracker.Mika.Run()
 }
 
 func init() {

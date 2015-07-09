@@ -44,11 +44,11 @@ type (
 //	c.String(http_error.Code, responseError(http_error.Message))
 //}
 
-func handleApiErrors(c *gin.Context) {
+func handleApiErrors(ctx *gin.Context) {
 	// Execute the next handler, recording any errors to be process below
-	c.Next()
+	ctx.Next()
 
-	error_returned := c.Errors.Last()
+	error_returned := ctx.Errors.Last()
 	if error_returned != nil {
 		meta := error_returned.JSON().(gin.H)
 
@@ -60,25 +60,31 @@ func handleApiErrors(c *gin.Context) {
 
 		// TODO handle private/public errors separately, like sentry output for priv errors
 		if error_returned != nil && error_returned.Meta != nil {
-			c.JSON(status, meta)
+			ctx.JSON(status, meta)
 		}
 	}
 }
 
 // Run starts all of the background goroutines related to managing the tracker
 // and starts the tracker and API HTTP interfaces
-func (t *Tracker) Run() {
-	go t.dbStatIndexer()
-	go t.syncWriter()
-	go t.peerStalker()
-	go t.listenTracker()
-	t.listenAPI()
+func (tracker *Tracker) Run() {
+
+	go tracker.dbStatIndexer()
+	go tracker.syncWriter()
+	go tracker.peerStalker()
+	go tracker.listenTracker()
+	go tracker.listenAPI()
+
+	select {
+	case <-tracker.stopChan:
+		log.Info("Exiting on stop chan signal")
+	}
 }
 
 // listenTracker created a new http router, configured the routes and handlers, and
 // starts the trackers HTTP server listening over HTTP. This function will not
 // start the API endpoints. See listenAPI for those.
-func (t *Tracker) listenTracker() {
+func (tracker *Tracker) listenTracker() {
 	log.WithFields(log.Fields{
 		"listen_host": conf.Config.ListenHost,
 		"tls":         false,
@@ -86,8 +92,8 @@ func (t *Tracker) listenTracker() {
 
 	router := NewRouter()
 
-	router.GET("/:passkey/announce", t.HandleAnnounce)
-	router.GET("/:passkey/scrape", t.HandleScrape)
+	router.GET("/:passkey/announce", tracker.HandleAnnounce)
+	router.GET("/:passkey/scrape", tracker.HandleScrape)
 
 	router.Run(conf.Config.ListenHost)
 }
@@ -109,8 +115,9 @@ func NewRouter() *gin.Engine {
 	return router
 }
 
+
 // listenAPI creates a new api request router and start the http server listening over TLS
-func (t *Tracker) listenAPI() {
+func (tracker *Tracker) listenAPI() {
 	log.WithFields(log.Fields{
 		"listen_host": conf.Config.ListenHostAPI,
 		"tls":         true,
@@ -131,21 +138,21 @@ func (t *Tracker) listenAPI() {
 		}))
 	}
 
-	api.GET("/version", t.HandleVersion)
-	api.GET("/uptime", t.HandleUptime)
-	api.GET("/torrent/:info_hash", t.HandleTorrentGet)
-	api.POST("/torrent", t.HandleTorrentAdd)
-	api.GET("/torrent/:info_hash/peers", t.HandleGetTorrentPeers)
-	api.DELETE("/torrent/:info_hash", t.HandleTorrentDel)
+	api.GET("/version", tracker.HandleVersion)
+	api.GET("/uptime", tracker.HandleUptime)
+	api.GET("/torrent/:info_hash", tracker.HandleTorrentGet)
+	api.POST("/torrent", tracker.HandleTorrentAdd)
+	api.GET("/torrent/:info_hash/peers", tracker.HandleGetTorrentPeers)
+	api.DELETE("/torrent/:info_hash", tracker.HandleTorrentDel)
 
-	api.POST("/user", t.HandleUserCreate)
-	api.GET("/user/:user_id", t.HandleUserGet)
-	api.POST("/user/:user_id", t.HandleUserUpdate)
-	api.DELETE("/user/:user_id", t.HandleUserDel)
-	api.GET("/user/:user_id/torrents", t.HandleUserTorrents)
+	api.POST("/user", tracker.HandleUserCreate)
+	api.GET("/user/:user_id", tracker.HandleUserGet)
+	api.POST("/user/:user_id", tracker.HandleUserUpdate)
+	api.DELETE("/user/:user_id", tracker.HandleUserDel)
+	api.GET("/user/:user_id/torrents", tracker.HandleUserTorrents)
 
-	api.POST("/whitelist", t.HandleWhitelistAdd)
-	api.DELETE("/whitelist/:prefix", t.HandleWhitelistDel)
+	api.POST("/whitelist", tracker.HandleWhitelistAdd)
+	api.DELETE("/whitelist/:prefix", tracker.HandleWhitelistDel)
 
 	tls_config := &tls.Config{
 		MinVersion:               tls.VersionTLS12,

@@ -9,7 +9,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-	"git.totdev.in/totv/mika/conf"
+	//"git.totdev.in/totv/mika/conf"
 )
 
 // t:usertorrent:<user_id>:<torrent_id> ->
@@ -56,7 +56,7 @@ func (user *User) scheduler(ticker *time.Ticker) {
 	//
 	// The updates are randomized across the time duration of the reap interval to spread
 	// the updates at least semi evenly
-	time.Sleep(time.Second * time.Duration(rand.Intn(conf.Configuration.ReapInterval)))
+	time.Sleep(time.Second * time.Duration(rand.Intn(60)))
 	for range user.Scheduler.C {
 		log.WithFields(log.Fields{
 			"fn":      "schedualer",

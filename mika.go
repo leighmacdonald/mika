@@ -6,16 +6,20 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"math/rand"
 	"time"
+	"github.com/getsentry/raven-go"
+	"git.totdev.in/totv/mika/conf"
 )
 
 var (
 	// This is a special variable that is set by the go linker
 	// If you do not build the project with make, or specify the linker settings
 	// when building this will result in an empty version string
-	Version string
+	Version = "master"
 
 	// Timestamp of when the program first stared up
 	StartTime int32
+
+	SentryClient *raven.Client
 )
 
 // VersionStr returns the currently running version of the application.
@@ -48,7 +52,30 @@ func SetupLogger(log_level string, force_colour bool) {
 	}
 }
 
+
+// NewSentryHook creates a hook to be added to an instance of logger
+// and initializes the raven client.
+// This method sets the timeout to 100 milliseconds.
+//func NewSentryHook(levels []log.Level) (*logrus_sentry.SentryHook, error) {
+//	return &logrus_sentry.SentryHook{100 * time.Millisecond, SentryClient, levels}, nil
+//}
+
+func SetupSentry() {
+	log.Info("Sentry configured for use @ ", conf.Config.SentryDSN)
+	SentryClient, _ = raven.NewClient(conf.Config.SentryDSN, nil)
+	if SentryClient == nil {
+		log.Error("Could not initialize sentry")
+	} else {
+		SentryClient.SetRelease(VersionStr())
+	}
+}
+
 func init() {
+
+	if Version == "" {
+		log.Warn(`Build this binary with "make" or "./build.sh"", not "go build"`)
+	}
+
 	// Make sure we get random numbers in the application
 	rand.Seed(time.Now().UTC().UnixNano())
 

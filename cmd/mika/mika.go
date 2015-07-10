@@ -37,7 +37,7 @@ import (
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/stats"
+	//"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/tracker"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
@@ -130,6 +130,9 @@ func main() {
 	}
 
 	logger := log.New()
+
+	mika.SetupSentry()
+
 	hook, err := logrus_sentry.NewSentryHook(conf.Config.SentryDSN, []log.Level{
 		log.PanicLevel,
 		log.FatalLevel,
@@ -143,7 +146,7 @@ func main() {
 	mika.SetupLogger(conf.Config.LogLevel, conf.Config.ColourLogs)
 
 	// Start stat counter
-	stats.Setup(conf.Config.MetricsDSN)
+	//stats.Setup(conf.Config.MetricsDSN)
 
 	db.Setup(conf.Config.RedisHost, conf.Config.RedisPass)
 
@@ -153,11 +156,6 @@ func main() {
 }
 
 func init() {
-	mika.StartTime = util.Unixtime()
-	if mika.Version == "" {
-		log.Warn(`Build this binary with "make" or "./build.sh"", not "go build"`)
-	}
-
 	// Parse CLI args
 	flag.Parse()
 

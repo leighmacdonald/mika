@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"fmt"
+	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
@@ -9,7 +10,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-	//"git.totdev.in/totv/mika/conf"
 )
 
 // t:usertorrent:<user_id>:<torrent_id> ->
@@ -34,6 +34,7 @@ type User struct {
 	KeyComplete   string       `redis:"-" json:"-"`
 	KeyHNR        string       `redis:"-" json:"-"`
 	Scheduler     *time.Ticker `redis:"-" json:"-"`
+	userStopChan  chan bool    `redis:"-" json:"-"`
 
 	// Active torrent set. Does not include historical or recently reaped peers.
 	torrents []*Torrent
@@ -50,19 +51,32 @@ func (tracker *Tracker) findUserID(passkey string) uint64 {
 	return 0
 }
 
-func (user *User) scheduler(ticker *time.Ticker) {
+func (user *User) scheduler(ticker *time.Ticker, stop_chan chan bool) {
 	// Randomize the scheduler start time to make sure everyone isn't updating at the exact
 	// same moment.
 	//
 	// The updates are randomized across the time duration of the reap interval to spread
 	// the updates at least semi evenly
 	time.Sleep(time.Second * time.Duration(rand.Intn(60)))
-	for range user.Scheduler.C {
-		log.WithFields(log.Fields{
-			"fn":      "schedualer",
-			"user_id": user.UserID,
-		}).Debug("User scheduler executed")
+	ticker = time.NewTicker(time.Second * time.Duration(conf.Config.AnnInterval))
+	for {
+		select {
+		case <-ticker.C:
+			log.WithFields(log.Fields{
+				"fn":      "schedualer",
+				"user_id": user.UserID,
+			}).Debug("User scheduler executed")
+
+		case <-stop_chan:
+			log.WithFields(log.Fields{
+				"fn":      "schedualer",
+				"user_id": user.UserID,
+			}).Debug("User scheduler stopped")
+			ticker.Stop()
+			return
+		}
 	}
+
 }
 
 // MergeDB will update the user instance with the currently active data
@@ -118,11 +132,17 @@ func NewUser(user_id uint64) *User {
 		KeyHNR:        fmt.Sprintf("t:u:hnr:%d", user_id),
 		Queued:        false,
 		Scheduler:     time.NewTicker(time.Minute * 15),
+		userStopChan:  make(chan bool),
 	}
 
-	go user.scheduler(user.Scheduler)
+	go user.scheduler(user.Scheduler, user.userStopChan)
 
 	return user
+}
+
+// Cleanup stops the active go routines attached to the specific user instance
+func (user *User) Cleanup() {
+	user.userStopChan <- true
 }
 
 func (user *User) AddHNR(r redis.Conn, torrent_id uint64) {

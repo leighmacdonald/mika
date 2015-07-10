@@ -41,12 +41,12 @@ func captureSentry(client *raven.Client, onlyCrashes bool) gin.HandlerFunc {
 				client.Capture(packet, flags)
 				ctx.Writer.WriteHeader(http.StatusInternalServerError)
 			}
-//			if !onlyCrashes {
-//				for _, item := range ctx.Errors {
-//					packet := raven.NewPacket(item.Err.Error(), &raven.Message{item.Err.Error(), []interface{}{item.Meta}})
-//					client.Capture(packet, flags)
-//				}
-//			}
+			//			if !onlyCrashes {
+			//				for _, item := range ctx.Errors {
+			//					packet := raven.NewPacket(item.Err.Error(), &raven.Message{item.Err.Error(), []interface{}{item.Meta}})
+			//					client.Capture(packet, flags)
+			//				}
+			//			}
 		}()
 		ctx.Next()
 	}

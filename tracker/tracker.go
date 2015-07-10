@@ -138,6 +138,7 @@ func (tracker *Tracker) DelUser(user *User) {
 	tracker.UsersMutex.Lock()
 	delete(tracker.Users, user.UserID)
 	tracker.UsersMutex.Unlock()
+	user.Cleanup()
 	log.WithFields(log.Fields{
 		"fn":      "tracker.DelUser",
 		"user_id": user.UserID,

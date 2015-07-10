@@ -171,7 +171,6 @@ func (tracker *Tracker) HandleTorrentAdd(ctx *gin.Context) {
 		// Add a new one
 		torrent = NewTorrent(payload.InfoHash, payload.Name, payload.TorrentID)
 		tracker.AddTorrent(torrent)
-
 	} else {
 		status = http.StatusAccepted
 		// Update our existing one
@@ -511,7 +510,6 @@ func (tracker *Tracker) HandleWhitelistDel(ctx *gin.Context) {
 		if p == prefix {
 			r := db.Pool.Get()
 			defer r.Close()
-
 			r.Do("HDEL", "t:whitelist", prefix)
 			tracker.initWhitelist(r)
 			log.WithFields(log.Fields{
@@ -519,6 +517,7 @@ func (tracker *Tracker) HandleWhitelistDel(ctx *gin.Context) {
 				"fn":     "HandleWhitelistDel",
 			}).Info("Deleted client from whitelist successfully")
 			ctx.JSON(http.StatusOK, resp_ok)
+			return
 		}
 	}
 	ctx.Error(errors.New("Tried to delete unknown client prefix")).SetMeta(errMeta(

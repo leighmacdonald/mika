@@ -3,11 +3,11 @@ package mika
 
 import (
 	"fmt"
+	"git.totdev.in/totv/mika/conf"
 	log "github.com/Sirupsen/logrus"
+	"github.com/getsentry/raven-go"
 	"math/rand"
 	"time"
-	"github.com/getsentry/raven-go"
-	"git.totdev.in/totv/mika/conf"
 )
 
 var (
@@ -51,7 +51,6 @@ func SetupLogger(log_level string, force_colour bool) {
 		log.SetLevel(log.InfoLevel)
 	}
 }
-
 
 // NewSentryHook creates a hook to be added to an instance of logger
 // and initializes the raven client.

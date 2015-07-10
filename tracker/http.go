@@ -2,11 +2,16 @@ package tracker
 
 import (
 	"crypto/tls"
+	"errors"
+	"fmt"
+	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
+	"github.com/getsentry/raven-go"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"runtime/debug"
 )
 
 type (
@@ -17,12 +22,44 @@ type (
 	}
 )
 
+// captureSentry is an error recovery middleware that will capture errors and backtraces
+// and forward them to a sentry client if configured.
+func captureSentry(client *raven.Client, onlyCrashes bool) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		defer func() {
+			flags := map[string]string{
+				"endpoint": ctx.Request.RequestURI,
+			}
+			if r_val := recover(); r_val != nil {
+				debug.PrintStack()
+				r_val_str := fmt.Sprint(r_val)
+				packet := raven.NewPacket(
+					r_val_str,
+					raven.NewException(errors.New(r_val_str),
+						raven.NewStacktrace(2, 3, nil)),
+				)
+				client.Capture(packet, flags)
+				ctx.Writer.WriteHeader(http.StatusInternalServerError)
+			}
+			if !onlyCrashes {
+				for _, item := range ctx.Errors {
+					packet := raven.NewPacket(item.Err.Error(), &raven.Message{item.Err.Error(), []interface{}{item.Meta}})
+					client.Capture(packet, flags)
+				}
+			}
+		}()
+		ctx.Next()
+	}
+}
+
 // handleTrackerErrors is used as the default error handler for tracker requests
 // the error is returned to the client as a bencoded error string as defined in the
 // bittorrent specs.
 func handleTrackerErrors(ctx *gin.Context) {
+	// Run request handler
 	ctx.Next()
 
+	// Handle any errors recorded
 	error_returned := ctx.Errors.Last()
 	if error_returned != nil {
 		meta := error_returned.JSON().(gin.H)
@@ -32,7 +69,7 @@ func handleTrackerErrors(ctx *gin.Context) {
 		if found {
 			status = custom_status.(int)
 		}
-		log.Debug(meta)
+
 		// TODO handle private/public errors separately, like sentry output for priv errors
 		oops(ctx, status)
 	}
@@ -47,7 +84,7 @@ func handleApiErrors(ctx *gin.Context) {
 	if error_returned != nil {
 		meta := error_returned.JSON().(gin.H)
 
-		status := 500
+		status := http.StatusInternalServerError
 		custom_status, found := meta["status"]
 		if found {
 			status = custom_status.(int)
@@ -63,6 +100,10 @@ func handleApiErrors(ctx *gin.Context) {
 // Run starts all of the background goroutines related to managing the tracker
 // and starts the tracker and API HTTP interfaces
 func (tracker *Tracker) Run() {
+
+	if conf.Config.SentryDSN != "" {
+
+	}
 
 	go tracker.dbStatIndexer()
 	go tracker.syncWriter()
@@ -86,6 +127,7 @@ func (tracker *Tracker) listenTracker() {
 	}).Info("Loading Tracker route handlers")
 
 	router := NewRouter()
+
 	router.Use(handleTrackerErrors)
 	router.GET("/:passkey/announce", tracker.HandleAnnounce)
 	router.GET("/:passkey/scrape", tracker.HandleScrape)
@@ -106,6 +148,9 @@ func errMeta(status int, message string, fields logrus.Fields, level logrus.Leve
 // the default middleware handlers.
 func NewRouter() *gin.Engine {
 	router := gin.New()
+	if conf.Config.SentryDSN != "" {
+		router.Use(captureSentry(mika.SentryClient, false))
+	}
 	router.Use(gin.Recovery())
 	return router
 }
@@ -163,5 +208,5 @@ func (tracker *Tracker) listenAPI() {
 		log.Fatalln("SSL config keys not set in config!")
 	}
 	srv := http.Server{TLSConfig: tls_config, Addr: conf.Config.ListenHostAPI, Handler: router}
-	log.Fatal(srv.ListenAndServeTLS(conf.Config.SSLCert, conf.Config.SSLPrivateKey))
+	srv.ListenAndServeTLS(conf.Config.SSLCert, conf.Config.SSLPrivateKey)
 }

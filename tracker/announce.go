@@ -188,7 +188,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 
 	peer_diff := PeerDiff{User: user, Torrent: torrent}
 	// user update MUST happen after peer update since we rely on the old dl/ul values
-	peer.Update(ann, &peer_diff)
+	peer.Update(ann, &peer_diff, torrent.Seeders)
 	torrent.Update(ann)
 	user.Update(ann, &peer_diff, torrent.MultiUp, torrent.MultiDn)
 

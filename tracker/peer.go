@@ -29,6 +29,9 @@ type PeerDiff struct {
 
 	// Total time in seconds the peer has been active on the torrent.
 	SeedTime uint64
+
+	// Bonus points earned for the request
+	InternetPoints uint64
 }
 
 func (peer_diff *PeerDiff) Key() string {
@@ -93,7 +96,7 @@ func (peer *Peer) IsNew() bool {
 }
 
 // Update the stored values with the data from an announce
-func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff) {
+func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff, seeders int) {
 	var ul_diff, dl_diff uint64
 	cur_time := util.Unixtime()
 	peer.Lock()
@@ -111,6 +114,7 @@ func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff) {
 		}
 		peer.SpeedUP = util.EstSpeed(peer.AnnounceLast, cur_time, ul_diff)
 		peer.SpeedDN = util.EstSpeed(peer.AnnounceLast, cur_time, dl_diff)
+
 	}
 	peer.Uploaded = announce.Uploaded
 	peer.Downloaded = announce.Downloaded
@@ -151,6 +155,8 @@ func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff) {
 			peer_diff.SeedTime = time_diff
 		}
 		peer.AnnounceFirst = cur_time
+		peer_diff.InternetPoints = uint64(CalculateBonus(time_diff, ul_diff, uint64(seeders)))
+		log.Debug("Calculated Peer bonus: ", peer_diff.InternetPoints)
 	}
 
 	peer.AnnounceLast = cur_time

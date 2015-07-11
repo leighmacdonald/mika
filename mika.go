@@ -52,13 +52,6 @@ func SetupLogger(log_level string, force_colour bool) {
 	}
 }
 
-// NewSentryHook creates a hook to be added to an instance of logger
-// and initializes the raven client.
-// This method sets the timeout to 100 milliseconds.
-//func NewSentryHook(levels []log.Level) (*logrus_sentry.SentryHook, error) {
-//	return &logrus_sentry.SentryHook{100 * time.Millisecond, SentryClient, levels}, nil
-//}
-
 func SetupSentry() {
 	log.Info("Sentry configured for use @ ", conf.Config.SentryDSN)
 	SentryClient, _ = raven.NewClient(conf.Config.SentryDSN, nil)

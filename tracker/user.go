@@ -7,34 +7,38 @@ import (
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"math/rand"
 	"sync"
 	"time"
+)
+
+var (
+	totalUsers int
 )
 
 // t:usertorrent:<user_id>:<torrent_id> ->
 //    first_ann, last_ann, uploaded, downloaded, seed_time, speed_up_max, speed_dn_max
 type User struct {
-	db.DBEntity   `redis:"-" json:"-"`
-	sync.RWMutex  `redis:"-" json:"-"`
-	Queued        bool         `redis:"-" json:"-"`
-	UserID        uint64       `redis:"user_id" json:"user_id"`
-	Enabled       bool         `redis:"enabled" json:"enabled"`
-	Uploaded      uint64       `redis:"uploaded" json:"uploaded"`
-	Downloaded    uint64       `redis:"downloaded" json:"downloaded"`
-	Snatches      uint32       `redis:"snatches" json:"snatches"`
-	Passkey       string       `redis:"passkey" json:"passkey"`
-	UserKey       string       `redis:"-" json:"key"`
-	Username      string       `redis:"username" json:"username"`
-	CanLeech      bool         `redis:"can_leech" json:"can_leech"`
-	Announces     uint64       `redis:"announces" json:"announces"`
-	Peers         []*Peer      `redis:"-" json:"-"`
-	KeyActive     string       `redis:"-" json:"-"`
-	KeyIncomplete string       `redis:"-" json:"-"`
-	KeyComplete   string       `redis:"-" json:"-"`
-	KeyHNR        string       `redis:"-" json:"-"`
-	Scheduler     *time.Ticker `redis:"-" json:"-"`
-	userStopChan  chan bool    `redis:"-" json:"-"`
+	db.DBEntity    `redis:"-" json:"-"`
+	sync.RWMutex   `redis:"-" json:"-"`
+	Queued         bool         `redis:"-" json:"-"`
+	UserID         uint64       `redis:"user_id" json:"user_id"`
+	Enabled        bool         `redis:"enabled" json:"enabled"`
+	Uploaded       uint64       `redis:"uploaded" json:"uploaded"`
+	Downloaded     uint64       `redis:"downloaded" json:"downloaded"`
+	Snatches       uint32       `redis:"snatches" json:"snatches"`
+	Passkey        string       `redis:"passkey" json:"passkey"`
+	UserKey        string       `redis:"-" json:"key"`
+	Username       string       `redis:"username" json:"username"`
+	CanLeech       bool         `redis:"can_leech" json:"can_leech"`
+	Announces      uint64       `redis:"announces" json:"announces"`
+	InternetPoints uint64       `redis:"points" json:"points"`
+	Peers          []*Peer      `redis:"-" json:"-"`
+	KeyActive      string       `redis:"-" json:"-"`
+	KeyIncomplete  string       `redis:"-" json:"-"`
+	KeyComplete    string       `redis:"-" json:"-"`
+	KeyHNR         string       `redis:"-" json:"-"`
+	Scheduler      *time.Ticker `redis:"-" json:"-"`
+	userStopChan   chan bool    `redis:"-" json:"-"`
 
 	// Active torrent set. Does not include historical or recently reaped peers.
 	torrents []*Torrent
@@ -52,12 +56,12 @@ func (tracker *Tracker) findUserID(passkey string) uint64 {
 }
 
 func (user *User) scheduler(ticker *time.Ticker, stop_chan chan bool) {
-	// Randomize the scheduler start time to make sure everyone isn't updating at the exact
+	// Stagger the scheduler start time to make sure everyone isn't updating at the exact
 	// same moment.
-	//
-	// The updates are randomized across the time duration of the reap interval to spread
-	// the updates at least semi evenly
-	time.Sleep(time.Second * time.Duration(rand.Intn(60)))
+	if !conf.Config.Testing {
+		time.Sleep(time.Millisecond * time.Duration(totalUsers+10))
+	}
+	totalUsers++
 	ticker = time.NewTicker(time.Second * time.Duration(conf.Config.AnnInterval))
 	for {
 		select {
@@ -156,7 +160,6 @@ func (user *User) AddHNR(r redis.Conn, torrent_id uint64) {
 // Update user stats from announce request
 func (user *User) Update(announce *AnnounceRequest, peer_diff *PeerDiff, multi_up, multi_dn float64) {
 	user.Lock()
-	defer user.Unlock()
 	if announce.Event != STARTED {
 		// Apply multipliers to get value we will actually record
 		upload_diff_multi := uint64(float64(peer_diff.UploadDiff) * multi_up)
@@ -183,11 +186,13 @@ func (user *User) Update(announce *AnnounceRequest, peer_diff *PeerDiff, multi_u
 
 		user.Uploaded = uploaded_new
 		user.Downloaded = downloaded_new
+		user.InternetPoints = peer_diff.InternetPoints
 	}
 	user.Announces++
 	if announce.Event == COMPLETED {
 		user.Snatches++
 	}
+	user.Unlock()
 }
 
 // Sync will write the pertinent date out to the redis connection. Its important to
@@ -206,6 +211,7 @@ func (user *User) Sync(r redis.Conn) {
 		"passkey", user.Passkey,
 		"enabled", user.Enabled,
 		"username", user.Username,
+		"bonus", user.InternetPoints,
 	)
 }
 

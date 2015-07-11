@@ -255,7 +255,7 @@ func (torrent *Torrent) PeerCounts() (int, int) {
 // total peers available is less than the max peers all peers will be returned. Otherwise
 // the peers are split 80/20 (leechers/seeders). If those numbers can't be met, the leecher counts are relaxed
 // so that seeders can fill their spots.
-func (torrent *Torrent) GetPeers(r redis.Conn, max_peers int) []*Peer {
+func (torrent *Torrent) GetPeers(max_peers int) []*Peer {
 	torrent.RLock()
 	defer torrent.RUnlock()
 	if len(torrent.Peers) > max_peers {

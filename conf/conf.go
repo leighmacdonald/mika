@@ -19,6 +19,10 @@ type Configuration struct {
 	// Enabled debug functions
 	Debug bool
 
+	// Enable testing mode which bypasses some functionality
+	// Do not set this to true in production ever!
+	Testing bool
+
 	// A loglevel to use "info", "error", "warn", "debug", "fatal", "panic"
 	LogLevel string
 

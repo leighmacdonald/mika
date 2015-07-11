@@ -62,6 +62,12 @@ func SetupSentry() {
 	}
 }
 
+func TestLog(args ...interface{}) {
+	if conf.Config.Testing {
+		log.Debug(args...)
+	}
+}
+
 func init() {
 
 	if Version == "" {

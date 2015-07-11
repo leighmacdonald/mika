@@ -32,14 +32,6 @@ type Torrent struct {
 	MultiDn         float64 `redis:"multi_dn" json:"multi_dn"`
 }
 
-func AcquireLock(torrent *Torrent) {
-	torrent.Lock()
-}
-
-func ReleaseUnlock(torrent *Torrent) {
-	torrent.Unlock()
-}
-
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
 func NewTorrent(info_hash string, name string, torrent_id uint64) *Torrent {

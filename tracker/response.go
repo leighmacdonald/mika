@@ -17,6 +17,7 @@ const (
 	MSG_MISSING_PEER_ID         int = 102
 	MSG_MISSING_PORT            int = 103
 	MSG_INVALID_PORT            int = 104
+	MSG_INVALID_AUTH            int = 110
 	MSG_INVALID_INFO_HASH       int = 150
 	MSG_INVALID_PEER_ID         int = 151
 	MSG_INVALID_NUM_WANT        int = 152
@@ -34,6 +35,7 @@ var (
 		MSG_MISSING_PEER_ID:         "peer_id missing from request",
 		MSG_MISSING_PORT:            "port missing from request",
 		MSG_INVALID_PORT:            "Invalid port",
+		MSG_INVALID_AUTH:            "Invalid passkey supplied",
 		MSG_INVALID_INFO_HASH:       "Torrent info hash must be 20 characters",
 		MSG_INVALID_PEER_ID:         "Peer ID Invalid",
 		MSG_INVALID_NUM_WANT:        "num_want invalid",

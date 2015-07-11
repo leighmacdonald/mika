@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"fmt"
+	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
@@ -52,6 +53,7 @@ func (tracker *Tracker) findUserID(passkey string) uint64 {
 			return user.UserID
 		}
 	}
+	mika.TestLog("passkey not found: ", passkey)
 	return 0
 }
 

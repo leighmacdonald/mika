@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
@@ -87,12 +88,13 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 			},
 			log.ErrorLevel,
 		))
+		mika.TestLog("Failed to parse announce request")
 		return
 	}
 
 	info_hash_hex := fmt.Sprintf("%x", ann.InfoHash)
 	log.WithFields(log.Fields{
-		"ih":    info_hash_hex[0:6],
+		"ih":    info_hash_hex,
 		"ip":    ann.IPv4,
 		"port":  ann.Port,
 		"up":    util.Bytes(ann.Uploaded),
@@ -108,11 +110,12 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	if user_id == 0 {
 		stats.Counter <- stats.EV_INVALID_PASSKEY
 		ctx.Error(errors.New("Invalid passkey")).SetMeta(errMeta(
-			MSG_GENERIC_ERROR,
+			MSG_INVALID_AUTH,
 			"Invalid passkey supplied",
 			log.Fields{"fn": "HandleAnnounce", "passkey": passkey},
 			log.ErrorLevel,
 		))
+		mika.TestLog("Bad passkey")
 		return
 	}
 	user := tracker.FindUserByID(user_id)
@@ -254,14 +257,8 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	}
 	r.Flush()
 
-	if !torrent.InQueue() {
-		torrent.SetInQueue(true)
-		SyncEntityC <- torrent
-	}
-	if !user.InQueue() {
-		user.SetInQueue(true)
-		SyncEntityC <- user
-	}
+	SyncEntityC <- torrent
+	SyncEntityC <- user
 
 	dict := bencode.Dict{
 		"complete":     torrent.Seeders,

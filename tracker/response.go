@@ -17,7 +17,7 @@ const (
 	MSG_MISSING_PEER_ID         int = 102
 	MSG_MISSING_PORT            int = 103
 	MSG_INVALID_PORT            int = 104
-	MSG_INVALID_AUTH            int = 110
+	MSG_INVALID_AUTH            int = 490
 	MSG_INVALID_INFO_HASH       int = 150
 	MSG_INVALID_PEER_ID         int = 151
 	MSG_INVALID_NUM_WANT        int = 152
@@ -49,17 +49,25 @@ var (
 // oops will output a bencoded error code to the torrent client using
 // a preset message code constant
 func oops(ctx *gin.Context, msg_code int) {
-	ctx.String(msg_code, responseError(resp_msg[msg_code]))
-}
-
-// oopsStr will output a bencoded error code to the torrent client using
-// a supplied custom message string
-func oopsStr(ctx *gin.Context, msg_code int, msg string) {
+	msg, exists := resp_msg[msg_code]
+	if !exists {
+		msg = resp_msg[MSG_GENERIC_ERROR]
+	}
 	ctx.String(msg_code, responseError(msg))
 }
 
+//
+//// oopsStr will output a bencoded error code to the torrent client using
+//// a supplied custom message string
+//func oopsStr(ctx *gin.Context, msg_code int, msg string) {
+//	ctx.String(msg_code, responseError(msg))
+//}
+
 // responseError generates a bencoded error response for the torrent client to
 // parse and display to the user
+//
+// Note that this function does not generate or support a warning reason, which are rarely if
+// ever used.
 func responseError(message string) string {
 	var out_bytes bytes.Buffer
 	bencoder := bencode.NewEncoder(&out_bytes)

@@ -107,7 +107,7 @@ func (tracker *Tracker) Run() {
 
 	go tracker.dbStatIndexer()
 	go tracker.syncWriter()
-	go tracker.peerStalker()
+	//	go tracker.peerStalker()
 	go tracker.listenTracker()
 	go tracker.listenAPI()
 

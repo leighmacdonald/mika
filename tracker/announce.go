@@ -106,7 +106,6 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	passkey := ctx.Param("passkey")
 
 	user_id := tracker.findUserID(passkey)
-
 	if user_id == 0 {
 		stats.Counter <- stats.EV_INVALID_PASSKEY
 		ctx.Error(errors.New("Invalid passkey")).SetMeta(errMeta(
@@ -115,7 +114,6 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 			log.Fields{"fn": "HandleAnnounce", "passkey": passkey},
 			log.ErrorLevel,
 		))
-		mika.TestLog("Bad passkey")
 		return
 	}
 	user := tracker.FindUserByID(user_id)

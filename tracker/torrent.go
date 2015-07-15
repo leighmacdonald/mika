@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"fmt"
-	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
@@ -12,7 +11,6 @@ import (
 )
 
 type Torrent struct {
-	db.DBEntity
 	sync.RWMutex
 	Name            string  `redis:"name" json:"name"`
 	TorrentID       uint64  `redis:"torrent_id" json:"torrent_id"`

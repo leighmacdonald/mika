@@ -15,11 +15,9 @@ var (
 )
 
 type DBEntity interface {
-	InQueue() bool
-	SetInQueue(bool)
 	Sync(r redis.Conn)
-	AcquireLock()
-	ReleaseLock()
+	Lock()
+	Unlock()
 }
 
 // Defined a single payload to send to the backend data store (redis)
@@ -65,7 +63,7 @@ func Setup(host string, pass string) {
 		IdleTimeout: 600 * time.Second,
 		Wait:        true,
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", host)
+			c, err := redis.DialTimeout("tcp", host, time.Second*10, time.Second*5, time.Second*5)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"err": err.Error(),

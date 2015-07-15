@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
-	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
@@ -19,7 +18,6 @@ var (
 // t:usertorrent:<user_id>:<torrent_id> ->
 //    first_ann, last_ann, uploaded, downloaded, seed_time, speed_up_max, speed_dn_max
 type User struct {
-	db.DBEntity    `redis:"-" json:"-"`
 	sync.RWMutex   `redis:"-" json:"-"`
 	Queued         bool         `redis:"-" json:"-"`
 	UserID         uint64       `redis:"user_id" json:"user_id"`

@@ -345,9 +345,11 @@ func (tracker *Tracker) HandleUserDel(ctx *gin.Context) {
 			log.ErrorLevel,
 		))
 		return
+	} else {
+		tracker.DelUser(user)
+		ctx.JSON(http.StatusOK, resp_ok)
 	}
-	tracker.DelUser(user)
-	ctx.JSON(http.StatusOK, resp_ok)
+	return
 }
 
 // HandleUserCreate facilitates the adding of new users into the trackers memory.
@@ -438,11 +440,9 @@ func (tracker *Tracker) HandleUserUpdate(ctx *gin.Context) {
 		))
 		return
 	}
+	user := tracker.FindUserByID(user_id)
 
-	tracker.UsersMutex.RLock()
-	user, exists := tracker.Users[user_id]
-	tracker.UsersMutex.RUnlock()
-	if !exists || user == nil {
+	if user == nil {
 		ctx.Error(errors.New("Invalid user")).SetMeta(errMeta(
 			http.StatusNotFound,
 			"User not found, cannot continue",
@@ -483,12 +483,15 @@ func (tracker *Tracker) HandleWhitelistAdd(ctx *gin.Context) {
 		))
 		return
 	}
+	tracker.WhitelistMutex.RLock()
 	for _, prefix := range tracker.Whitelist {
 		if prefix == payload.Prefix {
 			ctx.JSON(http.StatusConflict, resp_ok)
+			tracker.WhitelistMutex.RUnlock()
 			return
 		}
 	}
+	tracker.WhitelistMutex.RUnlock()
 
 	r := db.Pool.Get()
 	defer r.Close()
@@ -506,26 +509,33 @@ func (tracker *Tracker) HandleWhitelistAdd(ctx *gin.Context) {
 // active whitelist.
 func (tracker *Tracker) HandleWhitelistDel(ctx *gin.Context) {
 	prefix := ctx.Param("prefix")
+	found := false
+	tracker.WhitelistMutex.RLock()
 	for _, p := range tracker.Whitelist {
 		if p == prefix {
-			r := db.Pool.Get()
-			defer r.Close()
-			r.Do("HDEL", "t:whitelist", prefix)
-			tracker.initWhitelist(r)
-			log.WithFields(log.Fields{
-				"prefix": prefix,
-				"fn":     "HandleWhitelistDel",
-			}).Info("Deleted client from whitelist successfully")
-			ctx.JSON(http.StatusOK, resp_ok)
-			return
+			found = true
+			break
 		}
 	}
-	ctx.Error(errors.New("Tried to delete unknown client prefix")).SetMeta(errMeta(
-		http.StatusNotFound,
-		"Tried to delete unknown client prefix",
-		log.Fields{"fn": "HandleWhitelistDel", "prefix": prefix},
-		log.WarnLevel,
-	))
+	tracker.WhitelistMutex.RUnlock()
+	if found {
+		r := db.Pool.Get()
+		defer r.Close()
+		r.Do("HDEL", "t:whitelist", prefix)
+		tracker.initWhitelist(r)
+		log.WithFields(log.Fields{
+			"prefix": prefix,
+			"fn":     "HandleWhitelistDel",
+		}).Info("Deleted client from whitelist successfully")
+		ctx.JSON(http.StatusOK, resp_ok)
+	} else {
+		ctx.Error(errors.New("Tried to delete unknown client prefix")).SetMeta(errMeta(
+			http.StatusNotFound,
+			"Tried to delete unknown client prefix",
+			log.Fields{"fn": "HandleWhitelistDel", "prefix": prefix},
+			log.WarnLevel,
+		))
+	}
 }
 
 // HandleGetTorrentPeers returns all peers for a given info_hash

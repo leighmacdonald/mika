@@ -135,10 +135,12 @@ func (tracker *Tracker) DelTorrent(torrent *Torrent) bool {
 //
 // TODO Make sure other references are dropped so GC can take over.
 func (tracker *Tracker) DelUser(user *User) {
+	// user.Cleanup()
+
 	tracker.UsersMutex.Lock()
 	delete(tracker.Users, user.UserID)
 	tracker.UsersMutex.Unlock()
-	user.Cleanup()
+
 	log.WithFields(log.Fields{
 		"fn":      "tracker.DelUser",
 		"user_id": user.UserID,
@@ -162,12 +164,15 @@ func (tracker *Tracker) AddUser(user *User) {
 	log.WithFields(log.Fields{
 		"user_id":   user.UserID,
 		"user_name": user.Username,
+		"passkey":   user.Passkey,
 		"fn":        "AddUser",
 	}).Info("Added new user to tracker")
 }
 
 // initWhitelist will fetch the client whitelist from redis and load it into memory
 func (tracker *Tracker) initWhitelist(r redis.Conn) {
+	tracker.WhitelistMutex.Lock()
+	defer tracker.WhitelistMutex.Unlock()
 	tracker.Whitelist = []string{}
 	a, err := r.Do("HKEYS", "t:whitelist")
 

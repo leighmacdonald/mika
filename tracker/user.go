@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"fmt"
-	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
@@ -46,12 +45,13 @@ type User struct {
 // findUserID find a user_id from the supplied passkey. A return value
 // of 0 denotes a non-existing or disabled user_id
 func (tracker *Tracker) findUserID(passkey string) uint64 {
+	tracker.UsersMutex.RLock()
+	defer tracker.UsersMutex.RUnlock()
 	for _, user := range tracker.Users {
 		if user.Passkey == passkey {
 			return user.UserID
 		}
 	}
-	mika.TestLog("passkey not found: ", passkey)
 	return 0
 }
 
@@ -139,7 +139,7 @@ func NewUser(user_id uint64) *User {
 		userStopChan:  make(chan bool),
 	}
 
-	go user.scheduler(user.Scheduler, user.userStopChan)
+	// go user.scheduler(user.Scheduler, user.userStopChan)
 
 	return user
 }
@@ -215,7 +215,7 @@ func (user *User) Sync(r redis.Conn) {
 	)
 }
 
-// Join registeres a user into a
+// Join registers a user into a torrents swarm
 func (user *User) Join(torrent *Torrent) bool {
 	for _, known_torrent := range user.torrents {
 		if known_torrent == torrent {

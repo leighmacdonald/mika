@@ -4,7 +4,6 @@ package stats
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
-	"net"
 	"sync"
 	"time"
 )
@@ -67,10 +66,11 @@ type StatsCounter struct {
 	ScrapeUserIDS   []uint64
 }
 
-func Setup(metrics_dsn string) {
-	address, _ := net.ResolveTCPAddr("tcp", metrics_dsn)
-	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "tracker", address)
-}
+//
+//func Setup(metrics_dsn string) {
+//	address, _ := net.ResolveTCPAddr("tcp", metrics_dsn)
+//	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "tracker", address)
+//}
 
 // NewStatCounter initializes a statcounter instance using the registiry
 // passed in.
@@ -90,6 +90,7 @@ func NewStatCounter(registry metrics.Registry) *StatsCounter {
 		APIRequests:     metrics.NewCounter(),
 		APIRequestsFail: metrics.NewCounter(),
 	}
+
 	registry.Register(metric_names[EV_REQUEST_OK], counter.Requests)
 	registry.Register(metric_names[EV_REQUEST_ERR], counter.RequestsFail)
 	registry.Register(metric_names[EV_ANNOUNCE], counter.Announce)
@@ -121,19 +122,19 @@ func (stats *StatsCounter) Counter() {
 			stats.APIRequests.Inc(1)
 			stats.Requests.Inc(1)
 		case EV_API_FAIL:
-			stats.Errors.Inc(1)
+			stats.RequestsFail.Inc(1)
 			stats.APIRequestsFail.Inc(1)
 		case EV_ANNOUNCE:
 			stats.Announce.Inc(1)
 			stats.Requests.Inc(1)
 		case EV_ANNOUNCE_FAIL:
-			stats.Errors.Inc(1)
+			stats.RequestsFail.Inc(1)
 			stats.AnnounceFail.Inc(1)
 		case EV_SCRAPE:
 			stats.Scrape.Inc(1)
 			stats.Requests.Inc(1)
 		case EV_SCRAPE_FAIL:
-			stats.Errors.Inc(1)
+			stats.RequestsFail.Inc(1)
 			stats.ScrapeFail.Inc(1)
 		case EV_INVALID_INFOHASH:
 			stats.InvalidInfohash.Inc(1)

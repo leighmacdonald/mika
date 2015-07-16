@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"git.totdev.in/totv/mika"
+	//	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
@@ -13,7 +13,6 @@ import (
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
 	"net"
-	"net/http"
 	"strings"
 )
 
@@ -26,8 +25,10 @@ const (
 )
 
 // Represents an announce received from the bittorrent client
+//
+// TODO use gin binding func?
 type AnnounceRequest struct {
-	Compact    bool
+	Compact    bool `binding:"required"`
 	Downloaded uint64
 	Corrupt    uint64
 	Event      int
@@ -74,6 +75,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 		))
 		return
 	}
+
 	log.Debugln(ctx.Request.RequestURI)
 	ann, err := NewAnnounce(ctx)
 	if err != nil {
@@ -88,7 +90,6 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 			},
 			log.ErrorLevel,
 		))
-		mika.TestLog("Failed to parse announce request")
 		return
 	}
 
@@ -116,6 +117,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 		))
 		return
 	}
+
 	user := tracker.FindUserByID(user_id)
 	if !user.CanLeech && ann.Left > 0 {
 		ctx.Error(errors.New("Leech disabled for user")).SetMeta(errMeta(
@@ -164,8 +166,9 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 				"user_name": user.Username,
 				"info_hash": info_hash_hex,
 			},
-			log.DebugLevel,
+			log.WarnLevel,
 		))
+		return
 	} else if !torrent.Enabled {
 		stats.Counter <- stats.EV_INVALID_INFOHASH
 		ctx.Error(errors.New("Torrent not enabled")).SetMeta(errMeta(
@@ -177,9 +180,11 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 				"user_name": user.Username,
 				"info_hash": info_hash_hex,
 			},
-			log.DebugLevel,
+			log.WarnLevel,
 		))
+		return
 	}
+
 	peer := torrent.findPeer(ann.PeerID)
 	if peer == nil {
 		log.Debug("No existing peer found")
@@ -291,7 +296,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 		return
 	}
 
-	ctx.String(http.StatusOK, out_bytes.String())
+	ctx.String(MSG_OK, out_bytes.String())
 }
 
 // Parse the query string into an AnnounceRequest struct

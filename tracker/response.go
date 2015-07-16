@@ -11,17 +11,17 @@ type ErrorResponse struct {
 }
 
 const (
-	MSG_OK                      int = 0
 	MSG_INVALID_REQ_TYPE        int = 100
 	MSG_MISSING_INFO_HASH       int = 101
 	MSG_MISSING_PEER_ID         int = 102
 	MSG_MISSING_PORT            int = 103
 	MSG_INVALID_PORT            int = 104
-	MSG_INVALID_AUTH            int = 490
 	MSG_INVALID_INFO_HASH       int = 150
 	MSG_INVALID_PEER_ID         int = 151
 	MSG_INVALID_NUM_WANT        int = 152
-	MSG_INFO_HASH_NOT_FOUND     int = 200
+	MSG_OK                      int = 200
+	MSG_INFO_HASH_NOT_FOUND     int = 480
+	MSG_INVALID_AUTH            int = 490
 	MSG_CLIENT_REQUEST_TOO_FAST int = 500
 	MSG_MALFORMED_REQUEST       int = 901
 	MSG_GENERIC_ERROR           int = 900
@@ -39,10 +39,10 @@ var (
 		MSG_INVALID_INFO_HASH:       "Torrent info hash must be 20 characters",
 		MSG_INVALID_PEER_ID:         "Peer ID Invalid",
 		MSG_INVALID_NUM_WANT:        "num_want invalid",
-		MSG_INFO_HASH_NOT_FOUND:     "info_hash was not found, better luck next time",
+		MSG_INFO_HASH_NOT_FOUND:     "Unknown infohash",
 		MSG_CLIENT_REQUEST_TOO_FAST: "Slow down there jimmy.",
 		MSG_MALFORMED_REQUEST:       "Malformed request",
-		MSG_GENERIC_ERROR:           "Generic Error :(",
+		MSG_GENERIC_ERROR:           "Generic Error",
 	}
 )
 

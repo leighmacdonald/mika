@@ -23,8 +23,9 @@ const (
 	MSG_INFO_HASH_NOT_FOUND     int = 480
 	MSG_INVALID_AUTH            int = 490
 	MSG_CLIENT_REQUEST_TOO_FAST int = 500
-	MSG_MALFORMED_REQUEST       int = 901
 	MSG_GENERIC_ERROR           int = 900
+	MSG_MALFORMED_REQUEST       int = 901
+	MSG_QUERY_PARSE_FAIL        int = 902
 )
 
 var (
@@ -43,6 +44,7 @@ var (
 		MSG_CLIENT_REQUEST_TOO_FAST: "Slow down there jimmy.",
 		MSG_MALFORMED_REQUEST:       "Malformed request",
 		MSG_GENERIC_ERROR:           "Generic Error",
+		MSG_QUERY_PARSE_FAIL:        "Could not parse request",
 	}
 )
 

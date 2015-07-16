@@ -174,7 +174,7 @@ func (tracker *Tracker) initWhitelist(r redis.Conn) {
 	tracker.WhitelistMutex.Lock()
 	defer tracker.WhitelistMutex.Unlock()
 	tracker.Whitelist = []string{}
-	a, err := r.Do("HKEYS", "t:whitelist")
+	values, err := r.Do("HKEYS", "t:whitelist")
 
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -182,7 +182,7 @@ func (tracker *Tracker) initWhitelist(r redis.Conn) {
 		}).Error("Failed to fetch whitelist", err)
 		return
 	}
-	tracker.Whitelist, err = redis.Strings(a, nil)
+	tracker.Whitelist, err = redis.Strings(values, nil)
 	log.WithFields(log.Fields{
 		"total_clients": len(tracker.Whitelist),
 		"fn":            "initWhitelist",

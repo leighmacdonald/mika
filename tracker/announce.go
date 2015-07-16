@@ -81,7 +81,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	if err != nil {
 		stats.Counter <- stats.EV_ANNOUNCE_FAIL
 		ctx.Error(err).SetMeta(errMeta(
-			MSG_GENERIC_ERROR,
+			MSG_QUERY_PARSE_FAIL,
 			"Failed to parse announce",
 			log.Fields{
 				"fn":        "HandleAnnounce",

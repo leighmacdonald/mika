@@ -17,7 +17,7 @@ build: fmt
 	@go build $(GOFLAGS) cmd/mika/mika.go
 
 run:
-	@go run $(GOFLAGS) cmd/mika/mika.go
+	@go run $(GOFLAGS) -race cmd/mika/mika.go
 
 install: deps
 	@go install $(GOFLAGS) ./...

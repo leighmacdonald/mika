@@ -302,11 +302,9 @@ func (tracker *Tracker) dbStatIndexer() {
 		case <-ticker.C:
 			tracker.TorrentsMutex.RLock()
 			for _, torrent := range tracker.Torrents {
-				tracker.TorrentsMutex.RLock()
 				leecher_args = append(leecher_args, uint64(torrent.Leechers), torrent.TorrentID)
 				seeder_args = append(seeder_args, uint64(torrent.Seeders), torrent.TorrentID)
 				snatch_args = append(snatch_args, uint64(torrent.Snatches), torrent.TorrentID)
-				tracker.TorrentsMutex.RUnlock()
 				count++
 			}
 			tracker.TorrentsMutex.RUnlock()

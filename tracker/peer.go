@@ -73,7 +73,7 @@ type Peer struct {
 	Announces uint64 `redis:"announces" json:"announces"`
 
 	// Total active swarm participation time
-	TotalTime uint32 `redis:"total_time" json:"total_time"`
+	TotalTime uint64 `redis:"total_time" json:"total_time"`
 
 	// Last announce timestamp
 	AnnounceLast int32 `redis:"last_announce" json:"last_announce"`
@@ -151,12 +151,15 @@ func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff, seeders
 		time_diff = uint64(cur_time - peer.AnnounceLast)
 		// Ignore long periods of inactivity
 		if time_diff < (uint64(conf.Config.AnnInterval) * 4) {
-			peer.TotalTime += uint32(time_diff)
+			peer.TotalTime += time_diff
 			peer_diff.SeedTime = time_diff
 		}
 		peer.AnnounceFirst = cur_time
-		peer_diff.InternetPoints = uint64(CalculateBonus(time_diff, ul_diff, uint64(seeders)))
-		log.Debug("Calculated Peer bonus: ", peer_diff.InternetPoints)
+		peer.User.RLock()
+		uploaded_total := peer.User.Uploaded + peer.Uploaded
+		peer.User.RUnlock()
+		peer_diff.InternetPoints = uint64(CalculateBonus(peer.TotalTime, uploaded_total, uint64(seeders)))
+		log.Println("Calculated Peer bonus: ", peer_diff.InternetPoints)
 	}
 
 	peer.AnnounceLast = cur_time
@@ -164,7 +167,7 @@ func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff, seeders
 }
 
 func (peer *Peer) IsHNR() bool {
-	return peer.Downloaded > conf.Config.HNRMinBytes && peer.IsSeeder() && peer.TotalTime < uint32(conf.Config.HNRThreshold)
+	return peer.Downloaded > conf.Config.HNRMinBytes && peer.IsSeeder() && peer.TotalTime < uint64(conf.Config.HNRThreshold)
 }
 
 func (peer *Peer) IsSeeder() bool {

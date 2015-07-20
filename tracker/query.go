@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	//	"log"
-	"log"
 )
 
 type Query struct {

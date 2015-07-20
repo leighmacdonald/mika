@@ -246,7 +246,7 @@ func (user *User) AddPeer(peer *Peer) {
 	}
 }
 
-// HasPeer will check for a existing peer already regisered with the user
+// HasPeer will check for a existing peer already registered with the user
 // Ideally there should only be 1 peer/user, but allowing multiple clients
 // means we need to track them.
 func (user *User) HasPeer(peer *Peer) bool {

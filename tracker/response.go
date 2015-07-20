@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"log"
 )
 
 type ErrorResponse struct {
@@ -56,6 +57,9 @@ func oops(ctx *gin.Context, msg_code int) {
 		msg = resp_msg[MSG_GENERIC_ERROR]
 	}
 	ctx.String(msg_code, responseError(msg))
+
+	log.Println("Error in request (", msg_code, "):", msg)
+	log.Println("From:", ctx.Request.RequestURI)
 }
 
 //

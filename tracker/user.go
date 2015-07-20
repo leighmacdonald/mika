@@ -36,7 +36,7 @@ type User struct {
 	KeyComplete    string       `redis:"-" json:"-"`
 	KeyHNR         string       `redis:"-" json:"-"`
 	Scheduler      *time.Ticker `redis:"-" json:"-"`
-	userStopChan   chan bool    `redis:"-" json:"-"`
+	userStopChan   chan bool
 
 	// Active torrent set. Does not include historical or recently reaped peers.
 	torrents []*Torrent

@@ -32,6 +32,12 @@ type Configuration struct {
 	// URI for the api listen host :34001
 	ListenHostAPI string
 
+	// Enable IPv6 stack.
+	IPV6Enabled bool
+
+	// Force only using ipv6
+	IPV6Only bool
+
 	// Username required to use api, empty string for none
 	APIUsername string
 

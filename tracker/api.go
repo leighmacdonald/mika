@@ -414,7 +414,7 @@ func (tracker *Tracker) HandleUserCreate(ctx *gin.Context) {
 // HandleUserUpdate will update an existing users data. This is usually used to change
 // a users passkey without reloading the instance.
 //
-// Be aware that there is a race condition regardnig updating these values. When you fetch the user
+// Be aware that there is a race condition regarding updating these values. When you fetch the user
 // initially, your copy of the current data will become out of date upon the next announce or
 // periodic update for that user. If you do not update before that happens you may lose
 // user stats for that specific delta.

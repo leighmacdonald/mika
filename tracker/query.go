@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	//	"log"
+	"log"
 )
 
 type Query struct {
@@ -46,6 +48,12 @@ func QueryStringParser(query string) (*Query, error) {
 			if err != nil {
 				return nil, err
 			}
+			// The start can be greater than the end when the query contains an invalid
+			// empty query value
+			if valStart > valEnd {
+				return nil, errors.New("Malformed request")
+			}
+
 			valStr, err := url.QueryUnescape(query[valStart : valEnd+1])
 			if err != nil {
 				return nil, err

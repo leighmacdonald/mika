@@ -199,7 +199,7 @@ func MakeCompactPeers(peers []*Peer, skip_id string) []byte {
 // NewPeer created a new peer with the minimum attributes needed
 func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *User) *Peer {
 	var coord geo.LatLong
-	if conf.Config.GeoEnabled {
+	if !conf.Config.GeoEnabled {
 		coord = geo.LatLong{0.0, 0.0}
 	} else {
 		coord = geo.GetCoord(ip)

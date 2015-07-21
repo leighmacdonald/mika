@@ -29,5 +29,7 @@
   "SQLPass": "",
   "SentryDSN": "http://x:x@sentry-host.com/1",
   "LogLevel": "info",
-  "ColourLogs": true
+  "ColourLogs": true,
+  "GeoDBPath": "./geodb.dat"
+  "GeoEnabled": true
 }

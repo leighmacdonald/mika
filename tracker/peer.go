@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"git.totdev.in/totv/mika/conf"
+	"git.totdev.in/totv/mika/geo"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"net"
@@ -83,6 +84,8 @@ type Peer struct {
 
 	// Peer id, reported by client. Must have white-listed prefix
 	PeerID string `redis:"peer_id" json:"peer_id"`
+
+	Coord geo.LatLong
 
 	User     *User    `redis:"-"  json:"-"`
 	Torrent  *Torrent `redis:"-" json:"-"`
@@ -195,6 +198,12 @@ func MakeCompactPeers(peers []*Peer, skip_id string) []byte {
 
 // NewPeer created a new peer with the minimum attributes needed
 func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *User) *Peer {
+	var coord geo.LatLong
+	if conf.Config.GeoEnabled {
+		coord = geo.LatLong{0.0, 0.0}
+	} else {
+		coord = geo.GetCoord(ip)
+	}
 	peer := &Peer{
 		PeerID:        peer_id,
 		IP:            ip,
@@ -204,6 +213,7 @@ func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *Use
 		User:          user,
 		Torrent:       torrent,
 		KeyTimer:      fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, peer_id),
+		Coord:         coord,
 	}
 	return peer
 }

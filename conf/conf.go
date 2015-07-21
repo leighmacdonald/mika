@@ -86,6 +86,10 @@ type Configuration struct {
 	// Full DSN for graphite metric reporting eg: "localhost:2003"
 	MetricsDSN string
 
+	GeoEnabled bool
+
+	GeoDBPath string
+
 	// Wait time before writing the data to graphite
 	//	MetricsWriteTimer time.Duration
 

@@ -12,9 +12,9 @@ var ()
 func createTestContext() (ctx *gin.Context, w *httptest.ResponseRecorder, r *gin.Engine) {
 	w = httptest.NewRecorder()
 	r = gin.New()
-//	ctx = &gin.Context{engine: r}
-//	ctx.reset()
-//	ctx.writermem.reset(w)
+	//	ctx = &gin.Context{engine: r}
+	//	ctx.reset()
+	//	ctx.writermem.reset(w)
 	return
 }
 

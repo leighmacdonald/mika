@@ -67,6 +67,7 @@ type (
 		TorrentPayload
 		Reason string
 	}
+
 	WhitelistPayload struct {
 		Prefix string `json:"prefix"`
 	}
@@ -104,6 +105,17 @@ func (tracker *Tracker) HandleUptime(ctx *gin.Context) {
 			System:  int32(info.Uptime),
 		})
 	}
+}
+
+func (tracker *Tracker) HandleTorrentCounts(ctx *gin.Context) {
+	var torrent_stats []TorrentStats
+	tracker.TorrentsMutex.RLock()
+	defer tracker.TorrentsMutex.RUnlock()
+	for t := range tracker.Torrents {
+		s := tracker.Torrents[t].Stats()
+		torrent_stats = append(torrent_stats, s)
+	}
+	ctx.JSON(http.StatusOK, torrent_stats)
 }
 
 // HandleTorrentGet will find and return the requested torrent.

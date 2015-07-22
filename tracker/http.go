@@ -182,6 +182,7 @@ func (tracker *Tracker) listenAPI() {
 	api.GET("/torrent/:info_hash", tracker.HandleTorrentGet)
 	api.POST("/torrent", tracker.HandleTorrentAdd)
 	api.GET("/torrent/:info_hash/peers", tracker.HandleGetTorrentPeers)
+	api.GET("/counts", tracker.HandleTorrentCounts)
 	api.DELETE("/torrent/:info_hash", tracker.HandleTorrentDel)
 
 	api.POST("/user", tracker.HandleUserCreate)

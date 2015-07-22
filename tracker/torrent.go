@@ -30,6 +30,14 @@ type Torrent struct {
 	MultiDn         float64 `redis:"multi_dn" json:"multi_dn"`
 }
 
+type TorrentStats struct {
+	TorrentID uint64 `json:"torrent_id"`
+	InfoHash  string `json:"info_hash"`
+	Seeders   int    `json:"seeders"`
+	Leechers  int    `json:"leechers"`
+	Completed int    `json:"completed"`
+}
+
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
 func NewTorrent(info_hash string, name string, torrent_id uint64) *Torrent {
@@ -239,6 +247,16 @@ func (torrent *Torrent) PeerCounts() (int, int) {
 	}
 	torrent.RUnlock()
 	return s, l
+}
+
+func (torrent *Torrent) Stats() TorrentStats {
+	return TorrentStats{
+		torrent.TorrentID,
+		torrent.InfoHash,
+		torrent.Seeders,
+		torrent.Leechers,
+		1,
+	}
 }
 
 // GetPeers returns a slice of up to max_peers from the current torrent. If the

@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	pi                   = math.Pi
-	twopi                = math.Pi * 2.0
-	maxLoopCount         = 20
-	eps                  = 1.0e-23
-	kilometer = 2
+	pi           = math.Pi
+	twopi        = math.Pi * 2.0
+	maxLoopCount = 20
+	eps          = 1.0e-23
+	kilometer    = 2
 )
 
 var (
@@ -32,9 +32,9 @@ type LatLong struct {
 }
 
 type Ellipsoid struct {
-	Ellipse            ellipse
-	Distance_units     int
-	Distance_factor    float64
+	Ellipse         ellipse
+	Distance_units  int
+	Distance_factor float64
 }
 
 type ellipse struct {
@@ -218,11 +218,11 @@ func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 	}
 
 	faz = math.Atan2(tu1, tu2)
-	baz = math.Atan2(cu1 * sx, (baz * cx-su1 * cu2)) + pi
-	x = math.Sqrt(((1.0 / (r * r)) - 1.0) * c2a + 1.0) + 1.0
+	baz = math.Atan2(cu1*sx, (baz*cx-su1*cu2)) + pi
+	x = math.Sqrt(((1.0/(r*r))-1.0)*c2a+1.0) + 1.0
 	x = (x - 2.0) / x
 	c = 1.0 - x
-	c = ((x * x)/4.0 + 1.0) / c
+	c = ((x*x)/4.0 + 1.0) / c
 	d = ((0.375 * x * x) - 1.0) * x
 	x = e * cy
 

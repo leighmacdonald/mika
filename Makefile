@@ -25,12 +25,12 @@ install: deps
 test:
 	@go test $(GOFLAGS) -cover . ./...
 
-cover: install
+cover:
 	@go test -coverprofile=coverage.out $(GOFLAGS) */*_test.go
 	@go tool cover -html=coverage.out
 
-bench: install
-	@go test -run=NONE -bench=. $(GOFLAGS) . ./...
+bench:
+	@go test -run=NONE -bench=. $(GOFLAGS) ./...
 
 clean:
 	@go clean $(GOFLAGS) -i

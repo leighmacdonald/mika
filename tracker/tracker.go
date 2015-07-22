@@ -17,8 +17,6 @@ var (
 	Mika *Tracker
 
 	// Channels used to sync models to redis
-	//	SyncUserC    = make(chan *User, 100)
-	//	SyncTorrentC = make(chan *Torrent, 500)
 	SyncEntityC = make(chan db.DBEntity, 500)
 
 	key_leechers = "t:i:leechers"

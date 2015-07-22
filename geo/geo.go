@@ -1,3 +1,5 @@
+// Package geo provides the Lat/Long distance calculation functionality and GeoIP
+// lookup functionality used to determine the best peers to use.
 package geo
 
 import (
@@ -16,10 +18,7 @@ const (
 	twopi                = math.Pi * 2.0
 	maxLoopCount         = 20
 	eps                  = 1.0e-23
-	Kilometer            = 2 // 1000.0    meter are a kilometer
-	Degrees              = iota
-	LongitudeIsSymmetric = true
-	BearingIsSymmetric   = true
+	kilometer = 2
 )
 
 var (
@@ -34,13 +33,8 @@ type LatLong struct {
 
 type Ellipsoid struct {
 	Ellipse            ellipse
-	Units              int
 	Distance_units     int
-	LongitudeSymmetric bool
-	Bearing_symmetry   bool
 	Distance_factor    float64
-	// Having the Distance_factor AND the Distance_units in this struct is redundant
-	// but it looks nicer in the code.
 }
 
 type ellipse struct {
@@ -48,10 +42,14 @@ type ellipse struct {
 	Inv_flattening float64
 }
 
+// Distance computes the distances between two LatLong pairings
 func (ll_a LatLong) Distance(ll_b LatLong) float64 {
 	return math.Floor(elip.To(ll_a.Lat, ll_a.Long, ll_b.Lat, ll_b.Long))
 }
 
+// DownloadDB will fetch a new geoip database from maxmind and install it, uncompressed,
+// into the configured geodb_path config file path usually defined in the configuration
+// files.
 func DownloadDB(geodb_path string) bool {
 	db_url := "http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz"
 	resp, err := http.Get(db_url)
@@ -80,12 +78,12 @@ func DownloadDB(geodb_path string) bool {
 	return true
 }
 
+// Setup will initialized all needed data for the GeoIP lookups. This includes downloading
+// a new copy of the database if none is found locally.
 func Setup(geodb_path string) bool {
 	elip = Ellipsoid{
-		ellipse{6378137.0, 298.257223563},
-		Degrees, Kilometer,
-		LongitudeIsSymmetric,
-		BearingIsSymmetric,
+		ellipse{6378137.0, 298.257223563}, // WGS84, because why not
+		kilometer,
 		1000.0,
 	}
 	if _, err := os.Stat(geodb_path); err != nil {
@@ -93,17 +91,18 @@ func Setup(geodb_path string) bool {
 			return false
 		}
 	}
-
 	geo, err := geoip.Open(geodb_path)
 	if err != nil {
 		log.Println("Could not open GeoIP database")
 	} else {
-		log.Println("Loaded GeoIP database")
+		log.Println("Loaded GeoIP database succesfully")
 	}
 	gi = geo
 	return true
 }
 
+// GetCoord will take a IP address and return the LatLong value associated with it from
+// the maxmind geodb
 func GetCoord(ip string) LatLong {
 	record := gi.GetRecord(ip)
 	if record == nil {
@@ -112,6 +111,7 @@ func GetCoord(ip string) LatLong {
 	return LatLong{Lat: float64(record.Latitude), Long: float64(record.Longitude)}
 }
 
+// readGzFile will uncompress a gzip'd byte slice and return the resulting bytes
 func readGzFile(file_data []byte) ([]byte, error) {
 	fz, err := gzip.NewReader(bytes.NewReader(file_data))
 	if err != nil {
@@ -126,25 +126,23 @@ func readGzFile(file_data []byte) ([]byte, error) {
 	return s, nil
 }
 
+// deg2rad converts degrees to radians
 func deg2rad(d float64) (r float64) {
 	return d * pi / 180.0
 }
 
+// To will return the distance to another lat/long pairing.
 func (ellipsoid Ellipsoid) To(lat1, lon1, lat2, lon2 float64) (distance float64) {
-
-	if ellipsoid.Units == Degrees {
-		lat1 = deg2rad(lat1)
-		lon1 = deg2rad(lon1)
-		lat2 = deg2rad(lat2)
-		lon2 = deg2rad(lon2)
-	}
-
-	distance, _ = ellipsoid.calculateBearing(lat1, lon1, lat2, lon2)
+	distance, _ = ellipsoid.calculateBearing(
+		deg2rad(lat1), deg2rad(lon1),
+		deg2rad(lat2), deg2rad(lon2),
+	)
 	distance /= ellipsoid.Distance_factor
-
-	return
+	return distance
 }
 
+// calculateBearing will take 2 lat/long pairs and compute the distance and bearing of the
+// values.
 func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (distance, bearing float64) {
 	a := ellipsoid.Ellipse.Equatorial
 	f := 1 / ellipsoid.Ellipse.Inv_flattening
@@ -217,15 +215,14 @@ func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 		if cnt > maxLoopCount {
 			break
 		}
-
 	}
 
 	faz = math.Atan2(tu1, tu2)
-	baz = math.Atan2(cu1*sx, (baz*cx-su1*cu2)) + pi
-	x = math.Sqrt(((1.0/(r*r))-1.0)*c2a+1.0) + 1.0
+	baz = math.Atan2(cu1 * sx, (baz * cx-su1 * cu2)) + pi
+	x = math.Sqrt(((1.0 / (r * r)) - 1.0) * c2a + 1.0) + 1.0
 	x = (x - 2.0) / x
 	c = 1.0 - x
-	c = ((x*x)/4.0 + 1.0) / c
+	c = ((x * x)/4.0 + 1.0) / c
 	d = ((0.375 * x * x) - 1.0) * x
 	x = e * cy
 
@@ -233,22 +230,13 @@ func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 	s = ((((((((sy * sy * 4.0) - 3.0) * s * cz * d / 6.0) - x) * d / 4.0) + cz) * sy * d) + y) * c * a * r
 
 	// adjust azimuth to (0,360) or (-180,180) as specified
-	if ellipsoid.Bearing_symmetry == BearingIsSymmetric {
-		if faz < -(pi) {
-			faz += twopi
-		}
-		if faz >= pi {
-			faz -= twopi
-		}
-	} else {
-		if faz < 0 {
-			faz += twopi
-		}
-		if faz >= twopi {
-			faz -= twopi
-		}
+	if faz < -(pi) {
+		faz += twopi
+	}
+	if faz >= pi {
+		faz -= twopi
 	}
 
 	distance, bearing = s, faz
-	return
+	return distance, bearing
 }

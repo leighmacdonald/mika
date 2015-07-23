@@ -136,6 +136,9 @@ func (torrent *Torrent) Sync(r redis.Conn) {
 func (torrent *Torrent) findPeer(peer_id string) *Peer {
 	torrent.RLock()
 	defer torrent.RUnlock()
+	if torrent.Peers == nil {
+		return nil
+	}
 	for _, peer := range torrent.Peers {
 		if peer.PeerID == peer_id {
 			return peer

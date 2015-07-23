@@ -38,6 +38,7 @@ import (
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	//"git.totdev.in/totv/mika/stats"
+	"git.totdev.in/totv/mika/geo"
 	"git.totdev.in/totv/mika/tracker"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
@@ -149,6 +150,8 @@ func main() {
 	//stats.Setup(conf.Config.MetricsDSN)
 
 	db.Setup(conf.Config.RedisHost, conf.Config.RedisPass)
+
+	geo.Setup(conf.Config.GeoDBPath)
 
 	tracker.Mika = tracker.NewTracker()
 	tracker.Mika.Initialize()

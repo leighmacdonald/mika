@@ -32,6 +32,12 @@ type Configuration struct {
 	// URI for the api listen host :34001
 	ListenHostAPI string
 
+	// Enable IPv6 stack.
+	IPV6Enabled bool
+
+	// Force only using ipv6
+	IPV6Only bool
+
 	// Username required to use api, empty string for none
 	APIUsername string
 
@@ -79,6 +85,10 @@ type Configuration struct {
 
 	// Full DSN for graphite metric reporting eg: "localhost:2003"
 	MetricsDSN string
+
+	GeoEnabled bool
+
+	GeoDBPath string
 
 	// Wait time before writing the data to graphite
 	//	MetricsWriteTimer time.Duration

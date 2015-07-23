@@ -67,6 +67,7 @@ type (
 		TorrentPayload
 		Reason string
 	}
+
 	WhitelistPayload struct {
 		Prefix string `json:"prefix"`
 	}
@@ -104,6 +105,17 @@ func (tracker *Tracker) HandleUptime(ctx *gin.Context) {
 			System:  int32(info.Uptime),
 		})
 	}
+}
+
+func (tracker *Tracker) HandleTorrentCounts(ctx *gin.Context) {
+	var torrent_stats []TorrentStats
+	tracker.TorrentsMutex.RLock()
+	defer tracker.TorrentsMutex.RUnlock()
+	for t := range tracker.Torrents {
+		s := tracker.Torrents[t].Stats()
+		torrent_stats = append(torrent_stats, s)
+	}
+	ctx.JSON(http.StatusOK, torrent_stats)
 }
 
 // HandleTorrentGet will find and return the requested torrent.
@@ -414,7 +426,7 @@ func (tracker *Tracker) HandleUserCreate(ctx *gin.Context) {
 // HandleUserUpdate will update an existing users data. This is usually used to change
 // a users passkey without reloading the instance.
 //
-// Be aware that there is a race condition regardnig updating these values. When you fetch the user
+// Be aware that there is a race condition regarding updating these values. When you fetch the user
 // initially, your copy of the current data will become out of date upon the next announce or
 // periodic update for that user. If you do not update before that happens you may lose
 // user stats for that specific delta.

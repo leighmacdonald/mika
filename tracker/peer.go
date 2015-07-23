@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"git.totdev.in/totv/mika/conf"
+	"git.totdev.in/totv/mika/geo"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"net"
@@ -73,7 +74,7 @@ type Peer struct {
 	Announces uint64 `redis:"announces" json:"announces"`
 
 	// Total active swarm participation time
-	TotalTime uint32 `redis:"total_time" json:"total_time"`
+	TotalTime uint64 `redis:"total_time" json:"total_time"`
 
 	// Last announce timestamp
 	AnnounceLast int32 `redis:"last_announce" json:"last_announce"`
@@ -83,6 +84,8 @@ type Peer struct {
 
 	// Peer id, reported by client. Must have white-listed prefix
 	PeerID string `redis:"peer_id" json:"peer_id"`
+
+	Coord geo.LatLong
 
 	User     *User    `redis:"-"  json:"-"`
 	Torrent  *Torrent `redis:"-" json:"-"`
@@ -151,12 +154,15 @@ func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff, seeders
 		time_diff = uint64(cur_time - peer.AnnounceLast)
 		// Ignore long periods of inactivity
 		if time_diff < (uint64(conf.Config.AnnInterval) * 4) {
-			peer.TotalTime += uint32(time_diff)
+			peer.TotalTime += time_diff
 			peer_diff.SeedTime = time_diff
 		}
 		peer.AnnounceFirst = cur_time
-		peer_diff.InternetPoints = uint64(CalculateBonus(time_diff, ul_diff, uint64(seeders)))
-		log.Debug("Calculated Peer bonus: ", peer_diff.InternetPoints)
+		peer.User.RLock()
+		uploaded_total := peer.User.Uploaded + peer.Uploaded
+		peer.User.RUnlock()
+		peer_diff.InternetPoints = uint64(CalculateBonus(peer.TotalTime, uploaded_total, uint64(seeders)))
+		log.Println("Calculated Peer bonus: ", peer_diff.InternetPoints)
 	}
 
 	peer.AnnounceLast = cur_time
@@ -164,7 +170,7 @@ func (peer *Peer) Update(announce *AnnounceRequest, peer_diff *PeerDiff, seeders
 }
 
 func (peer *Peer) IsHNR() bool {
-	return peer.Downloaded > conf.Config.HNRMinBytes && peer.IsSeeder() && peer.TotalTime < uint32(conf.Config.HNRThreshold)
+	return peer.Downloaded > conf.Config.HNRMinBytes && peer.IsSeeder() && peer.TotalTime < uint64(conf.Config.HNRThreshold)
 }
 
 func (peer *Peer) IsSeeder() bool {
@@ -192,6 +198,12 @@ func MakeCompactPeers(peers []*Peer, skip_id string) []byte {
 
 // NewPeer created a new peer with the minimum attributes needed
 func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *User) *Peer {
+	var coord geo.LatLong
+	if !conf.Config.GeoEnabled {
+		coord = geo.LatLong{0.0, 0.0}
+	} else {
+		coord = geo.GetCoord(ip)
+	}
 	peer := &Peer{
 		PeerID:        peer_id,
 		IP:            ip,
@@ -201,6 +213,7 @@ func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *Use
 		User:          user,
 		Torrent:       torrent,
 		KeyTimer:      fmt.Sprintf("t:ptimeout:%s:%s", torrent.InfoHash, peer_id),
+		Coord:         coord,
 	}
 	return peer
 }

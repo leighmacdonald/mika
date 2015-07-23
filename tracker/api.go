@@ -112,8 +112,7 @@ func (tracker *Tracker) HandleTorrentCounts(ctx *gin.Context) {
 	tracker.TorrentsMutex.RLock()
 	defer tracker.TorrentsMutex.RUnlock()
 	for t := range tracker.Torrents {
-		s := tracker.Torrents[t].Stats()
-		torrent_stats = append(torrent_stats, s)
+		torrent_stats = append(torrent_stats, tracker.Torrents[t].Stats())
 	}
 	ctx.JSON(http.StatusOK, torrent_stats)
 }

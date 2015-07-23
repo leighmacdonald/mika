@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "Using gopath: $GOPATH"
 
@@ -15,6 +15,7 @@ deps=(
     "github.com/goji/param|master"
     "github.com/gin-gonic/gin|master"
     "github.com/getsentry/raven-go|master"
+    "github.com/abh/geoip|master"
 )
 
 pushd &> /dev/null

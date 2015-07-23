@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"fmt"
+	"git.totdev.in/totv/mika/geo"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
@@ -35,7 +36,7 @@ type TorrentStats struct {
 	InfoHash  string `json:"info_hash"`
 	Seeders   int    `json:"seeders"`
 	Leechers  int    `json:"leechers"`
-	Completed int    `json:"completed"`
+	Snatches  int    `json:"snatches"`
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all
@@ -250,13 +251,8 @@ func (torrent *Torrent) PeerCounts() (int, int) {
 }
 
 func (torrent *Torrent) Stats() TorrentStats {
-	return TorrentStats{
-		torrent.TorrentID,
-		torrent.InfoHash,
-		torrent.Seeders,
-		torrent.Leechers,
-		1,
-	}
+	s, l := torrent.PeerCounts()
+	return TorrentStats{torrent.TorrentID, torrent.InfoHash, s, l, int(torrent.Snatches)}
 }
 
 // GetPeers returns a slice of up to max_peers from the current torrent. If the
@@ -296,4 +292,8 @@ func (torrent *Torrent) GetPeers(max_peers int) []*Peer {
 	} else {
 		return torrent.Peers[0:util.UMin(uint64(len(torrent.Peers)), uint64(max_peers))]
 	}
+}
+
+func (torrent *Torrent) GetPeersGeo(origin geo.LatLong, max_peers int) []*Peer {
+
 }

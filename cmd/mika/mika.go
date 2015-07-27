@@ -37,7 +37,6 @@ import (
 	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
-	//"git.totdev.in/totv/mika/stats"
 	"git.totdev.in/totv/mika/geo"
 	"git.totdev.in/totv/mika/tracker"
 	"git.totdev.in/totv/mika/util"

@@ -9,7 +9,21 @@ to private tracker needs.
 
 ## Features
 
-Makes cake
+- Complete JSON/REST Api for interacting with the tracker on a separate authenticated
+port differing from the standard tracker port. This port is configured for TLS1.2+ only.
+- Redis backed storage engine with **no** support for RDBMS systems (mysql/postgres)
+- Designed for private tracker needs, [chihaya](https://github.com/chihaya/chihaya) is a more suitable 
+choice for public trackers.
+- (Partial) IPv4 and IPv6 support with the ability to enable or disable the stacks.
+- Smart peer selection based on geographic location.
+- No database reads on incoming announces/scrapes.
+- User bonus point system built into the tracker which is updated on each request instead of large batches.
+- (Partial) Support for metrics and instrumentation backends (graphite/influxdb)
+- Python based API Client maintained at [totv-python](https://github.com/ToTV/totv-python).
+- (Soon) PHP based API Client
+- Client whitelists for only allowing specific torrent clients
+- Tested on Linux, should run anywhere the golang platform does.
+- User authentication via passkey
 
 ## Usage
 

@@ -91,7 +91,7 @@ type Configuration struct {
 	GeoDBPath string
 
 	// Wait time before writing the data to graphite
-	//	MetricsWriteTimer time.Duration
+	//	MetricsWriteTimer timemake make sed.Duration
 
 	// Use colours log output
 	ColourLogs bool

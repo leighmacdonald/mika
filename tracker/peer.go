@@ -196,6 +196,11 @@ func MakeCompactPeers(peers []*Peer, skip_id string) []byte {
 	return out_buf.Bytes()
 }
 
+// GetCoord implements the geo.GeoObject interface to allow geo sorting peers
+func (peer *Peer) GetCoord() geo.LatLong {
+	return peer.Coord
+}
+
 // NewPeer created a new peer with the minimum attributes needed
 func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *User) *Peer {
 	var coord geo.LatLong
@@ -216,4 +221,31 @@ func NewPeer(peer_id string, ip string, port uint64, torrent *Torrent, user *Use
 		Coord:         coord,
 	}
 	return peer
+}
+
+type GeoObject interface {
+	GetCoord() geo.LatLong
+}
+
+type ByGeo struct {
+	origin   geo.LatLong
+	entities []*Peer
+}
+
+func (p ByGeo) Len() int {
+	return len(p.entities)
+}
+
+func (p ByGeo) Swap(i, j int) {
+	p.entities[i], p.entities[j] = p.entities[j], p.entities[i]
+}
+
+func (p ByGeo) Less(i, j int) bool {
+	a := p.origin.Distance(p.entities[i].GetCoord())
+	b := p.origin.Distance(p.entities[j].GetCoord())
+	return a < b
+}
+
+func NewGeoSorter(origin geo.LatLong, entities []*Peer) ByGeo {
+	return ByGeo{origin: origin, entities: entities}
 }

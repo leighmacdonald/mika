@@ -270,7 +270,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 		"min interval": conf.Config.AnnIntervalMin,
 	}
 
-	peers := torrent.GetPeers(ann.NumWant)
+	peers := torrent.GetPeers(ann.NumWant, peer.GetCoord())
 	if peers != nil {
 		dict["peers"] = MakeCompactPeers(peers, ann.PeerID)
 	} else {

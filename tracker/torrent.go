@@ -2,10 +2,13 @@ package tracker
 
 import (
 	"fmt"
+	"git.totdev.in/totv/mika/conf"
+	"git.totdev.in/totv/mika/geo"
 	"git.totdev.in/totv/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -35,7 +38,7 @@ type TorrentStats struct {
 	InfoHash  string `json:"info_hash"`
 	Seeders   int    `json:"seeders"`
 	Leechers  int    `json:"leechers"`
-	Completed int    `json:"completed"`
+	Snatches  int    `json:"snatches"`
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all
@@ -253,23 +256,26 @@ func (torrent *Torrent) PeerCounts() (int, int) {
 }
 
 func (torrent *Torrent) Stats() TorrentStats {
-	return TorrentStats{
-		torrent.TorrentID,
-		torrent.InfoHash,
-		torrent.Seeders,
-		torrent.Leechers,
-		1,
-	}
+	s, l := torrent.PeerCounts()
+	return TorrentStats{torrent.TorrentID, torrent.InfoHash, s, l, int(torrent.Snatches)}
 }
 
 // GetPeers returns a slice of up to max_peers from the current torrent. If the
 // total peers available is less than the max peers all peers will be returned. Otherwise
 // the peers are split 80/20 (leechers/seeders). If those numbers can't be met, the leecher counts are relaxed
 // so that seeders can fill their spots.
-func (torrent *Torrent) GetPeers(max_peers int) []*Peer {
+func (torrent *Torrent) GetPeers(max_peers int, origin geo.LatLong) []*Peer {
 	torrent.RLock()
 	defer torrent.RUnlock()
 	if len(torrent.Peers) > max_peers {
+		peer_set := make([]*Peer, len(torrent.Peers))
+		if conf.Config.GeoEnabled {
+			copy(peer_set, torrent.Peers)
+			sorter := NewGeoSorter(origin, peer_set)
+			sort.Sort(sorter)
+		} else {
+			peer_set = torrent.Peers
+		}
 		// Calculate the initial quantities we want
 		max_leechers := int(math.Ceil(float64(max_peers) * 0.2))
 		max_seeders := int(max_peers) - max_leechers

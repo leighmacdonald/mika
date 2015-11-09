@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	//	"git.totdev.in/totv/mika"
 	"git.totdev.in/totv/mika/conf"
 	"git.totdev.in/totv/mika/db"
 	"git.totdev.in/totv/mika/stats"
@@ -62,11 +61,11 @@ func getIP(ip_str string) (net.IP, error) {
 // HandleAnnounce is the handler for the /announce endpoint
 // Here be dragons
 func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
-	stats.Counter <- stats.EV_ANNOUNCE
+	stats.RegisterEvent(stats.EV_ANNOUNCE)
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		stats.Counter <- stats.EV_ANNOUNCE_FAIL
+		stats.RegisterEvent(stats.EV_ANNOUNCE_FAIL)
 		ctx.Error(r.Err()).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Internal error, HALP",
@@ -79,7 +78,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	log.Debugln(ctx.Request.RequestURI)
 	ann, err := NewAnnounce(ctx)
 	if err != nil {
-		stats.Counter <- stats.EV_ANNOUNCE_FAIL
+		stats.RegisterEvent(stats.EV_ANNOUNCE_FAIL)
 		ctx.Error(err).SetMeta(errMeta(
 			MSG_QUERY_PARSE_FAIL,
 			"Failed to parse announce",
@@ -108,7 +107,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 
 	user_id := tracker.findUserID(passkey)
 	if user_id == 0 {
-		stats.Counter <- stats.EV_INVALID_PASSKEY
+		stats.RegisterEvent(stats.EV_INVALID_PASSKEY)
 		ctx.Error(errors.New("Invalid passkey")).SetMeta(errMeta(
 			MSG_INVALID_AUTH,
 			"Invalid passkey supplied",
@@ -139,7 +138,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 	}
 
 	if !tracker.IsValidClient(ann.PeerID) {
-		stats.Counter <- stats.EV_INVALID_CLIENT
+		stats.RegisterEvent(stats.EV_INVALID_CLIENT)
 		ctx.Error(errors.New("Banned client")).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Banned client, check wiki for whitelisted clients",
@@ -156,7 +155,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 
 	torrent := tracker.FindTorrentByInfoHash(info_hash_hex)
 	if torrent == nil {
-		stats.Counter <- stats.EV_INVALID_INFOHASH
+		stats.RegisterEvent(stats.EV_INVALID_INFOHASH)
 		ctx.Error(errors.New("Invalid info hash")).SetMeta(errMeta(
 			MSG_INFO_HASH_NOT_FOUND,
 			"Torrent not found, try TPB",
@@ -170,7 +169,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 		))
 		return
 	} else if !torrent.Enabled {
-		stats.Counter <- stats.EV_INVALID_INFOHASH
+		stats.RegisterEvent(stats.EV_INVALID_INFOHASH)
 		ctx.Error(errors.New("Torrent not enabled")).SetMeta(errMeta(
 			MSG_INFO_HASH_NOT_FOUND,
 			torrent.DelReason(),
@@ -281,7 +280,7 @@ func (tracker *Tracker) HandleAnnounce(ctx *gin.Context) {
 
 	er_msg_encoded := encoder.Encode(dict)
 	if er_msg_encoded != nil {
-		stats.Counter <- stats.EV_ANNOUNCE_FAIL
+		stats.RegisterEvent(stats.EV_ANNOUNCE_FAIL)
 		ctx.Error(er_msg_encoded).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Internal error",

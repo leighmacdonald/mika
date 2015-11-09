@@ -22,11 +22,11 @@ type ScrapeResponse struct {
 // HandleScrape is the route handler for the /scrape requests
 // /scrape?info_hash=f%5bs%de06%19%d3ET%cc%81%bd%e5%0dZ%84%7f%f3%da
 func (tracker *Tracker) HandleScrape(ctx *gin.Context) {
-	stats.Counter <- stats.EV_SCRAPE
+	stats.RegisterEvent(stats.EV_SCRAPE)
 	r := db.Pool.Get()
 	defer r.Close()
 	if r.Err() != nil {
-		stats.Counter <- stats.EV_SCRAPE_FAIL
+		stats.RegisterEvent(stats.EV_SCRAPE_FAIL)
 		ctx.Error(r.Err()).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Internal error :(",
@@ -41,7 +41,7 @@ func (tracker *Tracker) HandleScrape(ctx *gin.Context) {
 	user_id := tracker.findUserID(passkey)
 
 	if user_id == 0 {
-		stats.Counter <- stats.EV_INVALID_PASSKEY
+		stats.RegisterEvent(stats.EV_INVALID_PASSKEY)
 		ctx.Error(errors.New("Invalid torrent")).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Invalid passkey",
@@ -71,7 +71,7 @@ func (tracker *Tracker) HandleScrape(ctx *gin.Context) {
 	}
 	q, err := QueryStringParser(ctx.Request.RequestURI)
 	if err != nil {
-		stats.Counter <- stats.EV_SCRAPE_FAIL
+		stats.RegisterEvent(stats.EV_SCRAPE_FAIL)
 		ctx.Error(err).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Could not parse request",
@@ -101,7 +101,7 @@ func (tracker *Tracker) HandleScrape(ctx *gin.Context) {
 	encoder := bencode.NewEncoder(&out_bytes)
 	err = encoder.Encode(resp)
 	if err != nil {
-		stats.Counter <- stats.EV_SCRAPE_FAIL
+		stats.RegisterEvent(stats.EV_SCRAPE_FAIL)
 		ctx.Error(err).SetMeta(errMeta(
 			MSG_GENERIC_ERROR,
 			"Failed to encode scrape response",

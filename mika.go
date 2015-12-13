@@ -3,7 +3,7 @@ package mika
 
 import (
 	"fmt"
-	"git.totdev.in/totv/mika/conf"
+	"github.com/leighmacdonald/mika/conf"
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"math/rand"

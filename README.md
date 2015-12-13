@@ -66,9 +66,9 @@ If building a binary from source you will need a Go 1.4+ SDK installed.
 To build, set your $GOPATH env var to $git_project_clone, install deps and go build.
     
     hacker@nsa:$ export GOPATH=$dir_path
-    hacker@nsa:$ mkdir -p $GOPATH/src/git.totdev.in/totv
-    hacker@nsa:$ cd $GOPATH/src/git.totdev.in/totv
-    hacker@nsa:$ git clone git@git.totdev.in:totv/mika
+    hacker@nsa:$ mkdir -p $GOPATH/src/github.com/leighmacdonald
+    hacker@nsa:$ cd $GOPATH/src/github.com/leighmacdonald
+    hacker@nsa:$ git clone git@github.com:leighmacdonald/mika
     hacker@nsa:$ cd mika 
     hacker@nsa:$ cp .hooks/pre-commit .git/hooks/
     hacker@nsa:$ ./ci_build.sh

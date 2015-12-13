@@ -1,8 +1,8 @@
 package tracker
 
 import (
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/util"
+	"github.com/leighmacdonald/mika/db"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"strings"

@@ -1,7 +1,7 @@
 package geo_test
 
 import (
-	"git.totdev.in/totv/mika/geo"
+	"github.com/leighmacdonald/mika/geo"
 	"testing"
 )
 

@@ -3,8 +3,8 @@ package tracker
 import (
 	"bytes"
 	"errors"
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/stats"
+	"github.com/leighmacdonald/mika/db"
+	"github.com/leighmacdonald/mika/stats"
 	log "github.com/Sirupsen/logrus"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"

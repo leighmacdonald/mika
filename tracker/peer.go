@@ -3,9 +3,9 @@ package tracker
 import (
 	"bytes"
 	"fmt"
-	"git.totdev.in/totv/mika/conf"
-	"git.totdev.in/totv/mika/geo"
-	"git.totdev.in/totv/mika/util"
+	"github.com/leighmacdonald/mika/conf"
+	"github.com/leighmacdonald/mika/geo"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"net"
 	"sync"

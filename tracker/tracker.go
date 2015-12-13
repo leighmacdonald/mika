@@ -2,8 +2,7 @@
 package tracker
 
 import (
-	//	"git.totdev.in/totv/mika/conf"
-	"git.totdev.in/totv/mika/db"
+	"github.com/leighmacdonald/mika/db"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"strconv"

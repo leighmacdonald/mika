@@ -2,9 +2,9 @@ package tracker
 
 import (
 	"errors"
-	"git.totdev.in/totv/mika"
-	"git.totdev.in/totv/mika/db"
-	"git.totdev.in/totv/mika/util"
+	"github.com/leighmacdonald/mika"
+	"github.com/leighmacdonald/mika/db"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gin-gonic/gin"

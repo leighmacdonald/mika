@@ -2,7 +2,7 @@ package tracker
 
 import (
 	"fmt"
-	"git.totdev.in/totv/mika/db"
+	"github.com/leighmacdonald/mika/db"
 	"math/rand"
 	"testing"
 )

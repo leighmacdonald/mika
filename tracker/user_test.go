@@ -1,7 +1,7 @@
 package tracker_test
 
 import (
-	"git.totdev.in/totv/mika/tracker"
+	"github.com/leighmacdonald/mika/tracker"
 	"testing"
 )
 

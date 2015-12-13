@@ -1,4 +1,4 @@
-package: git.totdev.in/totv/mika
+package: github.com/leighmacdonald/mika
 import:
   - package: github.com/getsentry/raven-go
     repo:    https://github.com/getsentry/raven-go

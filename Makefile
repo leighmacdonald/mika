@@ -1,6 +1,6 @@
 .PHONY: all test clean build install
 # export GOPATH=`pwd`
-GOFLAGS = -ldflags "-X git.totdev.in/totv/mika.Version=`git rev-parse --short HEAD`"
+GOFLAGS = -ldflags "-X github.com/leighmacdonald/mika.Version=`git rev-parse --short HEAD`"
 
 all: build
 

@@ -1,7 +1,7 @@
 package util_test
 
 import (
-	"git.totdev.in/totv/mika/util"
+	"github.com/leighmacdonald/mika/util"
 	"testing"
 )
 

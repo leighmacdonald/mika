@@ -1,7 +1,7 @@
 package util
 
 import (
-	"git.totdev.in/totv/mika/conf"
+	"github.com/leighmacdonald/mika/conf"
 	"strings"
 )
 

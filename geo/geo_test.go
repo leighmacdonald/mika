@@ -1,7 +1,7 @@
 package geo_test
 
 import (
-	"github.com/leighmacdonald/mika/geo"
+	"mika/geo"
 	"testing"
 )
 

@@ -1,7 +1,7 @@
 package tracker
 
 import (
-	"errors"
+	"mika/consts"
 	"net/url"
 	"strconv"
 	"strings"
@@ -12,18 +12,15 @@ type Query struct {
 	Params     map[string]string
 }
 
-// Parses a raw url query into a Query struct
-// Taken from Chihaya
+// QueryStringParser transforms a raw url query into a Query struct
 func QueryStringParser(query string) (*Query, error) {
 	var (
 		keyStart, keyEnd int
 		valStart, valEnd int
 		firstInfoHash    string
-
-		onKey       = true
-		hasInfoHash = false
-
-		q = &Query{
+		onKey            = true
+		hasInfoHash      = false
+		q                = &Query{
 			InfoHashes: nil,
 			Params:     make(map[string]string),
 		}
@@ -49,7 +46,7 @@ func QueryStringParser(query string) (*Query, error) {
 			// The start can be greater than the end when the query contains an invalid
 			// empty query value
 			if valStart > valEnd {
-				return nil, errors.New("Malformed request")
+				return nil, consts.ErrMalformedRequest
 			}
 
 			valStr, err := url.QueryUnescape(query[valStart : valEnd+1])
@@ -91,7 +88,7 @@ func QueryStringParser(query string) (*Query, error) {
 func (q *Query) Uint64(key string) (uint64, error) {
 	str, exists := q.Params[key]
 	if !exists {
-		return 0, errors.New("value does not exist for key: " + key)
+		return 0, consts.ErrInvalidMapKey
 	}
 	return strconv.ParseUint(str, 10, 64)
 }

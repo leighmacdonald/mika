@@ -5,8 +5,8 @@ package geo
 import (
 	"bytes"
 	"compress/gzip"
-	log "github.com/Sirupsen/logrus"
 	"github.com/abh/geoip"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math"
 	"net/http"

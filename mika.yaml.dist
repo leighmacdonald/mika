@@ -1,0 +1,33 @@
+general:
+  log_level: debug
+  log_colour: false
+
+tracker:
+  listen: ":34000"
+  ipv6: false
+  ipv6_only: false
+  annouce_interval: 300s
+  annouce_interval_minimum: 10s
+  reap_interval: 400s
+  hnr_threshold: 1d
+  index_interval: 60s
+
+store:
+  // memory, mysql, postgre, redis
+  type: mysql
+  host: localhost
+  port: 3306
+  name: dbname
+  user: ''
+  password: ''
+
+cache:
+  type: redis
+  host: localhost:6379
+  password: ''
+  max_idle: 500
+  db: 0
+
+geodb:
+  path: "./geodb.dat"
+  enabled: true

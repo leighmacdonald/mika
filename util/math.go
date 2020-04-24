@@ -25,11 +25,11 @@ func UMin(a, b uint64) uint64 {
 }
 
 // Estimate a peers speed using downloaded amount over time
-func EstSpeed(start_time int32, last_time int32, bytes_sent uint64) float64 {
-	if start_time <= 0 || last_time <= 0 || bytes_sent == 0 || last_time < start_time {
+func EstSpeed(startTime int32, lastTime int32, bytesSent uint64) float64 {
+	if startTime <= 0 || lastTime <= 0 || bytesSent == 0 || lastTime < startTime {
 		return 0.0
 	}
-	return RoundPlus(float64(bytes_sent)/(float64(last_time)-float64(start_time)), 2)
+	return RoundPlus(float64(bytesSent)/(float64(lastTime)-float64(startTime)), 2)
 }
 
 func LogN(n, b float64) float64 {

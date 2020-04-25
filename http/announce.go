@@ -153,7 +153,7 @@ func newAnnounce(c *gin.Context) (*AnnounceRequest, trackerErrCode) {
 	numWant := getUintKey(q, "numwant", 30)
 
 	return &AnnounceRequest{
-		Compact:    true,
+		Compact:    true, // Ignored and always set to true
 		Corrupt:    corrupt,
 		Downloaded: downloaded,
 		Event:      event,

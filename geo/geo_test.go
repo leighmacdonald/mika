@@ -1,7 +1,13 @@
-package geo_test
+package geo
 
 import (
-	"mika/geo"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"io/ioutil"
+	"math"
+	"mika/util"
+	"net"
+	"os"
 	"testing"
 )
 
@@ -10,23 +16,29 @@ var (
 )
 
 func TestGetCoord(t *testing.T) {
-	c := geo.GetCoord("12.34.56.78")
-	if c.Lat != 38.000000 || c.Long != -97.000000 {
-		t.Errorf("Invalid coord value: %f", c)
+	db := New("../" + viper.GetString("geodb_path"))
+	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
+	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -118.0 {
+		t.Errorf("Invalid coord value: %f", ip4.Location)
+	}
+	ip6 := db.GetLocation(net.ParseIP("2600::")) // Sprint owned IP6
+	if math.Round(ip6.Location.Latitude) != 38 || math.Round(ip6.Location.Longitude) != -98.0 {
+		t.Errorf("Invalid coord value: %f", ip4.Location)
 	}
 }
 
 func TestDistance(t *testing.T) {
-	a := geo.LatLong{38.000000, -97.000000}
-	b := geo.LatLong{37.000000, -98.000000}
+	a := LatLong{38.000000, -97.000000}
+	b := LatLong{37.000000, -98.000000}
 	distance := a.Distance(b)
 	if distance != 141.0 {
 		t.Errorf("Invalid distances: %f != %f", distance, 141.903347)
 	}
 }
+
 func BenchmarkDistance(t *testing.B) {
-	a := geo.LatLong{38.000000, -97.000000}
-	b := geo.LatLong{37.000000, -98.000000}
+	a := LatLong{38.000000, -97.000000}
+	b := LatLong{37.000000, -98.000000}
 	var r float64
 	for n := 0; n < t.N; n++ {
 		r = a.Distance(b)
@@ -34,6 +46,18 @@ func BenchmarkDistance(t *testing.B) {
 	result = r
 }
 
+func TestDownloadDB(t *testing.T) {
+	key := viper.GetString("geodb_api_key")
+	tFile, err := ioutil.TempFile("", "prefix")
+	if err != nil {
+		t.Fail()
+		return
+	}
+	defer os.Remove(tFile.Name())
+	err2 := DownloadDB(tFile.Name(), key)
+	assert.NoError(t, err2)
+}
+
 func init() {
-	geo.Setup("../geodb.dat")
+	util.InitConfig("")
 }

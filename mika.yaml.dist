@@ -1,33 +1,33 @@
-general:
-  log_level: debug
-  log_colour: false
+general_log_level: debug
+general_log_colour: false
+# Allow anyone to participate in swarms. This disables passkey support.
+tracker_public: false
+tracker_listen: ":34000"
+tracker_ipv6: false
+tracker_ipv6_only: false
+tracker_annouce_interval: 300s
+tracker_annouce_interval_minimum: 10s
+tracker_reap_interval: 400s
+tracker_hnr_threshold: 1d
+tracker_index_interval: 60s
+# memory, mysql, postgres, redis
+# postgres and mysql support requires that mika is built with the matching build tags
+# go build -tags postgres
+store_type: mysql
+store_host: localhost
+store_port: 3306
+# For redis, the dbname should be the numeric db value and should differ from the redic cache db value
+store_name: dbname
+store_user:
+store_password:
 
-tracker:
-  listen: ":34000"
-  ipv6: false
-  ipv6_only: false
-  annouce_interval: 300s
-  annouce_interval_minimum: 10s
-  reap_interval: 400s
-  hnr_threshold: 1d
-  index_interval: 60s
+cache_type: redis
+cache_host: localhost:6379
+cache_password:
+cache_max_idle: 500
+cache_db: 0
 
-store:
-  // memory, mysql, postgre, redis
-  type: mysql
-  host: localhost
-  port: 3306
-  name: dbname
-  user: ''
-  password: ''
-
-cache:
-  type: redis
-  host: localhost:6379
-  password: ''
-  max_idle: 500
-  db: 0
-
-geodb:
-  path: "./geodb.dat"
-  enabled: true
+# Visit https://www.maxmind.com and sign up to get a license key
+geodb_path: "./geodb.mmdb"
+geodb_api_key:
+geodb_enabled: false

@@ -31,7 +31,6 @@ func parseAnnounceType(t string) AnnounceType {
 	default:
 		return ANNOUNCE
 	}
-
 }
 
 type errorResponse struct {

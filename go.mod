@@ -3,7 +3,6 @@ module mika
 go 1.13
 
 require (
-	github.com/abh/geoip v0.0.0-20160510155516-07cea4480daa
 	github.com/chihaya/bencode v0.0.0-20160403015629-641906563e26
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gin-gonic/gin v1.6.2
@@ -12,6 +11,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.2.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/oschwald/maxminddb-golang v1.6.0
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pkg/errors v0.8.0
 	github.com/sirupsen/logrus v1.2.0

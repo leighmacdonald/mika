@@ -1,5 +1,5 @@
 // api package is used to remotely control all aspects of the tracker.
-package api
+package http
 
 import "mika/model"
 

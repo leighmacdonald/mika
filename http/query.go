@@ -1,4 +1,4 @@
-package tracker
+package http
 
 import (
 	"mika/consts"
@@ -7,12 +7,29 @@ import (
 	"strings"
 )
 
+type announceParam string
+
+const (
+	paramInfoHash   announceParam = "info_hash"
+	paramPeerID     announceParam = "peer_id"
+	paramIP         announceParam = "ip"
+	paramPort       announceParam = "port"
+	paramLeft       announceParam = "left"
+	paramDownloaded announceParam = "downloaded"
+	paramUploaded   announceParam = "uploaded"
+	paramCorrupt    announceParam = "corrupt"
+	paramNumWant    announceParam = "numwant"
+	paramCompact    announceParam = "compact"
+)
+
 type Query struct {
 	InfoHashes []string
-	Params     map[string]string
+	Params     map[announceParam]string
 }
 
 // QueryStringParser transforms a raw url query into a Query struct
+// This is used to avoid reflection calls used in the underlying gin.Bind functionality that
+// would normally be used to parse the query params
 func QueryStringParser(query string) (*Query, error) {
 	var (
 		keyStart, keyEnd int
@@ -22,7 +39,7 @@ func QueryStringParser(query string) (*Query, error) {
 		hasInfoHash      = false
 		q                = &Query{
 			InfoHashes: nil,
-			Params:     make(map[string]string),
+			Params:     make(map[announceParam]string),
 		}
 	)
 
@@ -53,7 +70,7 @@ func QueryStringParser(query string) (*Query, error) {
 			if err != nil {
 				return nil, err
 			}
-			q.Params[strings.ToLower(keyStr)] = valStr
+			q.Params[announceParam(strings.ToLower(keyStr))] = valStr
 
 			if keyStr == "info_hash" {
 				if hasInfoHash {
@@ -83,9 +100,9 @@ func QueryStringParser(query string) (*Query, error) {
 	return q, nil
 }
 
-// Uint64 is a helper to obtain a uint of any length from a Query. After being
+// Uint64 is a helper to obtain a uint64 of any length from a Query. After being
 // called, you can safely cast the uint64 to your desired length.
-func (q *Query) Uint64(key string) (uint64, error) {
+func (q *Query) Uint64(key announceParam) (uint64, error) {
 	str, exists := q.Params[key]
 	if !exists {
 		return 0, consts.ErrInvalidMapKey
@@ -93,16 +110,16 @@ func (q *Query) Uint64(key string) (uint64, error) {
 	return strconv.ParseUint(str, 10, 64)
 }
 
-// Parse the num want from the announce request, replacing with our
-// own default value if the supplied value is missing or deemed invalid
-func getNumWant(q *Query, fallback int) int {
-	if numWantStr, exists := q.Params["numwant"]; exists {
-		numWant, err := strconv.Atoi(numWantStr)
-		if err != nil {
-			return fallback
-		}
-		return numWant
+// Uint is a helper to obtain a uint of any length from a Query. After being
+// called, you can safely cast the uint64 to your desired length.
+func (q *Query) Uint(key announceParam) (uint, error) {
+	str, exists := q.Params[key]
+	if !exists {
+		return 0, consts.ErrInvalidMapKey
 	}
-
-	return fallback
+	v, err := strconv.ParseUint(str, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return uint(v), nil
 }

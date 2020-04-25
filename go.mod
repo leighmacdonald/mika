@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/abh/geoip v0.0.0-20160510155516-07cea4480daa
+	github.com/chihaya/bencode v0.0.0-20160403015629-641906563e26
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gin-gonic/gin v1.6.2
 	github.com/go-sql-driver/mysql v1.5.0
@@ -20,6 +21,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.3
+	github.com/stretchr/testify v1.4.0
 	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 )

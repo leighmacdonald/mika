@@ -1,10 +1,12 @@
 package model
 
-import (
-	"mika/geo"
-)
-
 type PeerID [20]byte
+
+func PeerIDFromString(s string) PeerID {
+	var buf [20]byte
+	copy(buf[:], s)
+	return buf
+}
 
 // Peer represents a single unique peer in a swarm
 type Peer struct {
@@ -51,7 +53,7 @@ type Peer struct {
 	// Peer id, reported by client. Must have white-listed prefix
 	PeerId PeerID `redis:"peer_id" json:"peer_id"`
 
-	Coord geo.LatLong
+	// Coord geo.LatLong
 
 	UserId uint64 `redis:"-" json:"-"`
 }

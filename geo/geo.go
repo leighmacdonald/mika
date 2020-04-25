@@ -1,5 +1,7 @@
 // Package geo provides the Lat/Long distance calculation functionality and GeoIP
 // lookup functionality used to determine the best peers to use.
+//
+// NOTE this requires libgeoip to build, should
 package geo
 
 import (

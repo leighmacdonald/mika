@@ -7,7 +7,7 @@ import (
 func TestUMin(t *testing.T) {
 	a := uint64(1)
 	b := uint64(2)
-	v := UMin(a, b)
+	v := UMin64(a, b)
 	if v != a {
 		t.Error("Invalid min value")
 	}
@@ -16,7 +16,7 @@ func TestUMin(t *testing.T) {
 func TestUMax(t *testing.T) {
 	a := uint64(1)
 	b := uint64(2)
-	v := UMax(a, b)
+	v := UMax64(a, b)
 	if v != b {
 		t.Error("Invalid min value")
 	}

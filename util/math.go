@@ -7,7 +7,16 @@ import (
 )
 
 // math.Max for uint64
-func UMax(a, b uint64) uint64 {
+func UMax64(a, b uint64) uint64 {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+
+// math.Max for uint64
+func UMax(a, b uint) uint {
 	if a > b {
 		return a
 	} else {
@@ -16,7 +25,7 @@ func UMax(a, b uint64) uint64 {
 }
 
 // math.Min for uint64
-func UMin(a, b uint64) uint64 {
+func UMin64(a, b uint64) uint64 {
 	if a < b {
 		return a
 	} else {

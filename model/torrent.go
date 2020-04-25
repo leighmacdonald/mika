@@ -2,11 +2,16 @@ package model
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 )
 
 type InfoHash [20]byte
+
+func InfoHashFromString(s string) InfoHash {
+	var buf [20]byte
+	copy(buf[:], s)
+	return buf
+}
 
 type Torrent struct {
 	sync.RWMutex
@@ -38,10 +43,10 @@ type TorrentStats struct {
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
-func NewTorrent(ih string, name string, tid uint64) *Torrent {
+func NewTorrent(ih InfoHash, name string, tid uint64) *Torrent {
 	torrent := &Torrent{
 		Name:            name,
-		InfoHash:        strings.ToLower(ih),
+		InfoHash:        ih,
 		TorrentKey:      fmt.Sprintf("t:t:%s", ih),
 		TorrentPeersKey: fmt.Sprintf("t:tpeers:%s", ih),
 		Enabled:         true,

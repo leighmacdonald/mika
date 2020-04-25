@@ -1,13 +1,11 @@
-package tracker
+package http
 
 import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"mika/http"
 	"mika/model"
 	"mika/util"
 	"net"
-	"strings"
 )
 
 type BitTorrentHandler struct{}
@@ -16,32 +14,33 @@ type BitTorrentHandler struct{}
 //
 // TODO use gin binding func?
 type AnnounceRequest struct {
-	Compact bool `binding:"required"` // Force compact always?
+	Compact bool `form:"compact"` // Force compact always?
 
 	// The total amount downloaded (since the client sent the 'started' event to the tracker) in
 	// base ten ASCII. While not explicitly stated in the official specification, the consensus is that
 	// this should be the total number of bytes downloaded.
-	Downloaded uint64 `binding:"required"`
+	Downloaded uint64 `form:"downloaded" binding:"required"`
 
 	// The number of bytes this peer still has to download, encoded in base ten ascii.
 	// Note that this can't be computed from downloaded and the file length since it
 	// might be a resume, and there's a chance that some of the downloaded data failed an
 	// integrity check and had to be re-downloaded.
-	Left uint64 `binding:"required"`
+	Left uint64 `form:"left" binding:"required"`
 
 	// The total amount uploaded (since the client sent the 'started' event to the tracker) in base ten
 	// ASCII. While not explicitly stated in the official specification, the concensus is that this should
 	// be the total number of bytes uploaded.
-	Uploaded uint64 `binding:"required"`
+	Uploaded uint64 `form:"uploaded" binding:"required"`
 
-	Corrupt uint64
+	Corrupt uint64 `form:"corrupt"`
+
 	// This is an optional key which maps to started, completed, or stopped (or empty,
 	// which is the same as not being present). If not present, this is one of the
 	// announcements done at regular intervals. An announcement using started is sent
 	// when a download first begins, and one using completed is sent when the download
 	// is complete. No completed is sent if the file was complete when started. Downloaders
 	// send an announcement using stopped when they cease downloading.
-	Event http.AnnounceType
+	Event AnnounceType `form:"event" binding:"required"`
 
 	//  Optional. The true IP address of the client machine, in dotted quad format or rfc3513
 	// defined hexed IPv6 address. Notes: In general this parameter is not necessary as the address
@@ -60,11 +59,11 @@ type AnnounceRequest struct {
 
 	// urlencoded 20-byte SHA1 hash of the value of the info key from the Metainfo file. Note that the
 	// value will be a bencoded dictionary, given the definition of the info key above.
-	InfoHash model.InfoHash `form:"ip"`
+	InfoHash model.InfoHash `form:"info_hash" binding:"required"`
 
 	// Optional. Number of peers that the client would like to receive from the tracker. This value is
 	// permitted to be zero. If omitted, typically defaults to 50 peers.
-	NumWant int
+	NumWant uint `form:"numwant" `
 
 	// Required for private tracker use. Authentication key to authenticate requests
 	Passkey string
@@ -74,14 +73,14 @@ type AnnounceRequest struct {
 	// generating this peer ID. However, one may rightly presume that it must at least be unique for
 	// your local machine, thus should probably incorporate things like process ID and perhaps a timestamp
 	// recorded at startup. See peer_id below for common client encodings of this field.
-	PeerID []byte
+	PeerID model.PeerID `form:"peer_id" binding:"required"`
 
 	// The port number that the client is listening on. Ports reserved for BitTorrent are typically
 	// 6881-6889. Clients may choose to give up if it cannot establish a port within this range.
-	Port uint64 `binding:"required"`
+	Port uint `binding:"required"`
 
 	// Optional. If a previous announce contained a tracker id, it should be set here.
-	TrackerId string
+	TrackerId string `form:"tracker_id"`
 }
 
 type AnnounceResponse struct {
@@ -102,115 +101,77 @@ type AnnounceResponse struct {
 	Warning string `bencode:"warning message"`
 }
 
+func getUint64Key(q *Query, key announceParam, def uint64) uint64 {
+	left, err := q.Uint64(key)
+	if err != nil {
+		return def
+	} else {
+		return util.UMax64(0, left)
+	}
+}
+
+func getUintKey(q *Query, key announceParam, def uint) uint {
+	left, err := q.Uint(key)
+	if err != nil {
+		return def
+	} else {
+		return util.UMax(0, left)
+	}
+}
+
 // Parse the query string into an AnnounceRequest struct
-func NewAnnounce(c *gin.Context) (*AnnounceRequest, http.TrackerErrCode) {
-	q, err := QueryStringParser(c.Request.RequestURI)
+func newAnnounce(c *gin.Context) (*AnnounceRequest, trackerErrCode) {
+	q, err := QueryStringParser(c.Request.URL.RawQuery)
 	if err != nil {
-		return nil, err
+		return nil, MsgMalformedRequest
 	}
 
-	compact := q.Params["compact"] != "0"
-
-	event := http.ANNOUNCE
-	event_name, _ := q.Params["event"]
-	switch event_name {
-	case "started":
-		event = http.STARTED
-	case "stopped":
-		event = http.STOPPED
-	case "completed":
-		event = http.COMPLETED
-	}
-
-	numWant := getNumWant(q, 30)
-
-	info_hash, exists := q.Params["info_hash"]
+	infoHash, exists := q.Params[paramInfoHash]
 	if !exists {
-		return nil, http.MsgInvalidInfoHash
+		return nil, MsgInvalidInfoHash
 	}
 
-	peerID, exists := q.Params["peer_id"]
+	peerID, exists := q.Params[paramPeerID]
 	if !exists {
-		return nil, http.MsgInvalidPeerId
+		return nil, MsgInvalidPeerId
 	}
 
-	ipv4, err := getIP(q.Params["ip"])
+	ipv4, err := getIP(q, c)
 	if err != nil {
-		// Look for forwarded ip in header then default to remote address
-		forwarded_ip := c.Request.Header.Get("X-Forwarded-For")
-		if forwarded_ip != "" {
-			ipv4_new, err := getIP(forwarded_ip)
-			if err != nil {
-				log.Error("NewAnnounce: Failed to parse header supplied IP", err)
-				return nil, errors.New("Invalid ip header")
-			}
-			ipv4 = ipv4_new
-		} else {
-			s := strings.Split(c.Request.RemoteAddr, ":")
-			ip_req, _ := s[0], s[1]
-			ipv4_new, err := getIP(ip_req)
-			if err != nil {
-				log.Error("NewAnnounce: Failed to parse detected IP", err)
-				return nil, errors.New("Invalid ip hash")
-			}
-			ipv4 = ipv4_new
-		}
-	}
 
-	port, err := q.Uint64("port")
-	if err != nil || port < 1024 || port > 65535 {
-		return nil, errors.New("Invalid port, must be between 1024 and 65535")
+		return nil, MsgMalformedRequest
 	}
-
-	left, err := q.Uint64("left")
-	if err != nil {
-		return nil, errors.New("No left value")
-	} else {
-		left = util.UMax(0, left)
+	port := getUintKey(q, paramPort, 0)
+	if port < 1024 || port > 65535 {
+		return nil, MsgInvalidPort
 	}
-
-	downloaded, err := q.Uint64("downloaded")
-	if err != nil {
-		downloaded = 0
-	} else {
-		downloaded = util.UMax(0, downloaded)
-	}
-
-	uploaded, err := q.Uint64("uploaded")
-	if err != nil {
-		uploaded = 0
-	} else {
-		uploaded = util.UMax(0, uploaded)
-	}
-
-	corrupt, err := q.Uint64("corrupt")
-	if err != nil {
-		// Assume we just don't have the param
-		corrupt = 0
-	} else {
-		corrupt = util.UMax(0, corrupt)
-	}
+	left := getUint64Key(q, paramLeft, 0)
+	downloaded := getUint64Key(q, paramDownloaded, 0)
+	uploaded := getUint64Key(q, paramUploaded, 0)
+	corrupt := getUint64Key(q, paramCorrupt, 0)
+	event := parseAnnounceType(q.Params[paramNumWant])
+	numWant := getUintKey(q, "numwant", 30)
 
 	return &AnnounceRequest{
-		Compact:    compact,
+		Compact:    true,
 		Corrupt:    corrupt,
 		Downloaded: downloaded,
 		Event:      event,
 		IP:         ipv4,
-		InfoHash:   info_hash,
+		InfoHash:   model.InfoHashFromString(infoHash),
 		Left:       left,
 		NumWant:    numWant,
-		PeerID:     peerID,
+		PeerID:     model.PeerIDFromString(peerID),
 		Port:       port,
 		Uploaded:   uploaded,
-	}, nil
+	}, MsgOk
 }
 
 func (h *BitTorrentHandler) Announce(c *gin.Context) {
-	var req AnnounceRequest
-	if err := c.Bind(&req); err != nil {
-		c.String(http.MsgMalformedRequest, "Error: %s", err.Error())
+	req, code := newAnnounce(c)
+	if code != MsgOk {
+		c.String(int(code), TrackerErr(code).Error())
 		return
 	}
-
+	log.Println(req)
 }

@@ -5,13 +5,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"math"
-	"mika/util"
+	"mika/config"
 	"net"
 	"os"
 	"testing"
 )
 
-func TestGetCoord(t *testing.T) {
+func TestGetLocation(t *testing.T) {
 	db := New("../" + viper.GetString("geodb_path"))
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
 	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -118.0 {
@@ -49,11 +49,11 @@ func TestDownloadDB(t *testing.T) {
 		t.Fail()
 		return
 	}
-	defer os.Remove(tFile.Name())
+	defer func() { _ = os.Remove(tFile.Name()) }()
 	err2 := DownloadDB(tFile.Name(), key)
 	assert.NoError(t, err2)
 }
 
 func init() {
-	util.InitConfig("")
+	config.Read("")
 }

@@ -1,8 +1,8 @@
 package model
 
 import (
-	"fmt"
 	"sync"
+	"time"
 )
 
 type InfoHash [20]byte
@@ -15,22 +15,27 @@ func InfoHashFromString(s string) InfoHash {
 
 type Torrent struct {
 	sync.RWMutex
-	Name            string   `redis:"name" json:"name"`
-	TorrentID       uint64   `redis:"torrent_id" json:"torrent_id"`
-	InfoHash        InfoHash `redis:"info_hash" json:"info_hash"`
-	Seeders         int      `redis:"seeders" json:"seeders"`
-	Leechers        int      `redis:"leechers" json:"leechers"`
-	Snatches        int16    `redis:"snatches" json:"snatches"`
-	Announces       uint64   `redis:"announces" json:"announces"`
-	Uploaded        uint64   `redis:"uploaded" json:"uploaded"`
-	Downloaded      uint64   `redis:"downloaded" json:"downloaded"`
-	TorrentKey      string   `redis:"-" json:"-"`
-	TorrentPeersKey string   `redis:"-" json:"-"`
-	Enabled         bool     `redis:"enabled" json:"enabled"`
-	Reason          string   `redis:"reason" json:"reason"`
-	Peers           []*Peer  `redis:"-" json:"peers"`
-	MultiUp         float64  `redis:"multi_up" json:"multi_up"`
-	MultiDn         float64  `redis:"multi_dn" json:"multi_dn"`
+	TorrentID      uint32   `db:"torrent_id" redis:"torrent_id" json:"torrent_id"`
+	ReleaseName    string   `db:"release_name" redis:"release_name" json:"release_name"`
+	InfoHash       InfoHash `db:"info_hash" redis:"info_hash" json:"info_hash"`
+	TotalCompleted int16    `db:"total_completed" redis:"total_completed" json:"total_completed"`
+	// This is stored as MB to reduce storage costs
+	TotalUploaded uint32 `db:"total_uploaded" redis:"total_uploaded" json:"total_uploaded"`
+	// This is stored as MB to reduce storage costs
+	TotalDownloaded uint32 `db:"total_downloaded" redis:"total_downloaded" json:"total_downloaded"`
+	IsDeleted       bool   `db:"is_deleted" redis:"is_deleted" json:"is_deleted"`
+	// When you have a message to pass to a client set enabled = false and set the reason message.
+	// If IsDeleted is true, then nothing will be returned to the client
+	IsEnabled bool `db:"is_enabled" redis:"is_enabled" json:"is_enabled"`
+	// Reason when set will return a message to the torrent client
+	Reason string `db:"reason" redis:"reason" json:"reason"`
+	// Upload multiplier added to the users totals
+	MultiUp float64 `db:"multi_up" redis:"multi_up" json:"multi_up"`
+	// Download multiplier added to the users totals
+	// 0 denotes freeleech status
+	MultiDn   float64   `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
+	CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
+	UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
 }
 
 type TorrentStats struct {
@@ -43,17 +48,15 @@ type TorrentStats struct {
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
-func NewTorrent(ih InfoHash, name string, tid uint64) *Torrent {
+func NewTorrent(ih InfoHash, name string, tid uint32) *Torrent {
 	torrent := &Torrent{
-		Name:            name,
-		InfoHash:        ih,
-		TorrentKey:      fmt.Sprintf("t:t:%s", ih),
-		TorrentPeersKey: fmt.Sprintf("t:tpeers:%s", ih),
-		Enabled:         true,
-		Peers:           []*Peer{},
-		TorrentID:       tid,
-		MultiUp:         1.0,
-		MultiDn:         1.0,
+		ReleaseName: name,
+		InfoHash:    ih,
+		IsDeleted:   false,
+		IsEnabled:   true,
+		TorrentID:   tid,
+		MultiUp:     1.0,
+		MultiDn:     1.0,
 	}
 	return torrent
 }

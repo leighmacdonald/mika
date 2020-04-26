@@ -65,7 +65,11 @@ func DownloadDB(outputPath string, apiKey string) error {
 	if err != nil {
 		return errors.New("Failed to downloaded geoip db: " + err.Error())
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Error("Failed to close response body for geodb download")
+		}
+	}()
 	s, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return err

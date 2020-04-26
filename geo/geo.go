@@ -1,7 +1,5 @@
 // Package geo provides the Lat/Long distance calculation functionality and GeoIP
 // lookup functionality used to determine the best peers to use.
-//
-// NOTE this requires libgeoip to build, should
 package geo
 
 import (
@@ -23,10 +21,6 @@ const (
 	eps            = 1.0e-23
 	kilometer      = 2
 	geoDownloadURL = "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=%s&suffix=tar.gz"
-)
-
-var (
-	ellipsoid Ellipsoid
 )
 
 type City struct {
@@ -55,8 +49,8 @@ type ellipse struct {
 }
 
 // Distance computes the distances between two LatLong pairings
-func (ll LatLong) Distance(llB LatLong) float64 {
-	return math.Floor(ellipsoid.To(ll.Latitude, ll.Longitude, llB.Latitude, llB.Longitude))
+func (db *DB) Distance(llA LatLong, llB LatLong) float64 {
+	return math.Floor(db.ellipsoid.To(llA.Latitude, llA.Longitude, llB.Latitude, llB.Longitude))
 }
 
 // DownloadDB will fetch a new geoip database from maxmind and install it, uncompressed,
@@ -113,12 +107,12 @@ func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 	r := 1.0 - f
 	cLat1 := math.Cos(lat1)
 	if cLat1 == 0 {
-		log.Warningln("Division by Zero in ellipsoid.go.")
+		log.Warningln("Division by Zero in geo.go.")
 		return 0.0, 0.0
 	}
 	cLat2 := math.Cos(lat2)
 	if cLat2 == 0 {
-		log.Warningln("Division by Zero in ellipsoid.go.")
+		log.Warningln("Division by Zero in geo.go.")
 		return 0.0, 0.0
 	}
 	tu1 := r * math.Sin(lat1) / cLat1
@@ -192,14 +186,12 @@ func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 	if faz >= pi {
 		faz -= twoPi
 	}
-
-	distance, bearing = s, faz
-	return distance, bearing
+	return s, faz
 }
 
-// Todo remove global elip var in favour of a struct bound var
 type DB struct {
-	db *maxminddb.Reader
+	db        *maxminddb.Reader
+	ellipsoid Ellipsoid
 }
 
 func New(path string) *DB {
@@ -209,6 +201,11 @@ func New(path string) *DB {
 	}
 	return &DB{
 		db: db,
+		ellipsoid: Ellipsoid{
+			ellipse{6378137.0, 298.257223563}, // WGS84, because why not
+			kilometer,
+			1000.0,
+		},
 	}
 }
 
@@ -219,12 +216,4 @@ func (db *DB) GetLocation(ip net.IP) City {
 		log.Fatal(err)
 	}
 	return record
-}
-
-func init() {
-	ellipsoid = Ellipsoid{
-		ellipse{6378137.0, 298.257223563}, // WGS84, because why not
-		kilometer,
-		1000.0,
-	}
 }

@@ -11,10 +11,6 @@ import (
 	"testing"
 )
 
-var (
-	result float64
-)
-
 func TestGetCoord(t *testing.T) {
 	db := New("../" + viper.GetString("geodb_path"))
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
@@ -28,22 +24,22 @@ func TestGetCoord(t *testing.T) {
 }
 
 func TestDistance(t *testing.T) {
+	db := New("../" + viper.GetString("geodb_path"))
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
-	distance := a.Distance(b)
+	distance := db.Distance(a, b)
 	if distance != 141.0 {
 		t.Errorf("Invalid distances: %f != %f", distance, 141.903347)
 	}
 }
 
 func BenchmarkDistance(t *testing.B) {
+	db := New("../" + viper.GetString("geodb_path"))
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
-	var r float64
 	for n := 0; n < t.N; n++ {
-		r = a.Distance(b)
+		_ = db.Distance(a, b)
 	}
-	result = r
 }
 
 func TestDownloadDB(t *testing.T) {

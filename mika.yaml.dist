@@ -10,7 +10,7 @@ tracker_annouce_interval_minimum: 10s
 tracker_reap_interval: 400s
 tracker_hnr_threshold: 1d
 tracker_index_interval: 60s
-# memory, mysql, postgres, redis
+# Can be one of: memory, mysql, postgres, redis
 # postgres and mysql support requires that mika is built with the matching build tags
 # go build -tags postgres
 store_type: mysql
@@ -21,8 +21,13 @@ store_name: dbname
 store_user:
 store_password:
 
+# Can be one of: memory, mysql, postgres, redis
+# The cache database is used to store ephemeral (live peers, user_id map, torrent_id map, etc.)
+# It can be the same as the store database however its recommended to only use high performance
+# options (redis or memory) for substantially reduced CPU & disk loads
 cache_type: redis
-cache_host: localhost:6379
+cache_host: localhost
+cache_port: 6379
 cache_password:
 cache_max_idle: 500
 cache_db: 0

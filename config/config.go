@@ -30,6 +30,7 @@ const (
 	StoreProperties            = "store_properties"
 	CacheType                  = "cache_type"
 	CacheHost                  = "cache_host"
+	CachePort                  = "cache_port"
 	CachePassword              = "cache_password"
 	CacheMaxIdle               = "cache_max_idle"
 	CacheDB                    = "cache_db"

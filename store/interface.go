@@ -11,10 +11,12 @@ package store
 import (
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"mika/config"
 	"mika/model"
 	"mika/store/memory"
 	"mika/store/mysql"
+	"mika/store/redis"
 )
 
 // Torrent store defines where we can store permanent torrent data
@@ -51,7 +53,11 @@ func NewTorrentStore(storeType string) TorrentStore {
 	case "postgres":
 		log.Panicf("Unimplemented store type specified: %s", storeType)
 	case "redis":
-		log.Panicf("Unimplemented store type specified: %s", storeType)
+		host := viper.GetString(config.CacheHost)
+		port := viper.GetInt(config.CachePort)
+		password := viper.GetString(config.CachePassword)
+		db := viper.GetInt(config.CacheDB)
+		s = redis.NewTorrentStore(host, port, password, db)
 	default:
 		log.Panicf("Unknown store type specified: %s", storeType)
 	}
@@ -70,7 +76,11 @@ func NewPeerStore(storeType string, db *sqlx.DB) PeerStore {
 	case "postgres":
 		log.Panicf("Unimplemented store type specified: %s", storeType)
 	case "redis":
-		log.Panicf("Unimplemented store type specified: %s", storeType)
+		host := viper.GetString(config.CacheHost)
+		port := viper.GetInt(config.CachePort)
+		password := viper.GetString(config.CachePassword)
+		db := viper.GetInt(config.CacheDB)
+		s = redis.NewPeerStore(host, port, password, db, nil)
 	default:
 		log.Panicf("Unknown store type specified: %s", storeType)
 	}

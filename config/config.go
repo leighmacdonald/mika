@@ -69,6 +69,8 @@ func Read(cfgFile string) {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
+	} else if os.Getenv("MIKA_CONFIG") != "" {
+		viper.SetConfigFile(os.Getenv("MIKA_CONFIG"))
 	} else {
 		// Find home directory.
 		home, err := homedir.Dir()

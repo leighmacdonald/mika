@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -11,6 +13,16 @@ func InfoHashFromString(s string) InfoHash {
 	var buf [20]byte
 	copy(buf[:], s)
 	return buf
+}
+
+// String implements fmt.Stringer, returning the base16 encoded PeerID.
+func (ih *InfoHash) String() string {
+	return fmt.Sprintf("%x", ih[:])
+}
+
+// RawString returns a 20-byte string of the raw bytes of the ID.
+func (ih *InfoHash) RawString() string {
+	return string(ih[:])
 }
 
 type Torrent struct {
@@ -57,6 +69,16 @@ func NewTorrent(ih InfoHash, name string, tid uint32) *Torrent {
 		TorrentID:   tid,
 		MultiUp:     1.0,
 		MultiDn:     1.0,
+		CreatedOn:   time.Now().UTC(),
+		UpdatedOn:   time.Now().UTC(),
 	}
 	return torrent
+}
+
+func GenerateTestTorrent() *Torrent {
+	token := make([]byte, 20)
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(token)
+	ih := InfoHashFromString(string(token))
+	return NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)), uint32(rand.Intn(1000000)))
 }

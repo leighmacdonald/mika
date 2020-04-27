@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"mika/geo"
 	"net"
 	"time"
@@ -12,6 +13,14 @@ func PeerIDFromString(s string) PeerID {
 	var buf [20]byte
 	copy(buf[:], s)
 	return buf
+}
+
+func (p PeerID) String() string {
+	return fmt.Sprintf("%x", p[:])
+}
+
+func (p PeerID) RawString() string {
+	return string(p[:])
 }
 
 // Peer represents a single unique peer in a swarm

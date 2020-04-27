@@ -205,6 +205,9 @@ func NewTorrentStore(host string, port int, password string, db int) *TorrentSto
 		Password: password,
 		DB:       db,
 	})
+	if err := client.Do("CLIENT", "SETNAME", "mika").Err(); err != nil {
+		log.Fatalf("Could not setname, bailing: %s", err)
+	}
 	return &TorrentStore{
 		client: client,
 	}
@@ -222,6 +225,9 @@ func NewPeerStore(host string, port int, password string, db int, existingConn *
 			Password: password,
 			DB:       db,
 		})
+		if err := c.Do("CLIENT", "SETNAME", "mika").Err(); err != nil {
+			log.Fatalf("Could not setname, bailing: %s", err)
+		}
 	}
 	return &PeerStore{
 		client: c,

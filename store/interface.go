@@ -36,7 +36,7 @@ type PeerStore interface {
 	AddPeer(tid *model.Torrent, p *model.Peer) error
 	UpdatePeer(tid *model.Torrent, p *model.Peer) error
 	DeletePeer(tid *model.Torrent, p *model.Peer) error
-	GetPeers(t *model.Torrent) ([]*model.Peer, error)
+	GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error)
 	GetScrape(t *model.Torrent)
 	Close() error
 }

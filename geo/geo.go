@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const (
@@ -35,6 +36,22 @@ type Country struct {
 type LatLong struct {
 	Latitude  float64 `maxminddb:"latitude"`
 	Longitude float64 `maxminddb:"longitude"`
+}
+
+func (ll LatLong) String() string {
+	return fmt.Sprintf("%f,%f", ll.Latitude, ll.Longitude)
+}
+
+func LatLongFromString(s string) LatLong {
+	p := strings.Split(s, ",")
+	if len(p) != 2 {
+		log.Warnf("Received invalid lat long string: %s", s)
+		return LatLong{0, 0}
+	}
+	return LatLong{
+		util.StringToFloat64(p[0], 0),
+		util.StringToFloat64(p[1], 0),
+	}
 }
 
 type Ellipsoid struct {

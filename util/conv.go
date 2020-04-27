@@ -15,6 +15,15 @@ func StringToInt16(s string, def int16) int16 {
 	return int16(v)
 }
 
+func StringToUInt16(s string, def uint16) uint16 {
+	v, err := strconv.ParseInt(s, 10, 16)
+	if err != nil {
+		log.Warnf("failed to parse uint16 value from redis: %s", s)
+		return def
+	}
+	return uint16(v)
+}
+
 func StringToUInt32(s string, def uint32) uint32 {
 	v, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {

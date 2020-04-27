@@ -2,9 +2,16 @@
 package util
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
 )
+
+func GenRandomBytes(size int) (blk []byte, err error) {
+	blk = make([]byte, size)
+	_, err = rand.Read(blk)
+	return
+}
 
 // math.Max for uint64
 func UMax64(a, b uint64) uint64 {

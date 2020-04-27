@@ -2,7 +2,9 @@ package model
 
 import (
 	"fmt"
+	"math/rand"
 	"mika/geo"
+	"mika/util"
 	"net"
 	"time"
 )
@@ -49,18 +51,44 @@ type Peer struct {
 	// Clients reported port
 	Port uint16 `db:"addr_port" redis:"addr_port" json:"addr_port"`
 	// Last announce timestamp
-	AnnounceLast int32 `redis:"last_announce" json:"last_announce"`
+	AnnounceLast time.Time `redis:"last_announce" json:"last_announce"`
 	// First announce timestamp
-	AnnounceFirst int32 `redis:"first_announce" json:"first_announce"`
+	AnnounceFirst time.Time `redis:"first_announce" json:"first_announce"`
 	// Peer id, reported by client. Must have white-listed prefix
-	PeerId    PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
-	Location  geo.LatLong `db:"location" redis:"location" json:"location"`
-	UserId    uint32      `db:"user_id" redis:"user_id" json:"user_id"`
-	CreatedOn time.Time   `db:"created_on" redis:"created_on" json:"created_on"`
-	UpdatedOn time.Time   `db:"updated_on" redis:"updated_on" json:"updated_on"`
+	PeerId   PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
+	Location geo.LatLong `db:"location" redis:"location" json:"location"`
+	UserId   uint32      `db:"user_id" redis:"user_id" json:"user_id"`
+	// TODO Do we actually care about these times? Announce times likely enough
+	CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
+	UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
 }
 
 // IsNew checks if the peer is making its first announce request
 func (peer *Peer) IsNew() bool {
-	return peer.AnnounceLast == 0
+	return peer.Announces == 0
+}
+
+func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
+	return &Peer{
+		UserPeerId:    0,
+		IP:            net.ParseIP("1.2.3.4"),
+		Port:          port,
+		AnnounceLast:  time.Now(),
+		AnnounceFirst: time.Now(),
+		PeerId:        peerId,
+		Location:      geo.LatLong{Latitude: 50, Longitude: -114},
+		UserId:        userId,
+		CreatedOn:     time.Now(),
+		UpdatedOn:     time.Now(),
+	}
+}
+
+func GenerateTestPeer() *Peer {
+	token, _ := util.GenRandomBytes(20)
+	ih := PeerIDFromString(string(token))
+	return NewPeer(
+		uint32(rand.Intn(1000000)),
+		ih,
+		net.ParseIP("1.2.3.4"),
+		uint16(rand.Intn(60000)))
 }

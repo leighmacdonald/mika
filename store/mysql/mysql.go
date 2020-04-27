@@ -66,10 +66,10 @@ func (ps *PeerStore) DeletePeer(tid *model.Torrent, p *model.Peer) error {
 	return err
 }
 
-func (ps *PeerStore) GetPeers(t *model.Torrent) ([]*model.Peer, error) {
-	const q = `SELECT * FROM peers WHERE torrent_id = ?`
+func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
+	const q = `SELECT * FROM peers WHERE torrent_id = ? LIMIT ?`
 	var peers []*model.Peer
-	if err := ps.db.Select(&peers, q, t.TorrentID); err != nil {
+	if err := ps.db.Select(&peers, q, t.TorrentID, limit); err != nil {
 		return nil, err
 	}
 	return peers, nil

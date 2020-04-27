@@ -62,14 +62,14 @@ func (ps *PeerStore) DeletePeer(tid *model.Torrent, p *model.Peer) error {
 	return nil
 }
 
-func (ps *PeerStore) GetPeers(t *model.Torrent) ([]*model.Peer, error) {
+func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
 	ps.RLock()
 	p, found := ps.peers[t.TorrentID]
 	ps.RUnlock()
 	if !found {
 		return nil, consts.ErrInvalidTorrentID
 	}
-	return p, nil
+	return p[0:limit], nil
 }
 
 func (ps *PeerStore) GetScrape(t *model.Torrent) {

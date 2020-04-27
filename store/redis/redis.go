@@ -158,6 +158,9 @@ func (ps *PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
 func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
 	var peers []*model.Peer
 	for i, key := range ps.findKeys(torrentPeerPrefix(t.InfoHash)) {
+		if i == limit {
+			break
+		}
 		v, err := ps.client.HGetAll(key).Result()
 		if err != nil {
 			return nil, errors.Wrap(err, "Error trying to GetPeers")
@@ -184,9 +187,6 @@ func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error
 			UpdatedOn:     util.StringToTime(v["updated_on"]),
 		}
 		peers = append(peers, p)
-		if i >= limit {
-			break
-		}
 	}
 	return peers, nil
 }

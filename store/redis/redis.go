@@ -5,12 +5,14 @@ import (
 	"github.com/go-redis/redis/v7"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"mika/config"
 	"mika/consts"
 	"mika/geo"
 	"mika/model"
 	"mika/store"
 	"mika/util"
 	"net"
+	"strconv"
 	"sync"
 )
 
@@ -205,11 +207,15 @@ func (ps *PeerStore) Close() error {
 	return ps.client.Close()
 }
 
-func (c Config) newRedisConfig() *redis.Options {
+func newRedisConfig(c *config.StoreConfig) *redis.Options {
+	database, err := strconv.ParseInt(c.Database, 10, 32)
+	if err != nil {
+		log.Panic("Failed to parse redis database integer: %s", c.Database)
+	}
 	return &redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", c.Host, c.Port),
 		Password: c.Password,
-		DB:       c.DB,
+		DB:       int(database),
 		OnConnect: func(conn *redis.Conn) error {
 			if err := conn.ClientSetName(clientName).Err(); err != nil {
 				log.Fatalf("Could not setname, bailing: %s", err)
@@ -221,14 +227,12 @@ func (c Config) newRedisConfig() *redis.Options {
 
 type torrentDriver struct{}
 
-func (td torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore, error) {
-	c := config.(*Config)
-	var client *redis.Client
-	if c.Conn != nil {
-		client = c.Conn
-	} else {
-		client = redis.NewClient(c.newRedisConfig())
+func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
+	c, ok := cfg.(*config.StoreConfig)
+	if !ok {
+		return nil, consts.ErrInvalidConfig
 	}
+	client := redis.NewClient(newRedisConfig(c))
 	return &TorrentStore{
 		client: client,
 	}, nil
@@ -236,14 +240,12 @@ func (td torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore,
 
 type peerDriver struct{}
 
-func (pd peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
-	c := config.(*Config)
-	var client *redis.Client
-	if c.Conn != nil {
-		client = c.Conn
-	} else {
-		client = redis.NewClient(c.newRedisConfig())
+func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
+	c, ok := cfg.(*config.StoreConfig)
+	if !ok {
+		return nil, consts.ErrInvalidConfig
 	}
+	client := redis.NewClient(newRedisConfig(c))
 	return &PeerStore{
 		client: client,
 	}, nil

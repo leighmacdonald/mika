@@ -1,28 +1,31 @@
 # Implementing Mika Into Your Codebase
 
-This document will describe the require actions you need to perform to have integration of the 
+This document will describe the required actions you need to perform to have integration of the 
 tracker into your own code bases. This document assumes that you are at least proficient enough
 in your language of choice to implement the ideas expressed here. You do not need to be 
 proficient in Go, but a good understanding of unix command line environment will make it easier.
 We are also assuming that you are using the tracker for a private site which has its own users and
-its own database system.
+its own database and authentication systems in place.
 
 
 ## Assumptions of What You Have
 
 The following are a general guideline of what is needed to get running:
 
-- Go 1.4+ environment, you can probably install from your distros package manager. If not you
+The tracker software itself, installable in a few different ways:
+- Using binary releases (Not available currently)
+- Building from source. Go 1.4+ environment, you can probably install from your distros package manager. If not you
 can download the latest from the [go site](https://golang.org/dl/). The setup of this is beyond the scope of 
 this document, but you can find [installation instruction](https://golang.org/doc/install) on the go site itself.
+
 - A front end site of some sort to, like gazelle, or hopefully a better a custom site.
 - This frontend should be tied to a RDBMS of some sort, mysql/postgres, to store and load torrent and user data.
 
 
 ## Loading Torrents 
 
-Currently mika does not support automatic torrent registration on announce. This is something that doesn't 
-make much sense on a private site usually, but not always. Because of this we must tell it about any torrent
+Currently, mika does not support automatic torrent registration on announce by default. This is something that doesn't 
+make much sense on a private site usually, though not always. Because of this we must tell it about any torrent
 we want to track. This is done over the api endpoint `POST /api/torrent`. The payload should consist of the 
 following:
 

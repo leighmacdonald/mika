@@ -33,17 +33,17 @@ func createTestPeerStore(c *redis.Client) (store.PeerStore, error) {
 
 func TestRedisTorrentStore(t *testing.T) {
 	config.Read("")
-	ts, err := createTestTorrentStore(nil)
-	require.NotNil(t, err)
+	ts, e := createTestTorrentStore(nil)
+	require.NoError(t, e, e)
 	store.TestTorrentStore(t, ts)
 }
 
 func TestRedisPeerStore(t *testing.T) {
 	config.Read("")
 	ts, err := createTestTorrentStore(nil)
-	require.NotNil(t, err)
+	require.NoError(t, err)
 	ps, err := createTestPeerStore(nil)
-	require.NotNil(t, err)
+	require.NoError(t, err, err)
 	store.TestPeerStore(t, ps, ts)
 }
 

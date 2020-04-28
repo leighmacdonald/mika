@@ -2,8 +2,6 @@ package model
 
 import (
 	"fmt"
-	"math/rand"
-	"mika/util"
 	"sync"
 	"time"
 )
@@ -74,10 +72,4 @@ func NewTorrent(ih InfoHash, name string, tid uint32) *Torrent {
 		UpdatedOn:   time.Now().UTC(),
 	}
 	return torrent
-}
-
-func GenerateTestTorrent() *Torrent {
-	token, _ := util.GenRandomBytes(20)
-	ih := InfoHashFromString(string(token))
-	return NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)), uint32(rand.Intn(1000000)))
 }

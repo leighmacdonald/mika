@@ -2,9 +2,7 @@ package model
 
 import (
 	"fmt"
-	"math/rand"
 	"mika/geo"
-	"mika/util"
 	"net"
 	"time"
 )
@@ -81,14 +79,4 @@ func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
 		CreatedOn:     time.Now(),
 		UpdatedOn:     time.Now(),
 	}
-}
-
-func GenerateTestPeer() *Peer {
-	token, _ := util.GenRandomBytes(20)
-	ih := PeerIDFromString(string(token))
-	return NewPeer(
-		uint32(rand.Intn(1000000)),
-		ih,
-		net.ParseIP("1.2.3.4"),
-		uint16(rand.Intn(60000)))
 }

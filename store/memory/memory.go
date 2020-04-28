@@ -15,7 +15,6 @@ type TorrentStore struct {
 	sync.RWMutex
 	torrents map[model.InfoHash]*model.Torrent
 }
-type config struct{}
 
 func (ts *TorrentStore) Close() error {
 	return nil
@@ -105,7 +104,7 @@ func (ts *TorrentStore) DeleteTorrent(t *model.Torrent, _ bool) error {
 
 type torrentDriver struct{}
 
-func (td torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore, error) {
+func (td torrentDriver) NewTorrentStore(_ interface{}) (store.TorrentStore, error) {
 	return &TorrentStore{
 		sync.RWMutex{},
 		map[model.InfoHash]*model.Torrent{},
@@ -114,7 +113,7 @@ func (td torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore,
 
 type peerDriver struct{}
 
-func (pd peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
+func (pd peerDriver) NewPeerStore(_ interface{}) (store.PeerStore, error) {
 	return &PeerStore{
 		sync.RWMutex{},
 		map[uint32][]*model.Peer{},

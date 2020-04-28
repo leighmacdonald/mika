@@ -98,7 +98,7 @@ func DownloadDB(outputPath string, apiKey string) error {
 }
 
 // deg2rad converts degrees to radians
-func deg2rad(d float64) (r float64) {
+func deg2rad(d float64) float64 {
 	return d * pi / 180.0
 }
 

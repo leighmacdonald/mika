@@ -7,7 +7,11 @@ choice for public trackers.
 
 For the previous, 1.x code, see the [legacy branch](https://github.com/leighmacdonald/mika/tree/legacy).
 
-## Features
+## Support & Discussion
+
+There is currently a discord server setup for mika. You can join [here](https://discord.gg/jWXFcHW). 
+
+## Features (Planned)
 
 - Complete JSON/REST Api for interacting with the tracker on a separate authenticated
 port differing from the standard tracker port. This port is configured for TLS1.2+ only.

@@ -91,5 +91,21 @@ func Read(cfgFile string) {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		log.Debugf("Using config file: %s", viper.ConfigFileUsed())
+		level := viper.GetString(GeneralLogLevel)
+		colour := viper.GetBool(GeneralLogColour)
+		SetupLogger(level, colour)
 	}
+}
+
+func SetupLogger(levelStr string, colour bool) {
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:      colour,
+		DisableTimestamp: true,
+	})
+	log.SetOutput(os.Stdout)
+	level, err := log.ParseLevel(levelStr)
+	if err != nil {
+		log.Panicln("Invalid log level defined")
+	}
+	log.SetLevel(level)
 }

@@ -16,8 +16,10 @@ import (
 )
 
 var (
+	userDriverMutex     = sync.RWMutex{}
 	peerDriversMutex    = sync.RWMutex{}
 	torrentDriversMutex = sync.RWMutex{}
+	userDrivers         = make(map[string]UserDriver)
 	peerDrivers         = make(map[string]PeerDriver)
 	torrentDrivers      = make(map[string]TorrentDriver)
 )
@@ -25,8 +27,13 @@ var (
 type TorrentDriver interface {
 	NewTorrentStore(config interface{}) (TorrentStore, error)
 }
+
 type PeerDriver interface {
 	NewPeerStore(config interface{}) (PeerStore, error)
+}
+
+type UserDriver interface {
+	NewUserStore(config interface{}) (UserStore, error)
 }
 
 func AddPeerDriver(name string, driver PeerDriver) {
@@ -43,6 +50,24 @@ func AddTorrentDriver(name string, driver TorrentDriver) {
 	log.Debugf("Registered torrent storage driver: %s", name)
 }
 
+func AddUserDriver(name string, driver UserDriver) {
+	userDriverMutex.Lock()
+	defer userDriverMutex.Unlock()
+	userDrivers[name] = driver
+	log.Debugf("Registered user storage driver: %s", name)
+}
+
+// UserStore defines a interface used to retrieve user data from a backing store.
+// These should be cached indefinitely, we treat any known user as allowed to connect.
+// To disable a user they MUST be deleted from the active user cache
+type UserStore interface {
+	GetUserByPasskey(passkey string) (model.User, error)
+	GetUserById(userId uint32) (model.User, error)
+	DeleteUser(user model.User) error
+	// Close should cleanup and clone the underlying storage driver
+	Close() error
+}
+
 // Torrent store defines where we can store permanent torrent data
 // The drivers should always persist the data to disk
 type TorrentStore interface {
@@ -57,9 +82,9 @@ type TorrentStore interface {
 // This doesnt need to be persisted to disk, but it will help warm up times
 // if its backed by something that can restore its in memory state, such as redis
 type PeerStore interface {
-	AddPeer(tid *model.Torrent, p *model.Peer) error
-	UpdatePeer(tid *model.Torrent, p *model.Peer) error
-	DeletePeer(tid *model.Torrent, p *model.Peer) error
+	AddPeer(t *model.Torrent, p *model.Peer) error
+	UpdatePeer(t *model.Torrent, p *model.Peer) error
+	DeletePeer(t *model.Torrent, p *model.Peer) error
 	GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error)
 	GetScrape(t *model.Torrent)
 	Close() error
@@ -85,4 +110,15 @@ func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 		return nil, consts.ErrInvalidDriver
 	}
 	return driver.NewPeerStore(config)
+}
+
+func NewUserStore(storeType string, config interface{}) (UserStore, error) {
+	userDriverMutex.RLock()
+	defer userDriverMutex.RUnlock()
+	var driver UserDriver
+	driver, found := userDrivers[storeType]
+	if !found {
+		return nil, consts.ErrInvalidDriver
+	}
+	return driver.NewUserStore(config)
 }

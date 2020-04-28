@@ -12,10 +12,13 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"mika/consts"
 	"mika/model"
 	"mika/store"
+	"net"
 	"net/http"
+	"time"
 )
 
 const (
@@ -37,9 +40,9 @@ type TorrentStore struct {
 	baseUrl string
 }
 
-func checkResponse(resp *http.Response) error {
+func checkResponse(resp *http.Response, code int) error {
 	switch resp.StatusCode {
-	case http.StatusCreated:
+	case code:
 		return nil
 	default:
 		log.Errorf("Received invalid response code from server: %d", resp.StatusCode)
@@ -64,7 +67,7 @@ func (ts TorrentStore) AddTorrent(t *model.Torrent) error {
 	if err != nil {
 		return err
 	}
-	return checkResponse(resp)
+	return checkResponse(resp, http.StatusCreated)
 }
 
 func (ts TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
@@ -73,19 +76,33 @@ func (ts TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 		if err != nil {
 			return err
 		}
-		return checkResponse(resp)
+		return checkResponse(resp, http.StatusOK)
 	} else {
-		resp, err := doRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseUrl, "/torrent"), t)
+		resp, err := doRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseUrl, "/torrent"), map[string]interface{}{
+			"total_downloaded": t.TotalDownloaded,
+			"total_uploaded":   t.TotalUploaded,
+		})
 		if err != nil {
 			return err
 		}
-		return checkResponse(resp)
+		return checkResponse(resp, http.StatusOK)
 	}
-
 }
 
 func (ts TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
-	panic("implement me")
+	resp, err := doRequest(ts.client, "GET", fmt.Sprintf(ts.baseUrl, "/torrent/%s", hash.RawString()), nil)
+	if err != nil {
+		return nil, err
+	}
+	b, err := ioutil.ReadAll(resp.Body)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	var t *model.Torrent
+	if err := json.Unmarshal(b, t); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 func (ts TorrentStore) Close() error {
@@ -94,11 +111,16 @@ func (ts TorrentStore) Close() error {
 }
 
 type PeerStore struct {
-	client *http.Client
+	client  *http.Client
+	baseUrl string
 }
 
 func (ps PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
-
+	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseUrl, "/torrent/%s/peer", t.InfoHash), p)
+	if err != nil {
+		return err
+	}
+	return checkResponse(resp, http.StatusCreated)
 }
 
 func (ps PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
@@ -106,11 +128,31 @@ func (ps PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 }
 
 func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
-	panic("implement me")
+	reqUrl := fmt.Sprintf(ps.baseUrl, "/torrent/%s/peer/%s", t.InfoHash, p.PeerId)
+	resp, err := doRequest(ps.client, "DELETE", reqUrl, nil)
+	if err != nil {
+		return err
+	}
+	return checkResponse(resp, http.StatusOK)
 }
 
 func (ps PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
-	panic("implement me")
+	var peers []*model.Peer
+	resp, err := doRequest(ps.client, "GET", fmt.Sprintf(ps.baseUrl, "/torrent/%s/peers", t.InfoHash), nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkResponse(resp, http.StatusOK); err != nil {
+		return nil, err
+	}
+	b, err := ioutil.ReadAll(resp.Body)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if err := json.Unmarshal(b, &peers); err != nil {
+		return nil, err
+	}
+	return peers, nil
 }
 
 func (ps PeerStore) GetScrape(t *model.Torrent) {
@@ -147,14 +189,20 @@ func (p peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
 type Config struct {
 	BaseUrl    string
 	AuthMethod AuthMode
+	Timeout    time.Duration
 }
 
 func newClient(c *Config) *http.Client {
 	return &http.Client{
-		Transport:     nil,
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: c.Timeout,
+			}).Dial,
+			TLSHandshakeTimeout: c.Timeout,
+		},
 		CheckRedirect: nil,
 		Jar:           nil,
-		Timeout:       0,
+		Timeout:       c.Timeout,
 	}
 }
 func init() {

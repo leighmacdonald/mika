@@ -1,5 +1,6 @@
 package mysql
 
+// TODO force use of utf8mb4_general_ci ?
 const schema = `
 create schema mika collate latin1_swedish_ci;
 
@@ -25,6 +26,17 @@ create table torrent
 		unique (release_name)
 );
 
+create table user
+(
+	user_id int unsigned auto_increment
+		primary key,
+	passkey varchar(20) not null,
+	download_enabled tinyint(1) default 1 not null,
+	is_deleted tinyint(1) default 0 not null,
+	constraint user_passkey_uindex
+		unique (passkey)
+);
+
 create table peers
 (
 	user_peer_id int unsigned auto_increment
@@ -48,10 +60,11 @@ create table peers
 	updated_on datetime not null,
 	constraint peer_id_torrent_id_uindex
 		unique (peer_id, torrent_id),
+	constraint peers_user_user_id_fk
+		foreign key (user_id) references user (user_id)
+			on update cascade on delete cascade,
 	constraint torrent_id_fk
 		foreign key (torrent_id) references torrent (torrent_id)
 			on update cascade on delete cascade
 );
-
-
 `

@@ -5,9 +5,9 @@ Copyright © 2020 Leigh MacDonald <leigh.macdonald@gmail.com>
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"log"
+	"mika/tracker"
 )
 
 // serveCmd represents the serve command
@@ -16,7 +16,10 @@ var serveCmd = &cobra.Command{
 	Short: "Start the tracker and serve requests",
 	Long:  `Start the tracker and serve requests`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("serve called")
+		_, err := tracker.New()
+		if err != nil {
+			log.Panicf("Failed to setup tracker: %s", err.Error())
+		}
 	},
 }
 

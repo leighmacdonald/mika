@@ -205,15 +205,7 @@ func (ps *PeerStore) Close() error {
 	return ps.client.Close()
 }
 
-type Config struct {
-	Host     string
-	Port     int
-	Password string
-	DB       int
-	Conn     *redis.Client
-}
-
-func (c Config) NewRedisConfig() *redis.Options {
+func (c Config) newRedisConfig() *redis.Options {
 	return &redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", c.Host, c.Port),
 		Password: c.Password,
@@ -235,7 +227,7 @@ func (td torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore,
 	if c.Conn != nil {
 		client = c.Conn
 	} else {
-		client = redis.NewClient(c.NewRedisConfig())
+		client = redis.NewClient(c.newRedisConfig())
 	}
 	return &TorrentStore{
 		client: client,
@@ -250,7 +242,7 @@ func (pd peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
 	if c.Conn != nil {
 		client = c.Conn
 	} else {
-		client = redis.NewClient(c.NewRedisConfig())
+		client = redis.NewClient(c.newRedisConfig())
 	}
 	return &PeerStore{
 		client: client,

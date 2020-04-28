@@ -4,11 +4,14 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"mika/model"
+	"mika/tracker"
 	"mika/util"
 	"net"
 )
 
-type BitTorrentHandler struct{}
+type BitTorrentHandler struct {
+	t *tracker.Tracker
+}
 
 // Represents an announce received from the bittorrent client
 //

@@ -10,4 +10,5 @@ var (
 	ErrInvalidIP        = errors.New("invalid client ip")
 	ErrInvalidTorrentID = errors.New("Invalid torrent_id")
 	ErrInvalidDriver    = errors.New("invalid driver")
+	ErrInvalidConfig    = errors.New("invalid configuration")
 )

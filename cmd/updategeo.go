@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"mika/geo"
+	"time"
 )
 
 // updategeoCmd represents the updategeo command
@@ -17,12 +18,15 @@ var updategeoCmd = &cobra.Command{
 	Short: "Downloaded the latest geo database from MaxMind.com",
 	Long:  `Downloaded the latest geo database from MaxMind.com`,
 	Run: func(cmd *cobra.Command, args []string) {
+		t0 := time.Now()
 		key := viper.GetString("geodb_api_key")
 		outPath := viper.GetString("geodb_path")
+		log.Infof("Starting download of MaxMind City database")
 		if err := geo.DownloadDB(outPath, key); err != nil {
 			log.Errorf("failed to download database: %s", err.Error())
 		} else {
-			log.Infof("Successfully downloaded geoip db to: %s", outPath)
+			d := time.Now().Sub(t0).String()
+			log.Infof("Successfully downloaded geoip db to: %s (%s)", outPath, d)
 		}
 	},
 }

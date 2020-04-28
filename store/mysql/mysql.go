@@ -9,7 +9,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"mika/consts"
 	"mika/model"
+	"mika/store"
+)
+
+const (
+	driverName = "mysql"
 )
 
 type TorrentStore struct {
@@ -113,23 +119,43 @@ func (s *TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 	return nil
 }
 
-func NewTorrentStore(dsn string) *TorrentStore {
-	db := sqlx.MustConnect("mysql", dsn)
+type torrentDriver struct{}
+
+func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
+	c, ok := cfg.(*store.Config)
+	if !ok {
+		return nil, consts.ErrInvalidConfig
+	}
+	var db *sqlx.DB
+	if c.Conn != nil {
+		db = c.Conn
+	} else {
+		db = sqlx.MustConnect("mysql", c.DSN())
+	}
 	return &TorrentStore{
 		db: db,
-	}
+	}, nil
 }
 
-// NewPeerStore will create a new mysql backed peer store
-// If existingConn is defined, it will be used instead of establishing a new connection
-func NewPeerStore(dsn string, existingConn *sqlx.DB) *PeerStore {
+type peerDriver struct{}
+
+func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
+	c, ok := cfg.(*store.Config)
+	if !ok {
+		return nil, consts.ErrInvalidConfig
+	}
 	var db *sqlx.DB
-	if existingConn != nil {
-		db = existingConn
+	if c.Conn != nil {
+		db = c.Conn
 	} else {
-		db = sqlx.MustConnect("mysql", dsn)
+		db = sqlx.MustConnect("mysql", c.DSN())
 	}
 	return &PeerStore{
 		db: db,
-	}
+	}, nil
+}
+
+func init() {
+	store.AddPeerDriver(driverName, peerDriver{})
+	store.AddTorrentDriver(driverName, torrentDriver{})
 }

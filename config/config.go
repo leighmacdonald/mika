@@ -5,7 +5,6 @@ import (
 	"github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"net/url"
 	"os"
 )
 
@@ -38,31 +37,6 @@ const (
 	GeodbApiKey                = "geodb_api_key"
 	GeodbEnabled               = "geodb_enabled"
 )
-
-// DSN constructs a uri for database connection strings
-//
-// protocol//[user]:[password]@[hosts][/database][?properties]
-func DSN() string {
-	props := viper.GetString(StoreProperties)
-	if props != "" {
-		props = "?" + props
-	}
-	s := fmt.Sprintf("%s//%s:%s@%s:%d/%s%s",
-		viper.GetString(StoreType),
-		viper.GetString(StoreUser),
-		viper.GetString(StorePassword),
-		viper.GetString(StoreHost),
-		viper.GetInt(StorePort),
-		viper.GetString(StoreName),
-		props,
-	)
-	u, err := url.Parse(s)
-	if err != nil {
-		log.Fatalf("Failed to construct database DSN: %s", err.Error())
-		return ""
-	}
-	return u.String()
-}
 
 // Read reads in config file and ENV variables if set.
 func Read(cfgFile string) {

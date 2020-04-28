@@ -71,7 +71,7 @@ func (peer *Peer) IsNew() bool {
 func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
 		UserPeerId:    0,
-		IP:            net.ParseIP("1.2.3.4"),
+		IP:            ip,
 		Port:          port,
 		AnnounceLast:  time.Now(),
 		AnnounceFirst: time.Now(),

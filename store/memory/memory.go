@@ -3,13 +3,19 @@ package memory
 import (
 	"mika/consts"
 	"mika/model"
+	"mika/store"
 	"sync"
+)
+
+const (
+	driverName = "memory"
 )
 
 type TorrentStore struct {
 	sync.RWMutex
 	torrents map[model.InfoHash]*model.Torrent
 }
+type config struct{}
 
 func (ts *TorrentStore) Close() error {
 	return nil
@@ -25,6 +31,7 @@ func (ts *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) 
 	return t, nil
 }
 
+// TODO shard peer storage
 type PeerStore struct {
 	sync.RWMutex
 	peers map[uint32][]*model.Peer
@@ -96,16 +103,25 @@ func (ts *TorrentStore) DeleteTorrent(t *model.Torrent, _ bool) error {
 	return nil
 }
 
-func NewTorrentStore() *TorrentStore {
+type torrentDriver struct{}
+
+func (td torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore, error) {
 	return &TorrentStore{
 		sync.RWMutex{},
 		map[model.InfoHash]*model.Torrent{},
-	}
+	}, nil
 }
 
-func NewPeerStore() *PeerStore {
+type peerDriver struct{}
+
+func (pd peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
 	return &PeerStore{
 		sync.RWMutex{},
 		map[uint32][]*model.Peer{},
-	}
+	}, nil
+}
+
+func init() {
+	store.AddPeerDriver(driverName, peerDriver{})
+	store.AddTorrentDriver(driverName, torrentDriver{})
 }

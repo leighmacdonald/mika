@@ -2,18 +2,12 @@ package consts
 
 import "github.com/pkg/errors"
 
-var ErrMalformedRequest error
-var ErrInvalidMapKey error
-var ErrDuplicate error
-var ErrInvalidInfoHash error
-var ErrInvalidTorrentID error
-var ErrInvalidIP error
-
-func init() {
+var (
 	ErrMalformedRequest = errors.New("Malformed request")
-	ErrInvalidMapKey = errors.New("Invalid map key specified")
-	ErrDuplicate = errors.New("Duplicate entry")
-	ErrInvalidInfoHash = errors.New("Info hash not supplied")
-	ErrInvalidIP = errors.New("invalid client ip")
+	ErrInvalidMapKey    = errors.New("Invalid map key specified")
+	ErrDuplicate        = errors.New("Duplicate entry")
+	ErrInvalidInfoHash  = errors.New("Info hash not supplied")
+	ErrInvalidIP        = errors.New("invalid client ip")
 	ErrInvalidTorrentID = errors.New("Invalid torrent_id")
-}
+	ErrInvalidDriver    = errors.New("invalid driver")
+)

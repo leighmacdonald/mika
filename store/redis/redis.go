@@ -8,9 +8,15 @@ import (
 	"mika/consts"
 	"mika/geo"
 	"mika/model"
+	"mika/store"
 	"mika/util"
 	"net"
 	"sync"
+)
+
+const (
+	driverName = "redis"
+	clientName = "mika"
 )
 
 type TorrentStore struct {
@@ -199,37 +205,59 @@ func (ps *PeerStore) Close() error {
 	return ps.client.Close()
 }
 
-func NewTorrentStore(host string, port int, password string, db int) *TorrentStore {
-	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", host, port),
-		Password: password,
-		DB:       db,
-	})
-	if err := client.Do("CLIENT", "SETNAME", "mika").Err(); err != nil {
-		log.Fatalf("Could not setname, bailing: %s", err)
-	}
-	return &TorrentStore{
-		client: client,
+type Config struct {
+	Host     string
+	Port     int
+	Password string
+	DB       int
+	Conn     *redis.Client
+}
+
+func (c Config) NewRedisConfig() *redis.Options {
+	return &redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", c.Host, c.Port),
+		Password: c.Password,
+		DB:       c.DB,
+		OnConnect: func(conn *redis.Conn) error {
+			if err := conn.ClientSetName(clientName).Err(); err != nil {
+				log.Fatalf("Could not setname, bailing: %s", err)
+			}
+			return nil
+		},
 	}
 }
 
-// NewPeerStore will create a new mysql backed peer store
-// If existingConn is defined, it will be used instead of establishing a new connection
-func NewPeerStore(host string, port int, password string, db int, existingConn *redis.Client) *PeerStore {
-	var c *redis.Client
-	if existingConn != nil {
-		c = existingConn
+type torrentDriver struct{}
+
+func (td torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore, error) {
+	c := config.(*Config)
+	var client *redis.Client
+	if c.Conn != nil {
+		client = c.Conn
 	} else {
-		c = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%d", host, port),
-			Password: password,
-			DB:       db,
-		})
-		if err := c.Do("CLIENT", "SETNAME", "mika").Err(); err != nil {
-			log.Fatalf("Could not setname, bailing: %s", err)
-		}
+		client = redis.NewClient(c.NewRedisConfig())
+	}
+	return &TorrentStore{
+		client: client,
+	}, nil
+}
+
+type peerDriver struct{}
+
+func (pd peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
+	c := config.(*Config)
+	var client *redis.Client
+	if c.Conn != nil {
+		client = c.Conn
+	} else {
+		client = redis.NewClient(c.NewRedisConfig())
 	}
 	return &PeerStore{
-		client: c,
-	}
+		client: client,
+	}, nil
+}
+
+func init() {
+	store.AddPeerDriver(driverName, peerDriver{})
+	store.AddTorrentDriver(driverName, torrentDriver{})
 }

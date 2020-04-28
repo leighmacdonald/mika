@@ -9,15 +9,39 @@
 package store
 
 import (
-	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"mika/config"
+	"mika/consts"
 	"mika/model"
-	"mika/store/memory"
-	"mika/store/mysql"
-	"mika/store/redis"
+	"sync"
 )
+
+var (
+	peerDriversMutex    = sync.RWMutex{}
+	torrentDriversMutex = sync.RWMutex{}
+	peerDrivers         = make(map[string]PeerDriver)
+	torrentDrivers      = make(map[string]TorrentDriver)
+)
+
+type TorrentDriver interface {
+	NewTorrentStore(config interface{}) (TorrentStore, error)
+}
+type PeerDriver interface {
+	NewPeerStore(config interface{}) (PeerStore, error)
+}
+
+func AddPeerDriver(name string, driver PeerDriver) {
+	peerDriversMutex.Lock()
+	defer peerDriversMutex.Unlock()
+	peerDrivers[name] = driver
+	log.Debugf("Registered peer storage driver: %s", name)
+}
+
+func AddTorrentDriver(name string, driver TorrentDriver) {
+	torrentDriversMutex.Lock()
+	defer torrentDriversMutex.Unlock()
+	torrentDrivers[name] = driver
+	log.Debugf("Registered torrent storage driver: %s", name)
+}
 
 // Torrent store defines where we can store permanent torrent data
 // The drivers should always persist the data to disk
@@ -41,48 +65,24 @@ type PeerStore interface {
 	Close() error
 }
 
-func NewTorrentStore(storeType string) TorrentStore {
-	var s TorrentStore
-	switch storeType {
-	case "memory":
-		s = memory.NewTorrentStore()
-	case "mysql":
-		fallthrough
-	case "mariadb":
-		s = mysql.NewTorrentStore(config.DSN())
-	case "postgres":
-		log.Panicf("Unimplemented store type specified: %s", storeType)
-	case "redis":
-		host := viper.GetString(config.CacheHost)
-		port := viper.GetInt(config.CachePort)
-		password := viper.GetString(config.CachePassword)
-		db := viper.GetInt(config.CacheDB)
-		s = redis.NewTorrentStore(host, port, password, db)
-	default:
-		log.Panicf("Unknown store type specified: %s", storeType)
+func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error) {
+	torrentDriversMutex.RLock()
+	defer torrentDriversMutex.RUnlock()
+	var driver TorrentDriver
+	driver, found := torrentDrivers[storeType]
+	if !found {
+		return nil, consts.ErrInvalidDriver
 	}
-	return s
+	return driver.NewTorrentStore(config)
 }
 
-func NewPeerStore(storeType string, db *sqlx.DB) PeerStore {
-	var s PeerStore
-	switch storeType {
-	case "memory":
-		s = memory.NewPeerStore()
-	case "mysql":
-		fallthrough
-	case "mariadb":
-		s = mysql.NewPeerStore(config.DSN(), db)
-	case "postgres":
-		log.Panicf("Unimplemented store type specified: %s", storeType)
-	case "redis":
-		host := viper.GetString(config.CacheHost)
-		port := viper.GetInt(config.CachePort)
-		password := viper.GetString(config.CachePassword)
-		db := viper.GetInt(config.CacheDB)
-		s = redis.NewPeerStore(host, port, password, db, nil)
-	default:
-		log.Panicf("Unknown store type specified: %s", storeType)
+func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
+	peerDriversMutex.RLock()
+	defer peerDriversMutex.RUnlock()
+	var driver PeerDriver
+	driver, found := peerDrivers[storeType]
+	if !found {
+		return nil, consts.ErrInvalidDriver
 	}
-	return s
+	return driver.NewPeerStore(config)
 }

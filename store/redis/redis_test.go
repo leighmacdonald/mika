@@ -7,30 +7,38 @@ import (
 	"mika/config"
 	"mika/consts"
 	"mika/model"
+	"mika/store"
 	"mika/util"
 	"testing"
 )
 
-func createTestTorrentStore() *TorrentStore {
-	host := viper.GetString(config.CacheHost)
-	port := viper.GetInt(config.CachePort)
-	password := viper.GetString(config.CachePassword)
-	db := viper.GetInt(config.CacheDB)
-	return NewTorrentStore(host, port, password, db)
+func createTestTorrentStore() (store.TorrentStore, error) {
+	var ts torrentDriver
+	return ts.NewTorrentStore(&Config{
+		Host:     viper.GetString(config.CacheHost),
+		Port:     viper.GetInt(config.CachePort),
+		Password: viper.GetString(config.CachePassword),
+		DB:       viper.GetInt(config.CacheDB),
+		Conn:     nil,
+	})
 }
 
-func createTestPeerStore(c *redis.Client) *PeerStore {
-	host := viper.GetString(config.CacheHost)
-	port := viper.GetInt(config.CachePort)
-	password := viper.GetString(config.CachePassword)
-	db := viper.GetInt(config.CacheDB)
-	return NewPeerStore(host, port, password, db, c)
+func createTestPeerStore(c *redis.Client) (store.PeerStore, error) {
+	var ts peerDriver
+	return ts.NewPeerStore(&Config{
+		Host:     viper.GetString(config.CacheHost),
+		Port:     viper.GetInt(config.CachePort),
+		Password: viper.GetString(config.CachePassword),
+		DB:       viper.GetInt(config.CacheDB),
+		Conn:     c,
+	})
 }
 
 func TestTorrentStore(t *testing.T) {
 	config.Read("")
-	s := createTestTorrentStore()
-	clearDB(s.client)
+	s, err := createTestTorrentStore()
+	assert.NoError(t, err)
+	//clearDB(s.client)
 	torrentA := model.GenerateTestTorrent()
 	assert.NoError(t, s.AddTorrent(torrentA))
 	fetchedTorrent, err := s.GetTorrent(torrentA.InfoHash)
@@ -48,9 +56,11 @@ func TestTorrentStore(t *testing.T) {
 
 func TestPeerStore(t *testing.T) {
 	config.Read("")
-	s := createTestTorrentStore()
-	p := createTestPeerStore(s.client)
-	clearDB(s.client)
+	s, err := createTestTorrentStore()
+	assert.NoError(t, err)
+	p, err := createTestPeerStore(nil)
+	assert.NoError(t, err)
+	//clearDB(s.client)
 	torrentA := model.GenerateTestTorrent()
 	defer s.DeleteTorrent(torrentA, true)
 	assert.NoError(t, s.AddTorrent(torrentA))

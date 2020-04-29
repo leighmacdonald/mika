@@ -32,8 +32,8 @@ func New() (*Tracker, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to setup peer store")
 	}
-	u, err := store.NewUserStore(viper.GetString(config.StorePeersType),
-		config.GetStoreConfig(config.Peers))
+	u, err := store.NewUserStore(viper.GetString(config.StoreUsersType),
+		config.GetStoreConfig(config.Users))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to setup user store")
 	}

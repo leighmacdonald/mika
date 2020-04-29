@@ -2,12 +2,17 @@ package http
 
 import (
 	"bytes"
+	"crypto/tls"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"mika/tracker"
 	"net"
+	"net/http"
 	"strings"
+	"time"
 )
 
 type AnnounceType string
@@ -109,28 +114,41 @@ func getIP(q *Query, c *gin.Context) (net.IP, error) {
 	}
 }
 
+// oops will output a bencoded error code to the torrent client using
+// a preset message code constant
+func oops(ctx *gin.Context, errCode trackerErrCode) {
+	msg, exists := responseStringMap[errCode]
+	if !exists {
+		msg = responseStringMap[MsgGenericError]
+	}
+	ctx.String(int(errCode), responseError(msg.Error()))
+
+	log.Println("Error in request (", errCode, "):", msg)
+	log.Println("From:", ctx.Request.RequestURI)
+}
+
 // handleTrackerErrors is used as the default error handler for tracker requests
 // the error is returned to the client as a bencoded error string as defined in the
 // bittorrent specs.
-//func handleTrackerErrors(ctx *gin.Context) {
-//	// Run request handler
-//	ctx.Next()
-//
-//	// Handle any errors recorded
-//	error_returned := ctx.Errors.Last()
-//	if error_returned != nil {
-//		meta := error_returned.JSON().(gin.H)
-//
-//		status := MsgGenericError
-//		custom_status, found := meta["status"]
-//		if found {
-//			status = custom_status.(int)
-//		}
-//
-//		// TODO handle private/public errors separately, like sentry output for priv errors
-//		oops(ctx, status)
-//	}
-//}
+func handleTrackerErrors(ctx *gin.Context) {
+	// Run request handler
+	ctx.Next()
+
+	// Handle any errors recorded
+	errorReturned := ctx.Errors.Last()
+	if errorReturned != nil {
+		meta := errorReturned.JSON().(gin.H)
+
+		status := MsgGenericError
+		customStatus, found := meta["status"]
+		if found {
+			status = customStatus.(trackerErrCode)
+		}
+
+		// TODO handle private/public errors separately, like sentry output for priv errors
+		oops(ctx, status)
+	}
+}
 
 // responseError generates a bencoded error response for the torrent client to
 // parse and display to the user
@@ -156,16 +174,70 @@ func newRouter() *gin.Engine {
 	return router
 }
 
-type RequestHandlers struct {
-	Api
-	BitTorrentHandler
+func NewBitTorrentHandler(tkr *tracker.Tracker) *gin.Engine {
+	r := newRouter()
+	r.Use(handleTrackerErrors)
+	h := BitTorrentHandler{
+		t: tkr,
+	}
+	r.GET("/:passkey/announce", h.Announce)
+	r.GET("/:passkey/scrape", h.Scrape)
+	return r
 }
 
-func NewHandler() *gin.Engine {
+func NewAPIHandler(tkr *tracker.Tracker) *gin.Engine {
 	r := newRouter()
-	//r.Use(handleTrackerErrors)
-	rh := RequestHandlers{}
-	r.GET("/:passkey/announce", rh.Announce)
-	r.GET("/:passkey/scrape", rh.Scrape)
+	h := AdminAPI{
+		t: tkr,
+	}
+	r.GET("/tracker/stats", h.Stats)
+	r.DELETE("/torrent/:info_hash", h.TorrentDelete)
+	r.PATCH("/torrent/:info_hash", h.TorrentUpdate)
 	return r
+}
+
+func CreateServer(router http.Handler, addr string, useTLS bool) *http.Server {
+	var tlsCfg *tls.Config
+	if useTLS {
+		tlsCfg = &tls.Config{
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		}
+	} else {
+		tlsCfg = nil
+	}
+	srv := &http.Server{
+		Addr:           addr,
+		Handler:        router,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+		TLSConfig:      tlsCfg,
+		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
+	}
+	return srv
+}
+
+// Doesnt seem to work? Causes duplicate port use??
+func StartListeners(s []*http.Server) {
+	var g errgroup.Group
+	for _, server := range s {
+		g.Go(func() error {
+			err := server.ListenAndServe()
+			if err != nil && err != http.ErrServerClosed {
+				log.Fatal(err)
+			}
+			return err
+		})
+	}
+	if err := g.Wait(); err != nil {
+		log.Fatal(err)
+	}
 }

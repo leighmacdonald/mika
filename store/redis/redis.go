@@ -210,7 +210,7 @@ func (ps *PeerStore) Close() error {
 func newRedisConfig(c *config.StoreConfig) *redis.Options {
 	database, err := strconv.ParseInt(c.Database, 10, 32)
 	if err != nil {
-		log.Panic("Failed to parse redis database integer: %s", c.Database)
+		log.Panicf("Failed to parse redis database integer: %s", c.Database)
 	}
 	return &redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", c.Host, c.Port),

@@ -1,7 +1,6 @@
 // Package mysql provides mysql/mariadb backed persistent storage
 //
 // NOTE this requires MySQL 8.0+ / MariaDB 10.5+ (maybe 10.4?) due to the POINT column type
-// +build mysql
 
 package mysql
 

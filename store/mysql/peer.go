@@ -3,6 +3,7 @@ package mysql
 import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"mika/config"
 	"mika/consts"
 	"mika/model"
 	"mika/store"
@@ -61,21 +62,16 @@ func (ps *PeerStore) GetScrape(t *model.Torrent) {
 type peerDriver struct{}
 
 func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
-	c, ok := cfg.(*store.SQLConfig)
+	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	var db *sqlx.DB
-	if c.Conn != nil {
-		db = c.Conn
-	} else {
-		db = sqlx.MustConnect("mysql", c.DSN())
-	}
+	db := sqlx.MustConnect("mysql", c.DSN())
 	return &PeerStore{
 		db: db,
 	}, nil
 }
 
 func init() {
-	store.AddPeerDriver(driverName, peerDriver{})
+	store.AddPeerDriver("mysql", peerDriver{})
 }

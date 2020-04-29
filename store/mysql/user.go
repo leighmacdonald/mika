@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"github.com/jmoiron/sqlx"
+	"mika/config"
 	"mika/consts"
 	"mika/model"
 	"mika/store"
@@ -15,7 +16,7 @@ type UserStore struct {
 }
 
 func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
-
+	return model.User{}, nil
 }
 
 func (u *UserStore) GetUserById(userId uint32) (model.User, error) {
@@ -33,16 +34,11 @@ func (u *UserStore) Close() error {
 type userDriver struct{}
 
 func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
-	c, ok := cfg.(*store.SQLConfig)
+	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	var db *sqlx.DB
-	if c.Conn != nil {
-		db = c.Conn
-	} else {
-		db = sqlx.MustConnect("mysql", c.DSN())
-	}
+	db := sqlx.MustConnect("mysql", c.DSN())
 	return &UserStore{
 		db:      db,
 		users:   map[string]model.User{},
@@ -51,5 +47,5 @@ func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 }
 
 func init() {
-	store.AddUserDriver(driverName, userDriver{})
+	store.AddUserDriver("mysql", userDriver{})
 }

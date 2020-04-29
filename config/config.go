@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -18,10 +19,13 @@ const (
 )
 
 const (
-	GeneralLogLevel            = "general_log_level"
-	GeneralLogColour           = "general_log_colour"
+	GeneralRunMode   = "general_run_mode"
+	GeneralLogLevel  = "general_log_level"
+	GeneralLogColour = "general_log_colour"
+
 	TrackerPublic              = "tracker_public"
 	TrackerListen              = "tracker_listen"
+	TrackerTLS                 = "tracker_tls"
 	TrackerIPv6                = "tracker_ipv6"
 	TrackerIPv6Only            = "tracker_ipv6_only"
 	TrackerAnnounceInterval    = "tracker_announce_interval"
@@ -29,6 +33,11 @@ const (
 	TrackerReapInterval        = "tracker_reap_internal"
 	TrackerHNRThreshold        = "tracker_hnr_threshold"
 	TrackerIndexInterval       = "tracker_index_interval"
+
+	APIListen   = "api_listen"
+	APITLS      = "api_tls"
+	APIIPv6     = "api_ipv6"
+	APIIPv6Only = "api_ipv6_only"
 
 	StoreTorrentType       = "store_torrent_type"
 	StoreTorrentHost       = "store_torrent_host"
@@ -77,8 +86,8 @@ func (c StoreConfig) DSN() string {
 	if props != "" {
 		props = "?" + props
 	}
-	s := fmt.Sprintf("%s//%s:%s@%s:%d/%s%s",
-		c.Type, c.Username, c.Password, c.Host, c.Port, c.Database, props)
+	s := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s%s",
+		c.Username, c.Password, c.Host, c.Port, c.Database, props)
 	u, err := url.Parse(s)
 	if err != nil {
 		log.Fatalf("Failed to construct valid database DSN: %s", err.Error())
@@ -153,6 +162,8 @@ func Read(cfgFile string) {
 		level := viper.GetString(GeneralLogLevel)
 		colour := viper.GetBool(GeneralLogColour)
 		SetupLogger(level, colour)
+
+		gin.SetMode(viper.GetString(GeneralRunMode))
 	}
 }
 

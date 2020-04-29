@@ -1,9 +1,12 @@
-general_log_level: debug
+# release/debug
+general_run_mode: debug
+general_log_level: info
 general_log_colour: true
 
 # Allow anyone to participate in swarms. This disables passkey support.
 tracker_public: false
 tracker_listen: ":34000"
+tracker_tls: false
 tracker_ipv6: false
 tracker_ipv6_only: false
 tracker_annouce_interval: 300s
@@ -12,16 +15,21 @@ tracker_reap_interval: 400s
 tracker_hnr_threshold: 1d
 tracker_index_interval: 60s
 
+api_listen: ":34001"
+api_ipv6: false
+api_ipv6_only: false
+
 # memory, mysql, postgres, redis
 # postgres and mysql support requires that mika is built with the matching build tags
 # go build -tags postgres
-store_tracker_type: mysql
-store_tracker_host: localhost
-store_tracker_port: 3306
-store_tracker_user:
-store_tracker_password:
-store_tracker_database: mika
-store_tracker_properties:
+store_torrent_type: mysql
+store_torrent_host: 127.1
+store_torrent_port: 3306
+# For redis, the dbname should be the numeric db value and should differ from the redic cache db value
+store_torrent_user: mika
+store_torrent_password: mika
+store_torrent_database: mika
+store_torrent_properties:
 
   // Live peer cache backend storage config
 store_peers_type: redis

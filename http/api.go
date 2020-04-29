@@ -6,30 +6,30 @@ import (
 	"mika/tracker"
 )
 
-type Api struct {
+type AdminAPI struct {
 	t *tracker.Tracker
 }
 
-func (a *Api) TorrentDelete(c *gin.Context) {
+func (a *AdminAPI) TorrentDelete(c *gin.Context) {
 
 }
 
-func (a *Api) TorrentUpdate(c *gin.Context) {
+func (a *AdminAPI) TorrentUpdate(c *gin.Context) {
 
 }
 
-func (a *Api) UserUpdate(c *gin.Context) {
+func (a *AdminAPI) UserUpdate(c *gin.Context) {
 
 }
 
-func (a *Api) UserDelete(c *gin.Context) {
+func (a *AdminAPI) UserDelete(c *gin.Context) {
 
 }
 
-func (a *Api) ConfigUpdate(c *gin.Context) {
+func (a *AdminAPI) ConfigUpdate(c *gin.Context) {
 
 }
 
-func (a *Api) Stats(c *gin.Context) {
+func (a *AdminAPI) Stats(c *gin.Context) {
 
 }

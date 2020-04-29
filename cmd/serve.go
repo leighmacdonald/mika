@@ -12,11 +12,8 @@ import (
 	"mika/config"
 	h "mika/http"
 	"mika/tracker"
+	"mika/util"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 // serveCmd represents the serve command
@@ -49,17 +46,12 @@ var serveCmd = &cobra.Command{
 				log.Fatalf("listen: %s\n", err)
 			}
 		}()
-		//go h.StartListeners([]*http.Server{btServer, apiServer})
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-		select {
-		case <-sigChan:
-			c, _ := context.WithDeadline(ctx, time.Now().Add(time.Second*5))
-			if err := apiServer.Shutdown(c); err != nil {
+		util.WaitForSignal(ctx, func(ctx context.Context) error {
+			if err := apiServer.Shutdown(ctx); err != nil {
 				log.Fatalf("Error closing servers gracefully; %s", err)
 			}
-		}
-
+			return nil
+		})
 	},
 }
 

@@ -9,6 +9,7 @@ import (
 	"mika/store"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type errMsg struct {
@@ -23,7 +24,7 @@ func errResponse(c *gin.Context, code int, msg string) {
 type ServerExample struct {
 	Addr       string
 	Router     *gin.Engine
-	Users      []*model.User
+	Users      map[string]*model.User
 	UsersMx    sync.RWMutex
 	Peers      map[model.InfoHash]*model.Peer
 	PeersMx    sync.RWMutex
@@ -48,10 +49,10 @@ func (s *ServerExample) getUser(c *gin.Context) {
 }
 
 func (s *ServerExample) Run() error {
-	return s.Router.Run("")
+	return s.Router.Run(s.Addr)
 }
 
-func New() *ServerExample {
+func New() *http.Server {
 	userCount := 10
 	torrentCount := 100
 	peerCount := 1000
@@ -62,9 +63,11 @@ func New() *ServerExample {
 		PeersMx:    sync.RWMutex{},
 		TorrentsMx: sync.RWMutex{},
 		Peers:      map[model.InfoHash]*model.Peer{},
+		Users:      map[string]*model.User{},
 	}
 	for i := 0; i < userCount; i++ {
-		s.Users = append(s.Users, store.GenerateTestUser())
+		usr := store.GenerateTestUser()
+		s.Users[usr.Passkey] = usr
 	}
 	for i := 0; i < torrentCount; i++ {
 		s.Torrents = append(s.Torrents, store.GenerateTestTorrent())
@@ -72,7 +75,14 @@ func New() *ServerExample {
 	for i := 0; i < peerCount; i++ {
 		s.Peers[s.Torrents[rand.Int31n(int32(torrentCount-1))].InfoHash] = store.GenerateTestPeer()
 	}
-	s.Router.GET("/api/torrent/<info_hash>", s.getTorrent)
-	s.Router.GET("/api/user/<passkey>", s.getUser)
-	return s
+	s.Router.GET("/api/torrent/:info_hash", s.getTorrent)
+	s.Router.GET("/api/user/pk/:passkey", s.getUser)
+	return &http.Server{
+		Addr:           s.Addr,
+		Handler:        s.Router,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+		TLSConfig:      nil,
+	}
 }

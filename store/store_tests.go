@@ -11,13 +11,21 @@ import (
 	"testing"
 )
 
-func generateTestTorrent() *model.Torrent {
+func GenerateTestUser() *model.User {
+	passkey, _ := util.GenRandomBytes(20)
+	return &model.User{
+		UserId:  uint32(rand.Intn(10000)),
+		Passkey: string(passkey),
+	}
+}
+
+func GenerateTestTorrent() *model.Torrent {
 	token, _ := util.GenRandomBytes(20)
 	ih := model.InfoHashFromString(string(token))
 	return model.NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)), uint32(rand.Intn(1000000)))
 }
 
-func generateTestPeer() *model.Peer {
+func GenerateTestPeer() *model.Peer {
 	token, _ := util.GenRandomBytes(20)
 	ih := model.PeerIDFromString(string(token))
 	return model.NewPeer(
@@ -39,15 +47,15 @@ func findPeer(peers []*model.Peer, p1 *model.Peer) *model.Peer {
 // TestPeerStore tests the interface implementation
 func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	//clearDB(ps.client)
-	torrentA := generateTestTorrent()
+	torrentA := GenerateTestTorrent()
 	defer func() { _ = ts.DeleteTorrent(torrentA, true) }()
 	require.NoError(t, ts.AddTorrent(torrentA))
 	peers := []*model.Peer{
-		generateTestPeer(),
-		generateTestPeer(),
-		generateTestPeer(),
-		generateTestPeer(),
-		generateTestPeer(),
+		GenerateTestPeer(),
+		GenerateTestPeer(),
+		GenerateTestPeer(),
+		GenerateTestPeer(),
+		GenerateTestPeer(),
 	}
 	for _, peer := range peers {
 		require.NoError(t, ps.AddPeer(torrentA, peer))
@@ -84,7 +92,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 
 // TestTorrentStore tests the interface implementation
 func TestTorrentStore(t *testing.T, ts TorrentStore) {
-	torrentA := generateTestTorrent()
+	torrentA := GenerateTestTorrent()
 	require.NoError(t, ts.AddTorrent(torrentA))
 	fetchedTorrent, err := ts.GetTorrent(torrentA.InfoHash)
 	require.NoError(t, err)

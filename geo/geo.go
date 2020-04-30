@@ -91,7 +91,7 @@ func DownloadDB(outputPath string, apiKey string) error {
 	if err != nil {
 		return err
 	}
-	if err := util.ExtractTarGz(resp.Body, s); err != nil {
+	if err := extractTarGz(resp.Body, s); err != nil {
 		return err
 	}
 	return nil

@@ -1,4 +1,4 @@
-package util
+package geo
 
 import (
 	"archive/tar"
@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-func ExtractTarGz(gzipStream io.Reader, outStream io.Writer) error {
+func extractTarGz(gzipStream io.Reader, outStream io.Writer) error {
 	uncompressedStream, err := gzip.NewReader(gzipStream)
 	if err != nil {
-		log.Fatal("ExtractTarGz: NewReader failed")
+		log.Fatal("extractTarGz: NewReader failed")
 	}
 
 	tarReader := tar.NewReader(uncompressedStream)
@@ -23,13 +23,13 @@ func ExtractTarGz(gzipStream io.Reader, outStream io.Writer) error {
 			break
 		}
 		if err != nil {
-			log.Fatalf("ExtractTarGz: Next() failed: %s", err.Error())
+			log.Fatalf("extractTarGz: Next() failed: %s", err.Error())
 		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
 			//if err := os.Mkdir(header.Name, 0755); err != nil {
-			//	log.Fatalf("ExtractTarGz: Mkdir() failed: %s", err.Error())
+			//	log.Fatalf("extractTarGz: Mkdir() failed: %s", err.Error())
 			//}
 		case tar.TypeReg:
 			if !strings.HasSuffix(header.Name, ".mmdb") {
@@ -37,11 +37,11 @@ func ExtractTarGz(gzipStream io.Reader, outStream io.Writer) error {
 			}
 			foundFile = true
 			if _, err := io.Copy(outStream, tarReader); err != nil {
-				log.Fatalf("ExtractTarGz: Copy() failed: %s", err.Error())
+				log.Fatalf("extractTarGz: Copy() failed: %s", err.Error())
 			}
 		default:
 			log.Fatalf(
-				"ExtractTarGz: uknown type: %s in %s",
+				"extractTarGz: uknown type: %s in %s",
 				header.Typeflag,
 				header.Name)
 		}

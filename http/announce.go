@@ -31,7 +31,7 @@ type announceRequest struct {
 	Left uint64 `form:"left" binding:"required"`
 
 	// The total amount uploaded (since the client sent the 'started' event to the tracker) in base ten
-	// ASCII. While not explicitly stated in the official specification, the concensus is that this should
+	// ASCII. While not explicitly stated in the official specification, the consensus is that this should
 	// be the total number of bytes uploaded.
 	Uploaded uint64 `form:"uploaded" binding:"required"`
 

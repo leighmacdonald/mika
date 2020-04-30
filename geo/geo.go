@@ -3,9 +3,9 @@
 package geo
 
 import (
-	"errors"
 	"fmt"
 	"github.com/oschwald/maxminddb-golang"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"math"
 	"mika/util"
@@ -24,24 +24,29 @@ const (
 	geoDownloadURL = "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=%s&suffix=tar.gz"
 )
 
+// City provides the country and lat/long
 type City struct {
 	Country  Country `maxminddb:"country"`
 	Location LatLong `maxminddb:"location"`
 }
 
+// Country is the ISO country code
 type Country struct {
 	ISOCode string `maxminddb:"iso_code"`
 }
 
+// LatLong provides a container and some helper functions for location data
 type LatLong struct {
 	Latitude  float64 `maxminddb:"latitude"`
 	Longitude float64 `maxminddb:"longitude"`
 }
 
+// String returns a comma separated lat long pair string
 func (ll LatLong) String() string {
 	return fmt.Sprintf("%f,%f", ll.Latitude, ll.Longitude)
 }
 
+// LatLongFromString will return a LatLong from a string formatted like N,-N
 func LatLongFromString(s string) LatLong {
 	p := strings.Split(s, ",")
 	if len(p) != 2 {
@@ -54,7 +59,7 @@ func LatLongFromString(s string) LatLong {
 	}
 }
 
-type Ellipsoid struct {
+type ellipsoid struct {
 	Ellipse        ellipse
 	DistanceUnits  int
 	DistanceFactor float64
@@ -65,9 +70,9 @@ type ellipse struct {
 	InvFlattening float64
 }
 
-// Distance computes the distances between two LatLong pairings
-func (db *DB) Distance(llA LatLong, llB LatLong) float64 {
-	return math.Floor(db.ellipsoid.To(llA.Latitude, llA.Longitude, llB.Latitude, llB.Longitude))
+// distance computes the distances between two LatLong pairings
+func (db *DB) distance(llA LatLong, llB LatLong) float64 {
+	return math.Floor(db.ellipsoid.to(llA.Latitude, llA.Longitude, llB.Latitude, llB.Longitude))
 }
 
 // DownloadDB will fetch a new geoip database from maxmind and install it, uncompressed,
@@ -80,7 +85,7 @@ func DownloadDB(outputPath string, apiKey string) error {
 	url := fmt.Sprintf(geoDownloadURL, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
-		return errors.New("Failed to downloaded geoip db: " + err.Error())
+		return errors.Wrap(err, "Failed to downloaded geoip db")
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -102,8 +107,8 @@ func deg2rad(d float64) float64 {
 	return d * pi / 180.0
 }
 
-// To will return the distance to another lat/long pairing.
-func (ellipsoid Ellipsoid) To(lat1, lon1, lat2, lon2 float64) (distance float64) {
+// to will return the distance to another lat/long pairing.
+func (ellipsoid ellipsoid) to(lat1, lon1, lat2, lon2 float64) (distance float64) {
 	distance, _ = ellipsoid.calculateBearing(
 		deg2rad(lat1), deg2rad(lon1),
 		deg2rad(lat2), deg2rad(lon2),
@@ -114,7 +119,7 @@ func (ellipsoid Ellipsoid) To(lat1, lon1, lat2, lon2 float64) (distance float64)
 
 // calculateBearing will take 2 lat/long pairs and compute the distance and bearing of the
 // values.
-func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (distance, bearing float64) {
+func (ellipsoid ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (distance, bearing float64) {
 	a := ellipsoid.Ellipse.Equatorial
 	f := 1 / ellipsoid.Ellipse.InvFlattening
 
@@ -212,7 +217,7 @@ func (ellipsoid Ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 
 type DB struct {
 	db        *maxminddb.Reader
-	ellipsoid Ellipsoid
+	ellipsoid ellipsoid
 }
 
 func New(path string) *DB {
@@ -222,7 +227,7 @@ func New(path string) *DB {
 	}
 	return &DB{
 		db: db,
-		ellipsoid: Ellipsoid{
+		ellipsoid: ellipsoid{
 			ellipse{6378137.0, 298.257223563}, // WGS84, because why not
 			kilometer,
 			1000.0,

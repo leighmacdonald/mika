@@ -10,19 +10,19 @@ type AdminAPI struct {
 	t *tracker.Tracker
 }
 
-func (a *AdminAPI) TorrentDelete(c *gin.Context) {
+func (a *AdminAPI) torrentDelete(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) TorrentUpdate(c *gin.Context) {
+func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) UserUpdate(c *gin.Context) {
+func (a *AdminAPI) userUpdate(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) UserDelete(c *gin.Context) {
+func (a *AdminAPI) userDelete(c *gin.Context) {
 
 }
 

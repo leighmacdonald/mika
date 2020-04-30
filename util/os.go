@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// WaitForSignal will execute a function when a matching os.Signal is received
+// This is mostly designed to shutdown & cleanup services
 func WaitForSignal(ctx context.Context, f func(ctx context.Context) error) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

@@ -13,8 +13,8 @@ type scrapeResponse struct {
 	Files []bencode.Dict
 }
 
-func (h *BitTorrentHandler) Scrape(c *gin.Context) {
-	//q, err := QueryStringParser(c.Request.RequestURI)
+func (h *BitTorrentHandler) scrape(c *gin.Context) {
+	//q, err := queryStringParser(c.Request.RequestURI)
 	//if err != nil {
 	//	return
 	//}

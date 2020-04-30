@@ -25,14 +25,16 @@ func GenerateTestTorrent() *model.Torrent {
 	return model.NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)), uint32(rand.Intn(1000000)))
 }
 
-func GenerateTestPeer() *model.Peer {
+func GenerateTestPeer(user *model.User) *model.Peer {
 	token, _ := util.GenRandomBytes(20)
 	ih := model.PeerIDFromString(string(token))
-	return model.NewPeer(
+	p := model.NewPeer(
 		uint32(rand.Intn(1000000)),
 		ih,
 		net.ParseIP("1.2.3.4"),
 		uint16(rand.Intn(60000)))
+	p.User = user
+	return p
 }
 
 func findPeer(peers []*model.Peer, p1 *model.Peer) *model.Peer {
@@ -51,11 +53,11 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	defer func() { _ = ts.DeleteTorrent(torrentA, true) }()
 	require.NoError(t, ts.AddTorrent(torrentA))
 	peers := []*model.Peer{
-		GenerateTestPeer(),
-		GenerateTestPeer(),
-		GenerateTestPeer(),
-		GenerateTestPeer(),
-		GenerateTestPeer(),
+		GenerateTestPeer(nil),
+		GenerateTestPeer(nil),
+		GenerateTestPeer(nil),
+		GenerateTestPeer(nil),
+		GenerateTestPeer(nil),
 	}
 	for _, peer := range peers {
 		require.NoError(t, ps.AddPeer(torrentA, peer))

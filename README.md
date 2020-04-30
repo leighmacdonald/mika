@@ -33,6 +33,13 @@ port differing from the standard tracker port. This port is configured for TLS1.
 - Multi platform support
 - User authentication via passkey
 
+## Build Notes
+
+To also build the demo http server add the demos build tags.
+
+    go build -tags demos 
+    ./mika demoapi
+
 ## Usage
 
 None, Don't use this yet.

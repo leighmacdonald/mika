@@ -27,7 +27,7 @@ func TestDistance(t *testing.T) {
 	db := New("../" + viper.GetString("geodb_path"))
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
-	distance := db.Distance(a, b)
+	distance := db.distance(a, b)
 	if distance != 141.0 {
 		t.Errorf("Invalid distances: %f != %f", distance, 141.903347)
 	}
@@ -38,7 +38,7 @@ func BenchmarkDistance(t *testing.B) {
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
 	for n := 0; n < t.N; n++ {
-		_ = db.Distance(a, b)
+		_ = db.distance(a, b)
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 	"mika/tracker"
 	"net"
 	"net/http"
@@ -45,40 +44,40 @@ type errorResponse struct {
 type trackerErrCode int
 
 const (
-	MsgInvalidReqType       trackerErrCode = 100
-	MsgMissingInfoHash      trackerErrCode = 101
-	MsgMissingPeerId        trackerErrCode = 102
-	MsgMissingPort          trackerErrCode = 103
-	MsgInvalidPort          trackerErrCode = 104
-	MsgInvalidInfoHash      trackerErrCode = 150
-	MsgInvalidPeerId        trackerErrCode = 151
-	MsgInvalidNumWant       trackerErrCode = 152
-	MsgOk                   trackerErrCode = 200
-	MsgInfoHashNotFound     trackerErrCode = 480
-	MsgInvalidAuth          trackerErrCode = 490
-	MsgClientRequestTooFast trackerErrCode = 500
-	MsgGenericError         trackerErrCode = 900
-	MsgMalformedRequest     trackerErrCode = 901
-	MsgQueryParseFail       trackerErrCode = 902
+	msgInvalidReqType       trackerErrCode = 100
+	msgMissingInfoHash      trackerErrCode = 101
+	msgMissingPeerId        trackerErrCode = 102
+	msgMissingPort          trackerErrCode = 103
+	msgInvalidPort          trackerErrCode = 104
+	msgInvalidInfoHash      trackerErrCode = 150
+	msgInvalidPeerId        trackerErrCode = 151
+	msgInvalidNumWant       trackerErrCode = 152
+	msgOk                   trackerErrCode = 200
+	msgInfoHashNotFound     trackerErrCode = 480
+	msgInvalidAuth          trackerErrCode = 490
+	msgClientRequestTooFast trackerErrCode = 500
+	msgGenericError         trackerErrCode = 900
+	msgMalformedRequest     trackerErrCode = 901
+	msgQueryParseFail       trackerErrCode = 902
 )
 
 var (
 	// Error code to message mappings
 	responseStringMap = map[trackerErrCode]error{
-		MsgInvalidReqType:       errors.New("Invalid request type"),
-		MsgMissingInfoHash:      errors.New("info_hash missing from request"),
-		MsgMissingPeerId:        errors.New("peer_id missing from request"),
-		MsgMissingPort:          errors.New("port missing from request"),
-		MsgInvalidPort:          errors.New("Invalid port"),
-		MsgInvalidAuth:          errors.New("Invalid passkey supplied"),
-		MsgInvalidInfoHash:      errors.New("Torrent info hash must be 20 characters"),
-		MsgInvalidPeerId:        errors.New("Peer ID Invalid"),
-		MsgInvalidNumWant:       errors.New("num_want invalid"),
-		MsgInfoHashNotFound:     errors.New("Unknown infohash"),
-		MsgClientRequestTooFast: errors.New("Slow down there jimmy."),
-		MsgMalformedRequest:     errors.New("Malformed request"),
-		MsgGenericError:         errors.New("Generic Error"),
-		MsgQueryParseFail:       errors.New("Could not parse request"),
+		msgInvalidReqType:       errors.New("Invalid request type"),
+		msgMissingInfoHash:      errors.New("info_hash missing from request"),
+		msgMissingPeerId:        errors.New("peer_id missing from request"),
+		msgMissingPort:          errors.New("port missing from request"),
+		msgInvalidPort:          errors.New("Invalid port"),
+		msgInvalidAuth:          errors.New("Invalid passkey supplied"),
+		msgInvalidInfoHash:      errors.New("Torrent info hash must be 20 characters"),
+		msgInvalidPeerId:        errors.New("Peer ID Invalid"),
+		msgInvalidNumWant:       errors.New("num_want invalid"),
+		msgInfoHashNotFound:     errors.New("Unknown infohash"),
+		msgClientRequestTooFast: errors.New("Slow down there jimmy."),
+		msgMalformedRequest:     errors.New("Malformed request"),
+		msgGenericError:         errors.New("Generic Error"),
+		msgQueryParseFail:       errors.New("Could not parse request"),
 	}
 )
 
@@ -87,7 +86,7 @@ func TrackerErr(code trackerErrCode) error {
 }
 
 // getIP Parses and returns a IP from a string
-func getIP(q *Query, c *gin.Context) (net.IP, error) {
+func getIP(q *query, c *gin.Context) (net.IP, error) {
 	ipStr, found := q.Params[paramIP]
 	if found {
 		ip := net.ParseIP(ipStr)
@@ -119,12 +118,10 @@ func getIP(q *Query, c *gin.Context) (net.IP, error) {
 func oops(ctx *gin.Context, errCode trackerErrCode) {
 	msg, exists := responseStringMap[errCode]
 	if !exists {
-		msg = responseStringMap[MsgGenericError]
+		msg = responseStringMap[msgGenericError]
 	}
 	ctx.String(int(errCode), responseError(msg.Error()))
-
-	log.Println("Error in request (", errCode, "):", msg)
-	log.Println("From:", ctx.Request.RequestURI)
+	log.Errorf("Error in request from: %s (%d)", ctx.Request.RequestURI, errCode)
 }
 
 // handleTrackerErrors is used as the default error handler for tracker requests
@@ -139,7 +136,7 @@ func handleTrackerErrors(ctx *gin.Context) {
 	if errorReturned != nil {
 		meta := errorReturned.JSON().(gin.H)
 
-		status := MsgGenericError
+		status := msgGenericError
 		customStatus, found := meta["status"]
 		if found {
 			status = customStatus.(trackerErrCode)
@@ -166,7 +163,7 @@ func responseError(message string) string {
 	return buf.String()
 }
 
-// NewRouter creates and returns a newly configured router instance using
+// newRouter creates and returns a newly configured router instance using
 // the default middleware handlers.
 func newRouter() *gin.Engine {
 	router := gin.New()
@@ -174,28 +171,33 @@ func newRouter() *gin.Engine {
 	return router
 }
 
+// NewBitTorrentHandler configures a router to handle tracker announce/scrape requests
 func NewBitTorrentHandler(tkr *tracker.Tracker) *gin.Engine {
 	r := newRouter()
 	r.Use(handleTrackerErrors)
 	h := BitTorrentHandler{
 		t: tkr,
 	}
-	r.GET("/:passkey/announce", h.Announce)
-	r.GET("/:passkey/scrape", h.Scrape)
+	r.GET("/:passkey/announce", h.announce)
+	r.GET("/:passkey/scrape", h.scrape)
 	return r
 }
 
+// NewAPIHandler configures a router to handle API requests
 func NewAPIHandler(tkr *tracker.Tracker) *gin.Engine {
 	r := newRouter()
 	h := AdminAPI{
 		t: tkr,
 	}
 	r.GET("/tracker/stats", h.Stats)
-	r.DELETE("/torrent/:info_hash", h.TorrentDelete)
-	r.PATCH("/torrent/:info_hash", h.TorrentUpdate)
+	r.DELETE("/torrent/:info_hash", h.torrentDelete)
+	r.PATCH("/torrent/:info_hash", h.torrentUpdate)
 	return r
 }
 
+// CreateServer will configure and return a *http.Server suitable for serving requests.
+// This should be used over the default ListenAndServe options as they do not set certain
+// parameters, notably timeouts, which can negatively effect performance.
 func CreateServer(router http.Handler, addr string, useTLS bool) *http.Server {
 	var tlsCfg *tls.Config
 	if useTLS {
@@ -220,24 +222,6 @@ func CreateServer(router http.Handler, addr string, useTLS bool) *http.Server {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 		TLSConfig:      tlsCfg,
-		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 	}
 	return srv
-}
-
-// Doesnt seem to work? Causes duplicate port use??
-func StartListeners(s []*http.Server) {
-	var g errgroup.Group
-	for _, server := range s {
-		g.Go(func() error {
-			err := server.ListenAndServe()
-			if err != nil && err != http.ErrServerClosed {
-				log.Fatal(err)
-			}
-			return err
-		})
-	}
-	if err := g.Wait(); err != nil {
-		log.Fatal(err)
-	}
 }

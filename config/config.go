@@ -10,6 +10,7 @@ import (
 	"os"
 )
 
+// StoreType is a mapping to the backing store types used
 type StoreType int
 
 const (
@@ -68,6 +69,7 @@ const (
 	GeodbEnabled = "geodb_enabled"
 )
 
+// StoreConfig provides a common config struct for backing stores
 type StoreConfig struct {
 	Type       string
 	Host       string
@@ -80,7 +82,7 @@ type StoreConfig struct {
 
 // DSN constructs a URI for database connection strings
 //
-// protocol//[user]:[password]@[hosts][/database][?properties]
+// protocol//[user]:[password]@tcp([host]:[port])[/database][?properties]
 func (c StoreConfig) DSN() string {
 	props := c.Properties
 	if props != "" {
@@ -96,6 +98,7 @@ func (c StoreConfig) DSN() string {
 	return u.String()
 }
 
+// GetStoreConfig returns the config options for the store type provided
 func GetStoreConfig(storeType StoreType) *StoreConfig {
 	switch storeType {
 	case Users:

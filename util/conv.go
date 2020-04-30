@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// StringToInt16 converts a string to a int16 returning a default value on failure
 func StringToInt16(s string, def int16) int16 {
 	v, err := strconv.ParseInt(s, 10, 16)
 	if err != nil {
@@ -15,6 +16,7 @@ func StringToInt16(s string, def int16) int16 {
 	return int16(v)
 }
 
+// StringToUInt16 converts a string to a uint16 returning a default value on failure
 func StringToUInt16(s string, def uint16) uint16 {
 	v, err := strconv.ParseInt(s, 10, 16)
 	if err != nil {
@@ -24,6 +26,7 @@ func StringToUInt16(s string, def uint16) uint16 {
 	return uint16(v)
 }
 
+// StringToUInt32 converts a string to a uint32 returning a default value on failure
 func StringToUInt32(s string, def uint32) uint32 {
 	v, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
@@ -33,6 +36,7 @@ func StringToUInt32(s string, def uint32) uint32 {
 	return uint32(v)
 }
 
+// StringToFloat64 converts a string to a float64 returning a default value on failure
 func StringToFloat64(s string, def float64) float64 {
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
@@ -42,6 +46,7 @@ func StringToFloat64(s string, def float64) float64 {
 	return v
 }
 
+// StringToBool converts a string to a bool returning a default value on failure
 func StringToBool(s string, def bool) bool {
 	v, err := strconv.ParseBool(s)
 	if err != nil {
@@ -51,6 +56,7 @@ func StringToBool(s string, def bool) bool {
 	return v
 }
 
+// StringToTime converts a string to a time.Time returning a default value on failure
 func StringToTime(s string) time.Time {
 	v, err := time.Parse(time.RFC1123Z, s)
 	if err != nil {
@@ -60,6 +66,7 @@ func StringToTime(s string) time.Time {
 	return v
 }
 
+// TimeToString converts a time.Time to a common RFC1123Z string
 func TimeToString(t time.Time) string {
 	return t.Format(time.RFC1123Z)
 }

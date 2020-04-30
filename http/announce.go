@@ -16,7 +16,7 @@ type BitTorrentHandler struct {
 // Represents an announce received from the bittorrent client
 //
 // TODO use gin binding func?
-type AnnounceRequest struct {
+type announceRequest struct {
 	Compact bool `form:"compact"` // Force compact always?
 
 	// The total amount downloaded (since the client sent the 'started' event to the tracker) in
@@ -86,7 +86,7 @@ type AnnounceRequest struct {
 	TrackerId string `form:"tracker_id"`
 }
 
-type AnnounceResponse struct {
+type announceResponse struct {
 	//  (optional) Minimum announce interval. If present clients must not reannounce more frequently than this.
 	MinInterval int `bencode:"min interval"`
 
@@ -104,7 +104,7 @@ type AnnounceResponse struct {
 	Warning string `bencode:"warning message"`
 }
 
-func getUint64Key(q *Query, key announceParam, def uint64) uint64 {
+func getUint64Key(q *query, key announceParam, def uint64) uint64 {
 	left, err := q.Uint64(key)
 	if err != nil {
 		return def
@@ -113,7 +113,7 @@ func getUint64Key(q *Query, key announceParam, def uint64) uint64 {
 	}
 }
 
-func getUintKey(q *Query, key announceParam, def uint) uint {
+func getUintKey(q *query, key announceParam, def uint) uint {
 	left, err := q.Uint(key)
 	if err != nil {
 		return def
@@ -122,31 +122,31 @@ func getUintKey(q *Query, key announceParam, def uint) uint {
 	}
 }
 
-// Parse the query string into an AnnounceRequest struct
-func newAnnounce(c *gin.Context) (*AnnounceRequest, trackerErrCode) {
-	q, err := QueryStringParser(c.Request.URL.RawQuery)
+// Parse the query string into an announceRequest struct
+func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
+	q, err := queryStringParser(c.Request.URL.RawQuery)
 	if err != nil {
-		return nil, MsgMalformedRequest
+		return nil, msgMalformedRequest
 	}
 
 	infoHash, exists := q.Params[paramInfoHash]
 	if !exists {
-		return nil, MsgInvalidInfoHash
+		return nil, msgInvalidInfoHash
 	}
 
 	peerID, exists := q.Params[paramPeerID]
 	if !exists {
-		return nil, MsgInvalidPeerId
+		return nil, msgInvalidPeerId
 	}
 
 	ipv4, err := getIP(q, c)
 	if err != nil {
 
-		return nil, MsgMalformedRequest
+		return nil, msgMalformedRequest
 	}
 	port := getUintKey(q, paramPort, 0)
 	if port < 1024 || port > 65535 {
-		return nil, MsgInvalidPort
+		return nil, msgInvalidPort
 	}
 	left := getUint64Key(q, paramLeft, 0)
 	downloaded := getUint64Key(q, paramDownloaded, 0)
@@ -155,7 +155,7 @@ func newAnnounce(c *gin.Context) (*AnnounceRequest, trackerErrCode) {
 	event := parseAnnounceType(q.Params[paramNumWant])
 	numWant := getUintKey(q, "numwant", 30)
 
-	return &AnnounceRequest{
+	return &announceRequest{
 		Compact:    true, // Ignored and always set to true
 		Corrupt:    corrupt,
 		Downloaded: downloaded,
@@ -167,12 +167,12 @@ func newAnnounce(c *gin.Context) (*AnnounceRequest, trackerErrCode) {
 		PeerID:     model.PeerIDFromString(peerID),
 		Port:       port,
 		Uploaded:   uploaded,
-	}, MsgOk
+	}, msgOk
 }
 
-func (h *BitTorrentHandler) Announce(c *gin.Context) {
+func (h *BitTorrentHandler) announce(c *gin.Context) {
 	req, code := newAnnounce(c)
-	if code != MsgOk {
+	if code != msgOk {
 		c.String(int(code), TrackerErr(code).Error())
 		return
 	}

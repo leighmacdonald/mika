@@ -22,41 +22,41 @@ const (
 	paramCompact    announceParam = "compact"
 )
 
-type Query struct {
+type query struct {
 	InfoHashes []string
 	Params     map[announceParam]string
 }
 
-// QueryStringParser transforms a raw url query into a Query struct
+// queryStringParser transforms a raw url query into a Query struct
 // This is used to avoid reflection calls used in the underlying gin.Bind functionality that
 // would normally be used to parse the query params
-func QueryStringParser(query string) (*Query, error) {
+func queryStringParser(qStr string) (*query, error) {
 	var (
 		keyStart, keyEnd int
 		valStart, valEnd int
 		firstInfoHash    string
 		onKey            = true
 		hasInfoHash      = false
-		q                = &Query{
+		q                = &query{
 			InfoHashes: nil,
 			Params:     make(map[announceParam]string),
 		}
 	)
 
-	for i, length := 0, len(query); i < length; i++ {
-		separator := query[i] == '&' || query[i] == ';' || query[i] == '?'
+	for i, length := 0, len(qStr); i < length; i++ {
+		separator := qStr[i] == '&' || qStr[i] == ';' || qStr[i] == '?'
 		if separator || i == length-1 {
 			if onKey {
 				keyStart = i + 1
 				continue
 			}
 			if i == length-1 && !separator {
-				if query[i] == '=' {
+				if qStr[i] == '=' {
 					continue
 				}
 				valEnd = i
 			}
-			keyStr, err := url.QueryUnescape(query[keyStart : keyEnd+1])
+			keyStr, err := url.QueryUnescape(qStr[keyStart : keyEnd+1])
 			if err != nil {
 				return nil, err
 			}
@@ -66,7 +66,7 @@ func QueryStringParser(query string) (*Query, error) {
 				return nil, consts.ErrMalformedRequest
 			}
 
-			valStr, err := url.QueryUnescape(query[valStart : valEnd+1])
+			valStr, err := url.QueryUnescape(qStr[valStart : valEnd+1])
 			if err != nil {
 				return nil, err
 			}
@@ -87,7 +87,7 @@ func QueryStringParser(query string) (*Query, error) {
 			}
 			onKey = true
 			keyStart = i + 1
-		} else if query[i] == '=' {
+		} else if qStr[i] == '=' {
 			onKey = false
 			valStart = i + 1
 		} else if onKey {
@@ -102,7 +102,7 @@ func QueryStringParser(query string) (*Query, error) {
 
 // Uint64 is a helper to obtain a uint64 of any length from a Query. After being
 // called, you can safely cast the uint64 to your desired length.
-func (q *Query) Uint64(key announceParam) (uint64, error) {
+func (q *query) Uint64(key announceParam) (uint64, error) {
 	str, exists := q.Params[key]
 	if !exists {
 		return 0, consts.ErrInvalidMapKey
@@ -112,7 +112,7 @@ func (q *Query) Uint64(key announceParam) (uint64, error) {
 
 // Uint is a helper to obtain a uint of any length from a Query. After being
 // called, you can safely cast the uint64 to your desired length.
-func (q *Query) Uint(key announceParam) (uint, error) {
+func (q *query) Uint(key announceParam) (uint, error) {
 	str, exists := q.Params[key]
 	if !exists {
 		return 0, consts.ErrInvalidMapKey

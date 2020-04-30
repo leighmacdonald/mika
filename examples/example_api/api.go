@@ -1,10 +1,11 @@
 // Package example_api implements a trivial reference server implementation
 // of the required API routes to communicate as a frontend server for the tracker.
+// +build demos
+
 package example_api
 
 import (
 	"github.com/gin-gonic/gin"
-	"math/rand"
 	"mika/model"
 	"mika/store"
 	"net/http"
@@ -21,23 +22,32 @@ func errResponse(c *gin.Context, code int, msg string) {
 	c.JSON(code, errMsg{code, msg})
 }
 
+// ServerExample provides and example / demo server implementation that conforms to mika's HTTP store backend.
 type ServerExample struct {
 	Addr       string
 	Router     *gin.Engine
-	Users      map[string]*model.User
+	Users      []*model.User
 	UsersMx    sync.RWMutex
-	Peers      map[model.InfoHash]*model.Peer
+	Peers      map[model.InfoHash][]*model.Peer
 	PeersMx    sync.RWMutex
-	Torrents   []*model.Torrent
+	Torrents   map[model.InfoHash]*model.Torrent
 	TorrentsMx sync.RWMutex
 }
 
 func (s *ServerExample) getTorrent(c *gin.Context) {
-	infoHash := c.Param("info_hash")
-	if infoHash == "" {
+	infoHashStr := c.Param("info_hash")
+	if infoHashStr == "" {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return
 	}
+	infoHash := model.InfoHashFromString(infoHashStr)
+	s.TorrentsMx.RLock()
+	t, found := s.Torrents[infoHash]
+	if !found || t.IsDeleted == true {
+		errResponse(c, http.StatusNotFound, "Unknown info_hash")
+		return
+	}
+	c.PureJSON(http.StatusOK, t)
 }
 
 func (s *ServerExample) getUser(c *gin.Context) {
@@ -46,34 +56,53 @@ func (s *ServerExample) getUser(c *gin.Context) {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
+	u := s.getUserByPasskey(passKey)
+	if u == nil {
+		errResponse(c, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	c.JSON(http.StatusOK, u)
 }
 
-func (s *ServerExample) Run() error {
-	return s.Router.Run(s.Addr)
+func (s *ServerExample) getUserByPasskey(passkey string) *model.User {
+	s.UsersMx.RLock()
+	defer s.UsersMx.RUnlock()
+	for _, u := range s.Users {
+		if u.Passkey == passkey {
+			return u
+		}
+	}
+	return nil
 }
 
+// New returns an example HTTP server implementation to test against and learn from
 func New() *http.Server {
 	userCount := 10
 	torrentCount := 100
-	peerCount := 1000
+	swarmSize := 10 // Peers per torrent
 	s := &ServerExample{
 		Addr:       "localhost:8080",
 		Router:     gin.Default(),
 		UsersMx:    sync.RWMutex{},
 		PeersMx:    sync.RWMutex{},
 		TorrentsMx: sync.RWMutex{},
-		Peers:      map[model.InfoHash]*model.Peer{},
-		Users:      map[string]*model.User{},
+		Torrents:   map[model.InfoHash]*model.Torrent{},
+		Peers:      map[model.InfoHash][]*model.Peer{},
+		Users:      []*model.User{},
 	}
 	for i := 0; i < userCount; i++ {
-		usr := store.GenerateTestUser()
-		s.Users[usr.Passkey] = usr
+		s.Users = append(s.Users, store.GenerateTestUser())
 	}
 	for i := 0; i < torrentCount; i++ {
-		s.Torrents = append(s.Torrents, store.GenerateTestTorrent())
+		t := store.GenerateTestTorrent()
+		s.Torrents[t.InfoHash] = t
 	}
-	for i := 0; i < peerCount; i++ {
-		s.Peers[s.Torrents[rand.Int31n(int32(torrentCount-1))].InfoHash] = store.GenerateTestPeer()
+	for k := range s.Torrents {
+		var swarm []*model.Peer
+		for i := 0; i < swarmSize; i++ {
+			swarm = append(swarm, store.GenerateTestPeer(s.Users[i]))
+		}
+		s.Peers[k] = swarm
 	}
 	s.Router.GET("/api/torrent/:info_hash", s.getTorrent)
 	s.Router.GET("/api/user/pk/:passkey", s.getUser)
@@ -83,6 +112,5 @@ func New() *http.Server {
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
-		TLSConfig:      nil,
 	}
 }

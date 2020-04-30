@@ -1,7 +1,8 @@
 // Package store provides the underlying interfaces and glue for the backend storage drivers.
 //
-// We define 2 distinct interfaces to allow for flexibility in storage options.
-// TorrentStore is meant as a persistent storage backend which is backed to permanent storage
+// We define 3 distinct interfaces to allow for flexibility in storage options.
+// UserStore is meant as a persistent storage backend for user data which is backed to permanent storage
+// TorrentStore is meant as a persistent storage backend for torrent data which is backed to permanent storage
 // PeerStore is meant as a cache to store ephemeral peer/swarm data, it does not need to be backed
 // by persistent storage, but the option is there if desired.
 //
@@ -24,18 +25,25 @@ var (
 	torrentDrivers      = make(map[string]TorrentDriver)
 )
 
+// TorrentDriver provides a interface to enable registration of TorrentStore drivers
 type TorrentDriver interface {
+	// NewUserStore instantiates a new TorrentStore
 	NewTorrentStore(config interface{}) (TorrentStore, error)
 }
 
+// PeerDriver provides a interface to enable registration of PeerStore drivers
 type PeerDriver interface {
+	// NewUserStore instantiates a new PeerStore
 	NewPeerStore(config interface{}) (PeerStore, error)
 }
 
+// UserDriver provides a interface to enable registration of UserStore drivers
 type UserDriver interface {
+	// NewUserStore instantiates a new UserStore
 	NewUserStore(config interface{}) (UserStore, error)
 }
 
+// AddPeerDriver will register a new driver able to instantiate a PeerStore
 func AddPeerDriver(name string, driver PeerDriver) {
 	peerDriversMutex.Lock()
 	defer peerDriversMutex.Unlock()
@@ -43,6 +51,7 @@ func AddPeerDriver(name string, driver PeerDriver) {
 	log.Debugf("Registered peer storage driver: %s", name)
 }
 
+// AddTorrentDriver will register a new driver able to instantiate a TorrentStore
 func AddTorrentDriver(name string, driver TorrentDriver) {
 	torrentDriversMutex.Lock()
 	defer torrentDriversMutex.Unlock()
@@ -50,6 +59,7 @@ func AddTorrentDriver(name string, driver TorrentDriver) {
 	log.Debugf("Registered torrent storage driver: %s", name)
 }
 
+// AddUserDriver will register a new driver able to instantiate a UserStore
 func AddUserDriver(name string, driver UserDriver) {
 	userDriverMutex.Lock()
 	defer userDriverMutex.Unlock()
@@ -61,10 +71,13 @@ func AddUserDriver(name string, driver UserDriver) {
 // These should be cached indefinitely, we treat any known user as allowed to connect.
 // To disable a user they MUST be deleted from the active user cache
 type UserStore interface {
+	// GetUserByPasskey returns a user matching the passkey
 	GetUserByPasskey(passkey string) (model.User, error)
+	// GetUserById returns a user matching the userId
 	GetUserById(userId uint32) (model.User, error)
+	// DeleteUser removes a user from the backing store
 	DeleteUser(user model.User) error
-	// Close should cleanup and clone the underlying storage driver
+	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }
 
@@ -73,8 +86,12 @@ type UserStore interface {
 type TorrentStore interface {
 	// Add a new torrent to the backing store
 	AddTorrent(t *model.Torrent) error
+	// DeleteTorrent will mark a torrent as deleted in the backing store.
+	// If dropRow is true, it will permanently remove the torrent from the store
 	DeleteTorrent(t *model.Torrent, dropRow bool) error
+	// GetTorrent returns the Torrent matching the infohash
 	GetTorrent(hash model.InfoHash) (*model.Torrent, error)
+	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }
 
@@ -82,14 +99,21 @@ type TorrentStore interface {
 // This doesnt need to be persisted to disk, but it will help warm up times
 // if its backed by something that can restore its in memory state, such as redis
 type PeerStore interface {
+	// AddPeer inserts a peer into the active swarm for the torrent provided
 	AddPeer(t *model.Torrent, p *model.Peer) error
+	// UpdatePeer will sync any new peer data with the backing store
 	UpdatePeer(t *model.Torrent, p *model.Peer) error
+	// DeletePeer will remove a user from a torrents swarm
 	DeletePeer(t *model.Torrent, p *model.Peer) error
+	// GetPeers will fetch peers for a torrents active swarm up to N users
 	GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error)
+	// GetScrape returns scrape data for the torrent provided
 	GetScrape(t *model.Torrent)
+	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }
 
+// NewTorrentStore will attempt to initialize a TorrentStore using the driver name provided
 func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error) {
 	torrentDriversMutex.RLock()
 	defer torrentDriversMutex.RUnlock()
@@ -101,6 +125,7 @@ func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error)
 	return driver.NewTorrentStore(config)
 }
 
+// NewPeerStore will attempt to initialize a PeerStore using the driver name provided
 func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 	peerDriversMutex.RLock()
 	defer peerDriversMutex.RUnlock()
@@ -112,6 +137,7 @@ func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 	return driver.NewPeerStore(config)
 }
 
+// NewUserStore will attempt to initialize a UserStore using the driver name provided
 func NewUserStore(storeType string, config interface{}) (UserStore, error) {
 	userDriverMutex.RLock()
 	defer userDriverMutex.RUnlock()

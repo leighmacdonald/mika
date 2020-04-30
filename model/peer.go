@@ -15,10 +15,12 @@ func PeerIDFromString(s string) PeerID {
 	return buf
 }
 
+// String implements fmt.Stringer, returning the base16 encoded PeerID.
 func (p PeerID) String() string {
 	return fmt.Sprintf("%x", p[:])
 }
 
+// RawString returns a 20-byte string of the raw bytes of the ID.
 func (p PeerID) RawString() string {
 	return string(p[:])
 }
@@ -59,6 +61,8 @@ type Peer struct {
 	// TODO Do we actually care about these times? Announce times likely enough
 	CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
 	UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
+
+	User *User
 }
 
 // IsNew checks if the peer is making its first announce request

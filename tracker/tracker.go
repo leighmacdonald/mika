@@ -9,6 +9,7 @@ import (
 	"sync"
 )
 
+// Tracker is the main application struct used to tie all the discreet components together
 type Tracker struct {
 	torrents store.TorrentStore
 	peers    store.PeerStore
@@ -19,6 +20,7 @@ type Tracker struct {
 	Whitelist      []string
 }
 
+// New creates a new Tracker instance with configured backend stores
 func New() (*Tracker, error) {
 	var err error
 	s, err := store.NewTorrentStore(

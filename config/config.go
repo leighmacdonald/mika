@@ -65,7 +65,7 @@ const (
 	StorePeersProperties = "store_peers_properties"
 
 	GeodbPath    = "geodb_path"
-	GeodbApiKey  = "geodb_api_key"
+	GeodbAPIKey  = "geodb_api_key"
 	GeodbEnabled = "geodb_enabled"
 )
 

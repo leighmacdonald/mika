@@ -3,6 +3,7 @@ package consts
 import "github.com/pkg/errors"
 
 var (
+	// General request error for invalid inputs that dont fall under other categories
 	ErrMalformedRequest    = errors.New("Malformed request")
 	ErrInvalidMapKey       = errors.New("Invalid map key specified")
 	ErrDuplicate           = errors.New("Duplicate entry")

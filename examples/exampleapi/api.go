@@ -1,8 +1,8 @@
-// Package example_api implements a trivial reference server implementation
+// Package exampleapi implements a trivial reference server implementation
 // of the required API routes to communicate as a frontend server for the tracker.
 // +build demos
 
-package example_api
+package exampleapi
 
 import (
 	"github.com/gin-gonic/gin"

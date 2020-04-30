@@ -19,7 +19,7 @@ func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
 	return model.User{}, nil
 }
 
-func (u *UserStore) GetUserById(userId uint32) (model.User, error) {
+func (u *UserStore) GetUserByID(userID uint32) (model.User, error) {
 	panic("implement me")
 }
 

@@ -36,9 +36,8 @@ func UMax(a, b uint) uint {
 func UMin64(a, b uint64) uint64 {
 	if a < b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }
 
 // EstSpeed will estimate a peers speed using downloaded amount over time

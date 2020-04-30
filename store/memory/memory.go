@@ -30,12 +30,15 @@ func (ts *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) 
 	return t, nil
 }
 
+// PeerStore is a memory backed store.PeerStore implementation
 // TODO shard peer storage
 type PeerStore struct {
 	sync.RWMutex
 	peers map[uint32][]*model.Peer
 }
 
+// Close flushes allocated memory
+// TODO flush mem
 func (ps *PeerStore) Close() error {
 	return nil
 }
@@ -54,7 +57,7 @@ func (ps *PeerStore) UpdatePeer(_ *model.Torrent, _ *model.Peer) error {
 
 func removePeer(peers []*model.Peer, p *model.Peer) []*model.Peer {
 	for i := len(peers) - 1; i >= 0; i-- {
-		if peers[i].UserPeerId == p.UserPeerId {
+		if peers[i].UserPeerID == p.UserPeerID {
 			return append(peers[:i], peers[i+1:]...)
 		}
 	}

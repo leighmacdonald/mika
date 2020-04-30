@@ -73,16 +73,16 @@ func AddUserDriver(name string, driver UserDriver) {
 type UserStore interface {
 	// GetUserByPasskey returns a user matching the passkey
 	GetUserByPasskey(passkey string) (model.User, error)
-	// GetUserById returns a user matching the userId
-	GetUserById(userId uint32) (model.User, error)
+	// GetUserByID returns a user matching the userId
+	GetUserByID(userId uint32) (model.User, error)
 	// DeleteUser removes a user from the backing store
 	DeleteUser(user model.User) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }
 
-// Torrent store defines where we can store permanent torrent data
-// The drivers should always persist the data to disk
+// TorrentStore defines where we can store permanent torrent data
+// The backing drivers should always persist the data to disk
 type TorrentStore interface {
 	// Add a new torrent to the backing store
 	AddTorrent(t *model.Torrent) error

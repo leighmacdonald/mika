@@ -103,8 +103,8 @@ type PeerStore struct {
 }
 
 func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
-	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerId), map[string]interface{}{
-		"user_peer_id":     p.UserPeerId,
+	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerID), map[string]interface{}{
+		"user_peer_id":     p.UserPeerID,
 		"speed_up":         p.SpeedUP,
 		"speed_dn":         p.SpeedDN,
 		"speed_up_max":     p.SpeedUPMax,
@@ -118,9 +118,9 @@ func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 		"addr_port":        p.Port,
 		"last_announce":    util.TimeToString(p.AnnounceLast),
 		"first_announce":   util.TimeToString(p.AnnounceFirst),
-		"peer_id":          p.PeerId.RawString(),
+		"peer_id":          p.PeerID.RawString(),
 		"location":         p.Location.String(),
-		"user_id":          p.UserId,
+		"user_id":          p.UserID,
 		"created_on":       util.TimeToString(p.CreatedOn),
 		"updated_on":       util.TimeToString(p.UpdatedOn),
 	}).Err()
@@ -139,7 +139,7 @@ func (ps *PeerStore) findKeys(prefix string) []string {
 }
 
 func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
-	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerId), map[string]interface{}{
+	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerID), map[string]interface{}{
 		"speed_up":         p.SpeedUP,
 		"speed_dn":         p.SpeedDN,
 		"speed_up_max":     p.SpeedUPMax,
@@ -160,7 +160,7 @@ func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 }
 
 func (ps *PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
-	return ps.client.Del(peerKey(t.InfoHash, p.PeerId)).Err()
+	return ps.client.Del(peerKey(t.InfoHash, p.PeerID)).Err()
 }
 
 func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
@@ -174,7 +174,7 @@ func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error
 			return nil, errors.Wrap(err, "Error trying to GetPeers")
 		}
 		p := &model.Peer{
-			UserPeerId:    util.StringToUInt32(v["user_peer_id"], 0),
+			UserPeerID:    util.StringToUInt32(v["user_peer_id"], 0),
 			SpeedUP:       util.StringToUInt32(v["speed_up"], 0),
 			SpeedDN:       util.StringToUInt32(v["speed_dn"], 0),
 			SpeedUPMax:    util.StringToUInt32(v["speed_dn_max"], 0),
@@ -188,9 +188,9 @@ func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error
 			Port:          util.StringToUInt16(v["addr_port"], 0),
 			AnnounceLast:  util.StringToTime(v["last_announce"]),
 			AnnounceFirst: util.StringToTime(v["first_announce"]),
-			PeerId:        model.PeerIDFromString(v["peer_id"]),
+			PeerID:        model.PeerIDFromString(v["peer_id"]),
 			Location:      geo.LatLongFromString(v["location"]),
-			UserId:        util.StringToUInt32(v["user_id"], 0),
+			UserID:        util.StringToUInt32(v["user_id"], 0),
 			CreatedOn:     util.StringToTime(v["created_on"]),
 			UpdatedOn:     util.StringToTime(v["updated_on"]),
 		}

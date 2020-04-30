@@ -14,7 +14,7 @@ import (
 func GenerateTestUser() *model.User {
 	passkey, _ := util.GenRandomBytes(20)
 	return &model.User{
-		UserId:  uint32(rand.Intn(10000)),
+		UserID:  uint32(rand.Intn(10000)),
 		Passkey: string(passkey),
 	}
 }
@@ -39,7 +39,7 @@ func GenerateTestPeer(user *model.User) *model.Peer {
 
 func findPeer(peers []*model.Peer, p1 *model.Peer) *model.Peer {
 	for _, p := range peers {
-		if p.PeerId == p1.PeerId {
+		if p.PeerID == p1.PeerID {
 			return p
 		}
 	}
@@ -68,7 +68,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	for _, peer := range peers {
 		fp := findPeer(peers, peer)
 		require.NotNil(t, fp)
-		require.Equal(t, fp.PeerId, peer.PeerId)
+		require.Equal(t, fp.PeerID, peer.PeerID)
 		require.Equal(t, fp.IP, peer.IP)
 		require.Equal(t, fp.Port, peer.Port)
 		require.Equal(t, fp.Location, peer.Location)

@@ -1,7 +1,3 @@
-/*
-Copyright © 2020 Leigh MacDonald <leigh.macdonald@gmail.com>
-
-*/
 package cmd
 
 import (
@@ -20,7 +16,7 @@ var updategeoCmd = &cobra.Command{
 	Long:  `Downloaded the latest geo database from MaxMind.com`,
 	Run: func(cmd *cobra.Command, args []string) {
 		t0 := time.Now()
-		key := viper.GetString(config.GeodbApiKey)
+		key := viper.GetString(config.GeodbAPIKey)
 		outPath := viper.GetString(config.GeodbPath)
 		log.Infof("Starting download of MaxMind City database")
 		if err := geo.DownloadDB(outPath, key); err != nil {

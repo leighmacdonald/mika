@@ -83,7 +83,7 @@ type announceRequest struct {
 	Port uint `binding:"required"`
 
 	// Optional. If a previous announce contained a tracker id, it should be set here.
-	TrackerId string `form:"tracker_id"`
+	TrackerID string `form:"tracker_id"`
 }
 
 type announceResponse struct {
@@ -98,7 +98,7 @@ type announceResponse struct {
 	Peers    string `bencode:"peers"`
 	//  A string that the client should send back on its next announcements. If absent and a previous
 	//  announce sent a tracker id, do not discard the old value; keep using it.
-	TrackerId []byte
+	TrackerID []byte
 	// ( optional ) Similar to failure reason, but the response still gets processed normally. The warning message is
 	// shown just like an error.
 	Warning string `bencode:"warning message"`
@@ -136,7 +136,7 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 
 	peerID, exists := q.Params[paramPeerID]
 	if !exists {
-		return nil, msgInvalidPeerId
+		return nil, msgInvalidPeerID
 	}
 
 	ipv4, err := getIP(q, c)

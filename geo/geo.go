@@ -96,10 +96,7 @@ func DownloadDB(outputPath string, apiKey string) error {
 	if err != nil {
 		return err
 	}
-	if err := extractTarGz(resp.Body, s); err != nil {
-		return err
-	}
-	return nil
+	return extractTarGz(resp.Body, s)
 }
 
 // deg2rad converts degrees to radians

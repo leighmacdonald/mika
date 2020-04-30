@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
+// PeerID is the client supplied unique identifier for a peer
 type PeerID [20]byte
 
+// PeerIDFromString translates a string into a binary PeerID
 func PeerIDFromString(s string) PeerID {
 	var buf [20]byte
 	copy(buf[:], s)
@@ -27,7 +29,7 @@ func (p PeerID) RawString() string {
 
 // Peer represents a single unique peer in a swarm
 type Peer struct {
-	UserPeerId uint32 `db:"user_peer_id" redis:"user_peer_id" json:"user_peer_id"`
+	UserPeerID uint32 `db:"user_peer_id" redis:"user_peer_id" json:"user_peer_id"`
 	// Current speed up, bytes/sec
 	SpeedUP uint32 `db:"speed_up" redis:"speed_up" json:"speed_up"`
 	// Current speed dn, bytes/sec
@@ -55,9 +57,9 @@ type Peer struct {
 	// First announce timestamp
 	AnnounceFirst time.Time `redis:"first_announce" json:"first_announce"`
 	// Peer id, reported by client. Must have white-listed prefix
-	PeerId   PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
+	PeerID   PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
 	Location geo.LatLong `db:"location" redis:"location" json:"location"`
-	UserId   uint32      `db:"user_id" redis:"user_id" json:"user_id"`
+	UserID   uint32      `db:"user_id" redis:"user_id" json:"user_id"`
 	// TODO Do we actually care about these times? Announce times likely enough
 	CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
 	UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
@@ -72,14 +74,14 @@ func (peer *Peer) IsNew() bool {
 
 func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
-		UserPeerId:    0,
+		UserPeerID:    0,
 		IP:            ip,
 		Port:          port,
 		AnnounceLast:  time.Now(),
 		AnnounceFirst: time.Now(),
-		PeerId:        peerId,
+		PeerID:        peerId,
 		Location:      geo.LatLong{Latitude: 50, Longitude: -114},
-		UserId:        userId,
+		UserID:        userId,
 		CreatedOn:     time.Now(),
 		UpdatedOn:     time.Now(),
 	}

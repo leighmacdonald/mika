@@ -46,11 +46,11 @@ type trackerErrCode int
 const (
 	msgInvalidReqType       trackerErrCode = 100
 	msgMissingInfoHash      trackerErrCode = 101
-	msgMissingPeerId        trackerErrCode = 102
+	msgMissingPeerID        trackerErrCode = 102
 	msgMissingPort          trackerErrCode = 103
 	msgInvalidPort          trackerErrCode = 104
 	msgInvalidInfoHash      trackerErrCode = 150
-	msgInvalidPeerId        trackerErrCode = 151
+	msgInvalidPeerID        trackerErrCode = 151
 	msgInvalidNumWant       trackerErrCode = 152
 	msgOk                   trackerErrCode = 200
 	msgInfoHashNotFound     trackerErrCode = 480
@@ -66,15 +66,15 @@ var (
 	responseStringMap = map[trackerErrCode]error{
 		msgInvalidReqType:       errors.New("Invalid request type"),
 		msgMissingInfoHash:      errors.New("info_hash missing from request"),
-		msgMissingPeerId:        errors.New("peer_id missing from request"),
+		msgMissingPeerID:        errors.New("peer_id missing from request"),
 		msgMissingPort:          errors.New("port missing from request"),
 		msgInvalidPort:          errors.New("Invalid port"),
 		msgInvalidAuth:          errors.New("Invalid passkey supplied"),
 		msgInvalidInfoHash:      errors.New("Torrent info hash must be 20 characters"),
-		msgInvalidPeerId:        errors.New("Peer ID Invalid"),
+		msgInvalidPeerID:        errors.New("Peer ID Invalid"),
 		msgInvalidNumWant:       errors.New("num_want invalid"),
 		msgInfoHashNotFound:     errors.New("Unknown infohash"),
-		msgClientRequestTooFast: errors.New("Slow down there jimmy."),
+		msgClientRequestTooFast: errors.New("Slow down there jimmy"),
 		msgMalformedRequest:     errors.New("Malformed request"),
 		msgGenericError:         errors.New("Generic Error"),
 		msgQueryParseFail:       errors.New("Could not parse request"),
@@ -95,22 +95,21 @@ func getIP(q *query, c *gin.Context) (net.IP, error) {
 		}
 	}
 	// Look for forwarded ip in header then default to remote address
-	forwardedIp := c.Request.Header.Get("X-Forwarded-For")
-	if forwardedIp != "" {
-		ip := net.ParseIP(forwardedIp)
-		if ip != nil {
-			return ip.To4(), nil
-		}
-		return ip, nil
-	} else {
-		s := strings.Split(c.Request.RemoteAddr, ":")
-		ipReq, _ := s[0], s[1]
-		ip := net.ParseIP(ipReq)
+	forwardedIP := c.Request.Header.Get("X-Forwarded-For")
+	if forwardedIP != "" {
+		ip := net.ParseIP(forwardedIP)
 		if ip != nil {
 			return ip.To4(), nil
 		}
 		return ip, nil
 	}
+	s := strings.Split(c.Request.RemoteAddr, ":")
+	ipReq, _ := s[0], s[1]
+	ip := net.ParseIP(ipReq)
+	if ip != nil {
+		return ip.To4(), nil
+	}
+	return ip, nil
 }
 
 // oops will output a bencoded error code to the torrent client using

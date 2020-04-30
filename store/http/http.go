@@ -25,10 +25,10 @@ const (
 	driverName = "http"
 )
 
-type AuthMode int
+type authMode int
 
 const (
-	Basic AuthMode = iota
+	Basic authMode = iota
 	BearerToken
 	KeyToken
 )
@@ -37,7 +37,7 @@ type torrentDriver struct{}
 
 type TorrentStore struct {
 	client  *http.Client
-	baseUrl string
+	baseURL string
 }
 
 func checkResponse(resp *http.Response, code int) error {
@@ -63,7 +63,7 @@ func doRequest(client *http.Client, method string, path string, data interface{}
 }
 
 func (ts TorrentStore) AddTorrent(t *model.Torrent) error {
-	resp, err := doRequest(ts.client, "POST", fmt.Sprintf(ts.baseUrl, "/torrent"), t)
+	resp, err := doRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/torrent"), t)
 	if err != nil {
 		return err
 	}
@@ -72,25 +72,24 @@ func (ts TorrentStore) AddTorrent(t *model.Torrent) error {
 
 func (ts TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 	if dropRow {
-		resp, err := doRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseUrl, "/torrent"), t)
-		if err != nil {
-			return err
-		}
-		return checkResponse(resp, http.StatusOK)
-	} else {
-		resp, err := doRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseUrl, "/torrent"), map[string]interface{}{
-			"total_downloaded": t.TotalDownloaded,
-			"total_uploaded":   t.TotalUploaded,
-		})
+		resp, err := doRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), t)
 		if err != nil {
 			return err
 		}
 		return checkResponse(resp, http.StatusOK)
 	}
+	resp, err := doRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseURL, "/torrent"), map[string]interface{}{
+		"total_downloaded": t.TotalDownloaded,
+		"total_uploaded":   t.TotalUploaded,
+	})
+	if err != nil {
+		return err
+	}
+	return checkResponse(resp, http.StatusOK)
 }
 
 func (ts TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
-	resp, err := doRequest(ts.client, "GET", fmt.Sprintf(ts.baseUrl, "/torrent/%s", hash.RawString()), nil)
+	resp, err := doRequest(ts.client, "GET", fmt.Sprintf(ts.baseURL, "/torrent/%s", hash.RawString()), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +127,7 @@ func (ps PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 }
 
 func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
-	reqUrl := fmt.Sprintf(ps.baseUrl, "/torrent/%s/peer/%s", t.InfoHash, p.PeerId)
+	reqUrl := fmt.Sprintf(ps.baseUrl, "/torrent/%s/peer/%s", t.InfoHash, p.PeerID)
 	resp, err := doRequest(ps.client, "DELETE", reqUrl, nil)
 	if err != nil {
 		return err
@@ -186,9 +185,10 @@ func (p peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
 	}, nil
 }
 
+// Config defines how we connect to external endpoints
 type Config struct {
-	BaseUrl    string
-	AuthMethod AuthMode
+	BaseURL    string
+	AuthMethod authMode
 	Timeout    time.Duration
 }
 

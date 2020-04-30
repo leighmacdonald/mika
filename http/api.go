@@ -1,4 +1,4 @@
-// api package is used to remotely control all aspects of the tracker.
+// Package http is used to remotely control all aspects of the tracker.
 package http
 
 import (

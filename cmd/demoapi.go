@@ -6,7 +6,7 @@ import (
 	"context"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"mika/examples/example_api"
+	"mika/examples/exampleapi"
 	"mika/util"
 	"net/http"
 )
@@ -18,7 +18,7 @@ var demoapiCmd = &cobra.Command{
 	Long:  `A example implementation of a HTTP backed store`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		e := example_api.New()
+		e := exampleapi.New()
 		go func() {
 			if err := e.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen: %s\n", err)

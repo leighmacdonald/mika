@@ -8,6 +8,7 @@ import (
 
 type InfoHash [20]byte
 
+// InfoHashFromString returns a binary infohash from the info string
 func InfoHashFromString(s string) InfoHash {
 	var buf [20]byte
 	copy(buf[:], s)

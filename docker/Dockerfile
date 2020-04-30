@@ -1,4 +1,4 @@
-FROM golang:latest
+FROM golang:1.14-buster
 LABEL maintainer="Leigh MacDonald <leigh.macdonald@gmail.com>"
 
 # Set the Current Working Directory inside the container

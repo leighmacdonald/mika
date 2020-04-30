@@ -9,6 +9,7 @@ import (
 	"mika/store"
 )
 
+// PeerStore is the mysql backed implementation of store.PeerStore
 type PeerStore struct {
 	db *sqlx.DB
 }
@@ -28,15 +29,15 @@ func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 	VALUES 
 	    (:peer_id, :torrent_id, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
 	`
-	res, err := ps.db.Exec(q, p.PeerId, t.TorrentID, p.IP, p.Port, p.Location, p.UserId)
+	res, err := ps.db.Exec(q, p.PeerID, t.TorrentID, p.IP, p.Port, p.Location, p.UserID)
 	if err != nil {
 		return err
 	}
-	lastId, err := res.LastInsertId()
+	lastID, err := res.LastInsertId()
 	if err != nil {
 		return errors.New("Failed to fetch insert ID")
 	}
-	p.UserPeerId = uint32(lastId)
+	p.UserPeerID = uint32(lastID)
 	return nil
 }
 

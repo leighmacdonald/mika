@@ -1,11 +1,9 @@
 // Package mysql provides mysql/mariadb backed persistent storage
 //
 // NOTE this requires MySQL 8.0+ / MariaDB 10.5+ (maybe 10.4?) due to the POINT column type
-
 package mysql
 
 import (
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"mika/config"
@@ -44,11 +42,11 @@ func (s *TorrentStore) AddTorrent(t *model.Torrent) error {
 	if err != nil {
 		return err
 	}
-	lastId, err := res.LastInsertId()
+	lastID, err := res.LastInsertId()
 	if err != nil {
 		return errors.New("Failed to fetch insert ID")
 	}
-	t.TorrentID = uint32(lastId)
+	t.TorrentID = uint32(lastID)
 	return nil
 }
 

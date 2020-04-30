@@ -13,6 +13,7 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
+	"mika/config"
 	"mika/consts"
 	"mika/model"
 	"mika/store"
@@ -89,8 +90,12 @@ func (ts TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 }
 
 func (ts TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
-	resp, err := doRequest(ts.client, "GET", fmt.Sprintf(ts.baseURL, "/torrent/%s", hash.RawString()), nil)
+	url := fmt.Sprintf("%s/torrent/%s", ts.baseURL, hash.String())
+	resp, err := doRequest(ts.client, "GET", url, nil)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkResponse(resp, http.StatusOK); err != nil {
 		return nil, err
 	}
 	b, err := ioutil.ReadAll(resp.Body)
@@ -111,11 +116,11 @@ func (ts TorrentStore) Close() error {
 
 type PeerStore struct {
 	client  *http.Client
-	baseUrl string
+	baseURL string
 }
 
 func (ps PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
-	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseUrl, "/torrent/%s/peer", t.InfoHash), p)
+	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", t.InfoHash), p)
 	if err != nil {
 		return err
 	}
@@ -127,7 +132,7 @@ func (ps PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 }
 
 func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
-	reqUrl := fmt.Sprintf(ps.baseUrl, "/torrent/%s/peer/%s", t.InfoHash, p.PeerID)
+	reqUrl := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", t.InfoHash, p.PeerID)
 	resp, err := doRequest(ps.client, "DELETE", reqUrl, nil)
 	if err != nil {
 		return err
@@ -137,7 +142,7 @@ func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
 
 func (ps PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
 	var peers []*model.Peer
-	resp, err := doRequest(ps.client, "GET", fmt.Sprintf(ps.baseUrl, "/torrent/%s/peers", t.InfoHash), nil)
+	resp, err := doRequest(ps.client, "GET", fmt.Sprintf(ps.baseURL, "/torrent/%s/peers", t.InfoHash), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -163,49 +168,118 @@ func (ps PeerStore) Close() error {
 	return nil
 }
 
-func (t torrentDriver) NewTorrentStore(config interface{}) (store.TorrentStore, error) {
-	c, ok := config.(*Config)
+func (t torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
+	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
 	return TorrentStore{
-		client: newClient(c),
+		client:  newClient(c),
+		baseURL: c.Host,
 	}, nil
 }
 
 type peerDriver struct{}
 
-func (p peerDriver) NewPeerStore(config interface{}) (store.PeerStore, error) {
-	c, ok := config.(*Config)
+func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
+	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
 	return PeerStore{
-		client: newClient(c),
+		client:  newClient(c),
+		baseURL: c.Host,
 	}, nil
 }
 
-// Config defines how we connect to external endpoints
-type Config struct {
-	BaseURL    string
-	AuthMethod authMode
-	Timeout    time.Duration
+type UserStore struct {
+	client  *http.Client
+	baseURL string
 }
 
-func newClient(c *Config) *http.Client {
+// GetUserByPasskey will lookup and return the user via their passkey used as an identifier
+// The errors returned for this method should be very generic and not reveal any info
+// that could possibly help attackers gain any insight. All error cases MUST
+// return ErrUnauthorized.
+func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
+	var usr model.User
+	if passkey == "" || len(passkey) != 20 {
+		return usr, consts.ErrUnauthorized
+	}
+	path := fmt.Sprintf("%s/api/user/pk/%s", u.baseURL, passkey)
+	resp, err := doRequest(u.client, "GET", path, nil)
+	if err != nil {
+		log.Errorf("Failed to make api call to backing http api: %s", err)
+		return usr, consts.ErrUnauthorized
+	}
+	if err := checkResponse(resp, http.StatusOK); err != nil {
+		return usr, consts.ErrUnauthorized
+	}
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Errorf("Could not read response body from backing http api: %s", err.Error())
+		return usr, consts.ErrUnauthorized
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if err := json.Unmarshal(b, &usr); err != nil {
+		log.Warnf("Failed to decode user data from backing http api: %s", err.Error())
+		return usr, consts.ErrUnauthorized
+	}
+	if !usr.Valid() {
+		log.Warnf("Received invalid user data from backing http api")
+		return usr, consts.ErrUnauthorized
+	}
+	return usr, nil
+}
+
+func (u *UserStore) GetUserByID(userId uint32) (model.User, error) {
+	panic("implement me")
+}
+
+func (u *UserStore) DeleteUser(user model.User) error {
+	panic("implement me")
+}
+
+func (u *UserStore) Close() error {
+	u.client.CloseIdleConnections()
+	return nil
+}
+
+type userDriver struct{}
+
+// NewUserStore creates a new http api backed user store.
+// the config key store_users_host should be a full url prefix, including port.
+// This should be everything up to the /api/... path
+// eg: http://localhost:35000 will be translated into:
+// http://localhost:35000/api/user/pk/12345678901234567890
+func (p userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
+	c, ok := cfg.(*config.StoreConfig)
+	if !ok {
+		return nil, consts.ErrInvalidConfig
+	}
+	return &UserStore{
+		client:  newClient(c),
+		baseURL: c.Host,
+	}, nil
+}
+
+func newClient(c *config.StoreConfig) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{
-				Timeout: c.Timeout,
+				Timeout: time.Second * 5,
 			}).Dial,
-			TLSHandshakeTimeout: c.Timeout,
+			TLSHandshakeTimeout: time.Second * 5,
 		},
 		CheckRedirect: nil,
 		Jar:           nil,
-		Timeout:       c.Timeout,
+		Timeout:       time.Second * 5,
 	}
 }
 func init() {
+	store.AddUserDriver(driverName, userDriver{})
 	store.AddPeerDriver(driverName, peerDriver{})
 	store.AddTorrentDriver(driverName, torrentDriver{})
 }

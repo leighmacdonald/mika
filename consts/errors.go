@@ -13,4 +13,5 @@ var (
 	ErrInvalidDriver       = errors.New("invalid driver")
 	ErrInvalidConfig       = errors.New("invalid configuration")
 	ErrInvalidResponseCode = errors.New("invalid response code")
+	ErrUnauthorized        = errors.New("invalid response code")
 )

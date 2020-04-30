@@ -81,7 +81,7 @@ func New() *http.Server {
 	torrentCount := 100
 	swarmSize := 10 // Peers per torrent
 	s := &ServerExample{
-		Addr:       "localhost:8080",
+		Addr:       "localhost:35000",
 		Router:     gin.Default(),
 		UsersMx:    sync.RWMutex{},
 		PeersMx:    sync.RWMutex{},
@@ -91,7 +91,12 @@ func New() *http.Server {
 		Users:      []*model.User{},
 	}
 	for i := 0; i < userCount; i++ {
-		s.Users = append(s.Users, store.GenerateTestUser())
+		usr := store.GenerateTestUser()
+		if i == 0 {
+			// Give user 0 a known passkey for testing
+			usr.Passkey = "12345678901234567890"
+		}
+		s.Users = append(s.Users, usr)
 	}
 	for i := 0; i < torrentCount; i++ {
 		t := store.GenerateTestTorrent()

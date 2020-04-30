@@ -11,10 +11,10 @@ import (
 
 // Tracker is the main application struct used to tie all the discreet components together
 type Tracker struct {
-	torrents store.TorrentStore
-	peers    store.PeerStore
-	users    store.UserStore
-	geodb    *geo.DB
+	Torrents store.TorrentStore
+	Peers    store.PeerStore
+	Users    store.UserStore
+	Geodb    *geo.DB
 	// Whitelist and whitelist lock
 	WhitelistMutex *sync.RWMutex
 	Whitelist      []string
@@ -41,9 +41,9 @@ func New() (*Tracker, error) {
 	}
 	geodb := geo.New(viper.GetString(config.GeodbPath))
 	return &Tracker{
-		torrents: s,
-		peers:    p,
-		users:    u,
-		geodb:    geodb,
+		Torrents: s,
+		Peers:    p,
+		Users:    u,
+		Geodb:    geodb,
 	}, nil
 }

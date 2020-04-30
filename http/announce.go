@@ -146,6 +146,7 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	}
 	port := getUintKey(q, paramPort, 0)
 	if port < 1024 || port > 65535 {
+		// Don't allow privileged ports which require root to bind to on unix
 		return nil, msgInvalidPort
 	}
 	left := getUint64Key(q, paramLeft, 0)
@@ -171,10 +172,27 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 }
 
 func (h *BitTorrentHandler) announce(c *gin.Context) {
+	pk := c.Param("passkey")
+	if pk == "" {
+		c.String(int(msgInvalidAuth), TrackerErr(msgInvalidAuth).Error())
+		return
+	}
+	usr, err := h.t.Users.GetUserByPasskey(pk)
+	if err != nil {
+		c.String(int(msgInvalidAuth), TrackerErr(msgInvalidAuth).Error())
+		return
+	}
+	log.Debugf("User announced: %s", usr)
 	req, code := newAnnounce(c)
 	if code != msgOk {
 		c.String(int(code), TrackerErr(code).Error())
 		return
 	}
 	log.Println(req)
+	tor, err := h.t.Torrents.GetTorrent(req.InfoHash)
+	if err != nil {
+		c.String(int(msgInvalidInfoHash), TrackerErr(msgInvalidInfoHash).Error())
+		return
+	}
+	log.Println(tor)
 }

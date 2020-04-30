@@ -123,7 +123,38 @@ func (pd peerDriver) NewPeerStore(_ interface{}) (store.PeerStore, error) {
 	}, nil
 }
 
+type UserStore struct {
+	sync.RWMutex
+	users map[string][]*model.User
+}
+
+func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
+	panic("implement me")
+}
+
+func (u *UserStore) GetUserByID(userId uint32) (model.User, error) {
+	panic("implement me")
+}
+
+func (u *UserStore) DeleteUser(user model.User) error {
+	panic("implement me")
+}
+
+func (u *UserStore) Close() error {
+	panic("implement me")
+}
+
+type userDriver struct{}
+
+func (pd userDriver) NewUserStore(_ interface{}) (store.UserStore, error) {
+	return &UserStore{
+		sync.RWMutex{},
+		map[string][]*model.User{},
+	}, nil
+}
+
 func init() {
+	store.AddUserDriver(driverName, userDriver{})
 	store.AddPeerDriver(driverName, peerDriver{})
 	store.AddTorrentDriver(driverName, torrentDriver{})
 }

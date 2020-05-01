@@ -101,7 +101,7 @@ func (peers Swarm) Counts() (seeders uint, leechers uint) {
 }
 
 // NewPeer create a new peer instance for inserting into a swarm
-func NewPeer(userId uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
+func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
 		RWMutex:       sync.RWMutex{},
 		UserPeerID:    0,
@@ -120,7 +120,7 @@ func NewPeer(userId uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
 		AnnounceFirst: time.Now(),
 		PeerID:        peerID,
 		Location:      geo.LatLong{Latitude: 50, Longitude: -114},
-		UserID:        userId,
+		UserID:        userID,
 		CreatedOn:     time.Now(),
 		UpdatedOn:     time.Now(),
 		User:          nil,

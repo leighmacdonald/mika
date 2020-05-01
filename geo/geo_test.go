@@ -2,7 +2,7 @@ package geo
 
 import (
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"math"
 	"mika/config"
@@ -51,7 +51,7 @@ func TestDownloadDB(t *testing.T) {
 	}
 	defer func() { _ = os.Remove(tFile.Name()) }()
 	err2 := DownloadDB(tFile.Name(), key)
-	assert.NoError(t, err2)
+	require.NoError(t, err2)
 }
 
 func init() {

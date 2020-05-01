@@ -100,7 +100,7 @@ const (
 	// StoreTorrentPassword password to connect with
 	// mika
 	StoreTorrentPassword = "store_torrent_password"
-	// Additional properties passed to the backing store configuration
+	// StoreTorrentProperties sets additional properties passed to the backing store configuration
 	StoreTorrentProperties = "store_torrent_properties"
 
 	// StoreUsersType sets the backing store type to be used for users

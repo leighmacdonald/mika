@@ -136,6 +136,7 @@ func (ps PeerStore) AddPeer(ih model.InfoHash, p *model.Peer) error {
 	return checkResponse(resp, http.StatusCreated)
 }
 
+// GetPeer will fetch the peer from the swarm if it exists
 func (ps PeerStore) GetPeer(_ model.InfoHash, _ model.PeerID) (*model.Peer, error) {
 	panic("implement me")
 }
@@ -147,8 +148,8 @@ func (ps PeerStore) UpdatePeer(_ model.InfoHash, _ *model.Peer) error {
 
 // DeletePeer will remove a user from a torrents swarm
 func (ps PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
-	reqUrl := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p.PeerID)
-	resp, err := doRequest(ps.client, "DELETE", reqUrl, nil)
+	reqURL := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p.PeerID)
+	resp, err := doRequest(ps.client, "DELETE", reqURL, nil)
 	if err != nil {
 		return err
 	}
@@ -218,6 +219,7 @@ type UserStore struct {
 	baseURL string
 }
 
+// AddUser will add a new user to the backing store
 func (u *UserStore) AddUser(_ *model.User) error {
 	panic("implement me")
 }

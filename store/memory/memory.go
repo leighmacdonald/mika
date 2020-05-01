@@ -43,6 +43,7 @@ type PeerStore struct {
 	peers map[model.InfoHash]model.Swarm
 }
 
+// GetPeer will fetch the peer from the swarm if it exists
 func (ps *PeerStore) GetPeer(ih model.InfoHash, p model.PeerID) (*model.Peer, error) {
 	ps.RLock()
 	defer ps.RUnlock()
@@ -150,6 +151,7 @@ type UserStore struct {
 	users map[string]*model.User
 }
 
+// AddUser will add a new user to the backing store
 func (u *UserStore) AddUser(usr *model.User) error {
 	u.Lock()
 	u.users[usr.Passkey] = usr
@@ -172,11 +174,11 @@ func (u *UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
 }
 
 // GetUserByID returns a user matching the userId
-func (u *UserStore) GetUserByID(userId uint32) (*model.User, error) {
+func (u *UserStore) GetUserByID(userID uint32) (*model.User, error) {
 	u.RLock()
 	defer u.RUnlock()
 	for _, usr := range u.users {
-		if usr.UserID == userId {
+		if usr.UserID == userID {
 			return usr, nil
 		}
 	}

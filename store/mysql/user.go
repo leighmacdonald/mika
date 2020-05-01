@@ -16,6 +16,7 @@ type UserStore struct {
 	usersMx sync.RWMutex
 }
 
+// AddUser will add a new user to the backing store
 func (u *UserStore) AddUser(_ *model.User) error {
 	panic("implement me")
 }

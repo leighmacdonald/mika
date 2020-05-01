@@ -76,7 +76,7 @@ type UserStore interface {
 	// GetUserByPasskey returns a user matching the passkey
 	GetUserByPasskey(passkey string) (*model.User, error)
 	// GetUserByID returns a user matching the userId
-	GetUserByID(userId uint32) (*model.User, error)
+	GetUserByID(userID uint32) (*model.User, error)
 	// DeleteUser removes a user from the backing store
 	DeleteUser(user *model.User) error
 	// Close will cleanup and close the underlying storage driver if necessary
@@ -109,7 +109,7 @@ type PeerStore interface {
 	DeletePeer(ih model.InfoHash, p *model.Peer) error
 	// GetPeers will fetch peers for a torrents active swarm up to N users
 	GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
-	// GetPeers will fetch peers for a torrents active swarm up to N users
+	// GetPeer will fetch the peer from the swarm if it exists
 	GetPeer(ih model.InfoHash, id model.PeerID) (*model.Peer, error)
 	// GetScrape returns scrape data for the torrent provided
 	GetScrape(ih model.InfoHash)

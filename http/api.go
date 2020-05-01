@@ -6,6 +6,7 @@ import (
 	"mika/tracker"
 )
 
+// AdminAPI is the interface for administering a live server over HTTP
 type AdminAPI struct {
 	t *tracker.Tracker
 }

@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+// BitTorrentHandler is the public HTTP interface for the tracker handling announces and
+// scrape requests
 type BitTorrentHandler struct {
 	t *tracker.Tracker
 }
@@ -46,7 +48,7 @@ type announceRequest struct {
 	// when a download first begins, and one using completed is sent when the download
 	// is complete. No completed is sent if the file was complete when started. Downloaders
 	// send an announcement using stopped when they cease downloading.
-	Event AnnounceType `form:"event" binding:"required"`
+	Event announceType `form:"event" binding:"required"`
 
 	//  Optional. The true IP address of the client machine, in dotted quad format or rfc3513
 	// defined hexed IPv6 address. Notes: In general this parameter is not necessary as the address
@@ -111,34 +113,32 @@ func getUint64Key(q *query, key announceParam, def uint64) uint64 {
 	left, err := q.Uint64(key)
 	if err != nil {
 		return def
-	} else {
-		return util.UMax64(0, left)
 	}
+	return util.UMax64(0, left)
 }
 
 func getUint32Key(q *query, key announceParam, def uint32) uint32 {
 	left, err := q.Uint32key(key)
 	if err != nil {
 		return def
-	} else {
-		return util.UMax32(0, left)
 	}
+	return util.UMax32(0, left)
 }
+
 func getUint16Key(q *query, key announceParam, def uint16) uint16 {
 	left, err := q.Uint16(key)
 	if err != nil {
 		return def
-	} else {
-		return util.UMax16(0, left)
 	}
+	return util.UMax16(0, left)
 }
+
 func getUintKey(q *query, key announceParam, def uint) uint {
 	left, err := q.Uint(key)
 	if err != nil {
 		return def
-	} else {
-		return util.UMax(0, left)
 	}
+	return util.UMax(0, left)
 }
 
 // Parse the query string into an announceRequest struct
@@ -281,8 +281,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		dict["peers"] = []byte{}
 	}
 	var outBytes bytes.Buffer
-	encoder := bencode.NewEncoder(&outBytes)
-	if err := encoder.Encode(dict); err != nil {
+	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
 		oops(c, msgGenericError)
 		return
 	}

@@ -74,6 +74,7 @@ func (peer *Peer) IsNew() bool {
 	return peer.Announces == 0
 }
 
+// Swarm is a set of users participating in a torrent
 type Swarm []*Peer
 
 // Remove removes a peer from a slice
@@ -99,7 +100,8 @@ func (peers Swarm) Counts() (seeders uint, leechers uint) {
 	return
 }
 
-func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
+// NewPeer create a new peer instance for inserting into a swarm
+func NewPeer(userId uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
 		RWMutex:       sync.RWMutex{},
 		UserPeerID:    0,
@@ -116,7 +118,7 @@ func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
 		Port:          port,
 		AnnounceLast:  time.Now(),
 		AnnounceFirst: time.Now(),
-		PeerID:        peerId,
+		PeerID:        peerID,
 		Location:      geo.LatLong{Latitude: 50, Longitude: -114},
 		UserID:        userId,
 		CreatedOn:     time.Now(),

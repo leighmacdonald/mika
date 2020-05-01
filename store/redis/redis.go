@@ -173,6 +173,7 @@ func (ps *PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
 	return ps.client.Del(peerKey(ih, p.PeerID)).Err()
 }
 
+// GetPeer will fetch the peer from the swarm if it exists
 func (ps *PeerStore) GetPeer(_ model.InfoHash, _ model.PeerID) (*model.Peer, error) {
 	panic("implement me")
 }

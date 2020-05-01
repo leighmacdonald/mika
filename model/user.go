@@ -14,6 +14,7 @@ func (u User) Valid() bool {
 	return u.UserID > 0 && len(u.Passkey) == 20
 }
 
+// Users is a slice of known users
 type Users []*User
 
 // Remove removes a users from a Users slice

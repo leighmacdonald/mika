@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// InfoHash is a unique 20byte identifier for a torrent
 type InfoHash [20]byte
 
 // InfoHashFromString returns a binary infohash from the info string

@@ -14,17 +14,17 @@ import (
 	"time"
 )
 
-type AnnounceType string
+type announceType string
 
 // Announce types
 const (
-	STARTED   AnnounceType = "started"
-	STOPPED   AnnounceType = "stopped"
-	COMPLETED AnnounceType = "completed"
-	ANNOUNCE  AnnounceType = ""
+	STARTED   announceType = "started"
+	STOPPED   announceType = "stopped"
+	COMPLETED announceType = "completed"
+	ANNOUNCE  announceType = ""
 )
 
-func parseAnnounceType(t string) AnnounceType {
+func parseAnnounceType(t string) announceType {
 	switch t {
 	case "started":
 		return STARTED

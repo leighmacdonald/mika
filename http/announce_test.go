@@ -3,6 +3,8 @@ package http
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"mika/config"
+	"mika/tracker"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,22 +19,25 @@ func performRequest(r http.Handler, method, path string) *httptest.ResponseRecor
 }
 
 func TestBitTorrentHandler_Announce(t *testing.T) {
-	rh := NewHandler()
+	config.Read("")
+	tkr, torrents, users, peers := tracker.NewTestTracker()
+	rh := NewBitTorrentHandler(tkr)
 	type testAnn struct {
 		key  string
 		v    url.Values
 		resp int
 	}
 	v := []testAnn{
-		{"blah",
+		{users[0].Passkey,
 			url.Values{
-				"info_hash":  {"12345678901234567890"},
-				"peer_id":    {"ABCDEFGHIJKLMNOPQRST"},
+				"info_hash":  {torrents[0].InfoHash.RawString()},
+				"peer_id":    {peers[0].PeerID.RawString()},
 				"ip":         {"255.255.255.255"},
 				"port":       {"6881"},
+				"uploaded":   {"5678"},
 				"downloaded": {"1234"},
 				"left":       {"9234"},
-				"event":      {"stopped"},
+				"event":      {""},
 			},
 			200,
 		},

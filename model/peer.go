@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mika/geo"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -29,6 +30,7 @@ func (p PeerID) RawString() string {
 
 // Peer represents a single unique peer in a swarm
 type Peer struct {
+	sync.RWMutex
 	UserPeerID uint32 `db:"user_peer_id" redis:"user_peer_id" json:"user_peer_id"`
 	// Current speed up, bytes/sec
 	SpeedUP uint32 `db:"speed_up" redis:"speed_up" json:"speed_up"`
@@ -72,9 +74,44 @@ func (peer *Peer) IsNew() bool {
 	return peer.Announces == 0
 }
 
+type Swarm []*Peer
+
+// Remove removes a peer from a slice
+func (peers Swarm) Remove(p *Peer) []*Peer {
+	for i := len(peers) - 1; i >= 0; i-- {
+		if peers[i] == p {
+			return append(peers[:i], peers[i+1:]...)
+		}
+	}
+	return peers
+}
+
+// Counts returns the sums for seeders and leechers in the swarm
+// TODO cache this somewhere and only update on state change
+func (peers Swarm) Counts() (seeders uint, leechers uint) {
+	for _, p := range peers {
+		if p.Left == 0 {
+			seeders++
+		} else {
+			leechers++
+		}
+	}
+	return
+}
+
 func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
+		RWMutex:       sync.RWMutex{},
 		UserPeerID:    0,
+		SpeedUP:       0,
+		SpeedDN:       0,
+		SpeedUPMax:    0,
+		SpeedDNMax:    0,
+		Uploaded:      0,
+		Downloaded:    0,
+		Left:          0,
+		Announces:     0,
+		TotalTime:     0,
 		IP:            ip,
 		Port:          port,
 		AnnounceLast:  time.Now(),
@@ -84,5 +121,6 @@ func NewPeer(userId uint32, peerId PeerID, ip net.IP, port uint16) *Peer {
 		UserID:        userId,
 		CreatedOn:     time.Now(),
 		UpdatedOn:     time.Now(),
+		User:          nil,
 	}
 }

@@ -1,12 +1,15 @@
 package http
 
 import (
+	"bytes"
+	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"mika/model"
 	"mika/tracker"
 	"mika/util"
 	"net"
+	"time"
 )
 
 type BitTorrentHandler struct {
@@ -22,20 +25,20 @@ type announceRequest struct {
 	// The total amount downloaded (since the client sent the 'started' event to the tracker) in
 	// base ten ASCII. While not explicitly stated in the official specification, the consensus is that
 	// this should be the total number of bytes downloaded.
-	Downloaded uint64 `form:"downloaded" binding:"required"`
+	Downloaded uint32 `form:"downloaded" binding:"required"`
 
 	// The number of bytes this peer still has to download, encoded in base ten ascii.
 	// Note that this can't be computed from downloaded and the file length since it
 	// might be a resume, and there's a chance that some of the downloaded data failed an
 	// integrity check and had to be re-downloaded.
-	Left uint64 `form:"left" binding:"required"`
+	Left uint32 `form:"left" binding:"required"`
 
 	// The total amount uploaded (since the client sent the 'started' event to the tracker) in base ten
 	// ASCII. While not explicitly stated in the official specification, the consensus is that this should
 	// be the total number of bytes uploaded.
-	Uploaded uint64 `form:"uploaded" binding:"required"`
+	Uploaded uint32 `form:"uploaded" binding:"required"`
 
-	Corrupt uint64 `form:"corrupt"`
+	Corrupt uint32 `form:"corrupt"`
 
 	// This is an optional key which maps to started, completed, or stopped (or empty,
 	// which is the same as not being present). If not present, this is one of the
@@ -80,7 +83,7 @@ type announceRequest struct {
 
 	// The port number that the client is listening on. Ports reserved for BitTorrent are typically
 	// 6881-6889. Clients may choose to give up if it cannot establish a port within this range.
-	Port uint `binding:"required"`
+	Port uint16 `binding:"required"`
 
 	// Optional. If a previous announce contained a tracker id, it should be set here.
 	TrackerID string `form:"tracker_id"`
@@ -113,6 +116,22 @@ func getUint64Key(q *query, key announceParam, def uint64) uint64 {
 	}
 }
 
+func getUint32Key(q *query, key announceParam, def uint32) uint32 {
+	left, err := q.Uint32key(key)
+	if err != nil {
+		return def
+	} else {
+		return util.UMax32(0, left)
+	}
+}
+func getUint16Key(q *query, key announceParam, def uint16) uint16 {
+	left, err := q.Uint16(key)
+	if err != nil {
+		return def
+	} else {
+		return util.UMax16(0, left)
+	}
+}
 func getUintKey(q *query, key announceParam, def uint) uint {
 	left, err := q.Uint(key)
 	if err != nil {
@@ -144,15 +163,15 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 
 		return nil, msgMalformedRequest
 	}
-	port := getUintKey(q, paramPort, 0)
+	port := getUint16Key(q, paramPort, 0)
 	if port < 1024 || port > 65535 {
 		// Don't allow privileged ports which require root to bind to on unix
 		return nil, msgInvalidPort
 	}
-	left := getUint64Key(q, paramLeft, 0)
-	downloaded := getUint64Key(q, paramDownloaded, 0)
-	uploaded := getUint64Key(q, paramUploaded, 0)
-	corrupt := getUint64Key(q, paramCorrupt, 0)
+	left := getUint32Key(q, paramLeft, 0)
+	downloaded := getUint32Key(q, paramDownloaded, 0)
+	uploaded := getUint32Key(q, paramUploaded, 0)
+	corrupt := getUint32Key(q, paramCorrupt, 0)
 	event := parseAnnounceType(q.Params[paramNumWant])
 	numWant := getUintKey(q, "numwant", 30)
 
@@ -171,28 +190,116 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	}, msgOk
 }
 
+// The meaty bits.
 func (h *BitTorrentHandler) announce(c *gin.Context) {
+	// Check that the user is valid before parsing anything
 	pk := c.Param("passkey")
 	if pk == "" {
-		c.String(int(msgInvalidAuth), TrackerErr(msgInvalidAuth).Error())
+		oops(c, msgInvalidAuth)
 		return
 	}
 	usr, err := h.t.Users.GetUserByPasskey(pk)
-	if err != nil {
-		c.String(int(msgInvalidAuth), TrackerErr(msgInvalidAuth).Error())
+	if err != nil || !usr.Valid() {
+		oops(c, msgInvalidAuth)
 		return
 	}
-	log.Debugf("User announced: %s", usr)
+
+	// Parse the announce into an announceRequest
 	req, code := newAnnounce(c)
 	if code != msgOk {
-		c.String(int(code), TrackerErr(code).Error())
+		oops(c, code)
 		return
 	}
-	log.Println(req)
+
+	// Get & Validate the torrent associated with the info_hash supplies
 	tor, err := h.t.Torrents.GetTorrent(req.InfoHash)
-	if err != nil {
-		c.String(int(msgInvalidInfoHash), TrackerErr(msgInvalidInfoHash).Error())
+	if err != nil || tor.IsDeleted {
+		oops(c, msgInvalidInfoHash)
 		return
 	}
-	log.Println(tor)
+	// If disabled and reason is set, the reason is returned to the client
+	// This is mostly useful for when a torrent has been "trumped" by another torrent so it
+	// should be downloaded instead
+	//
+	// TODO send this as a "warning message" field of a normal announce response instead?
+	if !tor.IsEnabled && tor.Reason != "" {
+		c.String(int(msgInvalidInfoHash), responseError(tor.Reason))
+		return
+	}
+
+	// Peer / Swarm stuff
+	peer, err := h.t.Peers.GetPeer(tor.InfoHash, req.PeerID)
+	if err != nil {
+		// Create a new peer for the swarm
+		peer = model.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
+		if err := h.t.Peers.AddPeer(tor.InfoHash, peer); err != nil {
+			log.Errorf("Failed to insert peer into swarm: %s", err.Error())
+			oops(c, msgGenericError)
+			return
+		}
+	}
+	// TODO use a channel to send deltas instead of locking in-request?
+	// Maybe use sync/atomic, but needs testing?
+	peer.Lock()
+	peer.Uploaded = req.Uploaded
+	peer.Downloaded = req.Downloaded
+	peer.Announces++
+	peer.Left = req.Left
+	peer.UpdatedOn = time.Now()
+	peer.Unlock()
+	switch req.Event {
+	case COMPLETED:
+		// TODO does a stop event get sent for a torrent when the user only downloads a specific file from the torrent
+		// Do we force left=0 for this? Or trust the client?
+		tor.TotalCompleted++
+	case STOPPED:
+		if err := h.t.Peers.DeletePeer(tor.InfoHash, peer); err != nil {
+			log.Errorf("Could not remove peer from swarm: %s", err.Error())
+			oops(c, msgGenericError)
+			return
+		}
+	}
+	peers, err := h.t.Peers.GetPeers(tor.InfoHash, h.t.MaxPeers)
+	if err != nil {
+		log.Errorf("Could not read peers from swarm: %s", err.Error())
+		oops(c, msgGenericError)
+		return
+	}
+	seeders, leechers := peers.Counts()
+	dict := bencode.Dict{
+		"complete":     seeders,
+		"incomplete":   leechers,
+		"interval":     h.t.AnnInterval,
+		"min interval": h.t.AnnIntervalMin,
+	}
+	// NOTE we ONLY support compact response formats (binary format) by design even though its
+	// technically breaking the protocol specs.
+	// There is no reason to support the older less efficient model for private needs
+	if peers != nil {
+		dict["peers"] = makeCompactPeers(peers, peer.PeerID)
+	} else {
+		dict["peers"] = []byte{}
+	}
+	var outBytes bytes.Buffer
+	encoder := bencode.NewEncoder(&outBytes)
+	if err := encoder.Encode(dict); err != nil {
+		oops(c, msgGenericError)
+		return
+	}
+	c.String(int(msgOk), outBytes.String())
+}
+
+// Generate a compact peer field array containing the byte representations
+// of a peers IP+Port appended to each other
+func makeCompactPeers(peers model.Swarm, skipID model.PeerID) []byte {
+	var buf bytes.Buffer
+	for _, peer := range peers {
+		if peer.PeerID == skipID {
+			// Skip the peers own peer_id
+			continue
+		}
+		buf.Write(peer.IP.To4())
+		buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+	}
+	return buf.Bytes()
 }

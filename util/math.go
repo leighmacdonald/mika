@@ -18,18 +18,32 @@ func GenRandomBytes(size int) (blk []byte, err error) {
 func UMax64(a, b uint64) uint64 {
 	if a > b {
 		return a
-	} else {
-		return b
 	}
+	return b
+}
+
+// UMax32 is math.Max for uint64
+func UMax32(a, b uint32) uint32 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// UMax16 is math.Max for uint16
+func UMax16(a, b uint16) uint16 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // UMax is math.Max for uint
 func UMax(a, b uint) uint {
 	if a > b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }
 
 // UMin64 is math.Min for uint64

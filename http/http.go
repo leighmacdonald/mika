@@ -189,7 +189,7 @@ func NewAPIHandler(tkr *tracker.Tracker) *gin.Engine {
 	h := AdminAPI{
 		t: tkr,
 	}
-	r.GET("/tracker/stats", h.Stats)
+	r.GET("/tracker/stats", h.stats)
 	r.DELETE("/torrent/:info_hash", h.torrentDelete)
 	r.PATCH("/torrent/:info_hash", h.torrentUpdate)
 	return r

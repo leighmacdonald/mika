@@ -71,12 +71,14 @@ func AddUserDriver(name string, driver UserDriver) {
 // These should be cached indefinitely, we treat any known user as allowed to connect.
 // To disable a user they MUST be deleted from the active user cache
 type UserStore interface {
+	// AddUser will add a new user to the backing store
+	AddUser(u *model.User) error
 	// GetUserByPasskey returns a user matching the passkey
-	GetUserByPasskey(passkey string) (model.User, error)
+	GetUserByPasskey(passkey string) (*model.User, error)
 	// GetUserByID returns a user matching the userId
-	GetUserByID(userId uint32) (model.User, error)
+	GetUserByID(userId uint32) (*model.User, error)
 	// DeleteUser removes a user from the backing store
-	DeleteUser(user model.User) error
+	DeleteUser(user *model.User) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }
@@ -100,15 +102,17 @@ type TorrentStore interface {
 // if its backed by something that can restore its in memory state, such as redis
 type PeerStore interface {
 	// AddPeer inserts a peer into the active swarm for the torrent provided
-	AddPeer(t *model.Torrent, p *model.Peer) error
+	AddPeer(ih model.InfoHash, p *model.Peer) error
 	// UpdatePeer will sync any new peer data with the backing store
-	UpdatePeer(t *model.Torrent, p *model.Peer) error
+	UpdatePeer(ih model.InfoHash, p *model.Peer) error
 	// DeletePeer will remove a user from a torrents swarm
-	DeletePeer(t *model.Torrent, p *model.Peer) error
+	DeletePeer(ih model.InfoHash, p *model.Peer) error
 	// GetPeers will fetch peers for a torrents active swarm up to N users
-	GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error)
+	GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
+	// GetPeers will fetch peers for a torrents active swarm up to N users
+	GetPeer(ih model.InfoHash, id model.PeerID) (*model.Peer, error)
 	// GetScrape returns scrape data for the torrent provided
-	GetScrape(t *model.Torrent)
+	GetScrape(ih model.InfoHash)
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }

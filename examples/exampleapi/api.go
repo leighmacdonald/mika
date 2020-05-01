@@ -80,7 +80,7 @@ func (s *ServerExample) getUserByPasskey(passkey string) *model.User {
 func New() *http.Server {
 	userCount := 10
 	torrentCount := 100
-	swarmSize := 10 // Peers per torrent
+	swarmSize := 10 // Swarm per torrent
 	s := &ServerExample{
 		Addr:       "localhost:35000",
 		Router:     gin.Default(),

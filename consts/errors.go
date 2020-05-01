@@ -15,6 +15,8 @@ var (
 	ErrInvalidIP = errors.New("invalid client ip")
 	// ErrInvalidTorrentID failure to find mapped torrent_id
 	ErrInvalidTorrentID = errors.New("Invalid torrent_id")
+	// ErrInvalidPeerID failure to find a peer by peer_id
+	ErrInvalidPeerID = errors.New("Invalid peer_id")
 	// ErrInvalidDriver is for when a unknown driver is used.
 	// Either misspelled or using driver that wasn't built into the binary
 	ErrInvalidDriver = errors.New("invalid driver")

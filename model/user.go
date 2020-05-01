@@ -13,3 +13,15 @@ type User struct {
 func (u User) Valid() bool {
 	return u.UserID > 0 && len(u.Passkey) == 20
 }
+
+type Users []*User
+
+// Remove removes a users from a Users slice
+func (users Users) Remove(p *User) []*User {
+	for i := len(users) - 1; i >= 0; i-- {
+		if users[i] == p {
+			return append(users[:i], users[i+1:]...)
+		}
+	}
+	return users
+}

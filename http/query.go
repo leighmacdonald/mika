@@ -110,6 +110,34 @@ func (q *query) Uint64(key announceParam) (uint64, error) {
 	return strconv.ParseUint(str, 10, 64)
 }
 
+// Uint32 is a helper to obtain a uint32 of any length from a Query. After being
+// called, you can safely cast the uint32 to your desired length.
+func (q *query) Uint32key(key announceParam) (uint32, error) {
+	str, exists := q.Params[key]
+	if !exists {
+		return 0, consts.ErrInvalidMapKey
+	}
+	v, err := strconv.ParseUint(str, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(v), nil
+}
+
+// Uint16 is a helper to obtain a uint16 of any length from a Query. After being
+// called, you can safely cast the uint16 to your desired length.
+func (q *query) Uint16(key announceParam) (uint16, error) {
+	str, exists := q.Params[key]
+	if !exists {
+		return 0, consts.ErrInvalidMapKey
+	}
+	v, err := strconv.ParseUint(str, 10, 16)
+	if err != nil {
+		return 0, err
+	}
+	return uint16(v), nil
+}
+
 // Uint is a helper to obtain a uint of any length from a Query. After being
 // called, you can safely cast the uint64 to your desired length.
 func (q *query) Uint(key announceParam) (uint, error) {

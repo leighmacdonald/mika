@@ -20,19 +20,19 @@ func (ps *PeerStore) Close() error {
 }
 
 // UpdatePeer will sync the new peer data with the backing store
-func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
+func (ps *PeerStore) UpdatePeer(_ model.InfoHash, _ *model.Peer) error {
 	panic("implement me")
 }
 
 // AddPeer insets the peer into the swarm of the torrent provided
-func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
+func (ps *PeerStore) AddPeer(ih model.InfoHash, p *model.Peer) error {
 	const q = `
 	INSERT INTO peers 
-	    (peer_id, torrent_id, addr_ip, addr_port, location, user_id, created_on, updated_on)
+	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, created_on, updated_on)
 	VALUES 
-	    (:peer_id, :torrent_id, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
+	    (:peer_id, :info_hash, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
 	`
-	res, err := ps.db.Exec(q, p.PeerID, t.TorrentID, p.IP, p.Port, p.Location, p.UserID)
+	res, err := ps.db.Exec(q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
 	if err != nil {
 		return err
 	}
@@ -45,24 +45,28 @@ func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 }
 
 // DeletePeer will remove a peer from the swarm of the torrent provided
-func (ps *PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
-	const q = `DELETE FROM peers WHERE user_peer_id = :user_peer_id`
-	_, err := ps.db.NamedExec(q, p)
+func (ps *PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
+	const q = `DELETE FROM peers WHERE info_hash = ? AND peer_id = ?`
+	_, err := ps.db.Exec(q, ih, p.PeerID)
 	return err
 }
 
+func (ps *PeerStore) GetPeer(_ model.InfoHash, _ model.PeerID) (*model.Peer, error) {
+	panic("implement me")
+}
+
 // GetPeers will fetch the torrents swarm member peers
-func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
-	const q = `SELECT * FROM peers WHERE torrent_id = ? LIMIT ?`
+func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error) {
+	const q = `SELECT * FROM peers WHERE info_hash = ? LIMIT ?`
 	var peers []*model.Peer
-	if err := ps.db.Select(&peers, q, t.TorrentID, limit); err != nil {
+	if err := ps.db.Select(&peers, q, ih, limit); err != nil {
 		return nil, err
 	}
 	return peers, nil
 }
 
 // GetScrape returns the scrape into for the input torrent
-func (ps *PeerStore) GetScrape(t *model.Torrent) {
+func (ps *PeerStore) GetScrape(_ model.InfoHash) {
 	panic("implement me")
 }
 

@@ -110,8 +110,8 @@ type PeerStore struct {
 }
 
 // AddPeer inserts a peer into the active swarm for the torrent provided
-func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
-	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerID), map[string]interface{}{
+func (ps *PeerStore) AddPeer(ih model.InfoHash, p *model.Peer) error {
+	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
 		"user_peer_id":     p.UserPeerID,
 		"speed_up":         p.SpeedUP,
 		"speed_dn":         p.SpeedDN,
@@ -147,8 +147,8 @@ func (ps *PeerStore) findKeys(prefix string) []string {
 }
 
 // UpdatePeer will sync any new peer data with the backing store
-func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
-	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerID), map[string]interface{}{
+func (ps *PeerStore) UpdatePeer(ih model.InfoHash, p *model.Peer) error {
+	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
 		"speed_up":         p.SpeedUP,
 		"speed_dn":         p.SpeedDN,
 		"speed_up_max":     p.SpeedUPMax,
@@ -169,14 +169,18 @@ func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 }
 
 // DeletePeer will remove a user from a torrents swarm
-func (ps *PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
-	return ps.client.Del(peerKey(t.InfoHash, p.PeerID)).Err()
+func (ps *PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
+	return ps.client.Del(peerKey(ih, p.PeerID)).Err()
+}
+
+func (ps *PeerStore) GetPeer(_ model.InfoHash, _ model.PeerID) (*model.Peer, error) {
+	panic("implement me")
 }
 
 // GetPeers will fetch peers for a torrents active swarm up to N users
-func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
+func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers []*model.Peer
-	for i, key := range ps.findKeys(torrentPeerPrefix(t.InfoHash)) {
+	for i, key := range ps.findKeys(torrentPeerPrefix(ih)) {
 		if i == limit {
 			break
 		}
@@ -211,7 +215,7 @@ func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error
 }
 
 // GetScrape returns scrape data for the torrent provided
-func (ps *PeerStore) GetScrape(t *model.Torrent) {
+func (ps *PeerStore) GetScrape(_ model.InfoHash) {
 	panic("implement me")
 }
 

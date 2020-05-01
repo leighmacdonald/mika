@@ -64,31 +64,31 @@ func (ps *PeerStore) Close() error {
 }
 
 // AddPeer inserts a peer into the active swarm for the torrent provided
-func (ps *PeerStore) AddPeer(tid *model.Torrent, p *model.Peer) error {
+func (ps *PeerStore) AddPeer(ih model.InfoHash, p *model.Peer) error {
 	ps.Lock()
-	ps.peers[tid.InfoHash] = append(ps.peers[tid.InfoHash], p)
+	ps.peers[ih] = append(ps.peers[ih], p)
 	ps.Unlock()
 	return nil
 }
 
 // UpdatePeer is a no-op for memory backed store
-func (ps *PeerStore) UpdatePeer(_ *model.Torrent, _ *model.Peer) error {
+func (ps *PeerStore) UpdatePeer(_ model.InfoHash, _ *model.Peer) error {
 	// no-op for in-memory store
 	return nil
 }
 
 // DeletePeer will remove a user from a torrents swarm
-func (ps *PeerStore) DeletePeer(tid *model.Torrent, p *model.Peer) error {
+func (ps *PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
 	ps.Lock()
-	ps.peers[tid.InfoHash].Remove(p)
+	ps.peers[ih].Remove(p)
 	ps.Unlock()
 	return nil
 }
 
 // GetPeers will fetch peers for a torrents active swarm up to N users
-func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
+func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error) {
 	ps.RLock()
-	p, found := ps.peers[t.InfoHash]
+	p, found := ps.peers[ih]
 	ps.RUnlock()
 	if !found {
 		return nil, consts.ErrInvalidTorrentID
@@ -97,7 +97,7 @@ func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error
 }
 
 // GetScrape returns scrape data for the torrent provided
-func (ps *PeerStore) GetScrape(_ *model.Torrent) {
+func (ps *PeerStore) GetScrape(_ model.InfoHash) {
 	panic("implement me")
 }
 

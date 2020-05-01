@@ -128,22 +128,26 @@ type PeerStore struct {
 }
 
 // AddPeer inserts a peer into the active swarm for the torrent provided
-func (ps PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
-	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", t.InfoHash), p)
+func (ps PeerStore) AddPeer(ih model.InfoHash, p *model.Peer) error {
+	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", ih), p)
 	if err != nil {
 		return err
 	}
 	return checkResponse(resp, http.StatusCreated)
 }
 
+func (ps PeerStore) GetPeer(_ model.InfoHash, _ model.PeerID) (*model.Peer, error) {
+	panic("implement me")
+}
+
 // UpdatePeer will sync any new peer data with the backing store
-func (ps PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
+func (ps PeerStore) UpdatePeer(_ model.InfoHash, _ *model.Peer) error {
 	panic("implement me")
 }
 
 // DeletePeer will remove a user from a torrents swarm
-func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
-	reqUrl := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", t.InfoHash, p.PeerID)
+func (ps PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
+	reqUrl := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p.PeerID)
 	resp, err := doRequest(ps.client, "DELETE", reqUrl, nil)
 	if err != nil {
 		return err
@@ -152,9 +156,9 @@ func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
 }
 
 // GetPeers will fetch peers for a torrents active swarm up to N users
-func (ps PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
+func (ps PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers []*model.Peer
-	resp, err := doRequest(ps.client, "GET", fmt.Sprintf(ps.baseURL, "/torrent/%s/peers", t.InfoHash), nil)
+	resp, err := doRequest(ps.client, "GET", fmt.Sprintf(ps.baseURL, "/torrent/%s/peers", ih), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +176,7 @@ func (ps PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error)
 }
 
 // GetScrape returns scrape data for the torrent provided
-func (ps PeerStore) GetScrape(t *model.Torrent) {
+func (ps PeerStore) GetScrape(_ model.InfoHash) {
 	panic("implement me")
 }
 
@@ -214,50 +218,54 @@ type UserStore struct {
 	baseURL string
 }
 
+func (u *UserStore) AddUser(_ *model.User) error {
+	panic("implement me")
+}
+
 // GetUserByPasskey will lookup and return the user via their passkey used as an identifier
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
+func (u *UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
 	var usr model.User
 	if passkey == "" || len(passkey) != 20 {
-		return usr, consts.ErrUnauthorized
+		return nil, consts.ErrUnauthorized
 	}
 	path := fmt.Sprintf("%s/api/user/pk/%s", u.baseURL, passkey)
 	resp, err := doRequest(u.client, "GET", path, nil)
 	if err != nil {
 		log.Errorf("Failed to make api call to backing http api: %s", err)
-		return usr, consts.ErrUnauthorized
+		return nil, consts.ErrUnauthorized
 	}
 	if err := checkResponse(resp, http.StatusOK); err != nil {
-		return usr, consts.ErrUnauthorized
+		return nil, consts.ErrUnauthorized
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("Could not read response body from backing http api: %s", err.Error())
-		return usr, consts.ErrUnauthorized
+		return nil, consts.ErrUnauthorized
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 	if err := json.Unmarshal(b, &usr); err != nil {
 		log.Warnf("Failed to decode user data from backing http api: %s", err.Error())
-		return usr, consts.ErrUnauthorized
+		return nil, consts.ErrUnauthorized
 	}
 	if !usr.Valid() {
 		log.Warnf("Received invalid user data from backing http api")
-		return usr, consts.ErrUnauthorized
+		return nil, consts.ErrUnauthorized
 	}
-	return usr, nil
+	return &usr, nil
 }
 
 // GetUserByID returns a user matching the userId
-func (u *UserStore) GetUserByID(userId uint32) (model.User, error) {
+func (u *UserStore) GetUserByID(_ uint32) (*model.User, error) {
 	panic("implement me")
 }
 
 // DeleteUser removes a user from the backing store
-func (u *UserStore) DeleteUser(user model.User) error {
+func (u *UserStore) DeleteUser(_ *model.User) error {
 	panic("implement me")
 }
 
@@ -285,7 +293,7 @@ func (p userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 	}, nil
 }
 
-func newClient(c *config.StoreConfig) *http.Client {
+func newClient(_ *config.StoreConfig) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{

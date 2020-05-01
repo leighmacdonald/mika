@@ -16,21 +16,25 @@ type UserStore struct {
 	usersMx sync.RWMutex
 }
 
+func (u *UserStore) AddUser(_ *model.User) error {
+	panic("implement me")
+}
+
 // GetUserByPasskey will lookup and return the user via their passkey used as an identifier
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
-	return model.User{}, nil
+func (u *UserStore) GetUserByPasskey(_ string) (*model.User, error) {
+	return &model.User{}, nil
 }
 
 // GetUserByID returns a user matching the userId
-func (u *UserStore) GetUserByID(userID uint32) (model.User, error) {
+func (u *UserStore) GetUserByID(_ uint32) (*model.User, error) {
 	panic("implement me")
 }
 
 // DeleteUser removes a user from the backing store
-func (u *UserStore) DeleteUser(user model.User) error {
+func (u *UserStore) DeleteUser(_ *model.User) error {
 	panic("implement me")
 }
 

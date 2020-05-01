@@ -4,6 +4,7 @@
 package mysql
 
 import (
+	// imported for side-effects
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -17,14 +18,17 @@ const (
 	driverName = "mysql"
 )
 
+// TorrentStore implements the store.TorrentStore interface for mysql
 type TorrentStore struct {
 	db *sqlx.DB
 }
 
+// Close will close the underlying mysql database connection
 func (s *TorrentStore) Close() error {
 	return s.db.Close()
 }
 
+// GetTorrent returns a torrent for the hash provided
 func (s *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
 	var t *model.Torrent
@@ -34,6 +38,7 @@ func (s *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
 	return t, nil
 }
 
+// AddTorrent inserts a new torrent into the backing store
 func (s *TorrentStore) AddTorrent(t *model.Torrent) error {
 	if t.TorrentID > 0 {
 		return errors.New("Torrent ID already attached")
@@ -51,6 +56,8 @@ func (s *TorrentStore) AddTorrent(t *model.Torrent) error {
 	return nil
 }
 
+// DeleteTorrent will mark a torrent as deleted in the backing store.
+// If dropRow is true, it will permanently remove the torrent from the store
 func (s *TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE torrent_id = :torrent_id`
@@ -70,6 +77,7 @@ func (s *TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 
 type torrentDriver struct{}
 
+// NewTorrentStore initialize a TorrentStore implementation using the mysql backing store
 func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {

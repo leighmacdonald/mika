@@ -25,10 +25,12 @@ There is currently a discord server setup for mika. You can join [here](https://
 -   Complete JSON/REST Api for interacting with the tracker on a separate authenticated
 port differing from the standard tracker port. This port is configured for TLS1.2+ only.
 -   Multiple storage backends
-   - PostgreSQL
-   - MySQL/MariaDB
-   - Redis
-   - Memory
+
+   -   PostgreSQL
+   -   MySQL/MariaDB
+   -   Redis
+   -   Memory
+   
 -   IPv4 and IPv6 support with the ability to enable or disable the stacks.
 -   Smart peer selection based on geographic location.
 -   No database reads on incoming announces/scrapes.

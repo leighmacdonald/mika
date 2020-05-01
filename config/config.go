@@ -14,16 +14,29 @@ import (
 type StoreType int
 
 const (
+	// Torrent maps to store_torrent_* config options
 	Torrent StoreType = iota
+	// Peers maps to store_peers_* config options
 	Peers
+	// Users maps to store_users_* config options
 	Users
 )
 
 const (
-	GeneralRunMode   = "general_run_mode"
-	GeneralLogLevel  = "general_log_level"
+	// GeneralRunMode defines the aapplication run mode.
+	// debug|release
+	GeneralRunMode = "general_run_mode"
+
+	// GeneralLogLevel sets the logrus Logger level
+	// info|warn|debug|trace
+	GeneralLogLevel = "general_log_level"
+
+	// GeneralLogColour toggles between colourised console output
+	// true|false
 	GeneralLogColour = "general_log_colour"
 
+	// TrackerPublic enables/disables auto registration of torrents and users
+	// true|false
 	TrackerPublic              = "tracker_public"
 	TrackerListen              = "tracker_listen"
 	TrackerTLS                 = "tracker_tls"
@@ -64,8 +77,14 @@ const (
 	StorePeersPassword   = "store_peers_password"
 	StorePeersProperties = "store_peers_properties"
 
-	GeodbPath    = "geodb_path"
-	GeodbAPIKey  = "geodb_api_key"
+	// GeodbPath sets the path to use for downloading and loading the geo database. Relative to the binary's path.
+	// ./path/to/file.mmdb
+	GeodbPath = "geodb_path"
+	// GeodbAPIKey is the MaxMind.com API key used to download the database
+	// XXXXXXXXXXXXXXXX
+	GeodbAPIKey = "geodb_api_key"
+	// GeodbEnabled toggles use of the geo database
+	// true|false
 	GeodbEnabled = "geodb_enabled"
 )
 
@@ -164,13 +183,13 @@ func Read(cfgFile string) {
 		log.Debugf("Using config file: %s", viper.ConfigFileUsed())
 		level := viper.GetString(GeneralLogLevel)
 		colour := viper.GetBool(GeneralLogColour)
-		SetupLogger(level, colour)
+		setupLogger(level, colour)
 
 		gin.SetMode(viper.GetString(GeneralRunMode))
 	}
 }
 
-func SetupLogger(levelStr string, colour bool) {
+func setupLogger(levelStr string, colour bool) {
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:      colour,
 		DisableTimestamp: true,

@@ -14,14 +14,17 @@ type PeerStore struct {
 	db *sqlx.DB
 }
 
+// Close will close the underlying database connection
 func (ps *PeerStore) Close() error {
 	return ps.db.Close()
 }
 
+// UpdatePeer will sync the new peer data with the backing store
 func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 	panic("implement me")
 }
 
+// AddPeer insets the peer into the swarm of the torrent provided
 func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 	const q = `
 	INSERT INTO peers 
@@ -41,12 +44,14 @@ func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 	return nil
 }
 
+// DeletePeer will remove a peer from the swarm of the torrent provided
 func (ps *PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
 	const q = `DELETE FROM peers WHERE user_peer_id = :user_peer_id`
 	_, err := ps.db.NamedExec(q, p)
 	return err
 }
 
+// GetPeers will fetch the torrents swarm member peers
 func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
 	const q = `SELECT * FROM peers WHERE torrent_id = ? LIMIT ?`
 	var peers []*model.Peer
@@ -56,12 +61,14 @@ func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error
 	return peers, nil
 }
 
+// GetScrape returns the scrape into for the input torrent
 func (ps *PeerStore) GetScrape(t *model.Torrent) {
 	panic("implement me")
 }
 
 type peerDriver struct{}
 
+// NewPeerStore returns a mysql backed store.PeerStore driver
 func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {

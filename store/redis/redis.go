@@ -21,6 +21,7 @@ const (
 	clientName = "mika"
 )
 
+// TorrentStore is the redis backed store.TorrentStore implementation
 type TorrentStore struct {
 	client *redis.Client
 }
@@ -37,6 +38,7 @@ func peerKey(t model.InfoHash, p model.PeerID) string {
 	return fmt.Sprintf("p:%s:%s", t.String(), p.String())
 }
 
+// AddTorrent adds a new torrent to the redis backing store
 func (ts *TorrentStore) AddTorrent(t *model.Torrent) error {
 	err := ts.client.HSet(torrentKey(t.InfoHash), map[string]interface{}{
 		"torrent_id":       t.TorrentID,
@@ -59,6 +61,8 @@ func (ts *TorrentStore) AddTorrent(t *model.Torrent) error {
 	return nil
 }
 
+// DeleteTorrent will mark a torrent as deleted in the backing store.
+// If dropRow is true, it will permanently remove the torrent from the store
 func (ts *TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 	if dropRow {
 		return ts.client.Del(torrentKey(t.InfoHash)).Err()
@@ -66,6 +70,7 @@ func (ts *TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 	return ts.client.HSet(torrentKey(t.InfoHash), "is_deleted", 1).Err()
 }
 
+// GetTorrent returns the Torrent matching the infohash
 func (ts *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
 	v, err := ts.client.HGetAll(torrentKey(hash)).Result()
 	if err != nil {
@@ -94,14 +99,17 @@ func (ts *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) 
 	return &t, nil
 }
 
+// Close will close the underlying redis client and clear the caches
 func (ts *TorrentStore) Close() error {
 	return ts.client.Close()
 }
 
+// PeerStore is the redis backed store.PeerStore implementation
 type PeerStore struct {
 	client *redis.Client
 }
 
+// AddPeer inserts a peer into the active swarm for the torrent provided
 func (ps *PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerID), map[string]interface{}{
 		"user_peer_id":     p.UserPeerID,
@@ -138,6 +146,7 @@ func (ps *PeerStore) findKeys(prefix string) []string {
 	return v
 }
 
+// UpdatePeer will sync any new peer data with the backing store
 func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 	err := ps.client.HSet(peerKey(t.InfoHash, p.PeerID), map[string]interface{}{
 		"speed_up":         p.SpeedUP,
@@ -159,10 +168,12 @@ func (ps *PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 	return nil
 }
 
+// DeletePeer will remove a user from a torrents swarm
 func (ps *PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
 	return ps.client.Del(peerKey(t.InfoHash, p.PeerID)).Err()
 }
 
+// GetPeers will fetch peers for a torrents active swarm up to N users
 func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
 	var peers []*model.Peer
 	for i, key := range ps.findKeys(torrentPeerPrefix(t.InfoHash)) {
@@ -199,10 +210,12 @@ func (ps *PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error
 	return peers, nil
 }
 
+// GetScrape returns scrape data for the torrent provided
 func (ps *PeerStore) GetScrape(t *model.Torrent) {
 	panic("implement me")
 }
 
+// Close will close the underlying redis client and clear in-memory caches
 func (ps *PeerStore) Close() error {
 	return ps.client.Close()
 }
@@ -227,6 +240,7 @@ func newRedisConfig(c *config.StoreConfig) *redis.Options {
 
 type torrentDriver struct{}
 
+// NewTorrentStore initialize a TorrentStore implementation using the redis backing store
 func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
@@ -240,6 +254,7 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 
 type peerDriver struct{}
 
+// NewPeerStore initialize a NewPeerStore implementation using the redis backing store
 func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {

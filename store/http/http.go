@@ -26,16 +26,18 @@ const (
 	driverName = "http"
 )
 
+// authMode defines what type of authentication to use when talking to the http backing store api
 type authMode int
 
 const (
-	Basic authMode = iota
-	BearerToken
-	KeyToken
+	basic authMode = iota
+	bearerToken
+	keyToken
 )
 
 type torrentDriver struct{}
 
+// TorrentStore is the HTTP API backed store.TorrentStore implementation
 type TorrentStore struct {
 	client  *http.Client
 	baseURL string
@@ -63,6 +65,7 @@ func doRequest(client *http.Client, method string, path string, data interface{}
 	return client.Do(req)
 }
 
+// AddTorrent adds a new torrent to the HTTP API backing store
 func (ts TorrentStore) AddTorrent(t *model.Torrent) error {
 	resp, err := doRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/torrent"), t)
 	if err != nil {
@@ -71,6 +74,8 @@ func (ts TorrentStore) AddTorrent(t *model.Torrent) error {
 	return checkResponse(resp, http.StatusCreated)
 }
 
+// DeleteTorrent will mark a torrent as deleted in the backing store.
+// If dropRow is true, it will permanently remove the torrent from the store
 func (ts TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 	if dropRow {
 		resp, err := doRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), t)
@@ -89,6 +94,7 @@ func (ts TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
 	return checkResponse(resp, http.StatusOK)
 }
 
+// GetTorrent returns the Torrent matching the infohash
 func (ts TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
 	url := fmt.Sprintf("%s/torrent/%s", ts.baseURL, hash.String())
 	resp, err := doRequest(ts.client, "GET", url, nil)
@@ -109,16 +115,19 @@ func (ts TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
 	return t, nil
 }
 
+// Close will close all the remaining http connections
 func (ts TorrentStore) Close() error {
 	ts.client.CloseIdleConnections()
 	return nil
 }
 
+// PeerStore is the HTTP API backed store.PeerStore implementation
 type PeerStore struct {
 	client  *http.Client
 	baseURL string
 }
 
+// AddPeer inserts a peer into the active swarm for the torrent provided
 func (ps PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", t.InfoHash), p)
 	if err != nil {
@@ -127,10 +136,12 @@ func (ps PeerStore) AddPeer(t *model.Torrent, p *model.Peer) error {
 	return checkResponse(resp, http.StatusCreated)
 }
 
+// UpdatePeer will sync any new peer data with the backing store
 func (ps PeerStore) UpdatePeer(t *model.Torrent, p *model.Peer) error {
 	panic("implement me")
 }
 
+// DeletePeer will remove a user from a torrents swarm
 func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
 	reqUrl := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", t.InfoHash, p.PeerID)
 	resp, err := doRequest(ps.client, "DELETE", reqUrl, nil)
@@ -140,6 +151,7 @@ func (ps PeerStore) DeletePeer(t *model.Torrent, p *model.Peer) error {
 	return checkResponse(resp, http.StatusOK)
 }
 
+// GetPeers will fetch peers for a torrents active swarm up to N users
 func (ps PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error) {
 	var peers []*model.Peer
 	resp, err := doRequest(ps.client, "GET", fmt.Sprintf(ps.baseURL, "/torrent/%s/peers", t.InfoHash), nil)
@@ -159,15 +171,18 @@ func (ps PeerStore) GetPeers(t *model.Torrent, limit int) ([]*model.Peer, error)
 	return peers, nil
 }
 
+// GetScrape returns scrape data for the torrent provided
 func (ps PeerStore) GetScrape(t *model.Torrent) {
 	panic("implement me")
 }
 
+// Close will close all the remaining http connections
 func (ps PeerStore) Close() error {
 	ps.client.CloseIdleConnections()
 	return nil
 }
 
+// NewTorrentStore initialize a TorrentStore implementation using the HTTP API backing store
 func (t torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
@@ -181,6 +196,7 @@ func (t torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, err
 
 type peerDriver struct{}
 
+// NewPeerStore initialize a NewPeerStore implementation using the HTTP API backing store
 func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
@@ -192,6 +208,7 @@ func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	}, nil
 }
 
+// UserStore is the HTTP API backed store.UserStore implementation
 type UserStore struct {
 	client  *http.Client
 	baseURL string
@@ -234,14 +251,17 @@ func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
 	return usr, nil
 }
 
+// GetUserByID returns a user matching the userId
 func (u *UserStore) GetUserByID(userId uint32) (model.User, error) {
 	panic("implement me")
 }
 
+// DeleteUser removes a user from the backing store
 func (u *UserStore) DeleteUser(user model.User) error {
 	panic("implement me")
 }
 
+// Close will close all the remaining http connections
 func (u *UserStore) Close() error {
 	u.client.CloseIdleConnections()
 	return nil

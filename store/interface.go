@@ -84,7 +84,7 @@ type UserStore interface {
 // TorrentStore defines where we can store permanent torrent data
 // The backing drivers should always persist the data to disk
 type TorrentStore interface {
-	// Add a new torrent to the backing store
+	// AddTorrent adds a new torrent to the backing store
 	AddTorrent(t *model.Torrent) error
 	// DeleteTorrent will mark a torrent as deleted in the backing store.
 	// If dropRow is true, it will permanently remove the torrent from the store

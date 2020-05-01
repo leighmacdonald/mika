@@ -3,15 +3,26 @@ package consts
 import "github.com/pkg/errors"
 
 var (
-	// General request error for invalid inputs that dont fall under other categories
-	ErrMalformedRequest    = errors.New("Malformed request")
-	ErrInvalidMapKey       = errors.New("Invalid map key specified")
-	ErrDuplicate           = errors.New("Duplicate entry")
-	ErrInvalidInfoHash     = errors.New("Info hash not supplied")
-	ErrInvalidIP           = errors.New("invalid client ip")
-	ErrInvalidTorrentID    = errors.New("Invalid torrent_id")
-	ErrInvalidDriver       = errors.New("invalid driver")
-	ErrInvalidConfig       = errors.New("invalid configuration")
+	// ErrMalformedRequest is the general request error for invalid inputs that dont fall under other categories
+	ErrMalformedRequest = errors.New("Malformed request")
+	// ErrInvalidMapKey isfor general map key lookup failure
+	ErrInvalidMapKey = errors.New("Invalid map key specified")
+	// ErrDuplicate duplicate entry error
+	ErrDuplicate = errors.New("Duplicate entry")
+	// ErrInvalidInfoHash returned to clients on unknown hash
+	ErrInvalidInfoHash = errors.New("Info hash not supplied")
+	// ErrInvalidIP Non routable, invalid IP format or ipv6 in ipv4 exclusive setup
+	ErrInvalidIP = errors.New("invalid client ip")
+	// ErrInvalidTorrentID failure to find mapped torrent_id
+	ErrInvalidTorrentID = errors.New("Invalid torrent_id")
+	// ErrInvalidDriver is for when a unknown driver is used.
+	// Either misspelled or using driver that wasn't built into the binary
+	ErrInvalidDriver = errors.New("invalid driver")
+	// ErrInvalidConfig is issued when a invalid config value is used
+	ErrInvalidConfig = errors.New("invalid configuration")
+	// ErrInvalidResponseCode is a generic error code representing a invalid response code
+	// was received from the server
 	ErrInvalidResponseCode = errors.New("invalid response code")
-	ErrUnauthorized        = errors.New("invalid response code")
+	// ErrUnauthorized is a general non-info disclosing auth error
+	ErrUnauthorized = errors.New("not authorized")
 )

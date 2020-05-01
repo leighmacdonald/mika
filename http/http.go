@@ -81,6 +81,7 @@ var (
 	}
 )
 
+// TrackerErr maps a tracker error code to a error
 func TrackerErr(code trackerErrCode) error {
 	return responseStringMap[code]
 }

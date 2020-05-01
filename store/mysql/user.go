@@ -9,30 +9,39 @@ import (
 	"sync"
 )
 
+// UserStore is the MySQL backed store.UserStore implementation
 type UserStore struct {
 	db      *sqlx.DB
 	users   map[string]model.User
 	usersMx sync.RWMutex
 }
 
+// GetUserByPasskey will lookup and return the user via their passkey used as an identifier
+// The errors returned for this method should be very generic and not reveal any info
+// that could possibly help attackers gain any insight. All error cases MUST
+// return ErrUnauthorized.
 func (u *UserStore) GetUserByPasskey(passkey string) (model.User, error) {
 	return model.User{}, nil
 }
 
+// GetUserByID returns a user matching the userId
 func (u *UserStore) GetUserByID(userID uint32) (model.User, error) {
 	panic("implement me")
 }
 
+// DeleteUser removes a user from the backing store
 func (u *UserStore) DeleteUser(user model.User) error {
 	panic("implement me")
 }
 
+// Close will close the underlying database connection and clear the local caches
 func (u *UserStore) Close() error {
 	panic("implement me")
 }
 
 type userDriver struct{}
 
+// NewUserStore creates a new mysql backed user store.
 func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {

@@ -11,6 +11,7 @@ import (
 	"testing"
 )
 
+// GenerateTestUser creates a peer using fake data. Used for testing.
 func GenerateTestUser() *model.User {
 	passkey, _ := util.GenRandomBytes(20)
 	return &model.User{
@@ -19,12 +20,14 @@ func GenerateTestUser() *model.User {
 	}
 }
 
+// GenerateTestTorrent creates a torrent using fake data. Used for testing.
 func GenerateTestTorrent() *model.Torrent {
 	token, _ := util.GenRandomBytes(20)
 	ih := model.InfoHashFromString(string(token))
 	return model.NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)), uint32(rand.Intn(1000000)))
 }
 
+// GenerateTestPeer creates a peer using fake data for the provided user. Used for testing.
 func GenerateTestPeer(user *model.User) *model.Peer {
 	token, _ := util.GenRandomBytes(20)
 	ih := model.PeerIDFromString(string(token))

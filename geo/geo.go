@@ -212,11 +212,14 @@ func (ellipsoid ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 	return s, faz
 }
 
+// DB handles opening and querying from the maxmind Cities geo memory mapped database (.mmdb) file.
 type DB struct {
 	db        *maxminddb.Reader
 	ellipsoid ellipsoid
 }
 
+// New opens the .mmdb file for querying and sets up the ellipsoid configuration for more accurate
+// geo queries
 func New(path string) *DB {
 	db, err := maxminddb.Open(path)
 	if err != nil {
@@ -232,6 +235,7 @@ func New(path string) *DB {
 	}
 }
 
+// GetLocation returns the geo location of the input IP addr
 func (db *DB) GetLocation(ip net.IP) City {
 	var record City
 	err := db.db.Lookup(ip, &record)

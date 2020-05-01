@@ -26,10 +26,10 @@ func (a *AdminAPI) userDelete(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) ConfigUpdate(c *gin.Context) {
+func (a *AdminAPI) configUpdate(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) Stats(c *gin.Context) {
+func (a *AdminAPI) stats(c *gin.Context) {
 
 }

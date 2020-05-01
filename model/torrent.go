@@ -25,6 +25,7 @@ func (ih *InfoHash) RawString() string {
 	return string(ih[:])
 }
 
+// Torrent is the core struct for our torrent being tracked
 type Torrent struct {
 	sync.RWMutex
 	TorrentID      uint32   `db:"torrent_id" redis:"torrent_id" json:"torrent_id"`
@@ -50,6 +51,8 @@ type Torrent struct {
 	UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
 }
 
+// TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats
+// from peer info as well as the normal torrent stats.
 type TorrentStats struct {
 	TorrentID uint64 `json:"torrent_id"`
 	InfoHash  string `json:"info_hash"`

@@ -1,5 +1,6 @@
 // Package exampleapi implements a trivial reference server implementation
 // of the required API routes to communicate as a frontend server for the tracker.
+//
 // +build demos
 
 package exampleapi

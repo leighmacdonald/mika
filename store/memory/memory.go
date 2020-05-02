@@ -98,8 +98,14 @@ func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
 }
 
 // GetScrape returns scrape data for the torrent provided
-func (ps *PeerStore) GetScrape(_ model.InfoHash) {
-	panic("implement me")
+func (ps *PeerStore) GetScrape(ih model.InfoHash) {
+	ps.RLock()
+	_, found := ps.peers[ih]
+	ps.RUnlock()
+	if !found {
+		return
+	}
+	return
 }
 
 // AddTorrent adds a new torrent to the memory store

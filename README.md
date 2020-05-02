@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/f06234b0551a49cc8ac111d7b77827b2)](https://www.codacy.com/manual/leighmacdonald/mika?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=leighmacdonald/mika&amp;utm_campaign=Badge_Grade)
+[![Maintainability](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/maintainability)](https://codeclimate.com/github/leighmacdonald/mika/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/test_coverage)](https://codeclimate.com/github/leighmacdonald/mika/test_coverage)
 [![Discord chat](https://img.shields.io/badge/discord-Chat%20Now-a29bfe.svg?style=flat-square)](https://discord.gg/jWXFcHW)
 
 A torrent tracker written in the Go programming language.
@@ -26,10 +28,10 @@ There is currently a discord server setup for mika. You can join [here](https://
 port differing from the standard tracker port. This port is configured for TLS1.2+ only.
 -   Multiple storage backends
 
-   -   PostgreSQL
-   -   MySQL/MariaDB
-   -   Redis
-   -   Memory
+  -   PostgreSQL
+  -   MySQL/MariaDB
+  -   Redis
+  -   Memory
    
 -   IPv4 and IPv6 support with the ability to enable or disable the stacks.
 -   Smart peer selection based on geographic location.

@@ -157,7 +157,11 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	}
 	ipv4, err := getIP(q, c)
 	if err != nil {
-
+		log.Warn("Could not get user IP from request")
+		return nil, msgMalformedRequest
+	}
+	if util.IsPrivateIP(ipv4) {
+		log.Warnf("Attempt to use non-routable IP value: %s", ipv4.String())
 		return nil, msgMalformedRequest
 	}
 	port := getUint16Key(q, paramPort, 0)

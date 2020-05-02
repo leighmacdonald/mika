@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"mika/geo"
+	"mika/util"
 	"net"
 	"sync"
 	"time"
@@ -31,7 +32,6 @@ func (p PeerID) RawString() string {
 // Peer represents a single unique peer in a swarm
 type Peer struct {
 	sync.RWMutex
-	UserPeerID uint32 `db:"user_peer_id" redis:"user_peer_id" json:"user_peer_id"`
 	// Current speed up, bytes/sec
 	SpeedUP uint32 `db:"speed_up" redis:"speed_up" json:"speed_up"`
 	// Current speed dn, bytes/sec
@@ -74,6 +74,10 @@ func (peer *Peer) IsNew() bool {
 	return peer.Announces == 0
 }
 
+func (peer *Peer) Valid() bool {
+	return peer.UserID > 0 && peer.Port >= 1024 && peer.Port < 65535 && util.IsPrivateIP(peer.IP)
+}
+
 // Swarm is a set of users participating in a torrent
 type Swarm []*Peer
 
@@ -104,7 +108,6 @@ func (peers Swarm) Counts() (seeders uint, leechers uint) {
 func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
 		RWMutex:       sync.RWMutex{},
-		UserPeerID:    0,
 		SpeedUP:       0,
 		SpeedDN:       0,
 		SpeedUPMax:    0,

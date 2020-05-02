@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	"mika/config"
 	"mika/consts"
 	"mika/model"
@@ -17,31 +18,66 @@ type UserStore struct {
 }
 
 // AddUser will add a new user to the backing store
-func (u *UserStore) AddUser(_ *model.User) error {
-	panic("implement me")
+func (u *UserStore) AddUser(user *model.User) error {
+	if user.UserID > 0 {
+		return errors.New("User already has a user_id")
+	}
+	const q = `
+		INSERT INTO user 
+		    (passkey, download_enabled, is_deleted) 
+		VALUES
+		    (?, ?, ?)`
+	res, err := u.db.Exec(q, user.Passkey, true, false)
+	if err != nil {
+		return errors.Wrap(err, "Failed to add user to store")
+	}
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return errors.New("Failed to fetch insert ID")
+	}
+	user.UserID = uint32(lastID)
+	return nil
 }
 
 // GetUserByPasskey will lookup and return the user via their passkey used as an identifier
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetUserByPasskey(_ string) (*model.User, error) {
-	return &model.User{}, nil
+func (u *UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
+	var user model.User
+	const q = `SELECT * FROM user WHERE passkey = ?`
+	if err := u.db.Get(&user, q, passkey); err != nil {
+		return nil, errors.Wrap(err, "Failed to fetch user by passkey")
+	}
+	return &user, nil
 }
 
 // GetUserByID returns a user matching the userId
-func (u *UserStore) GetUserByID(_ uint32) (*model.User, error) {
-	panic("implement me")
+func (u *UserStore) GetUserByID(userID uint32) (*model.User, error) {
+	var user model.User
+	const q = `SELECT * FROM user WHERE user_id = ?`
+	if err := u.db.Get(&user, q, userID); err != nil {
+		return nil, errors.Wrap(err, "Failed to fetch user by user_id")
+	}
+	return &user, nil
 }
 
 // DeleteUser removes a user from the backing store
-func (u *UserStore) DeleteUser(_ *model.User) error {
-	panic("implement me")
+func (u *UserStore) DeleteUser(user *model.User) error {
+	if user.UserID <= 0 {
+		return errors.New("User doesnt have a user_id")
+	}
+	const q = `DELETE FROM user WHERE user_id = ?`
+	if _, err := u.db.Exec(q, user.UserID); err != nil {
+		return errors.Wrap(err, "Failed to delete user")
+	}
+	user.UserID = 0
+	return nil
 }
 
 // Close will close the underlying database connection and clear the local caches
 func (u *UserStore) Close() error {
-	panic("implement me")
+	return u.db.Close()
 }
 
 type userDriver struct{}
@@ -52,7 +88,7 @@ func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect("mysql", c.DSN())
+	db := sqlx.MustConnect(driverName, c.DSN())
 	return &UserStore{
 		db:      db,
 		users:   map[string]model.User{},
@@ -61,5 +97,5 @@ func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 }
 
 func init() {
-	store.AddUserDriver("mysql", userDriver{})
+	store.AddUserDriver(driverName, userDriver{})
 }

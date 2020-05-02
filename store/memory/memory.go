@@ -97,17 +97,6 @@ func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
 	return p[0:limit], nil
 }
 
-// GetScrape returns scrape data for the torrent provided
-func (ps *PeerStore) GetScrape(ih model.InfoHash) {
-	ps.RLock()
-	_, found := ps.peers[ih]
-	ps.RUnlock()
-	if !found {
-		return
-	}
-	return
-}
-
 // AddTorrent adds a new torrent to the memory store
 func (ts *TorrentStore) AddTorrent(t *model.Torrent) error {
 	ts.RLock()
@@ -124,9 +113,9 @@ func (ts *TorrentStore) AddTorrent(t *model.Torrent) error {
 
 // DeleteTorrent will mark a torrent as deleted in the backing store.
 // NOTE the memory store always permanently deletes the torrent
-func (ts *TorrentStore) DeleteTorrent(t *model.Torrent, _ bool) error {
+func (ts *TorrentStore) DeleteTorrent(ih model.InfoHash, _ bool) error {
 	ts.Lock()
-	delete(ts.torrents, t.InfoHash)
+	delete(ts.torrents, ih)
 	ts.Unlock()
 	return nil
 }

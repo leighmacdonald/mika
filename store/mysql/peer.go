@@ -52,8 +52,13 @@ func (ps *PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
 }
 
 // GetPeer will fetch the peer from the swarm if it exists
-func (ps *PeerStore) GetPeer(_ model.InfoHash, _ model.PeerID) (*model.Peer, error) {
-	panic("implement me")
+func (ps *PeerStore) GetPeer(ih model.InfoHash, peerID model.PeerID) (*model.Peer, error) {
+	const q = `SELECT * FROM peers WHERE info_hash = ? AND peer_id = ? LIMIT 1`
+	var peer model.Peer
+	if err := ps.db.Get(&peer, q, ih, peerID); err != nil {
+		return nil, errors.Wrap(err, "Unknown peer")
+	}
+	return &peer, nil
 }
 
 // GetPeers will fetch the torrents swarm member peers
@@ -66,11 +71,6 @@ func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
 	return peers, nil
 }
 
-// GetScrape returns the scrape into for the input torrent
-func (ps *PeerStore) GetScrape(_ model.InfoHash) {
-	panic("implement me")
-}
-
 type peerDriver struct{}
 
 // NewPeerStore returns a mysql backed store.PeerStore driver
@@ -79,12 +79,12 @@ func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect("mysql", c.DSN())
+	db := sqlx.MustConnect(driverName, c.DSN())
 	return &PeerStore{
 		db: db,
 	}, nil
 }
 
 func init() {
-	store.AddPeerDriver("mysql", peerDriver{})
+	store.AddPeerDriver(driverName, peerDriver{})
 }

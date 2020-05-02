@@ -58,16 +58,16 @@ func (s *TorrentStore) AddTorrent(t *model.Torrent) error {
 
 // DeleteTorrent will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (s *TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
+func (s *TorrentStore) DeleteTorrent(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
-		const dropQ = `DELETE FROM torrent WHERE torrent_id = :torrent_id`
-		_, err := s.db.NamedExec(dropQ, t)
+		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
+		_, err := s.db.Exec(dropQ, ih)
 		if err != nil {
 			return err
 		}
 	} else {
-		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE torrent_id = :torrent_id`
-		_, err := s.db.NamedExec(updateQ, t)
+		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = ?`
+		_, err := s.db.NamedExec(updateQ, ih)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect("mysql", c.DSN())
+	db := sqlx.MustConnect(driverName, c.DSN())
 	return &TorrentStore{
 		db: db,
 	}, nil

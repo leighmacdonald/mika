@@ -63,11 +63,11 @@ func (ts *TorrentStore) AddTorrent(t *model.Torrent) error {
 
 // DeleteTorrent will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (ts *TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
+func (ts *TorrentStore) DeleteTorrent(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
-		return ts.client.Del(torrentKey(t.InfoHash)).Err()
+		return ts.client.Del(torrentKey(ih)).Err()
 	}
-	return ts.client.HSet(torrentKey(t.InfoHash), "is_deleted", 1).Err()
+	return ts.client.HSet(torrentKey(ih), "is_deleted", 1).Err()
 }
 
 // GetTorrent returns the Torrent matching the infohash
@@ -213,11 +213,6 @@ func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
 		peers = append(peers, p)
 	}
 	return peers, nil
-}
-
-// GetScrape returns scrape data for the torrent provided
-func (ps *PeerStore) GetScrape(_ model.InfoHash) {
-	panic("implement me")
 }
 
 // Close will close the underlying redis client and clear in-memory caches

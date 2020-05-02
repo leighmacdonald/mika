@@ -90,7 +90,7 @@ type TorrentStore interface {
 	AddTorrent(t *model.Torrent) error
 	// DeleteTorrent will mark a torrent as deleted in the backing store.
 	// If dropRow is true, it will permanently remove the torrent from the store
-	DeleteTorrent(t *model.Torrent, dropRow bool) error
+	DeleteTorrent(ih model.InfoHash, dropRow bool) error
 	// GetTorrent returns the Torrent matching the infohash
 	GetTorrent(hash model.InfoHash) (*model.Torrent, error)
 	// Close will cleanup and close the underlying storage driver if necessary
@@ -111,8 +111,6 @@ type PeerStore interface {
 	GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
 	// GetPeer will fetch the peer from the swarm if it exists
 	GetPeer(ih model.InfoHash, id model.PeerID) (*model.Peer, error)
-	// GetScrape returns scrape data for the torrent provided
-	GetScrape(ih model.InfoHash)
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }

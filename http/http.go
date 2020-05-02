@@ -126,6 +126,8 @@ func oops(ctx *gin.Context, errCode trackerErrCode) {
 }
 
 // preFlightChecks ensures our user meets the requirements to make an authorized request
+// THis is used within the request handler itself and not as a middleware because of the
+// slightly higher cost of passing data in through the request context
 func preFlightChecks(c *gin.Context, t *tracker.Tracker) (*model.User, bool) {
 	// Check that the user is valid before parsing anything
 	pk := c.Param("passkey")

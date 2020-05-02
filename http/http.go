@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"mika/model"
 	"mika/tracker"
 	"net"
 	"net/http"
@@ -122,6 +123,22 @@ func oops(ctx *gin.Context, errCode trackerErrCode) {
 	}
 	ctx.String(int(errCode), responseError(msg.Error()))
 	log.Errorf("Error in request from: %s (%d)", ctx.Request.RequestURI, errCode)
+}
+
+// preFlightChecks ensures our user meets the requirements to make an authorized request
+func preFlightChecks(c *gin.Context, t *tracker.Tracker) (*model.User, bool) {
+	// Check that the user is valid before parsing anything
+	pk := c.Param("passkey")
+	if pk == "" {
+		oops(c, msgInvalidAuth)
+		return nil, false
+	}
+	usr, err := t.Users.GetUserByPasskey(pk)
+	if err != nil || !usr.Valid() {
+		oops(c, msgInvalidAuth)
+		return nil, false
+	}
+	return usr, true
 }
 
 // handleTrackerErrors is used as the default error handler for tracker requests

@@ -147,17 +147,14 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	if err != nil {
 		return nil, msgMalformedRequest
 	}
-
 	infoHash, exists := q.Params[paramInfoHash]
 	if !exists {
 		return nil, msgInvalidInfoHash
 	}
-
 	peerID, exists := q.Params[paramPeerID]
 	if !exists {
 		return nil, msgInvalidPeerID
 	}
-
 	ipv4, err := getIP(q, c)
 	if err != nil {
 
@@ -174,7 +171,6 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	corrupt := getUint32Key(q, paramCorrupt, 0)
 	event := parseAnnounceType(q.Params[paramNumWant])
 	numWant := getUintKey(q, "numwant", 30)
-
 	return &announceRequest{
 		Compact:    true, // Ignored and always set to true
 		Corrupt:    corrupt,
@@ -193,24 +189,16 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 // The meaty bits.
 func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// Check that the user is valid before parsing anything
-	pk := c.Param("passkey")
-	if pk == "" {
-		oops(c, msgInvalidAuth)
+	usr, valid := preFlightChecks(c, h.t)
+	if !valid {
 		return
 	}
-	usr, err := h.t.Users.GetUserByPasskey(pk)
-	if err != nil || !usr.Valid() {
-		oops(c, msgInvalidAuth)
-		return
-	}
-
 	// Parse the announce into an announceRequest
 	req, code := newAnnounce(c)
 	if code != msgOk {
 		oops(c, code)
 		return
 	}
-
 	// Get & Validate the torrent associated with the info_hash supplies
 	tor, err := h.t.Torrents.GetTorrent(req.InfoHash)
 	if err != nil || tor.IsDeleted {
@@ -249,7 +237,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	peer.Unlock()
 	switch req.Event {
 	case COMPLETED:
-		// TODO does a stop event get sent for a torrent when the user only downloads a specific file from the torrent
+		// TODO does a complete event get sent for a torrent when the user only downloads a specific file from the torrent
 		// Do we force left=0 for this? Or trust the client?
 		tor.TotalCompleted++
 	case STOPPED:

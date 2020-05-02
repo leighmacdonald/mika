@@ -9,25 +9,10 @@ import (
 	"net/http"
 )
 
-type scrapeRequest struct {
-	InfoHashes []string
-}
-
-type scrapeResponse struct {
-	Files []bencode.Dict
-}
-
 // scrape handles the bittorrent scrape protocol for
 func (h *BitTorrentHandler) scrape(c *gin.Context) {
-	// Check that the user is valid before parsing anything
-	pk := c.Param("passkey")
-	if pk == "" {
-		oops(c, msgInvalidAuth)
-		return
-	}
-	usr, err := h.t.Users.GetUserByPasskey(pk)
-	if err != nil || !usr.Valid() {
-		oops(c, msgInvalidAuth)
+	_, valid := preFlightChecks(c, h.t)
+	if !valid {
 		return
 	}
 	q, err := queryStringParser(c.Request.RequestURI)

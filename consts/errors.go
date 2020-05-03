@@ -27,4 +27,7 @@ var (
 	ErrInvalidResponseCode = errors.New("invalid response code")
 	// ErrUnauthorized is a general non-info disclosing auth error
 	ErrUnauthorized = errors.New("not authorized")
+	// ErrInvalidState is used when the state of the data returned is not what we expect or invalid
+	// in any way.
+	ErrInvalidState = errors.New("invalid struct state")
 )

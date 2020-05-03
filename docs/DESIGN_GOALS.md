@@ -12,6 +12,15 @@ We can avoid this entire class of problems by using a garbage collected language
 An API exists to facilitate live administration and optional 2-way data communication between a web frontend 
 like gazelle or unit3d for example. The cli interface `./mika client -h` communicates over this API.
 
+## Memory Usage
+
+Since mika is targeting private tracker use, we are selecting types appropriate for optimizing memory usage (size). Wherever
+it makes sense we will use the smallest int types (uint16, uint32 mostly) needed for the value. This has the downside of
+*potentially* slightly less optimized execution by the CPU. As private trackers are often strained
+for resources already. We think it makes sense to take this approach since our intent is to store as much data in memory as 
+possible and memory is often more expensive than CPU resources. This approach is most beneficial for tracking peer swarms 
+which could be millions of entries in total across all the torrents.
+
 ## Storage Backend
 
 Due to the way trackers work, there is a significant amount of database load created without a sound

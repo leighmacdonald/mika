@@ -57,6 +57,7 @@ func (us UserStore) AddUser(u *model.User) error {
 	return nil
 }
 
+// GetUserByPasskey returns the hash values set of the passkey and maps it to a User struct
 func (us UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
 	v, err := us.client.HGetAll(userKey(passkey)).Result()
 	if err != nil {
@@ -71,6 +72,7 @@ func (us UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
 	return &user, nil
 }
 
+// GetUserByID will query the passkey:user_id index for the passkey and return the matching user
 func (us UserStore) GetUserByID(userID uint32) (*model.User, error) {
 	panic("implement me")
 }
@@ -84,6 +86,7 @@ func (us UserStore) DeleteUser(user *model.User) error {
 	return nil
 }
 
+// Close will shutdown the underlying redis connection
 func (us UserStore) Close() error {
 	return us.client.Close()
 }

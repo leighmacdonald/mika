@@ -95,6 +95,12 @@ type TorrentStore interface {
 	GetTorrent(hash model.InfoHash) (*model.Torrent, error)
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
+	// WhiteListDel removes a client from the global whitelist
+	WhiteListDel(client model.WhiteListClient) error
+	// WhiteListAdd will insert a new client prefix into the allowed clients list
+	WhiteListAdd(client model.WhiteListClient) error
+	// WhiteListGetAll fetches all known whitelisted clients
+	WhiteListGetAll() ([]model.WhiteListClient, error)
 }
 
 // PeerStore defines our interface for storing peer data

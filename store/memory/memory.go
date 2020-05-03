@@ -14,7 +14,34 @@ const (
 // TorrentStore is the memory backed store.TorrentStore implementation
 type TorrentStore struct {
 	sync.RWMutex
-	torrents map[model.InfoHash]*model.Torrent
+	torrents  map[model.InfoHash]*model.Torrent
+	whitelist []model.WhiteListClient
+}
+
+func (ts *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
+	ts.Lock()
+	// Remove removes a peer from a slice
+	for i := len(ts.whitelist) - 1; i >= 0; i-- {
+		if ts.whitelist[i].ClientPrefix == client.ClientPrefix {
+			ts.whitelist = append(ts.whitelist[:i], ts.whitelist[i+1:]...)
+			return nil
+		}
+	}
+	return consts.ErrInvalidClient
+}
+
+func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
+	ts.Lock()
+	ts.whitelist = append(ts.whitelist, client)
+	ts.Unlock()
+	return nil
+}
+
+func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
+	ts.RLock()
+	wl := ts.whitelist
+	ts.RUnlock()
+	return wl, nil
 }
 
 // Close will delete/free all the underlying torrent data
@@ -127,6 +154,7 @@ func (td torrentDriver) NewTorrentStore(_ interface{}) (store.TorrentStore, erro
 	return &TorrentStore{
 		sync.RWMutex{},
 		make(map[model.InfoHash]*model.Torrent),
+		[]model.WhiteListClient{},
 	}, nil
 }
 

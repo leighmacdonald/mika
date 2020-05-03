@@ -30,4 +30,9 @@ var (
 	// ErrInvalidState is used when the state of the data returned is not what we expect or invalid
 	// in any way.
 	ErrInvalidState = errors.New("invalid struct state")
+	// ErrInvalidUser is used when a user lookup fails
+	ErrInvalidUser = errors.New("invalid user")
+
+	// ErrInvalidClient is used when an invalid client is requested/used
+	ErrInvalidClient = errors.New("invalid torrent client")
 )

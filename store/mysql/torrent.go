@@ -23,6 +23,18 @@ type TorrentStore struct {
 	db *sqlx.DB
 }
 
+func (s *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
+	panic("implement me")
+}
+
+func (s *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
+	panic("implement me")
+}
+
+func (s *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
+	panic("implement me")
+}
+
 // Close will close the underlying mysql database connection
 func (s *TorrentStore) Close() error {
 	return s.db.Close()

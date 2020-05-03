@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -77,4 +78,18 @@ func NewTorrent(ih InfoHash, name string, tid uint32) *Torrent {
 		UpdatedOn:   time.Now().UTC(),
 	}
 	return torrent
+}
+
+// WhiteListClient defines a whitelisted bittorrent client allowed to participate
+// in swarms. This is not a foolproof solution as its fairly trivial for a motivated
+// attacker to fake this.
+type WhiteListClient struct {
+	ClientID     int       `json:"client_id"`
+	ClientPrefix string    `json:"client_prefix"`
+	CreatedOn    time.Time `json:"created_on"`
+}
+
+// Match returns true if the client matches this prefix
+func (wl WhiteListClient) Match(client string) bool {
+	return strings.HasPrefix(client, wl.ClientPrefix)
 }

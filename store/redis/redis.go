@@ -25,7 +25,7 @@ func torrentKey(t model.InfoHash) string {
 	return fmt.Sprintf("t:%s", t.String())
 }
 
-func torrentPeerPrefix(t model.InfoHash) string {
+func torrentPeersKey(t model.InfoHash) string {
 	return fmt.Sprintf("p:%s:*", t.String())
 }
 
@@ -37,21 +37,27 @@ func userKey(passkey string) string {
 	return fmt.Sprintf("u:%s", passkey)
 }
 
+func userIDKey(userID uint32) string {
+	return fmt.Sprintf("uid_pk:%d", userID)
+}
+
 // UserStore is the redis backed store.TorrentStore implementation
 type UserStore struct {
 	client *redis.Client
 }
 
 // AddUser inserts a user into redis via at the string provided by the userKey function
-// TODO Change to pipeline and add an index so we can query by id as well
+// This additionally sets the passkey->user_id mapping
 func (us UserStore) AddUser(u *model.User) error {
-	err := us.client.HSet(userKey(u.Passkey), map[string]interface{}{
+	pipe := us.client.TxPipeline()
+	pipe.HSet(userKey(u.Passkey), map[string]interface{}{
 		"user_id":          u.UserID,
 		"passkey":          u.Passkey,
 		"download_enabled": true,
 		"is_deleted":       false,
-	}).Err()
-	if err != nil {
+	})
+	pipe.Set(userIDKey(u.UserID), u.Passkey, 0)
+	if _, err := pipe.Exec(); err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
 	}
 	return nil
@@ -74,7 +80,15 @@ func (us UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
 
 // GetUserByID will query the passkey:user_id index for the passkey and return the matching user
 func (us UserStore) GetUserByID(userID uint32) (*model.User, error) {
-	panic("implement me")
+	passkey, err := us.client.Get(userIDKey(userID)).Result()
+	if err != nil {
+		log.Warnf("Failed to lookup user by ID, no passkey mapped: %d", userID)
+		return nil, consts.ErrInvalidUser
+	}
+	if passkey == "" {
+		return nil, consts.ErrInvalidUser
+	}
+	return us.GetUserByPasskey(passkey)
 }
 
 // DeleteUser drops a user from redis.
@@ -94,6 +108,18 @@ func (us UserStore) Close() error {
 // TorrentStore is the redis backed store.TorrentStore implementation
 type TorrentStore struct {
 	client *redis.Client
+}
+
+func (ts *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
+	panic("implement me")
+}
+
+func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
+	panic("implement me")
+}
+
+func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
+	panic("implement me")
 }
 
 // AddTorrent adds a new torrent to the redis backing store
@@ -274,7 +300,7 @@ func mapPeerValues(v map[string]string) model.Peer {
 // GetPeers will fetch peers for a torrents active swarm up to N users
 func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers []*model.Peer
-	for i, key := range ps.findKeys(torrentPeerPrefix(ih)) {
+	for i, key := range ps.findKeys(torrentPeersKey(ih)) {
 		if i == limit {
 			break
 		}

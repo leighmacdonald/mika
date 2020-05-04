@@ -149,7 +149,6 @@ func preFlightChecks(c *gin.Context, t *tracker.Tracker) (*model.User, bool) {
 func handleTrackerErrors(ctx *gin.Context) {
 	// Run request handler
 	ctx.Next()
-
 	// Handle any errors recorded
 	errorReturned := ctx.Errors.Last()
 	if errorReturned != nil {
@@ -160,8 +159,6 @@ func handleTrackerErrors(ctx *gin.Context) {
 		if found {
 			status = customStatus.(trackerErrCode)
 		}
-
-		// TODO handle private/public errors separately, like sentry output for priv errors
 		oops(ctx, status)
 	}
 }

@@ -26,6 +26,7 @@ func init() {
 	}
 }
 
+// IsPrivateIP returns true if the IP provided is a valid routable address
 func IsPrivateIP(ip net.IP) bool {
 	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return true

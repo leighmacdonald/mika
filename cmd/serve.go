@@ -23,15 +23,16 @@ var serveCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to initialize tracker: %s", err)
 		}
-		listenBT := viper.GetString(config.TrackerListen)
-		listenBTTLS := viper.GetBool(config.TrackerTLS)
+		listenBT := viper.GetString(string(config.TrackerListen))
+		listenBTTLS := viper.GetBool(string(config.TrackerTLS))
 		btHandler := h.NewBitTorrentHandler(tkr)
 		btServer := h.CreateServer(btHandler, listenBT, listenBTTLS)
 
-		listenAPI := viper.GetString(config.APIListen)
-		listenAPITLS := viper.GetBool(config.APITLS)
+		listenAPI := viper.GetString(string(config.APIListen))
+		listenAPITLS := viper.GetBool(string(config.APITLS))
 		apiHandler := h.NewAPIHandler(tkr)
 		apiServer := h.CreateServer(apiHandler, listenAPI, listenAPITLS)
+
 		go func() {
 			if err := btServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen: %s\n", err)

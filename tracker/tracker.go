@@ -31,30 +31,41 @@ type Tracker struct {
 func New() (*Tracker, error) {
 	var err error
 	s, err := store.NewTorrentStore(
-		viper.GetString(config.StoreTorrentType),
+		viper.GetString(string(config.StoreTorrentType)),
 		config.GetStoreConfig(config.Torrent))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to setup torrent store")
 	}
-	p, err := store.NewPeerStore(viper.GetString(config.StorePeersType),
+	p, err := store.NewPeerStore(viper.GetString(string(config.StorePeersType)),
 		config.GetStoreConfig(config.Peers))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to setup peer store")
 	}
-	u, err := store.NewUserStore(viper.GetString(config.StoreUsersType),
+	u, err := store.NewUserStore(viper.GetString(string(config.StoreUsersType)),
 		config.GetStoreConfig(config.Users))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to setup user store")
 	}
-	geodb := geo.New(viper.GetString(config.GeodbPath))
+	geodb := geo.New(viper.GetString(string(config.GeodbPath)))
+	whitelist := make(map[string]model.WhiteListClient)
+	wl, err := s.WhiteListGetAll()
+	if err != nil {
+		log.Warnf("Whitelist empty, all clients are allowed")
+	} else {
+		for _, cw := range wl {
+			whitelist[cw.ClientPrefix] = cw
+		}
+	}
 	return &Tracker{
 		Torrents:       s,
 		Peers:          p,
 		Users:          u,
 		Geodb:          geodb,
+		Whitelist:      whitelist,
+		WhitelistMutex: &sync.RWMutex{},
 		MaxPeers:       50,
-		AnnInterval:    viper.GetInt(config.TrackerAnnounceInterval),
-		AnnIntervalMin: viper.GetInt(config.TrackerAnnounceIntervalMin),
+		AnnInterval:    viper.GetInt(string(config.TrackerAnnounceInterval)),
+		AnnIntervalMin: viper.GetInt(string(config.TrackerAnnounceIntervalMin)),
 	}, nil
 }
 
@@ -98,6 +109,14 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 		}
 		torrents = append(torrents, t)
 	}
+	wl, err := ts.WhiteListGetAll()
+	if err != nil {
+		log.Warnf("Failed to read any client whitelists, all clients allowed")
+	}
+	wlm := make(map[string]model.WhiteListClient)
+	for _, cw := range wl {
+		wlm[cw.ClientPrefix] = cw
+	}
 	var peers []*model.Peer
 	for _, t := range torrents {
 		for i := 0; i < swarmSize; i++ {
@@ -112,11 +131,11 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 		Torrents:       ts,
 		Peers:          ps,
 		Users:          us,
-		Geodb:          geo.New(viper.GetString(config.GeodbPath)),
-		WhitelistMutex: nil,
-		Whitelist:      nil,
+		Geodb:          geo.New(viper.GetString(string(config.GeodbPath))),
+		WhitelistMutex: &sync.RWMutex{},
+		Whitelist:      wlm,
 		MaxPeers:       50,
-		AnnInterval:    viper.GetInt(config.TrackerAnnounceInterval),
-		AnnIntervalMin: viper.GetInt(config.TrackerAnnounceIntervalMin),
+		AnnInterval:    viper.GetInt(string(config.TrackerAnnounceInterval)),
+		AnnIntervalMin: viper.GetInt(string(config.TrackerAnnounceIntervalMin)),
 	}, torrents, users, peers
 }

@@ -2,47 +2,24 @@ package redis
 
 import (
 	"github.com/go-redis/redis/v7"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"mika/config"
 	"mika/store"
 	"testing"
 )
 
-func createTestTorrentStore(c *redis.Client) (store.TorrentStore, error) {
-	var ts torrentDriver
-	return ts.NewTorrentStore(&Config{
-		Host:     viper.GetString(config.CacheHost),
-		Port:     viper.GetInt(config.CachePort),
-		Password: viper.GetString(config.CachePassword),
-		DB:       viper.GetInt(config.CacheDB),
-		Conn:     c,
-	})
-}
-
-func createTestPeerStore(c *redis.Client) (store.PeerStore, error) {
-	var ts peerDriver
-	return ts.NewPeerStore(&Config{
-		Host:     viper.GetString(config.CacheHost),
-		Port:     viper.GetInt(config.CachePort),
-		Password: viper.GetString(config.CachePassword),
-		DB:       viper.GetInt(config.CacheDB),
-		Conn:     c,
-	})
-}
-
 func TestRedisTorrentStore(t *testing.T) {
 	config.Read("")
-	ts, e := createTestTorrentStore(nil)
+	ts, e := store.NewTorrentStore("redis", config.GetStoreConfig(config.Torrent))
 	require.NoError(t, e, e)
 	store.TestTorrentStore(t, ts)
 }
 
 func TestRedisPeerStore(t *testing.T) {
 	config.Read("")
-	ts, err := createTestTorrentStore(nil)
+	ts, err := store.NewTorrentStore("redis", config.GetStoreConfig(config.Torrent))
 	require.NoError(t, err)
-	ps, err := createTestPeerStore(nil)
+	ps, err := store.NewPeerStore("redis", config.GetStoreConfig(config.Peers))
 	require.NoError(t, err, err)
 	store.TestPeerStore(t, ps, ts)
 }

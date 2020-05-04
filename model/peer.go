@@ -74,8 +74,9 @@ func (peer *Peer) IsNew() bool {
 	return peer.Announces == 0
 }
 
+// Valid returns true if the peer data meets the minimum requirements to participate in swarms
 func (peer *Peer) Valid() bool {
-	return peer.UserID > 0 && peer.Port >= 1024 && peer.Port < 65535 && util.IsPrivateIP(peer.IP)
+	return peer.UserID > 0 && peer.Port >= 1024 && util.IsPrivateIP(peer.IP)
 }
 
 // Swarm is a set of users participating in a torrent

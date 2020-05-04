@@ -18,6 +18,7 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
+// WhiteListDel removes a client from the global whitelist
 func (ts *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
 	ts.Lock()
 	// Remove removes a peer from a slice
@@ -30,6 +31,7 @@ func (ts *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
 	return consts.ErrInvalidClient
 }
 
+// WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 	ts.Lock()
 	ts.whitelist = append(ts.whitelist, client)
@@ -37,6 +39,7 @@ func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 	return nil
 }
 
+// WhiteListGetAll fetches all known whitelisted clients
 func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	ts.RLock()
 	wl := ts.whitelist

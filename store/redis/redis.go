@@ -21,24 +21,37 @@ const (
 	clientName = "mika"
 )
 
+const (
+	prefixWhitelist    = "whitelist:"
+	prefixTorrent      = "t:"
+	prefixTorrentPeers = "tp:"
+	prefixPeer         = "p:"
+	prefixUser         = "u:"
+	prefixUserID       = "user_id_pk:"
+)
+
+func whiteListKey(prefix string) string {
+	return fmt.Sprintf("%s%s", prefixWhitelist, prefix)
+}
+
 func torrentKey(t model.InfoHash) string {
-	return fmt.Sprintf("t:%s", t.String())
+	return fmt.Sprintf("%s%s", prefixTorrent, t.String())
 }
 
 func torrentPeersKey(t model.InfoHash) string {
-	return fmt.Sprintf("p:%s:*", t.String())
+	return fmt.Sprintf("%s:%s:*", prefixTorrentPeers, t.String())
 }
 
 func peerKey(t model.InfoHash, p model.PeerID) string {
-	return fmt.Sprintf("p:%s:%s", t.String(), p.String())
+	return fmt.Sprintf("%s%s:%s", prefixPeer, t.String(), p.String())
 }
 
 func userKey(passkey string) string {
-	return fmt.Sprintf("u:%s", passkey)
+	return fmt.Sprintf("%s%s", prefixUser, passkey)
 }
 
 func userIDKey(userID uint32) string {
-	return fmt.Sprintf("uid_pk:%d", userID)
+	return fmt.Sprintf("%s%d", prefixUserID, userID)
 }
 
 // UserStore is the redis backed store.TorrentStore implementation
@@ -92,10 +105,12 @@ func (us UserStore) GetUserByID(userID uint32) (*model.User, error) {
 }
 
 // DeleteUser drops a user from redis.
-// TODO Needs to also drop the index value
 func (us UserStore) DeleteUser(user *model.User) error {
 	if err := us.client.Del(userKey(user.Passkey)).Err(); err != nil {
-		return errors.Wrap(err, "Could not remove torrent from store")
+		return errors.Wrap(err, "Could not remove user from store")
+	}
+	if err := us.client.Del(userIDKey(user.UserID)).Err(); err != nil {
+		return errors.Wrap(err, "Could not remove user pk index from store")
 	}
 	return nil
 }
@@ -110,16 +125,53 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
+// WhiteListDel removes a client from the global whitelist
 func (ts *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
-	panic("implement me")
+	res, err := ts.client.Del(whiteListKey(client.ClientPrefix)).Result()
+	if err != nil {
+		return errors.Wrap(err, "Failed to remove whitelisted client")
+	}
+	if res != 1 {
+		return consts.ErrInvalidClient
+	}
+	return nil
 }
 
+// WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	panic("implement me")
+	valueMap := map[string]string{
+		"prefix":      client.ClientPrefix,
+		"client_id":   fmt.Sprintf("%d", client.ClientID),
+		"client_name": client.ClientName,
+		"created_on":  util.TimeToString(client.CreatedOn),
+	}
+	err := ts.client.HSet(whiteListKey(client.ClientPrefix), valueMap).Err()
+	if err != nil {
+		return errors.Wrapf(err, "failed to add new whitelisted client prefix: %s", client.ClientPrefix)
+	}
+	return nil
 }
 
+// WhiteListGetAll fetches all known whitelisted clients
 func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
-	panic("implement me")
+	prefixes, err := ts.client.Keys(fmt.Sprintf("%s*", prefixWhitelist)).Result()
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to fetch whitelist keys")
+	}
+	var wl []model.WhiteListClient
+	for i, prefix := range prefixes {
+		valueMap, err := ts.client.HGetAll(whiteListKey(prefix)).Result()
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to fetch whitelist value for: %s", whiteListKey(prefix))
+		}
+		wl = append(wl, model.WhiteListClient{
+			ClientID:     util.StringToUInt16(valueMap["client_id"], uint16(i)),
+			ClientPrefix: valueMap["prefix"],
+			ClientName:   valueMap["client_name"],
+			CreatedOn:    util.StringToTime(valueMap["created_on"]),
+		})
+	}
+	return wl, nil
 }
 
 // AddTorrent adds a new torrent to the redis backing store

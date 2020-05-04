@@ -43,6 +43,21 @@ type TorrentStore struct {
 	baseURL string
 }
 
+// WhiteListDel removes a client from the global whitelist
+func (ts TorrentStore) WhiteListDel(client model.WhiteListClient) error {
+	panic("implement me")
+}
+
+// WhiteListAdd will insert a new client prefix into the allowed clients list
+func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
+	panic("implement me")
+}
+
+// WhiteListGetAll fetches all known whitelisted clients
+func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
+	panic("implement me")
+}
+
 func checkResponse(resp *http.Response, code int) error {
 	switch resp.StatusCode {
 	case code:
@@ -76,17 +91,16 @@ func (ts TorrentStore) AddTorrent(t *model.Torrent) error {
 
 // DeleteTorrent will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (ts TorrentStore) DeleteTorrent(t *model.Torrent, dropRow bool) error {
+func (ts TorrentStore) DeleteTorrent(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
-		resp, err := doRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), t)
+		resp, err := doRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), ih.String())
 		if err != nil {
 			return err
 		}
 		return checkResponse(resp, http.StatusOK)
 	}
 	resp, err := doRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseURL, "/torrent"), map[string]interface{}{
-		"total_downloaded": t.TotalDownloaded,
-		"total_uploaded":   t.TotalUploaded,
+		"is_deleted": true,
 	})
 	if err != nil {
 		return err

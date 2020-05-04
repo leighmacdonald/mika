@@ -32,15 +32,10 @@ func (ps *PeerStore) AddPeer(ih model.InfoHash, p *model.Peer) error {
 	VALUES 
 	    (:peer_id, :info_hash, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
 	`
-	res, err := ps.db.Exec(q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
+	_, err := ps.db.Exec(q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
 	if err != nil {
 		return err
 	}
-	lastID, err := res.LastInsertId()
-	if err != nil {
-		return errors.New("Failed to fetch insert ID")
-	}
-	p.UserPeerID = uint32(lastID)
 	return nil
 }
 

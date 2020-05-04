@@ -84,8 +84,9 @@ func NewTorrent(ih InfoHash, name string, tid uint32) *Torrent {
 // in swarms. This is not a foolproof solution as its fairly trivial for a motivated
 // attacker to fake this.
 type WhiteListClient struct {
-	ClientID     int       `json:"client_id"`
+	ClientID     uint16    `json:"client_id"`
 	ClientPrefix string    `json:"client_prefix"`
+	ClientName   string    `json:"client_name"`
 	CreatedOn    time.Time `json:"created_on"`
 }
 

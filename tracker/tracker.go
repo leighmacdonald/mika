@@ -24,7 +24,7 @@ type Tracker struct {
 	MaxPeers       int
 	// Whitelist and whitelist lock
 	WhitelistMutex *sync.RWMutex
-	Whitelist      []string
+	Whitelist      map[string]model.WhiteListClient
 }
 
 // New creates a new Tracker instance with configured backend stores
@@ -88,6 +88,7 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 	}
 	if users == nil {
 		log.Panicf("Failed to instantiate users")
+		return nil, nil, nil, nil
 	}
 	var torrents []*model.Torrent
 	for i := 0; i < torrentCount; i++ {
@@ -101,7 +102,7 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 	for _, t := range torrents {
 		for i := 0; i < swarmSize; i++ {
 			p := store.GenerateTestPeer(users[i])
-			if err := ps.AddPeer(t, p); err != nil {
+			if err := ps.AddPeer(t.InfoHash, p); err != nil {
 				log.Panicf("Error adding peer: %s", err.Error())
 			}
 			peers = append(peers, p)

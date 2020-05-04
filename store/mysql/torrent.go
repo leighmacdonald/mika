@@ -23,14 +23,17 @@ type TorrentStore struct {
 	db *sqlx.DB
 }
 
+// WhiteListDel removes a client from the global whitelist
 func (s *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
 	panic("implement me")
 }
 
+// WhiteListAdd will insert a new client prefix into the allowed clients list
 func (s *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 	panic("implement me")
 }
 
+// WhiteListGetAll fetches all known whitelisted clients
 func (s *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	panic("implement me")
 }

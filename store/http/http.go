@@ -15,6 +15,7 @@ import (
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net"
@@ -45,17 +46,43 @@ type TorrentStore struct {
 
 // WhiteListDelete removes a client from the global whitelist
 func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
-	panic("implement me")
+	url := fmt.Sprintf(ts.baseURL, fmt.Sprintf("/whitelist/%s", client.ClientPrefix))
+	resp, err := doRequest(ts.client, "DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	return checkResponse(resp, http.StatusOK)
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	panic("implement me")
+	resp, err := doRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/whitelist"), client)
+	if err != nil {
+		return err
+	}
+	return checkResponse(resp, http.StatusCreated)
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
 func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
-	panic("implement me")
+	url := fmt.Sprintf(ts.baseURL, "/whitelist")
+	resp, err := doRequest(ts.client, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkResponse(resp, http.StatusOK); err != nil {
+		return nil, err
+	}
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var wl []model.WhiteListClient
+	if err := json.Unmarshal(b, &wl); err != nil {
+		return nil, errors.Wrap(err, "Failed to unmarshal whitelists")
+	}
+	return wl, nil
 }
 
 func checkResponse(resp *http.Response, code int) error {
@@ -173,10 +200,15 @@ func (ps PeerStore) Delete(ih model.InfoHash, p *model.Peer) error {
 	return checkResponse(resp, http.StatusOK)
 }
 
+func genURL(base string, args ...interface{}) string {
+	return fmt.Sprintf(base, fmt.Sprintf("/torrent/%s/peers", args))
+}
+
 // GetN will fetch peers for a torrents active swarm up to N users
 func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers model.Swarm
-	resp, err := doRequest(ps.client, "GET", fmt.Sprintf(ps.baseURL, "/torrent/%s/peers", ih), nil)
+	url := genURL(ps.baseURL, "/torrent/%s/peers/%d", ih.String(), limit)
+	resp, err := doRequest(ps.client, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,7 @@ const (
 	Users
 )
 
+// Key represents a known configuration key
 type Key string
 
 const (

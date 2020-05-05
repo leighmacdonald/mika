@@ -18,6 +18,10 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
+func (ts *TorrentStore) Conn() interface{} {
+	return nil
+}
+
 // WhiteListDelete removes a client from the global whitelist
 func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	ts.Lock()

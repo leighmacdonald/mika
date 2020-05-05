@@ -1,11 +1,11 @@
 package model
 
 import (
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 )
 
 // InfoHash is a unique 20byte identifier for a torrent
@@ -18,6 +18,10 @@ func InfoHashFromString(s string) InfoHash {
 	return buf
 }
 
+func (ih *InfoHash) Value() (driver.Value, error) {
+	return ih.Bytes(), nil
+}
+
 // Scan implements the sql Scanner interface for conversion to our custom type
 func (ih *InfoHash) Scan(v interface{}) error {
 	// Should be more strictly to check this type.
@@ -25,7 +29,10 @@ func (ih *InfoHash) Scan(v interface{}) error {
 	if !ok {
 		return errors.New("failed to convert value to infohash")
 	}
-	copy(ih[:], vt)
+	cnt := copy(ih[:], vt)
+	if cnt != 20 {
+		return errors.New(fmt.Sprintf("invalid data length received: %d, expected 20", cnt))
+	}
 	return nil
 }
 
@@ -65,9 +72,7 @@ type Torrent struct {
 	MultiUp float64 `db:"multi_up" redis:"multi_up" json:"multi_up"`
 	// Download multiplier added to the users totals
 	// 0 denotes freeleech status
-	MultiDn   float64   `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
-	CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
-	UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
+	MultiDn float64 `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
 }
 
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats
@@ -90,8 +95,6 @@ func NewTorrent(ih InfoHash, name string) *Torrent {
 		IsEnabled:   true,
 		MultiUp:     1.0,
 		MultiDn:     1.0,
-		CreatedOn:   time.Now().UTC(),
-		UpdatedOn:   time.Now().UTC(),
 	}
 	return torrent
 }
@@ -100,10 +103,8 @@ func NewTorrent(ih InfoHash, name string) *Torrent {
 // in swarms. This is not a foolproof solution as its fairly trivial for a motivated
 // attacker to fake this.
 type WhiteListClient struct {
-	ClientID     uint16    `json:"client_id"`
-	ClientPrefix string    `json:"client_prefix"`
-	ClientName   string    `json:"client_name"`
-	CreatedOn    time.Time `json:"created_on"`
+	ClientPrefix string `db:"client_prefix" json:"client_prefix"`
+	ClientName   string `db:"client_name" json:"client_name"`
 }
 
 // Match returns true if the client matches this prefix

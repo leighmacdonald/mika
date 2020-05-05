@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/util"
+	"github.com/pkg/errors"
 	"net"
 	"sync"
 	"time"
@@ -17,6 +18,17 @@ func PeerIDFromString(s string) PeerID {
 	var buf [20]byte
 	copy(buf[:], s)
 	return buf
+}
+
+// Scan implements the sql Scanner interface for conversion to our custom type
+func (p *PeerID) Scan(v interface{}) error {
+	// Should be more strictly to check this type.
+	vt, ok := v.([]byte)
+	if !ok {
+		return errors.New("failed to convert value to infohash")
+	}
+	copy(p[:], vt)
+	return nil
 }
 
 // Bytes returns the raw bytes of the peer_id. This is primarily useful for inserting to SQL stores since

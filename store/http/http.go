@@ -44,6 +44,10 @@ type TorrentStore struct {
 	baseURL string
 }
 
+func (ts TorrentStore) Conn() interface{} {
+	return ts.client
+}
+
 // WhiteListDelete removes a client from the global whitelist
 func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	url := fmt.Sprintf(ts.baseURL, fmt.Sprintf("/whitelist/%s", client.ClientPrefix))
@@ -347,6 +351,7 @@ func (p userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 	}, nil
 }
 
+// TODO use context instead for timeouts
 func newClient(_ *config.StoreConfig) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{

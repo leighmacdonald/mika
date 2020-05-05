@@ -134,22 +134,16 @@ func New() *http.Server {
 		Users:      []*model.User{},
 		WhiteList: map[string]model.WhiteListClient{
 			"qB": {
-				ClientID:     0,
 				ClientPrefix: "qB",
 				ClientName:   "qBittorrent",
-				CreatedOn:    time.Now(),
 			},
 			"UT": {
-				ClientID:     1,
 				ClientPrefix: "UT",
 				ClientName:   "uTorrent",
-				CreatedOn:    time.Now(),
 			},
 			"TR": {
-				ClientID:     2,
 				ClientPrefix: "TR",
 				ClientName:   "Transmission",
-				CreatedOn:    time.Now(),
 			},
 		},
 		WhiteListMx: &sync.RWMutex{},

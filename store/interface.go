@@ -101,6 +101,8 @@ type TorrentStore interface {
 	WhiteListAdd(client model.WhiteListClient) error
 	// WhiteListGetAll fetches all known whitelisted clients
 	WhiteListGetAll() ([]model.WhiteListClient, error)
+	// Conn returns the underlying connection, if any
+	Conn() interface{}
 }
 
 // PeerStore defines our interface for storing peer data

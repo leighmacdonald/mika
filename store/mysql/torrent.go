@@ -23,6 +23,11 @@ type TorrentStore struct {
 	db *sqlx.DB
 }
 
+// Conn returns the underlying database driver
+func (s *TorrentStore) Conn() interface{} {
+	return s.db
+}
+
 // WhiteListDelete removes a client from the global whitelist
 func (s *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	const q = `DELETE FROM whitelist WHERE client_prefix = ?`
@@ -34,7 +39,7 @@ func (s *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (s *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	const q = `INSERT INTO whitelist (client_prefix, created_on) VALUES (?, ?)`
+	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES (:client_prefix, :client_name)`
 	if _, err := s.db.NamedExec(q, client); err != nil {
 		return errors.Wrap(err, "Failed to insert new whitelist entry")
 	}
@@ -60,7 +65,11 @@ func (s *TorrentStore) Close() error {
 func (s *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
 	var t model.Torrent
-	if err := s.db.Get(&t, q, hash.Bytes()); err != nil {
+	err := s.db.Get(&t, q, hash.Bytes())
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, consts.ErrInvalidInfoHash
+		}
 		return nil, err
 	}
 	return &t, nil
@@ -68,8 +77,8 @@ func (s *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 
 // Add inserts a new torrent into the backing store
 func (s *TorrentStore) Add(t *model.Torrent) error {
-	const q = `INSERT INTO torrent (info_hash, release_name, created_on, updated_on) VALUES(?, ?, ?, ?)`
-	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName, t.CreatedOn, t.UpdatedOn)
+	const q = `INSERT INTO torrent (info_hash, release_name) VALUES(?, ?)`
+	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName)
 	if err != nil {
 		return err
 	}
@@ -81,13 +90,13 @@ func (s *TorrentStore) Add(t *model.Torrent) error {
 func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
-		_, err := s.db.Exec(dropQ, ih)
+		_, err := s.db.Exec(dropQ, ih.Bytes())
 		if err != nil {
 			return err
 		}
 	} else {
 		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = ?`
-		_, err := s.db.NamedExec(updateQ, ih)
+		_, err := s.db.NamedExec(updateQ, ih.Bytes())
 		if err != nil {
 			return err
 		}

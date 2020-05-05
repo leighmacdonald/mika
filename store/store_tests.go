@@ -2,15 +2,25 @@ package store
 
 import (
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/stretchr/testify/require"
+	"log"
 	"math/rand"
 	"net"
 	"testing"
 	"time"
 )
+
+func ClearTables(db *sqlx.DB, tableNames []string) {
+	for _, table := range tableNames {
+		if _, err := db.Exec(fmt.Sprintf("DELETE FROM %s", table)); err != nil {
+			log.Panicf("Failed to clear table: %s", table)
+		}
+	}
+}
 
 // GenerateTestUser creates a peer using fake data. Used for testing.
 func GenerateTestUser() *model.User {
@@ -52,7 +62,6 @@ func findPeer(peers []*model.Peer, p1 *model.Peer) *model.Peer {
 
 // TestPeerStore tests the interface implementation
 func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
-	//clearDB(ps.client)
 	torrentA := GenerateTestTorrent()
 	defer func() { _ = ts.Delete(torrentA.InfoHash, true) }()
 	require.NoError(t, ts.Add(torrentA))
@@ -105,24 +114,18 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.Equal(t, torrentA.InfoHash, fetchedTorrent.InfoHash)
 	require.Equal(t, torrentA.IsDeleted, fetchedTorrent.IsDeleted)
 	require.Equal(t, torrentA.IsEnabled, fetchedTorrent.IsEnabled)
-	require.Equal(t, util.TimeToString(torrentA.CreatedOn), util.TimeToString(fetchedTorrent.CreatedOn))
 	require.NoError(t, ts.Delete(torrentA.InfoHash, true))
 	deletedTorrent, err := ts.Get(torrentA.InfoHash)
 	require.Nil(t, deletedTorrent)
 	require.Equal(t, consts.ErrInvalidInfoHash, err)
-
 	wlClients := []model.WhiteListClient{
 		{
-			ClientID:     1,
 			ClientPrefix: "UT",
 			ClientName:   "uTorrent",
-			CreatedOn:    time.Now(),
 		},
 		{
-			ClientID:     2,
 			ClientPrefix: "qT",
 			ClientName:   "QBittorrent",
-			CreatedOn:    time.Now(),
 		},
 	}
 	for _, c := range wlClients {
@@ -134,7 +137,6 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.NoError(t, ts.WhiteListDelete(wlClients[0]))
 	clientsUpdated, _ := ts.WhiteListGetAll()
 	require.Equal(t, len(wlClients)-1, len(clientsUpdated))
-
 }
 
 func init() {

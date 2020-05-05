@@ -125,6 +125,10 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
+func (ts *TorrentStore) Conn() interface{} {
+	return ts.client
+}
+
 // WhiteListDelete removes a client from the global whitelist
 func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	res, err := ts.client.Del(whiteListKey(client.ClientPrefix)).Result()
@@ -140,10 +144,8 @@ func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 	valueMap := map[string]string{
-		"prefix":      client.ClientPrefix,
-		"client_id":   fmt.Sprintf("%d", client.ClientID),
-		"client_name": client.ClientName,
-		"created_on":  util.TimeToString(client.CreatedOn),
+		"client_prefix": client.ClientPrefix,
+		"client_name":   client.ClientName,
 	}
 	err := ts.client.HSet(whiteListKey(client.ClientPrefix), valueMap).Err()
 	if err != nil {
@@ -159,16 +161,14 @@ func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 		return nil, errors.Wrap(err, "Failed to fetch whitelist keys")
 	}
 	var wl []model.WhiteListClient
-	for i, prefix := range prefixes {
+	for _, prefix := range prefixes {
 		valueMap, err := ts.client.HGetAll(whiteListKey(prefix)).Result()
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to fetch whitelist value for: %s", whiteListKey(prefix))
 		}
 		wl = append(wl, model.WhiteListClient{
-			ClientID:     util.StringToUInt16(valueMap["client_id"], uint16(i)),
-			ClientPrefix: valueMap["prefix"],
+			ClientPrefix: valueMap["client_prefix"],
 			ClientName:   valueMap["client_name"],
-			CreatedOn:    util.StringToTime(valueMap["created_on"]),
 		})
 	}
 	return wl, nil
@@ -177,7 +177,6 @@ func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 // Add adds a new torrent to the redis backing store
 func (ts *TorrentStore) Add(t *model.Torrent) error {
 	err := ts.client.HSet(torrentKey(t.InfoHash), map[string]interface{}{
-		"torrent_id":       t.TorrentID,
 		"release_name":     t.ReleaseName,
 		"total_completed":  t.TotalCompleted,
 		"total_downloaded": t.TotalDownloaded,
@@ -188,8 +187,6 @@ func (ts *TorrentStore) Add(t *model.Torrent) error {
 		"info_hash":        t.InfoHash.RawString(),
 		"is_deleted":       t.IsDeleted,
 		"is_enabled":       t.IsEnabled,
-		"created_on":       util.TimeToString(t.CreatedOn),
-		"updated_on":       util.TimeToString(t.UpdatedOn),
 	}).Err()
 	if err != nil {
 		return err
@@ -234,8 +231,6 @@ func (ts *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 		Reason:          v["reason"],
 		MultiUp:         util.StringToFloat64(v["multi_up"], 1.0),
 		MultiDn:         util.StringToFloat64(v["multi_dn"], 1.0),
-		CreatedOn:       util.StringToTime(v["created_on"]),
-		UpdatedOn:       util.StringToTime(v["updated_on"]),
 	}
 	return &t, nil
 }

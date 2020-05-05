@@ -83,7 +83,7 @@ cheating on those systems.
 
 See [CHEATERS.md](CHEATERS.md) for more detailed descriptions of methods used.
 
-## Smart Peer Selection
+## Smart Peer Selection Strategies
 
 There are several methods used to enable smarter, and configurable, peer selection for larger swarms. If your torrents
 mostly have a swarm size less than the max returned peer count then it may make sense for your use case to simply 
@@ -99,7 +99,7 @@ Whichever you select, if any, be sure it matches your goals as a tracker operato
 would be nice to have without considerations. For example, Some will benefit trackers with mostly small torrents, 
 like ebooks or MP3, which can often be difficult for users to maintain ratio on.
 
-### Location Bias
+### Location Bias Strategy
 
 By using a geo database ([MaxMind City](https://dev.maxmind.com/geoip/)) to lookup IP locations we can select 
 peers that are globally closest to each other. We are calculating distances between the lat/long of peers under the 
@@ -107,7 +107,7 @@ peers that are globally closest to each other. We are calculating distances betw
 
 This should be considered the "fairest" option for most setups and should always be safe to enable.
 
-### Completion Bias
+### Completion Bias Strategy
 
 To prevent what people may consider a "Pay2Win" scenario where User_A has a 10Gb+ SSD backed client in a 
 datacenter (seedbox) and User_B at home on his 1Mb upload speed. We can negatively
@@ -115,14 +115,14 @@ bias users on how much they have uploaded after completing a torrent. This is de
 lesser connections have less trouble maintaining an acceptable ratio based on the sites rules. This would not really
 be recommended for a ratioless tracker.
 
-### Peer Speed Bias
+### Peer Speed Bias Strategy
 
 Similar in function to the completion bias, it will be able to either positively or negatively bias users based
 on their peer speed. By favouring slower peers you are largely biasing your peers to non-seedbox backed home 
 connections. This is of course not always the case, 1Gb home connections are more and more common these days. The 
 opposite will favour low latency fast peers found in data centers (seedboxes).
 
-### User Bias
+### User Bias Strategy
 
 User bias enables specific user classes to be prioritized. For example, you have a group of users defined as 
 "uploaders". These users all have known fast connections and are often the original seeder of a torrent. You can 
@@ -132,7 +132,7 @@ Another option could be if You want favour donators who help support the tracker
 established, especially if you are not ratioless.
 
 
-### Seed Time Bias
+### Seed Time Bias Strategy
 
 This involves prioritizing seeders who have been in the swarm the least amount of time. This is designed to help users
 who are a bit late snatching a new release still be able to build some ratio.

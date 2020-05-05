@@ -25,17 +25,30 @@ type TorrentStore struct {
 
 // WhiteListDelete removes a client from the global whitelist
 func (s *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
-	panic("implement me")
+	const q = `DELETE FROM whitelist WHERE client_prefix = ?`
+	if _, err := s.db.Exec(q, client.ClientPrefix); err != nil {
+		return errors.Wrap(err, "Failed to delete client whitelist")
+	}
+	return nil
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (s *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	panic("implement me")
+	const q = `INSERT INTO whitelist (client_prefix, created_on) VALUES (?, ?)`
+	if _, err := s.db.NamedExec(q, client); err != nil {
+		return errors.Wrap(err, "Failed to insert new whitelist entry")
+	}
+	return nil
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
 func (s *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
-	panic("implement me")
+	var wl []model.WhiteListClient
+	const q = `SELECT * FROM whitelist`
+	if err := s.db.Select(&wl, q); err != nil {
+		return nil, errors.Wrap(err, "Failed to select client whitelists")
+	}
+	return wl, nil
 }
 
 // Close will close the underlying mysql database connection
@@ -55,19 +68,11 @@ func (s *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 
 // Add inserts a new torrent into the backing store
 func (s *TorrentStore) Add(t *model.Torrent) error {
-	if t.TorrentID > 0 {
-		return errors.New("Torrent ID already attached")
-	}
-	const q = `INSERT INTO torrent (info_hash, release_name, created_on, updated_on) VALUES( ?, ?, ?, ?)`
-	res, err := s.db.NamedExec(q, t)
+	const q = `INSERT INTO torrent (info_hash, release_name, created_on, updated_on) VALUES(?, ?, ?, ?)`
+	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName, t.CreatedOn, t.UpdatedOn)
 	if err != nil {
 		return err
 	}
-	lastID, err := res.LastInsertId()
-	if err != nil {
-		return errors.New("Failed to fetch insert ID")
-	}
-	t.TorrentID = uint32(lastID)
 	return nil
 }
 

@@ -1,6 +1,7 @@
 # Mika - Bittorrent Tracker
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fleighmacdonald%2Fmika.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fleighmacdonald%2Fmika?ref=badge_shield)
+
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/f06234b0551a49cc8ac111d7b77827b2)](https://www.codacy.com/manual/leighmacdonald/mika?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=leighmacdonald/mika&amp;utm_campaign=Badge_Grade)
 [![Maintainability](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/maintainability)](https://codeclimate.com/github/leighmacdonald/mika/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/test_coverage)](https://codeclimate.com/github/leighmacdonald/mika/test_coverage)
@@ -73,3 +74,7 @@ To also build the demo http server add the demos build tags.
 ## Usage
 
 None, Don't use this yet.
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fleighmacdonald%2Fmika.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fleighmacdonald%2Fmika?ref=badge_large)

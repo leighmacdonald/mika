@@ -2,9 +2,9 @@ package http
 
 import (
 	"fmt"
+	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/tracker"
 	"github.com/stretchr/testify/assert"
-	"mika/config"
-	"mika/tracker"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

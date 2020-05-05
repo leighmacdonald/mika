@@ -3,10 +3,10 @@ package http
 
 import (
 	"github.com/gin-gonic/gin"
-	"mika/config"
-	"mika/consts"
-	"mika/model"
-	"mika/tracker"
+	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/tracker"
 	"net/http"
 )
 
@@ -30,7 +30,7 @@ func (a *AdminAPI) torrentDelete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := a.t.Torrents.DeleteTorrent(ih, true); err != nil {
+	if err := a.t.Torrents.Delete(ih, true); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
@@ -50,7 +50,7 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 	if !ok {
 		return
 	}
-	t, err := a.t.Torrents.GetTorrent(ih)
+	t, err := a.t.Torrents.Get(ih)
 	if err == consts.ErrInvalidInfoHash {
 		c.JSON(http.StatusNotFound, gin.H{})
 		return

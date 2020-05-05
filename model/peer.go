@@ -2,8 +2,8 @@ package model
 
 import (
 	"fmt"
-	"mika/geo"
-	"mika/util"
+	"github.com/leighmacdonald/mika/geo"
+	"github.com/leighmacdonald/mika/util"
 	"net"
 	"sync"
 	"time"

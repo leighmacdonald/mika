@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/tracker"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"mika/model"
-	"mika/tracker"
 	"net"
 	"net/http"
 	"strings"
@@ -135,7 +135,7 @@ func preFlightChecks(c *gin.Context, t *tracker.Tracker) (*model.User, bool) {
 		oops(c, msgInvalidAuth)
 		return nil, false
 	}
-	usr, err := t.Users.GetUserByPasskey(pk)
+	usr, err := t.Users.GetByPasskey(pk)
 	if err != nil || !usr.Valid() {
 		oops(c, msgInvalidAuth)
 		return nil, false

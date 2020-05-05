@@ -5,11 +5,11 @@ Copyright © 2020 Leigh MacDonald <leigh.macdonald@gmail.com>
 package main
 
 import (
-	"mika/cmd"
-	_ "mika/store/http"
-	_ "mika/store/memory"
-	_ "mika/store/mysql"
-	_ "mika/store/redis"
+	"github.com/leighmacdonald/mika/cmd"
+	_ "github.com/leighmacdonald/mika/store/http"
+	_ "github.com/leighmacdonald/mika/store/memory"
+	_ "github.com/leighmacdonald/mika/store/mysql"
+	_ "github.com/leighmacdonald/mika/store/redis"
 )
 
 func main() {

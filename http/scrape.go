@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/model"
 	log "github.com/sirupsen/logrus"
-	"mika/model"
 	"net/http"
 )
 
@@ -34,12 +34,12 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 	resp := make(bencode.Dict, len(q.InfoHashes))
 	for _, ihStr := range q.InfoHashes {
 		ih := model.InfoHashFromString(ihStr)
-		torrent, err := h.t.Torrents.GetTorrent(ih)
+		torrent, err := h.t.Torrents.Get(ih)
 		if err != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}
-		peers, err := h.t.Peers.GetPeers(ih, 100)
+		peers, err := h.t.Peers.GetN(ih, 100)
 		if err != nil {
 			log.Debugf("Failed to get peers for scrape: %s", ih)
 			continue

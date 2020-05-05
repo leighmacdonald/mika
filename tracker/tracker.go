@@ -1,15 +1,15 @@
 package tracker
 
 import (
+	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/geo"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"mika/config"
-	"mika/geo"
-	"mika/model"
-	"mika/store"
 	// Imported for side-effects for NewTestTracker
-	_ "mika/store/memory"
+	_ "github.com/leighmacdonald/mika/store/memory"
 	"sync"
 )
 
@@ -94,7 +94,7 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 			// Give user 0 a known passkey for testing
 			usr.Passkey = "12345678901234567890"
 		}
-		_ = us.AddUser(usr)
+		_ = us.Add(usr)
 		users = append(users, usr)
 	}
 	if users == nil {
@@ -104,7 +104,7 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 	var torrents []*model.Torrent
 	for i := 0; i < torrentCount; i++ {
 		t := store.GenerateTestTorrent()
-		if err := ts.AddTorrent(t); err != nil {
+		if err := ts.Add(t); err != nil {
 			log.Panicf("Error adding torrent: %s", err.Error())
 		}
 		torrents = append(torrents, t)
@@ -121,7 +121,7 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 	for _, t := range torrents {
 		for i := 0; i < swarmSize; i++ {
 			p := store.GenerateTestPeer(users[i])
-			if err := ps.AddPeer(t.InfoHash, p); err != nil {
+			if err := ps.Add(t.InfoHash, p); err != nil {
 				log.Panicf("Error adding peer: %s", err.Error())
 			}
 			peers = append(peers, p)

@@ -1,9 +1,9 @@
 package memory
 
 import (
-	"mika/consts"
-	"mika/model"
-	"mika/store"
+	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"sync"
 )
 
@@ -18,8 +18,8 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
-// WhiteListDel removes a client from the global whitelist
-func (ts *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
+// WhiteListDelete removes a client from the global whitelist
+func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	ts.Lock()
 	// Remove removes a peer from a slice
 	for i := len(ts.whitelist) - 1; i >= 0; i-- {
@@ -55,8 +55,8 @@ func (ts *TorrentStore) Close() error {
 	return nil
 }
 
-// GetTorrent returns the Torrent matching the infohash
-func (ts *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
+// Get returns the Torrent matching the infohash
+func (ts *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 	ts.RLock()
 	t, found := ts.torrents[hash]
 	ts.RUnlock()
@@ -73,8 +73,8 @@ type PeerStore struct {
 	peers map[model.InfoHash]model.Swarm
 }
 
-// GetPeer will fetch the peer from the swarm if it exists
-func (ps *PeerStore) GetPeer(ih model.InfoHash, p model.PeerID) (*model.Peer, error) {
+// Get will fetch the peer from the swarm if it exists
+func (ps *PeerStore) Get(ih model.InfoHash, p model.PeerID) (*model.Peer, error) {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, peer := range ps.peers[ih] {
@@ -94,30 +94,30 @@ func (ps *PeerStore) Close() error {
 	return nil
 }
 
-// AddPeer inserts a peer into the active swarm for the torrent provided
-func (ps *PeerStore) AddPeer(ih model.InfoHash, p *model.Peer) error {
+// Add inserts a peer into the active swarm for the torrent provided
+func (ps *PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
 	ps.Lock()
 	ps.peers[ih] = append(ps.peers[ih], p)
 	ps.Unlock()
 	return nil
 }
 
-// UpdatePeer is a no-op for memory backed store
-func (ps *PeerStore) UpdatePeer(_ model.InfoHash, _ *model.Peer) error {
+// Update is a no-op for memory backed store
+func (ps *PeerStore) Update(_ model.InfoHash, _ *model.Peer) error {
 	// no-op for in-memory store
 	return nil
 }
 
-// DeletePeer will remove a user from a torrents swarm
-func (ps *PeerStore) DeletePeer(ih model.InfoHash, p *model.Peer) error {
+// Delete will remove a user from a torrents swarm
+func (ps *PeerStore) Delete(ih model.InfoHash, p *model.Peer) error {
 	ps.Lock()
 	ps.peers[ih].Remove(p)
 	ps.Unlock()
 	return nil
 }
 
-// GetPeers will fetch peers for a torrents active swarm up to N users
-func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error) {
+// GetN will fetch peers for a torrents active swarm up to N users
+func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	ps.RLock()
 	p, found := ps.peers[ih]
 	ps.RUnlock()
@@ -127,8 +127,8 @@ func (ps *PeerStore) GetPeers(ih model.InfoHash, limit int) (model.Swarm, error)
 	return p[0:limit], nil
 }
 
-// AddTorrent adds a new torrent to the memory store
-func (ts *TorrentStore) AddTorrent(t *model.Torrent) error {
+// Add adds a new torrent to the memory store
+func (ts *TorrentStore) Add(t *model.Torrent) error {
 	ts.RLock()
 	_, found := ts.torrents[t.InfoHash]
 	ts.RUnlock()
@@ -141,9 +141,9 @@ func (ts *TorrentStore) AddTorrent(t *model.Torrent) error {
 	return nil
 }
 
-// DeleteTorrent will mark a torrent as deleted in the backing store.
+// Delete will mark a torrent as deleted in the backing store.
 // NOTE the memory store always permanently deletes the torrent
-func (ts *TorrentStore) DeleteTorrent(ih model.InfoHash, _ bool) error {
+func (ts *TorrentStore) Delete(ih model.InfoHash, _ bool) error {
 	ts.Lock()
 	delete(ts.torrents, ih)
 	ts.Unlock()
@@ -177,19 +177,19 @@ type UserStore struct {
 	users map[string]*model.User
 }
 
-// AddUser will add a new user to the backing store
-func (u *UserStore) AddUser(usr *model.User) error {
+// Add will add a new user to the backing store
+func (u *UserStore) Add(usr *model.User) error {
 	u.Lock()
 	u.users[usr.Passkey] = usr
 	u.Unlock()
 	return nil
 }
 
-// GetUserByPasskey will lookup and return the user via their passkey used as an identifier
+// GetByPasskey will lookup and return the user via their passkey used as an identifier
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
+func (u *UserStore) GetByPasskey(passkey string) (*model.User, error) {
 	u.RLock()
 	user, found := u.users[passkey]
 	u.RUnlock()
@@ -199,8 +199,8 @@ func (u *UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
 	return user, nil
 }
 
-// GetUserByID returns a user matching the userId
-func (u *UserStore) GetUserByID(userID uint32) (*model.User, error) {
+// GetByID returns a user matching the userId
+func (u *UserStore) GetByID(userID uint32) (*model.User, error) {
 	u.RLock()
 	defer u.RUnlock()
 	for _, usr := range u.users {
@@ -211,8 +211,8 @@ func (u *UserStore) GetUserByID(userID uint32) (*model.User, error) {
 	return nil, consts.ErrUnauthorized
 }
 
-// DeleteUser removes a user from the backing store
-func (u *UserStore) DeleteUser(user *model.User) error {
+// Delete removes a user from the backing store
+func (u *UserStore) Delete(user *model.User) error {
 	u.Lock()
 	delete(u.users, user.Passkey)
 	u.Unlock()

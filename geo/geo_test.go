@@ -1,11 +1,11 @@
 package geo
 
 import (
+	"github.com/leighmacdonald/mika/config"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"math"
-	"mika/config"
 	"net"
 	"os"
 	"testing"

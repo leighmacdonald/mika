@@ -1,7 +1,7 @@
 package http
 
 import (
-	"mika/consts"
+	"github.com/leighmacdonald/mika/consts"
 	"net/url"
 	"strconv"
 	"strings"

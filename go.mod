@@ -1,6 +1,6 @@
-module mika
+module github.com/leighmacdonald/mika
 
-go 1.13
+go 1.14
 
 require (
 	github.com/chihaya/bencode v0.0.0-20160403015629-641906563e26

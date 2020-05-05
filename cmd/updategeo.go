@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/geo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"mika/config"
-	"mika/geo"
 	"time"
 )
 

@@ -4,10 +4,10 @@ package cmd
 
 import (
 	"context"
+	"github.com/leighmacdonald/mika/examples/exampleapi"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"mika/examples/exampleapi"
-	"mika/util"
 	"net/http"
 )
 

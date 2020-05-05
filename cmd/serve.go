@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"context"
+	"github.com/leighmacdonald/mika/config"
+	h "github.com/leighmacdonald/mika/http"
+	"github.com/leighmacdonald/mika/tracker"
+	"github.com/leighmacdonald/mika/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"log"
-	"mika/config"
-	h "mika/http"
-	"mika/tracker"
-	"mika/util"
 	"net/http"
 )
 

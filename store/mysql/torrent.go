@@ -7,11 +7,11 @@ import (
 	// imported for side-effects
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
-	"mika/config"
-	"mika/consts"
-	"mika/model"
-	"mika/store"
 )
 
 const (
@@ -23,8 +23,8 @@ type TorrentStore struct {
 	db *sqlx.DB
 }
 
-// WhiteListDel removes a client from the global whitelist
-func (s *TorrentStore) WhiteListDel(client model.WhiteListClient) error {
+// WhiteListDelete removes a client from the global whitelist
+func (s *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	panic("implement me")
 }
 
@@ -43,8 +43,8 @@ func (s *TorrentStore) Close() error {
 	return s.db.Close()
 }
 
-// GetTorrent returns a torrent for the hash provided
-func (s *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
+// Get returns a torrent for the hash provided
+func (s *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
 	var t *model.Torrent
 	if err := s.db.Get(t, q, hash.String()); err != nil {
@@ -53,8 +53,8 @@ func (s *TorrentStore) GetTorrent(hash model.InfoHash) (*model.Torrent, error) {
 	return t, nil
 }
 
-// AddTorrent inserts a new torrent into the backing store
-func (s *TorrentStore) AddTorrent(t *model.Torrent) error {
+// Add inserts a new torrent into the backing store
+func (s *TorrentStore) Add(t *model.Torrent) error {
 	if t.TorrentID > 0 {
 		return errors.New("Torrent ID already attached")
 	}
@@ -71,9 +71,9 @@ func (s *TorrentStore) AddTorrent(t *model.Torrent) error {
 	return nil
 }
 
-// DeleteTorrent will mark a torrent as deleted in the backing store.
+// Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (s *TorrentStore) DeleteTorrent(ih model.InfoHash, dropRow bool) error {
+func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
 		_, err := s.db.Exec(dropQ, ih)

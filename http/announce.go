@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/tracker"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
-	"mika/model"
-	"mika/tracker"
-	"mika/util"
 	"net"
 	"time"
 )
@@ -204,7 +204,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		return
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
-	tor, err := h.t.Torrents.GetTorrent(req.InfoHash)
+	tor, err := h.t.Torrents.Get(req.InfoHash)
 	if err != nil || tor.IsDeleted {
 		oops(c, msgInvalidInfoHash)
 		return
@@ -220,11 +220,11 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	}
 
 	// Peer / Swarm stuff
-	peer, err := h.t.Peers.GetPeer(tor.InfoHash, req.PeerID)
+	peer, err := h.t.Peers.Get(tor.InfoHash, req.PeerID)
 	if err != nil {
 		// Create a new peer for the swarm
 		peer = model.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
-		if err := h.t.Peers.AddPeer(tor.InfoHash, peer); err != nil {
+		if err := h.t.Peers.Add(tor.InfoHash, peer); err != nil {
 			log.Errorf("Failed to insert peer into swarm: %s", err.Error())
 			oops(c, msgGenericError)
 			return
@@ -245,13 +245,13 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		// Do we force left=0 for this? Or trust the client?
 		tor.TotalCompleted++
 	case STOPPED:
-		if err := h.t.Peers.DeletePeer(tor.InfoHash, peer); err != nil {
+		if err := h.t.Peers.Delete(tor.InfoHash, peer); err != nil {
 			log.Errorf("Could not remove peer from swarm: %s", err.Error())
 			oops(c, msgGenericError)
 			return
 		}
 	}
-	peers, err := h.t.Peers.GetPeers(tor.InfoHash, h.t.MaxPeers)
+	peers, err := h.t.Peers.GetN(tor.InfoHash, h.t.MaxPeers)
 	if err != nil {
 		log.Errorf("Could not read peers from swarm: %s", err.Error())
 		oops(c, msgGenericError)

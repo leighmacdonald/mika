@@ -2,9 +2,9 @@ package redis
 
 import (
 	"github.com/go-redis/redis/v7"
+	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/stretchr/testify/require"
-	"mika/config"
-	"mika/store"
 	"testing"
 )
 

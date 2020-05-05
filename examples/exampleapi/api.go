@@ -5,8 +5,8 @@ package exampleapi
 
 import (
 	"github.com/gin-gonic/gin"
-	"mika/model"
-	"mika/store"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"net/http"
 	"sync"
 	"time"

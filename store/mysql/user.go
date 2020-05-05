@@ -2,11 +2,11 @@ package mysql
 
 import (
 	"github.com/jmoiron/sqlx"
+	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
-	"mika/config"
-	"mika/consts"
-	"mika/model"
-	"mika/store"
 	"sync"
 )
 
@@ -17,8 +17,8 @@ type UserStore struct {
 	usersMx sync.RWMutex
 }
 
-// AddUser will add a new user to the backing store
-func (u *UserStore) AddUser(user *model.User) error {
+// Add will add a new user to the backing store
+func (u *UserStore) Add(user *model.User) error {
 	if user.UserID > 0 {
 		return errors.New("User already has a user_id")
 	}
@@ -39,11 +39,11 @@ func (u *UserStore) AddUser(user *model.User) error {
 	return nil
 }
 
-// GetUserByPasskey will lookup and return the user via their passkey used as an identifier
+// GetByPasskey will lookup and return the user via their passkey used as an identifier
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
+func (u *UserStore) GetByPasskey(passkey string) (*model.User, error) {
 	var user model.User
 	const q = `SELECT * FROM user WHERE passkey = ?`
 	if err := u.db.Get(&user, q, passkey); err != nil {
@@ -52,8 +52,8 @@ func (u *UserStore) GetUserByPasskey(passkey string) (*model.User, error) {
 	return &user, nil
 }
 
-// GetUserByID returns a user matching the userId
-func (u *UserStore) GetUserByID(userID uint32) (*model.User, error) {
+// GetByID returns a user matching the userId
+func (u *UserStore) GetByID(userID uint32) (*model.User, error) {
 	var user model.User
 	const q = `SELECT * FROM user WHERE user_id = ?`
 	if err := u.db.Get(&user, q, userID); err != nil {
@@ -62,8 +62,8 @@ func (u *UserStore) GetUserByID(userID uint32) (*model.User, error) {
 	return &user, nil
 }
 
-// DeleteUser removes a user from the backing store
-func (u *UserStore) DeleteUser(user *model.User) error {
+// Delete removes a user from the backing store
+func (u *UserStore) Delete(user *model.User) error {
 	if user.UserID <= 0 {
 		return errors.New("User doesnt have a user_id")
 	}

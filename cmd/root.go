@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/leighmacdonald/mika/config"
 	"github.com/spf13/cobra"
-	"mika/config"
 	"os"
 )
 

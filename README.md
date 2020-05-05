@@ -36,7 +36,7 @@ port differing from the standard tracker port. This port is configured for TLS1.
     for the 3 types of backend interfaces we implement: Users, Torrents, Peers.
     - `postgres` A PostgreSQL 10+ backed store. We also use the [PostGIS](https://postgis.net/) extension to store location
      data and perform geo queries.
-    - `mysql/mariadb` A MySQL 8.0+ / MariaDB 10.5+ backed persistent storage backend. We use the POINT column for geospatial
+    - `mysql/mariadb` A MySQL 5.1+ / MariaDB 10.1+ backed persistent storage backend. We use the POINT column for geospatial
     queries which is why we require these versions at minimum.
     - `redis` Redis provides an in-memory datastore which does get persisted to disk (if enabled in redis).
     - `memory` A simple in-memory storage which is not persisted anywhere.

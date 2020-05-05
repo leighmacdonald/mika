@@ -78,6 +78,7 @@ type Peer struct {
 	AnnounceFirst time.Time `redis:"first_announce" json:"first_announce"`
 	// Peer id, reported by client. Must have white-listed prefix
 	PeerID   PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
+	InfoHash InfoHash    `db:"info_hash" redis:"info_hash" json:"info_hash"`
 	Location geo.LatLong `db:"location" redis:"location" json:"location"`
 	UserID   uint32      `db:"user_id" redis:"user_id" json:"user_id"`
 	// TODO Do we actually care about these times? Announce times likely enough

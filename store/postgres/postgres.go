@@ -1,12 +1,16 @@
+// Package postgre provides the backing store for postgresql
+// TODO create domains for the uint types, eg: create domain uint64 as numeric(20,0);
 package postgres
 
 import (
-	"github.com/jmoiron/sqlx"
+	"context"
+	"github.com/jackc/pgx/v4"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
+	"time"
 )
 
 const (
@@ -15,7 +19,8 @@ const (
 
 // UserStore is the postgres backed store.UserStore implementation
 type UserStore struct {
-	db *sqlx.DB
+	db  *pgx.Conn
+	ctx context.Context
 }
 
 // Add will add a new user to the backing store
@@ -23,15 +28,16 @@ func (us UserStore) Add(user *model.User) error {
 	if user.UserID > 0 {
 		return errors.New("User already has a user_id")
 	}
+	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
 	const q = `
 		INSERT INTO users 
 		    (passkey, download_enabled, is_deleted) 
 		VALUES
-		    (?, ?, ?)
+		    ($1, $2, $3)
 		RETURNING 
 		    (user_id)`
 	var userID int
-	err := us.db.QueryRowx(q, user.Passkey, true, false).Scan(&userID)
+	err := us.db.QueryRow(c, q, user.Passkey, true, false).Scan(&userID)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
 	}
@@ -44,9 +50,11 @@ func (us UserStore) Add(user *model.User) error {
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
 func (us UserStore) GetByPasskey(passkey string) (*model.User, error) {
+	const q = `SELECT user_id, passkey, download_enabled, is_deleted FROM users WHERE passkey = $1`
 	var user model.User
-	const q = `SELECT * FROM users WHERE passkey = ?`
-	if err := us.db.Get(&user, q, passkey); err != nil {
+	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	err := us.db.QueryRow(c, q, passkey).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted)
+	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch user by passkey")
 	}
 	return &user, nil
@@ -54,9 +62,11 @@ func (us UserStore) GetByPasskey(passkey string) (*model.User, error) {
 
 // GetByID returns a user matching the userId
 func (us UserStore) GetByID(userID uint32) (*model.User, error) {
+	const q = `SELECT user_id, passkey, download_enabled, is_deleted FROM users WHERE user_id = $1`
 	var user model.User
-	const q = `SELECT * FROM users WHERE user_id = ?`
-	if err := us.db.Get(&user, q, userID); err != nil {
+	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	err := us.db.QueryRow(c, q, userID).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted)
+	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch user by user_id")
 	}
 	return &user, nil
@@ -67,8 +77,9 @@ func (us UserStore) Delete(user *model.User) error {
 	if user.UserID <= 0 {
 		return errors.New("User doesnt have a user_id")
 	}
-	const q = `DELETE FROM users WHERE user_id = ?`
-	if _, err := us.db.Exec(q, user.UserID); err != nil {
+	const q = `DELETE FROM users WHERE user_id = $1`
+	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	if _, err := us.db.Exec(c, q, user.UserID); err != nil {
 		return errors.Wrap(err, "Failed to delete user")
 	}
 	user.UserID = 0
@@ -77,12 +88,14 @@ func (us UserStore) Delete(user *model.User) error {
 
 // Close will close the underlying database connection and clear the local caches
 func (us UserStore) Close() error {
-	return us.db.Close()
+	c, _ := context.WithDeadline(us.ctx, time.Now().Add(15*time.Second))
+	return us.db.Close(c)
 }
 
 // TorrentStore implements the store.TorrentStore interface for postgres
 type TorrentStore struct {
-	db *sqlx.DB
+	db  *pgx.Conn
+	ctx context.Context
 }
 
 // Conn returns the underlying database driver
@@ -92,10 +105,14 @@ func (ts TorrentStore) Conn() interface{} {
 
 // Add inserts a new torrent into the backing store
 func (ts TorrentStore) Add(t *model.Torrent) error {
-	const q = `INSERT INTO torrent (info_hash, release_name) VALUES(?, ?)`
-	_, err := ts.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName)
+	const q = `INSERT INTO torrent (info_hash, release_name) VALUES($1, $2)`
+	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	commandTag, err := ts.db.Exec(c, q, t.InfoHash.Bytes(), t.ReleaseName)
 	if err != nil {
 		return err
+	}
+	if commandTag.RowsAffected() != 1 {
+		return errors.New("Failed to insert new torrent to store 0 rows affected")
 	}
 	return nil
 }
@@ -103,27 +120,49 @@ func (ts TorrentStore) Add(t *model.Torrent) error {
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
 func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
+	const dropQ = `DELETE FROM torrent WHERE info_hash = $1`
+	const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = $1`
+	var query string
 	if dropRow {
-		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
-		_, err := ts.db.Exec(dropQ, ih.Bytes())
-		if err != nil {
-			return err
-		}
+		query = dropQ
 	} else {
-		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = ?`
-		_, err := ts.db.NamedExec(updateQ, ih.Bytes())
-		if err != nil {
-			return err
-		}
+		query = updateQ
+	}
+	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	commandTag, err := ts.db.Exec(c, query, ih.Bytes())
+	if err != nil {
+		return err
+	}
+	if commandTag.RowsAffected() != 1 {
+		return consts.ErrInvalidInfoHash
 	}
 	return nil
 }
 
 // Get returns a torrent for the hash provided
-func (ts TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
-	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
+func (ts TorrentStore) Get(ih model.InfoHash) (*model.Torrent, error) {
+	const q = `
+		SELECT 
+			info_hash, release_name, total_uploaded, total_downloaded, total_completed, 
+			is_deleted, is_enabled, reason, multi_up, multi_dn
+		FROM 
+		    torrent 
+		WHERE 
+		    info_hash = $1 AND is_deleted = false`
 	var t model.Torrent
-	err := ts.db.Get(&t, q, hash.Bytes())
+	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	err := ts.db.QueryRow(c, q, ih.Bytes()).Scan(
+		&t.InfoHash,
+		&t.ReleaseName,
+		&t.TotalUploaded,
+		&t.TotalDownloaded,
+		&t.TotalCompleted,
+		&t.IsDeleted,
+		&t.IsEnabled,
+		&t.Reason,
+		&t.MultiUp,
+		&t.MultiDn,
+	)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return nil, consts.ErrInvalidInfoHash
@@ -135,23 +174,34 @@ func (ts TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 
 // Close will close the underlying postgres database connection
 func (ts TorrentStore) Close() error {
-	return ts.db.Close()
+	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(15*time.Second))
+	return ts.db.Close(c)
 }
 
 // WhiteListDelete removes a client from the global whitelist
 func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
-	const q = `DELETE FROM whitelist WHERE client_prefix = ?`
-	if _, err := ts.db.Exec(q, client.ClientPrefix); err != nil {
+	const q = `DELETE FROM whitelist WHERE client_prefix = $1`
+	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	commandTag, err := ts.db.Exec(c, q, client.ClientPrefix)
+	if err != nil {
 		return errors.Wrap(err, "Failed to delete client whitelist")
+	}
+	if commandTag.RowsAffected() != 1 {
+		return errors.New("insert ok, but no row modified")
 	}
 	return nil
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES (:client_prefix, :client_name)`
-	if _, err := ts.db.NamedExec(q, client); err != nil {
+	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES ($1, $2)`
+	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	commandTag, err := ts.db.Exec(c, q, client.ClientPrefix, client.ClientName)
+	if err != nil {
 		return errors.Wrap(err, "Failed to insert new whitelist entry")
+	}
+	if commandTag.RowsAffected() != 1 {
+		return errors.New("Failed to insert, but no error?")
 	}
 	return nil
 }
@@ -159,16 +209,28 @@ func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 // WhiteListGetAll fetches all known whitelisted clients
 func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	var wl []model.WhiteListClient
-	const q = `SELECT * FROM whitelist`
-	if err := ts.db.Select(&wl, q); err != nil {
+	const q = `SELECT client_prefix, client_name FROM whitelist`
+	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	rows, err := ts.db.Query(c, q)
+	if err != nil {
 		return nil, errors.Wrap(err, "Failed to select client whitelists")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var client model.WhiteListClient
+		err = rows.Scan(&client.ClientPrefix, &client.ClientName)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to fetch client whitelist")
+		}
+		wl = append(wl, client)
 	}
 	return wl, nil
 }
 
 // PeerStore is the postgres backed implementation of store.PeerStore
 type PeerStore struct {
-	db *sqlx.DB
+	db  *pgx.Conn
+	ctx context.Context
 }
 
 // Add insets the peer into the swarm of the torrent provided
@@ -179,9 +241,13 @@ func (ps PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
 	VALUES 
 	    (:peer_id, :info_hash, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
 	`
-	_, err := ps.db.Exec(q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
+	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	commandTag, err := ps.db.Exec(c, q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
 	if err != nil {
 		return err
+	}
+	if commandTag.RowsAffected() != 1 {
+		return errors.New("Invalid rows affected inserting peer")
 	}
 	return nil
 }
@@ -193,34 +259,73 @@ func (ps PeerStore) Update(ih model.InfoHash, p *model.Peer) error {
 
 // Delete will remove a peer from the swarm of the torrent provided
 func (ps PeerStore) Delete(ih model.InfoHash, p *model.Peer) error {
-	const q = `DELETE FROM peers WHERE info_hash = ? AND peer_id = ?`
-	_, err := ps.db.Exec(q, ih, p.PeerID)
+	const q = `DELETE FROM peers WHERE info_hash = $1 AND peer_id = $2`
+	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	_, err := ps.db.Exec(c, q, ih.Bytes(), p.PeerID)
 	return err
 }
 
 // GetN will fetch the torrents swarm member peers
 func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
-	const q = `SELECT * FROM peers WHERE info_hash = ? LIMIT ?`
+	const q = `
+		SELECT 
+		       peer_id, info_hash, user_id, addr_ip, addr_port, total_downloaded, total_announces,
+		       speed_up, speed_dn, speed_up_max, speed_dn_max, location, created_on, updated_on
+		FROM
+		    peers 
+		WHERE
+		      info_hash = $1 
+		LIMIT 
+		    $2`
 	var peers []*model.Peer
-	if err := ps.db.Select(&peers, q, ih, limit); err != nil {
+	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	rows, err := ps.db.Query(c, q, ih, limit)
+	if err != nil {
 		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p model.Peer
+		err = rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
+			&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location, &p.CreatedOn,
+			&p.UpdatedOn)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to fetch N peers from store")
+		}
+		peers = append(peers, &p)
+	}
+	if rows.Err() != nil {
+		return nil, errors.Wrap(err, "error in peer query")
 	}
 	return peers, nil
 }
 
 // Get will fetch the peer from the swarm if it exists
 func (ps PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (*model.Peer, error) {
-	const q = `SELECT * FROM peers WHERE info_hash = ? AND peer_id = ? LIMIT 1`
-	var peer model.Peer
-	if err := ps.db.Get(&peer, q, ih, peerID); err != nil {
+	const q = `
+		SELECT 
+		       peer_id, info_hash, user_id, addr_ip, addr_port, total_downloaded, total_announces,
+		       speed_up, speed_dn, speed_up_max, speed_dn_max, location, created_on, updated_on
+		FROM
+		    peers 
+		WHERE 
+			info_hash = $1 AND peer_id = $2`
+	var p model.Peer
+	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	err := ps.db.QueryRow(c, q, ih, peerID).Scan(
+		&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
+		&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location, &p.CreatedOn,
+		&p.UpdatedOn)
+	if err != nil {
 		return nil, errors.Wrap(err, "Unknown peer")
 	}
-	return &peer, nil
+	return &p, nil
 }
 
 // Close will close the underlying database connection
 func (ps PeerStore) Close() error {
-	return ps.db.Close()
+	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(15*time.Second))
+	return ps.db.Close(c)
 }
 
 type userDriver struct{}
@@ -231,7 +336,10 @@ func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect(driverName, c.DSN())
+	db, err := pgx.Connect(context.Background(), c.DSN())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to postgres user store")
+	}
 	return &UserStore{
 		db: db,
 	}, nil
@@ -245,7 +353,10 @@ func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect(driverName, c.DSN())
+	db, err := pgx.Connect(context.Background(), c.DSN())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to postgres peer store")
+	}
 	return &PeerStore{
 		db: db,
 	}, nil
@@ -259,7 +370,10 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect(driverName, c.DSN())
+	db, err := pgx.Connect(context.Background(), c.DSN())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to postgres torrent store")
+	}
 	return &TorrentStore{
 		db: db,
 	}, nil

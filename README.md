@@ -4,6 +4,9 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/f06234b0551a49cc8ac111d7b77827b2)](https://www.codacy.com/manual/leighmacdonald/mika?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=leighmacdonald/mika&amp;utm_campaign=Badge_Grade)
 [![Maintainability](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/maintainability)](https://codeclimate.com/github/leighmacdonald/mika/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/test_coverage)](https://codeclimate.com/github/leighmacdonald/mika/test_coverage)
+[![Go Report Card](https://goreportcard.com/badge/github.com/leighmacdonald/mika)](https://goreportcard.com/report/github.com/leighmacdonald/mika)
+[![GoDoc](https://godoc.org/github.com/leighmacdonald/mika?status.svg)](https://godoc.org/github.com/leighmacdonald/mika)
+![Lines of Code](https://tokei.rs/b1/github/leighmacdonald/mika)
 [![Discord chat](https://img.shields.io/badge/discord-Chat%20Now-a29bfe.svg?style=flat-square)](https://discord.gg/jWXFcHW)
 
 A torrent tracker written in the Go programming language.

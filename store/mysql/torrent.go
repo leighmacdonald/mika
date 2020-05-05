@@ -59,11 +59,11 @@ func (s *TorrentStore) Close() error {
 // Get returns a torrent for the hash provided
 func (s *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
-	var t *model.Torrent
-	if err := s.db.Get(t, q, hash.String()); err != nil {
+	var t model.Torrent
+	if err := s.db.Get(&t, q, hash.Bytes()); err != nil {
 		return nil, err
 	}
-	return t, nil
+	return &t, nil
 }
 
 // Add inserts a new torrent into the backing store

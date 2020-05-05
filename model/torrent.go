@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -17,9 +18,20 @@ func InfoHashFromString(s string) InfoHash {
 	return buf
 }
 
+// Scan implements the sql Scanner interface for conversion to our custom type
+func (ih *InfoHash) Scan(v interface{}) error {
+	// Should be more strictly to check this type.
+	vt, ok := v.([]byte)
+	if !ok {
+		return errors.New("failed to convert value to infohash")
+	}
+	copy(ih[:], vt)
+	return nil
+}
+
 // Bytes returns the raw bytes of the info_hash. This is primarily useful for inserting to SQL stores since
 // they have trouble with the sized variant
-func (ih InfoHash) Bytes() []byte {
+func (ih *InfoHash) Bytes() []byte {
 	return ih[:]
 }
 

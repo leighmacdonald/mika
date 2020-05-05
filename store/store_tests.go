@@ -136,3 +136,7 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.Equal(t, len(wlClients)-1, len(clientsUpdated))
 
 }
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}

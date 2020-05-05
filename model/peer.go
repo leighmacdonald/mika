@@ -19,6 +19,12 @@ func PeerIDFromString(s string) PeerID {
 	return buf
 }
 
+// Bytes returns the raw bytes of the peer_id. This is primarily useful for inserting to SQL stores since
+// they have trouble with the sized variant
+func (p PeerID) Bytes() []byte {
+	return p[:]
+}
+
 // String implements fmt.Stringer, returning the base16 encoded PeerID.
 func (p PeerID) String() string {
 	return fmt.Sprintf("%x", p[:])
@@ -26,7 +32,7 @@ func (p PeerID) String() string {
 
 // RawString returns a 20-byte string of the raw bytes of the ID.
 func (p PeerID) RawString() string {
-	return string(p[:])
+	return string(p.Bytes())
 }
 
 // Peer represents a single unique peer in a swarm

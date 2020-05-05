@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"testing"
+	"time"
 )
 
 // GenerateTestUser creates a peer using fake data. Used for testing.
@@ -24,7 +25,7 @@ func GenerateTestUser() *model.User {
 func GenerateTestTorrent() *model.Torrent {
 	token, _ := util.GenRandomBytes(20)
 	ih := model.InfoHashFromString(string(token))
-	return model.NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)), uint32(rand.Intn(1000000)))
+	return model.NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)))
 }
 
 // GenerateTestPeer creates a peer using fake data for the provided user. Used for testing.
@@ -101,7 +102,6 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.NoError(t, ts.Add(torrentA))
 	fetchedTorrent, err := ts.Get(torrentA.InfoHash)
 	require.NoError(t, err)
-	require.Equal(t, torrentA.TorrentID, fetchedTorrent.TorrentID)
 	require.Equal(t, torrentA.InfoHash, fetchedTorrent.InfoHash)
 	require.Equal(t, torrentA.IsDeleted, fetchedTorrent.IsDeleted)
 	require.Equal(t, torrentA.IsEnabled, fetchedTorrent.IsEnabled)
@@ -110,4 +110,29 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	deletedTorrent, err := ts.Get(torrentA.InfoHash)
 	require.Nil(t, deletedTorrent)
 	require.Equal(t, consts.ErrInvalidInfoHash, err)
+
+	wlClients := []model.WhiteListClient{
+		{
+			ClientID:     1,
+			ClientPrefix: "UT",
+			ClientName:   "uTorrent",
+			CreatedOn:    time.Now(),
+		},
+		{
+			ClientID:     2,
+			ClientPrefix: "qT",
+			ClientName:   "QBittorrent",
+			CreatedOn:    time.Now(),
+		},
+	}
+	for _, c := range wlClients {
+		require.NoError(t, ts.WhiteListAdd(c))
+	}
+	clients, err := ts.WhiteListGetAll()
+	require.NoError(t, err)
+	require.Equal(t, len(wlClients), len(clients))
+	require.NoError(t, ts.WhiteListDelete(wlClients[0]))
+	clientsUpdated, _ := ts.WhiteListGetAll()
+	require.Equal(t, len(wlClients)-1, len(clientsUpdated))
+
 }

@@ -17,6 +17,12 @@ func InfoHashFromString(s string) InfoHash {
 	return buf
 }
 
+// Bytes returns the raw bytes of the info_hash. This is primarily useful for inserting to SQL stores since
+// they have trouble with the sized variant
+func (ih InfoHash) Bytes() []byte {
+	return ih[:]
+}
+
 // String implements fmt.Stringer, returning the base16 encoded PeerID.
 func (ih *InfoHash) String() string {
 	return fmt.Sprintf("%x", ih[:])
@@ -24,13 +30,12 @@ func (ih *InfoHash) String() string {
 
 // RawString returns a 20-byte string of the raw bytes of the ID.
 func (ih *InfoHash) RawString() string {
-	return string(ih[:])
+	return string(ih.Bytes())
 }
 
 // Torrent is the core struct for our torrent being tracked
 type Torrent struct {
 	sync.RWMutex
-	TorrentID      uint32   `db:"torrent_id" redis:"torrent_id" json:"torrent_id"`
 	ReleaseName    string   `db:"release_name" redis:"release_name" json:"release_name"`
 	InfoHash       InfoHash `db:"info_hash" redis:"info_hash" json:"info_hash"`
 	TotalCompleted int16    `db:"total_completed" redis:"total_completed" json:"total_completed"`
@@ -65,13 +70,12 @@ type TorrentStats struct {
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
-func NewTorrent(ih InfoHash, name string, tid uint32) *Torrent {
+func NewTorrent(ih InfoHash, name string) *Torrent {
 	torrent := &Torrent{
 		ReleaseName: name,
 		InfoHash:    ih,
 		IsDeleted:   false,
 		IsEnabled:   true,
-		TorrentID:   tid,
 		MultiUp:     1.0,
 		MultiDn:     1.0,
 		CreatedOn:   time.Now().UTC(),

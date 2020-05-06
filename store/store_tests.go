@@ -2,25 +2,15 @@ package store
 
 import (
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/stretchr/testify/require"
-	"log"
 	"math/rand"
 	"net"
 	"testing"
 	"time"
 )
-
-func ClearTables(db *sqlx.DB, tableNames []string) {
-	for _, table := range tableNames {
-		if _, err := db.Exec(fmt.Sprintf("DELETE FROM %s", table)); err != nil {
-			log.Panicf("Failed to clear table: %s", table)
-		}
-	}
-}
 
 // GenerateTestUser creates a peer using fake data. Used for testing.
 func GenerateTestUser() *model.User {

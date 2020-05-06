@@ -23,7 +23,7 @@ func (u *UserStore) Add(user *model.User) error {
 		return errors.New("User already has a user_id")
 	}
 	const q = `
-		INSERT INTO user 
+		INSERT INTO users 
 		    (passkey, download_enabled, is_deleted) 
 		VALUES
 		    (?, ?, ?)`
@@ -45,7 +45,7 @@ func (u *UserStore) Add(user *model.User) error {
 // return ErrUnauthorized.
 func (u *UserStore) GetByPasskey(passkey string) (*model.User, error) {
 	var user model.User
-	const q = `SELECT * FROM user WHERE passkey = ?`
+	const q = `SELECT * FROM users WHERE passkey = ?`
 	if err := u.db.Get(&user, q, passkey); err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch user by passkey")
 	}
@@ -55,7 +55,7 @@ func (u *UserStore) GetByPasskey(passkey string) (*model.User, error) {
 // GetByID returns a user matching the userId
 func (u *UserStore) GetByID(userID uint32) (*model.User, error) {
 	var user model.User
-	const q = `SELECT * FROM user WHERE user_id = ?`
+	const q = `SELECT * FROM users WHERE user_id = ?`
 	if err := u.db.Get(&user, q, userID); err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch user by user_id")
 	}
@@ -67,7 +67,7 @@ func (u *UserStore) Delete(user *model.User) error {
 	if user.UserID <= 0 {
 		return errors.New("User doesnt have a user_id")
 	}
-	const q = `DELETE FROM user WHERE user_id = ?`
+	const q = `DELETE FROM users WHERE user_id = ?`
 	if _, err := u.db.Exec(q, user.UserID); err != nil {
 		return errors.Wrap(err, "Failed to delete user")
 	}

@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
@@ -377,6 +378,11 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 	return &TorrentStore{
 		db: db,
 	}, nil
+}
+
+func makeDSN(c *config.StoreConfig) string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s%s",
+		c.Username, c.Password, c.Host, c.Port, c.Database, c.Properties)
 }
 
 func init() {

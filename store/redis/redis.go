@@ -22,12 +22,12 @@ const (
 )
 
 const (
-	prefixWhitelist    = "whitelist:"
-	prefixTorrent      = "t:"
-	prefixTorrentPeers = "tp:"
-	prefixPeer         = "p:"
-	prefixUser         = "u:"
-	prefixUserID       = "user_id_pk:"
+	prefixWhitelist    = "whitelist"
+	prefixTorrent      = "t"
+	prefixTorrentPeers = "tp"
+	prefixPeer         = "p"
+	prefixUser         = "u"
+	prefixUserID       = "user_id_pk"
 )
 
 func whiteListKey(prefix string) string {
@@ -35,23 +35,23 @@ func whiteListKey(prefix string) string {
 }
 
 func torrentKey(t model.InfoHash) string {
-	return fmt.Sprintf("%s%s", prefixTorrent, t.String())
+	return fmt.Sprintf("%s:%s", prefixTorrent, t.String())
 }
 
 func torrentPeersKey(t model.InfoHash) string {
-	return fmt.Sprintf("%s:%s:*", prefixTorrentPeers, t.String())
+	return fmt.Sprintf("%s:%s:*", prefixPeer, t.String())
 }
 
 func peerKey(t model.InfoHash, p model.PeerID) string {
-	return fmt.Sprintf("%s%s:%s", prefixPeer, t.String(), p.String())
+	return fmt.Sprintf("%s:%s:%s", prefixPeer, t.String(), p.String())
 }
 
 func userKey(passkey string) string {
-	return fmt.Sprintf("%s%s", prefixUser, passkey)
+	return fmt.Sprintf("%s:%s", prefixUser, passkey)
 }
 
 func userIDKey(userID uint32) string {
-	return fmt.Sprintf("%s%d", prefixUserID, userID)
+	return fmt.Sprintf("%s:%d", prefixUserID, userID)
 }
 
 // UserStore is the redis backed store.TorrentStore implementation
@@ -125,6 +125,7 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
+// Conn returns the underlying connection
 func (ts *TorrentStore) Conn() interface{} {
 	return ts.client
 }
@@ -211,7 +212,7 @@ func (ts *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 
 // Get returns the Torrent matching the infohash
 func (ts *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
-	v, err := ts.client.HGetAll(torrentKey(hash)).Result()
+	v, err := ts.client.HGetAll(torrentKey(hash) + ":*").Result()
 	if err != nil {
 		return nil, err
 	}

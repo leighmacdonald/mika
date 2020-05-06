@@ -18,7 +18,7 @@ func StringToInt16(s string, def int16) int16 {
 
 // StringToUInt16 converts a string to a uint16 returning a default value on failure
 func StringToUInt16(s string, def uint16) uint16 {
-	v, err := strconv.ParseInt(s, 10, 16)
+	v, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
 		log.Warnf("failed to parse uint16 value from redis: %s", s)
 		return def

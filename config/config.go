@@ -27,7 +27,7 @@ type Key string
 
 const (
 	// GeneralRunMode defines the application run mode.
-	// debug|release
+	// debug|release|testing
 	GeneralRunMode Key = "general_run_mode"
 
 	// GeneralLogLevel sets the logrus Logger level
@@ -229,23 +229,21 @@ func GetStoreConfig(storeType StoreType) *StoreConfig {
 
 // Read reads in config file and ENV variables if set.
 func Read(cfgFile string) {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else if os.Getenv("MIKA_CONFIG") != "" {
+	// Find home directory.
+	home, err := homedir.Dir()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	viper.AddConfigPath(home)
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("../")
+	viper.AddConfigPath("../../")
+	if os.Getenv("MIKA_CONFIG") != "" {
 		viper.SetConfigFile(os.Getenv("MIKA_CONFIG"))
+	} else if cfgFile != "" {
+		viper.SetConfigName(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// Search config in home directory with name ".mika" (without extension).
-		viper.AddConfigPath(home)
-		viper.AddConfigPath(".")
-		viper.AddConfigPath("../")
 		viper.SetConfigName("mika")
 	}
 
@@ -257,8 +255,8 @@ func Read(cfgFile string) {
 		level := viper.GetString(string(GeneralLogLevel))
 		colour := viper.GetBool(string(GeneralLogColour))
 		setupLogger(level, colour)
-
 		gin.SetMode(viper.GetString(string(GeneralRunMode)))
+
 	}
 }
 

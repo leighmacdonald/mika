@@ -4,7 +4,10 @@ import (
 	"github.com/go-redis/redis/v7"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 )
 
@@ -16,7 +19,8 @@ func TestRedisTorrentStore(t *testing.T) {
 }
 
 func TestRedisPeerStore(t *testing.T) {
-	config.Read("")
+	client := redis.NewClient(newRedisConfig(config.GetStoreConfig(config.Torrent)))
+	setupDB(t, client)
 	ts, err := store.NewTorrentStore("redis", config.GetStoreConfig(config.Torrent))
 	require.NoError(t, err)
 	ps, err := store.NewPeerStore("redis", config.GetStoreConfig(config.Peers))
@@ -25,7 +29,29 @@ func TestRedisPeerStore(t *testing.T) {
 }
 
 func clearDB(c *redis.Client) {
-	for _, k := range c.Keys("*").Val() {
+	keys, err := c.Keys("*").Result()
+	if err != nil {
+		log.Panicf("Could not initialize redis db: %s", err.Error())
+	}
+	for _, k := range keys {
 		c.Del(k)
 	}
+}
+
+func setupDB(t *testing.T, c *redis.Client) {
+	clearDB(c)
+	t.Cleanup(func() {
+		clearDB(c)
+	})
+}
+
+func TestMain(m *testing.M) {
+	config.Read("mika_testing_redis")
+	if viper.GetString(string(config.GeneralRunMode)) != "test" {
+		log.Info("Skipping database tests, not running in testing mode")
+		os.Exit(0)
+		return
+	}
+	exitCode := m.Run()
+	os.Exit(exitCode)
 }

@@ -8,7 +8,6 @@ import (
 )
 
 func TestTorrentDriver(t *testing.T) {
-	config.Read("")
 	s, err := store.NewTorrentStore(driverName, config.GetStoreConfig(config.Torrent))
 	if err != nil {
 		t.Skipf("Skipping postgres tests, could not instantiate driver: %s", err)

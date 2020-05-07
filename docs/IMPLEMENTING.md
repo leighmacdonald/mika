@@ -25,7 +25,7 @@ this document, but you can find [installation instruction](https://golang.org/do
 ## Loading Torrents 
 
 Currently, mika does not support automatic torrent registration on announce by default. This is something that doesn't 
-make much sense on a private site usually, though not always. Because of this we must tell it about any torrent
+make much sense on a private site usually. Because of this we must tell it about any torrent
 we want to track. This is done over the api endpoint `POST /api/torrent`. The payload should consist of the 
 following:
 
@@ -44,7 +44,7 @@ We track both the info_hash and torrent_id internally because it makes certain o
 the expense of a bit more memory usage.
 
 You MUST keep this up to date by tying in your upload forms to call this API endpoint somehow. You can either do it
-instantly in the request, or queue it up as a task for your system to execute. Its important that this
+instantly in the request, or queue it up as a task for your system to execute. Its important this
 happens quite fast as the tracker will reject any announce for the torrent until that time.
 
 ## Loading Users

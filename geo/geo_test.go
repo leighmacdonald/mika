@@ -2,17 +2,21 @@ package geo
 
 import (
 	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/util"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	"math"
 	"net"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestGetLocation(t *testing.T) {
-	db := New("../" + viper.GetString("geodb_path"))
+	fp := util.FindFile(viper.GetString("geodb_path"))
+	db := New(fp)
+	defer func() { _ = db.Close() }()
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
 	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -118.0 {
 		t.Errorf("Invalid coord value: %f", ip4.Location)
@@ -24,17 +28,20 @@ func TestGetLocation(t *testing.T) {
 }
 
 func TestDistance(t *testing.T) {
-	db := New("../" + viper.GetString("geodb_path"))
+	db := New(util.FindFile(viper.GetString("geodb_path")))
+	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
 	distance := db.distance(a, b)
 	if distance != 141.0 {
 		t.Errorf("Invalid distances: %f != %f", distance, 141.903347)
 	}
+
 }
 
 func BenchmarkDistance(t *testing.B) {
-	db := New("../" + viper.GetString("geodb_path"))
+	db := New(util.FindFile(viper.GetString("geodb_path")))
+	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
 	for n := 0; n < t.N; n++ {
@@ -43,17 +50,26 @@ func BenchmarkDistance(t *testing.B) {
 }
 
 func TestDownloadDB(t *testing.T) {
-	key := viper.GetString("geodb_api_key")
-	tFile, err := ioutil.TempFile("", "prefix")
-	if err != nil {
-		t.Fail()
-		return
+	p := util.FindFile(viper.GetString("geodb_path"))
+	if util.Exists(p) {
+		file, err := os.Stat(p)
+		if err != nil {
+			log.Fatalf("failed to stat file: %s", err)
+		}
+		if time.Now().Sub(file.ModTime()).Hours() >= 6 {
+			if err := os.Remove(p); err != nil {
+				t.Fatalf("Could not remove mmdb file: %s", err)
+			}
+		} else {
+			t.Skipf("Skipping download test, file age too new")
+		}
 	}
-	defer func() { _ = os.Remove(tFile.Name()) }()
-	err2 := DownloadDB(tFile.Name(), key)
+	key := viper.GetString("geodb_api_key")
+	err2 := DownloadDB(p, key)
 	require.NoError(t, err2)
+	require.NoError(t, New(p).db.Verify(), "failed to verify downloaded mmdb")
 }
 
 func init() {
-	config.Read("")
+	config.Read("mika_testing")
 }

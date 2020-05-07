@@ -65,6 +65,8 @@ whitelisted clients support it.
 
 ## Build Notes
 
+The minimum required version of go for building from the source is `1.14+`.
+
 To also build the demo http server add the demos build tags.
 
     go build -tags demos 

@@ -11,23 +11,19 @@ to redis.conf
 
 notify-keyspace-events Kx
 
-This settings tells redis to publish a key expire event over a channel which
+These settings tell redis to publish a key expire event over a channel which
 we can intercept and then handle anything that needs to occur.
 
 Standard Structures
 -------------------
 
-All tracker related entries in the redis db will use the t: prefix to signify
-tracker.
-
 In general a "t" or "p" in the key name will refer to a "torrent" or "peer".
 
 **Info Hash Mappings**
 
-The var $torrent_id refers to the torrents.id column in the SQL DB. These
-hashes should be loaded in via the manage.py tool. The existence of one
-of these keys determines the validity of an info hash received from an
-announce. This means that the key must be flushed or added if the
+The var $torrent_id refers to the torrents.id column in the SQL DB. The existence of one
+of these keys determines the validity of an info hash received from
+announces. This means that the key must be flushed or added if the
 torrent is created or deleted. The tracker itself does *not* manage this
 itself.
 
@@ -43,7 +39,7 @@ The white list is a simple set of client prefixes and long
 **Users**
 
 Users are mostly referred to by their unique passkey and not their user_id as we
-do not care about any user information, just they they are allowed to participate
+do not care about any user information, just that they are allowed to participate
 in our swarms
 
 [HASH] "t:user:$passkey"
@@ -118,19 +114,19 @@ When a user completed a torrent its torrent_id gets added to here and removed fr
 
 [SET] "t:u:complete"
 
-All incomplete torrent_ids are in this set. This include HnRs torrent_ids.
+All incomplete torrent_ids are in this set. This includes HnRs torrent_ids.
 
 [SET] "t:u:incomplete"
 
-If a torrents total active time is less than the hnr threshold and the user is inactive
+If a torrent has total active time is less than the hnr threshold, and the user is inactive
 the torrent_id will be placed in here. It will not be removed from the incomplete set.
 
 [SET] "t:u:hnr"
 
 **Global Stats/Info**
 
-These stats are very cheap to use since they are just static values so we can
-use these in any number of place we want without worry for performance.
+These stats are very cheap to use since they are just static values, so we can
+use these in any number of place we want without performance issues.
 
 Global leechers count
 
@@ -173,5 +169,5 @@ www side or task queue).
 **Torrent Peers**
 
 This channel is used by torrent peer swarms, if the key expires before the next
-client announce we assume the client has gone away so we remove from the
+client announce we assume the client has gone away, so we remove from the
 active peer SET and lower the seeder or leecher counts.

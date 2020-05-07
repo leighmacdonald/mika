@@ -9,7 +9,6 @@ import (
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net"
-	"time"
 )
 
 // BitTorrentHandler is the public HTTP interface for the tracker handling announces and
@@ -232,13 +231,11 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	}
 	// TODO use a channel to send deltas instead of locking in-request?
 	// Maybe use sync/atomic, but needs testing?
-	peer.Lock()
 	peer.Uploaded = req.Uploaded
 	peer.Downloaded = req.Downloaded
 	peer.Announces++
 	peer.Left = req.Left
-	peer.UpdatedOn = time.Now()
-	peer.Unlock()
+
 	switch req.Event {
 	case COMPLETED:
 		// TODO does a complete event get sent for a torrent when the user only downloads a specific file from the torrent

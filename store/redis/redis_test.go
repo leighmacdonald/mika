@@ -12,7 +12,6 @@ import (
 )
 
 func TestRedisTorrentStore(t *testing.T) {
-	config.Read("")
 	ts, e := store.NewTorrentStore("redis", config.GetStoreConfig(config.Torrent))
 	require.NoError(t, e, e)
 	store.TestTorrentStore(t, ts)

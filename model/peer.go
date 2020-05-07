@@ -6,7 +6,6 @@ import (
 	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -49,7 +48,6 @@ func (p PeerID) RawString() string {
 
 // Peer represents a single unique peer in a swarm
 type Peer struct {
-	sync.RWMutex
 	// Current speed up, bytes/sec
 	SpeedUP uint32 `db:"speed_up" redis:"speed_up" json:"speed_up"`
 	// Current speed dn, bytes/sec
@@ -82,8 +80,8 @@ type Peer struct {
 	Location geo.LatLong `db:"location" redis:"location" json:"location"`
 	UserID   uint32      `db:"user_id" redis:"user_id" json:"user_id"`
 	// TODO Do we actually care about these times? Announce times likely enough
-	CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
-	UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
+	//CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
+	//UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
 
 	User *User
 }
@@ -127,7 +125,6 @@ func (peers Swarm) Counts() (seeders uint, leechers uint) {
 // NewPeer create a new peer instance for inserting into a swarm
 func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
-		RWMutex:       sync.RWMutex{},
 		SpeedUP:       0,
 		SpeedDN:       0,
 		SpeedUPMax:    0,
@@ -144,8 +141,6 @@ func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
 		PeerID:        peerID,
 		Location:      geo.LatLong{Latitude: 50, Longitude: -114},
 		UserID:        userID,
-		CreatedOn:     time.Now(),
-		UpdatedOn:     time.Now(),
 		User:          nil,
 	}
 }

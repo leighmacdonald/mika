@@ -14,7 +14,6 @@ func extractTarGz(gzipStream io.Reader, outStream io.Writer) error {
 	if err != nil {
 		log.Fatal("extractTarGz: NewReader failed")
 	}
-
 	tarReader := tar.NewReader(uncompressedStream)
 	foundFile := false
 	for true {
@@ -25,7 +24,6 @@ func extractTarGz(gzipStream io.Reader, outStream io.Writer) error {
 		if err != nil {
 			log.Fatalf("extractTarGz: Next() failed: %s", err.Error())
 		}
-
 		switch header.Typeflag {
 		case tar.TypeDir:
 			//if err := os.Mkdir(header.Name, 0755); err != nil {
@@ -41,7 +39,7 @@ func extractTarGz(gzipStream io.Reader, outStream io.Writer) error {
 			}
 		default:
 			log.Fatalf(
-				"extractTarGz: unknown type: %s in %s",
+				"extractTarGz: unknown type: %v in %s",
 				header.Typeflag,
 				header.Name)
 		}

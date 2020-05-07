@@ -9,8 +9,8 @@ tracker_listen: ":34000"
 tracker_tls: false
 tracker_ipv6: false
 tracker_ipv6_only: false
-tracker_annouce_interval: 300s
-tracker_annouce_interval_minimum: 10s
+tracker_announce_interval: 300s
+tracker_announce_interval_minimum: 10s
 tracker_reap_interval: 400s
 tracker_hnr_threshold: 1d
 tracker_index_interval: 60s
@@ -25,7 +25,7 @@ api_ipv6_only: false
 store_torrent_type: mysql
 store_torrent_host: 127.1
 store_torrent_port: 3306
-# For redis, the dbname should be the numeric db value and should differ from the redic cache db value
+# For redis, the dbname should be the numeric db value and should differ from the redis cache db value
 store_torrent_user: mika
 store_torrent_password: mika
 store_torrent_database: mika

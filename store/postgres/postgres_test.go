@@ -35,7 +35,9 @@ func clearDB(db *pgx.Conn) {
 
 func setupDB(t *testing.T, db *pgx.Conn) {
 	clearDB(db)
-	db.Exec(context.Background(), schema)
+	if _, err := db.Exec(context.Background(), schema); err != nil {
+		log.Panicf("Failed to setupDB: %s", err)
+	}
 	t.Cleanup(func() {
 		clearDB(db)
 	})

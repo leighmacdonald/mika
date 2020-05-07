@@ -75,7 +75,6 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 		require.Equal(t, fp.IP, peer.IP)
 		require.Equal(t, fp.Port, peer.Port)
 		require.Equal(t, fp.Location, peer.Location)
-		require.Equal(t, util.TimeToString(fp.CreatedOn), util.TimeToString(peer.CreatedOn))
 	}
 	p1 := peers[2]
 	p1.Announces = 5
@@ -83,8 +82,8 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	p1.Downloaded = 10000
 	p1.Uploaded = 10000
 	require.NoError(t, ps.Update(torrentA.InfoHash, p1))
-	updatedPeers, err := ps.GetN(torrentA.InfoHash, 5)
-	require.NoError(t, err)
+	updatedPeers, err2 := ps.GetN(torrentA.InfoHash, 5)
+	require.NoError(t, err2)
 	p1Updated := findPeer(updatedPeers, p1)
 	require.Equal(t, p1.Announces, p1Updated.Announces)
 	require.Equal(t, p1.TotalTime, p1Updated.TotalTime)
@@ -105,24 +104,18 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.Equal(t, torrentA.IsDeleted, fetchedTorrent.IsDeleted)
 	require.Equal(t, torrentA.IsEnabled, fetchedTorrent.IsEnabled)
 	require.NoError(t, ts.Delete(torrentA.InfoHash, true))
-	deletedTorrent, err := ts.Get(torrentA.InfoHash)
+	deletedTorrent, err2 := ts.Get(torrentA.InfoHash)
 	require.Nil(t, deletedTorrent)
-	require.Equal(t, consts.ErrInvalidInfoHash, err)
+	require.Equal(t, consts.ErrInvalidInfoHash, err2)
 	wlClients := []model.WhiteListClient{
-		{
-			ClientPrefix: "UT",
-			ClientName:   "uTorrent",
-		},
-		{
-			ClientPrefix: "qT",
-			ClientName:   "QBittorrent",
-		},
+		{ClientPrefix: "UT", ClientName: "uTorrent"},
+		{ClientPrefix: "qT", ClientName: "QBittorrent"},
 	}
 	for _, c := range wlClients {
 		require.NoError(t, ts.WhiteListAdd(c))
 	}
-	clients, err := ts.WhiteListGetAll()
-	require.NoError(t, err)
+	clients, err3 := ts.WhiteListGetAll()
+	require.NoError(t, err3)
 	require.Equal(t, len(wlClients), len(clients))
 	require.NoError(t, ts.WhiteListDelete(wlClients[0]))
 	clientsUpdated, _ := ts.WhiteListGetAll()

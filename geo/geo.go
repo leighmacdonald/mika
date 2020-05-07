@@ -225,6 +225,9 @@ func New(path string) *DB {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err := db.Verify(); err != nil {
+		log.Fatalf("Failed to validate maxmind geodb file: %s", err)
+	}
 	return &DB{
 		db: db,
 		ellipsoid: ellipsoid{
@@ -233,6 +236,11 @@ func New(path string) *DB {
 			1000.0,
 		},
 	}
+}
+
+// Close close the underlying memory mapped file
+func (db *DB) Close() error {
+	return db.db.Close()
 }
 
 // GetLocation returns the geo location of the input IP addr

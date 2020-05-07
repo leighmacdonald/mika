@@ -165,7 +165,7 @@ func (ts TorrentStore) Get(ih model.InfoHash) (*model.Torrent, error) {
 		&t.MultiDn,
 	)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
+		if err.Error() == "no rows in result set" {
 			return nil, consts.ErrInvalidInfoHash
 		}
 		return nil, err
@@ -271,7 +271,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	const q = `
 		SELECT 
 		       peer_id, info_hash, user_id, addr_ip, addr_port, total_downloaded, total_announces,
-		       speed_up, speed_dn, speed_up_max, speed_dn_max, location, created_on, updated_on
+		       speed_up, speed_dn, speed_up_max, speed_dn_max, location
 		FROM
 		    peers 
 		WHERE
@@ -288,8 +288,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	for rows.Next() {
 		var p model.Peer
 		err = rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
-			&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location, &p.CreatedOn,
-			&p.UpdatedOn)
+			&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to fetch N peers from store")
 		}
@@ -306,7 +305,7 @@ func (ps PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (*model.Peer, er
 	const q = `
 		SELECT 
 		       peer_id, info_hash, user_id, addr_ip, addr_port, total_downloaded, total_announces,
-		       speed_up, speed_dn, speed_up_max, speed_dn_max, location, created_on, updated_on
+		       speed_up, speed_dn, speed_up_max, speed_dn_max, location
 		FROM
 		    peers 
 		WHERE 
@@ -315,8 +314,7 @@ func (ps PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (*model.Peer, er
 	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	err := ps.db.QueryRow(c, q, ih, peerID).Scan(
 		&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
-		&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location, &p.CreatedOn,
-		&p.UpdatedOn)
+		&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unknown peer")
 	}

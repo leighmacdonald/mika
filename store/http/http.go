@@ -353,6 +353,7 @@ func (p userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 
 // TODO use context instead for timeouts
 func newClient(_ *config.StoreConfig) *http.Client {
+	//noinspection GoDeprecation
 	return &http.Client{
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{

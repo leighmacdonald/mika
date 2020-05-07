@@ -212,7 +212,7 @@ func (ts *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 
 // Get returns the Torrent matching the infohash
 func (ts *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
-	v, err := ts.client.HGetAll(torrentKey(hash) + ":*").Result()
+	v, err := ts.client.HGetAll(torrentKey(hash)).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -265,8 +265,6 @@ func (ps *PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
 		"peer_id":          p.PeerID.RawString(),
 		"location":         p.Location.String(),
 		"user_id":          p.UserID,
-		"created_on":       util.TimeToString(p.CreatedOn),
-		"updated_on":       util.TimeToString(p.UpdatedOn),
 	}).Err()
 	if err != nil {
 		return errors.Wrap(err, "Failed to Add")
@@ -296,7 +294,6 @@ func (ps *PeerStore) Update(ih model.InfoHash, p *model.Peer) error {
 		"total_time":       p.TotalTime,
 		"last_announce":    util.TimeToString(p.AnnounceLast),
 		"first_announce":   util.TimeToString(p.AnnounceFirst),
-		"updated_on":       util.TimeToString(p.UpdatedOn),
 	}).Err()
 	if err != nil {
 		return errors.Wrap(err, "Failed to Update")
@@ -340,8 +337,6 @@ func mapPeerValues(v map[string]string) model.Peer {
 		PeerID:        model.PeerIDFromString(v["peer_id"]),
 		Location:      geo.LatLongFromString(v["location"]),
 		UserID:        util.StringToUInt32(v["user_id"], 0),
-		CreatedOn:     util.StringToTime(v["created_on"]),
-		UpdatedOn:     util.StringToTime(v["updated_on"]),
 	}
 }
 

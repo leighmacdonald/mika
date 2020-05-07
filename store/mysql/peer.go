@@ -28,9 +28,9 @@ func (ps *PeerStore) Update(_ model.InfoHash, _ *model.Peer) error {
 func (ps *PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
 	const q = `
 	INSERT INTO peers 
-	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, created_on, updated_on)
+	    (peer_id, info_hash, addr_ip, addr_port, location, user_id)
 	VALUES 
-	    (:peer_id, :info_hash, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
+	    (:peer_id, :info_hash, :addr_ip, :addr_port, :location, :user_id)
 	`
 	_, err := ps.db.Exec(q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
 	if err != nil {

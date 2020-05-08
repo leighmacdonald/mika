@@ -74,9 +74,9 @@ type UserStore interface {
 	// Add will add a new user to the backing store
 	Add(u model.User) error
 	// GetByPasskey returns a user matching the passkey
-	GetByPasskey(passkey string) (model.User, error)
+	GetByPasskey(user *model.User, passkey string) error
 	// GetByID returns a user matching the userId
-	GetByID(userID uint32) (model.User, error)
+	GetByID(user *model.User, userID uint32) error
 	// Delete removes a user from the backing store
 	Delete(user model.User) error
 	// Close will cleanup and close the underlying storage driver if necessary
@@ -92,7 +92,7 @@ type TorrentStore interface {
 	// If dropRow is true, it will permanently remove the torrent from the store
 	Delete(ih model.InfoHash, dropRow bool) error
 	// Get returns the Torrent matching the infohash
-	Get(hash model.InfoHash) (model.Torrent, error)
+	Get(torrent *model.Torrent, hash model.InfoHash) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// WhiteListDelete removes a client from the global whitelist
@@ -103,6 +103,8 @@ type TorrentStore interface {
 	WhiteListGetAll() ([]model.WhiteListClient, error)
 	// Conn returns the underlying connection, if any
 	Conn() interface{}
+
+	UpdateState(ih model.InfoHash, state model.TorrentStats)
 }
 
 // PeerStore defines our interface for storing peer data
@@ -114,13 +116,15 @@ type PeerStore interface {
 	// Update will sync any new peer data with the backing store
 	Update(ih model.InfoHash, p model.Peer) error
 	// Delete will remove a user from a torrents swarm
-	Delete(ih model.InfoHash, p model.Peer) error
+	Delete(ih model.InfoHash, p model.PeerID) error
 	// GetN will fetch peers for a torrents active swarm up to N users
 	GetN(ih model.InfoHash, limit int) (model.Swarm, error)
 	// Get will fetch the peer from the swarm if it exists
-	Get(ih model.InfoHash, id model.PeerID) (model.Peer, error)
+	Get(peer *model.Peer, ih model.InfoHash, id model.PeerID) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
+	// Reap will loop through the peers removing any stale entries from active swarms
+	Reap()
 }
 
 // NewTorrentStore will attempt to initialize a TorrentStore using the driver name provided

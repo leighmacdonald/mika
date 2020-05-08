@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"github.com/leighmacdonald/mika/consts"
 	"strings"
 )
 
@@ -76,11 +77,10 @@ type Torrent struct {
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats
 // from peer info as well as the normal torrent stats.
 type TorrentStats struct {
-	TorrentID uint64 `json:"torrent_id"`
-	InfoHash  string `json:"info_hash"`
-	Seeders   int    `json:"seeders"`
-	Leechers  int    `json:"leechers"`
-	Snatches  int    `json:"snatches"`
+	Seeders  int `json:"seeders"`
+	Leechers int `json:"leechers"`
+	Snatches int `json:"snatches"`
+	Event    consts.AnnounceType
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all

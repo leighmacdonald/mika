@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"time"
 )
 
 // BitTorrentHandler is the public HTTP interface for the tracker handling announces and
 // scrape requests
 type BitTorrentHandler struct {
-	t *tracker.Tracker
+	tracker *tracker.Tracker
 }
 
 // Represents an announce received from the bittorrent client
@@ -29,7 +31,7 @@ type announceRequest struct {
 	Downloaded uint32 `form:"downloaded" binding:"required"`
 
 	// The number of bytes this peer still has to download, encoded in base ten ascii.
-	// Note that this can't be computed from downloaded and the file length since it
+	// Note that this can'tracker be computed from downloaded and the file length since it
 	// might be a resume, and there's a chance that some of the downloaded data failed an
 	// integrity check and had to be re-downloaded.
 	Left uint32 `form:"left" binding:"required"`
@@ -47,7 +49,7 @@ type announceRequest struct {
 	// when a download first begins, and one using completed is sent when the download
 	// is complete. No completed is sent if the file was complete when started. Downloaders
 	// send an announcement using stopped when they cease downloading.
-	Event announceType `form:"event" binding:"required"`
+	Event consts.AnnounceType `form:"event" binding:"required"`
 
 	//  Optional. The true IP address of the client machine, in dotted quad format or rfc3513
 	// defined hexed IPv6 address. Notes: In general this parameter is not necessary as the address
@@ -165,14 +167,14 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	}
 	port := getUint16Key(q, paramPort, 0)
 	if port < 1024 || port > 65535 {
-		// Don't allow privileged ports which require root to bind to on unix
+		// Don'tracker allow privileged ports which require root to bind to on unix
 		return nil, msgInvalidPort
 	}
 	left := getUint32Key(q, paramLeft, 0)
 	downloaded := getUint32Key(q, paramDownloaded, 0)
 	uploaded := getUint32Key(q, paramUploaded, 0)
 	corrupt := getUint32Key(q, paramCorrupt, 0)
-	event := parseAnnounceType(q.Params[paramNumWant])
+	event := consts.ParseAnnounceType(q.Params[paramNumWant])
 	numWant := getUintKey(q, "numwant", 30)
 	return &announceRequest{
 		Compact:    true, // Ignored and always set to true
@@ -190,10 +192,14 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 }
 
 // The meaty bits.
+// NOTE we ONLY support compact response formats (binary format) by design even though its
+// technically breaking the protocol specs.
+// There is no reason to support the older less efficient model for private needs
 func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// Check that the user is valid before parsing anything
-	usr, valid := preFlightChecks(c, h.t)
-	if !valid {
+	var usr model.User
+	if valid := preFlightChecks(&usr, c, h.tracker); !valid {
+		oops(c, msgInvalidAuth)
 		return
 	}
 	// Parse the announce into an announceRequest
@@ -203,8 +209,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		return
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
-	tor, err := h.t.Torrents.Get(req.InfoHash)
-	if err != nil || tor.IsDeleted {
+	var tor model.Torrent
+	if err := h.tracker.Torrents.Get(&tor, req.InfoHash); err != nil || tor.IsDeleted {
 		oops(c, msgInvalidInfoHash)
 		return
 	}
@@ -217,40 +223,30 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		c.String(int(msgInvalidInfoHash), responseError(tor.Reason))
 		return
 	}
-
-	// Peer / Swarm stuff
-	peer, err := h.t.Peers.Get(tor.InfoHash, req.PeerID)
+	var peer model.Peer
+	err := h.tracker.Peers.Get(&peer, tor.InfoHash, req.PeerID)
 	if err != nil {
 		// Create a new peer for the swarm
 		peer = model.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
-		if err := h.t.Peers.Add(tor.InfoHash, peer); err != nil {
+		if err := h.tracker.Peers.Add(tor.InfoHash, peer); err != nil {
 			log.Errorf("Failed to insert peer into swarm: %s", err.Error())
 			oops(c, msgGenericError)
 			return
 		}
 	}
-	// TODO use a channel to send deltas instead of locking in-request?
-	// Maybe use sync/atomic, but needs testing?
-	peer.Uploaded = req.Uploaded
-	peer.Downloaded = req.Downloaded
-	peer.Announces++
-	peer.Left = req.Left
-
-	switch req.Event {
-	case COMPLETED:
-		// TODO does a complete event get sent for a torrent when the user only downloads a specific file from the torrent
-		// Do we force left=0 for this? Or trust the client?
-		tor.TotalCompleted++
-	case STOPPED:
-		if err := h.t.Peers.Delete(tor.InfoHash, peer); err != nil {
-			log.Errorf("Could not remove peer from swarm: %s", err.Error())
-			oops(c, msgGenericError)
-			return
-		}
+	h.tracker.StateUpdateChan <- model.UpdateState{
+		InfoHash:   tor.InfoHash,
+		PeerID:     peer.PeerID,
+		Uploaded:   req.Uploaded,
+		Downloaded: req.Downloaded,
+		Left:       req.Left,
+		Event:      req.Event,
+		Timestamp:  time.Now(),
 	}
-	peers, err := h.t.Peers.GetN(tor.InfoHash, h.t.MaxPeers)
-	if err != nil {
-		log.Errorf("Could not read peers from swarm: %s", err.Error())
+
+	peers, err2 := h.tracker.Peers.GetN(tor.InfoHash, h.tracker.MaxPeers)
+	if err2 != nil {
+		log.Errorf("Could not read peers from swarm: %s", err2.Error())
 		oops(c, msgGenericError)
 		return
 	}
@@ -258,23 +254,17 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	dict := bencode.Dict{
 		"complete":     seeders,
 		"incomplete":   leechers,
-		"interval":     h.t.AnnInterval,
-		"min interval": h.t.AnnIntervalMin,
+		"interval":     h.tracker.AnnInterval,
+		"min interval": h.tracker.AnnIntervalMin,
+		"peers":        makeCompactPeers(peers, peer.PeerID),
 	}
-	// NOTE we ONLY support compact response formats (binary format) by design even though its
-	// technically breaking the protocol specs.
-	// There is no reason to support the older less efficient model for private needs
-	if peers != nil {
-		dict["peers"] = makeCompactPeers(peers, peer.PeerID)
-	} else {
-		dict["peers"] = []byte{}
-	}
+
 	var outBytes bytes.Buffer
 	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
 		oops(c, msgGenericError)
 		return
 	}
-	c.String(int(msgOk), outBytes.String())
+	c.Data(int(msgOk), "text/plain", outBytes.Bytes())
 }
 
 // Generate a compact peer field array containing the byte representations

@@ -15,29 +15,6 @@ import (
 	"time"
 )
 
-type announceType string
-
-// Announce types
-const (
-	STARTED   announceType = "started"
-	STOPPED   announceType = "stopped"
-	COMPLETED announceType = "completed"
-	ANNOUNCE  announceType = ""
-)
-
-func parseAnnounceType(t string) announceType {
-	switch t {
-	case "started":
-		return STARTED
-	case "stopped":
-		return STOPPED
-	case "completed":
-		return COMPLETED
-	default:
-		return ANNOUNCE
-	}
-}
-
 type errorResponse struct {
 	FailReason string `bencode:"failure reason"`
 }
@@ -128,19 +105,18 @@ func oops(ctx *gin.Context, errCode trackerErrCode) {
 // preFlightChecks ensures our user meets the requirements to make an authorized request
 // THis is used within the request handler itself and not as a middleware because of the
 // slightly higher cost of passing data in through the request context
-func preFlightChecks(c *gin.Context, t *tracker.Tracker) (model.User, bool) {
+func preFlightChecks(usr *model.User, c *gin.Context, t *tracker.Tracker) bool {
 	// Check that the user is valid before parsing anything
 	pk := c.Param("passkey")
 	if pk == "" {
 		oops(c, msgInvalidAuth)
-		return model.User{}, false
+		return false
 	}
-	usr, err := t.Users.GetByPasskey(pk)
-	if err != nil || !usr.Valid() {
+	if err := t.Users.GetByPasskey(usr, pk); err != nil {
 		oops(c, msgInvalidAuth)
-		return usr, false
+		return false
 	}
-	return usr, true
+	return usr.Valid()
 }
 
 // handleTrackerErrors is used as the default error handler for tracker requests
@@ -192,7 +168,7 @@ func NewBitTorrentHandler(tkr *tracker.Tracker) *gin.Engine {
 	r := newRouter()
 	r.Use(handleTrackerErrors)
 	h := BitTorrentHandler{
-		t: tkr,
+		tracker: tkr,
 	}
 	r.GET("/:passkey/announce", h.announce)
 	r.GET("/:passkey/scrape", h.scrape)

@@ -19,7 +19,7 @@ var serveCmd = &cobra.Command{
 	Long:  `Start the tracker and serve requests`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		tkr, err := tracker.New()
+		tkr, err := tracker.New(ctx)
 		if err != nil {
 			log.Fatalf("Failed to initialize tracker: %s", err)
 		}
@@ -33,6 +33,8 @@ var serveCmd = &cobra.Command{
 		apiHandler := h.NewAPIHandler(tkr)
 		apiServer := h.CreateServer(apiHandler, listenAPI, listenAPITLS)
 
+		go tkr.PeerReaper()
+		go tkr.StatWorker()
 		go func() {
 			if err := btServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen: %s\n", err)

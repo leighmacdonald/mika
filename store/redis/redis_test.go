@@ -45,7 +45,11 @@ func setupDB(t *testing.T, c *redis.Client) {
 }
 
 func TestMain(m *testing.M) {
-	config.Read("mika_testing_redis")
+	if err := config.Read("mika_testing_redis"); err != nil {
+		log.Info("Skipping database tests, failed to find config: mika_testing_redis.yaml")
+		os.Exit(0)
+		return
+	}
 	if viper.GetString(string(config.GeneralRunMode)) != "test" {
 		log.Info("Skipping database tests, not running in testing mode")
 		os.Exit(0)

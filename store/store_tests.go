@@ -74,7 +74,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 		require.Equal(t, fp.Port, peer.Port)
 		require.Equal(t, fp.Location, peer.Location)
 	}
-	if len(peers) < 5 {
+	if peers == nil || len(peers) < 5 {
 		t.Fatalf("Invalid peer count")
 	}
 	p1 := peers[2]

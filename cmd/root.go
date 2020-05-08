@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/spf13/cobra"
+	"log"
 	"os"
 )
 
@@ -30,7 +31,9 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(func() {
-		config.Read(cfgFile)
+		if err := config.Read(cfgFile); err != nil {
+			log.Fatal("Could not load config")
+		}
 	})
 
 	// Here you will define your flags and configuration settings.

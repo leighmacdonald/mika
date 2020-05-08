@@ -44,7 +44,11 @@ func setupDB(t *testing.T, db *pgx.Conn) {
 }
 
 func TestMain(m *testing.M) {
-	config.Read("mika_testing_postgres")
+	if err := config.Read("mika_testing_postgres"); err != nil {
+		log.Info("Skipping database tests, failed to find config: mika_testing_postgres.yaml")
+		os.Exit(0)
+		return
+	}
 	if viper.GetString(string(config.GeneralRunMode)) != "test" {
 		log.Info("Skipping database tests, not running in testing mode")
 		os.Exit(0)

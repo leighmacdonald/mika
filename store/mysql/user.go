@@ -18,7 +18,7 @@ type UserStore struct {
 }
 
 // Add will add a new user to the backing store
-func (u *UserStore) Add(user *model.User) error {
+func (u *UserStore) Add(user model.User) error {
 	if user.UserID > 0 {
 		return errors.New("User already has a user_id")
 	}
@@ -43,27 +43,27 @@ func (u *UserStore) Add(user *model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetByPasskey(passkey string) (*model.User, error) {
+func (u *UserStore) GetByPasskey(passkey string) (model.User, error) {
 	var user model.User
 	const q = `SELECT * FROM users WHERE passkey = ?`
 	if err := u.db.Get(&user, q, passkey); err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch user by passkey")
+		return user, errors.Wrap(err, "Failed to fetch user by passkey")
 	}
-	return &user, nil
+	return user, nil
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(userID uint32) (*model.User, error) {
+func (u *UserStore) GetByID(userID uint32) (model.User, error) {
 	var user model.User
 	const q = `SELECT * FROM users WHERE user_id = ?`
 	if err := u.db.Get(&user, q, userID); err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch user by user_id")
+		return user, errors.Wrap(err, "Failed to fetch user by user_id")
 	}
-	return &user, nil
+	return user, nil
 }
 
 // Delete removes a user from the backing store
-func (u *UserStore) Delete(user *model.User) error {
+func (u *UserStore) Delete(user model.User) error {
 	if user.UserID <= 0 {
 		return errors.New("User doesnt have a user_id")
 	}

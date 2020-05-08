@@ -64,11 +64,10 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{})
 		return
 	}
-	t.Lock()
+	// TODO use update channel
 	t.Reason = tup.Reason
 	t.IsDeleted = tup.IsDeleted
 	t.IsEnabled = tup.IsEnabled
-	t.Unlock()
 	c.JSON(http.StatusOK, tup)
 
 }

@@ -112,7 +112,7 @@ func doRequest(client *http.Client, method string, path string, data interface{}
 }
 
 // Add adds a new torrent to the HTTP API backing store
-func (ts TorrentStore) Add(t *model.Torrent) error {
+func (ts TorrentStore) Add(t model.Torrent) error {
 	resp, err := doRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/torrent"), t)
 	if err != nil {
 		return err
@@ -140,25 +140,26 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
+func (ts TorrentStore) Get(hash model.InfoHash) (model.Torrent, error) {
+	var t model.Torrent
 	url := fmt.Sprintf("%s/torrent/%s", ts.baseURL, hash.String())
 	resp, err := doRequest(ts.client, "GET", url, nil)
 	if err != nil {
-		return nil, err
+		return t, err
 	}
 	if err := checkResponse(resp, http.StatusOK); err != nil {
-		return nil, err
+		return t, err
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return t, err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	var t *model.Torrent
+
 	if err := json.Unmarshal(b, t); err != nil {
-		return nil, err
+		return t, err
 	}
 	return t, nil
 }
@@ -176,7 +177,7 @@ type PeerStore struct {
 }
 
 // Add inserts a peer into the active swarm for the torrent provided
-func (ps PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
+func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", ih), p)
 	if err != nil {
 		return err
@@ -185,17 +186,17 @@ func (ps PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps PeerStore) Get(_ model.InfoHash, _ model.PeerID) (*model.Peer, error) {
+func (ps PeerStore) Get(_ model.InfoHash, _ model.PeerID) (model.Peer, error) {
 	panic("implement me")
 }
 
 // Update will sync any new peer data with the backing store
-func (ps PeerStore) Update(_ model.InfoHash, _ *model.Peer) error {
+func (ps PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
 	panic("implement me")
 }
 
 // Delete will remove a user from a torrents swarm
-func (ps PeerStore) Delete(ih model.InfoHash, p *model.Peer) error {
+func (ps PeerStore) Delete(ih model.InfoHash, p model.Peer) error {
 	reqURL := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p.PeerID)
 	resp, err := doRequest(ps.client, "DELETE", reqURL, nil)
 	if err != nil {
@@ -276,7 +277,7 @@ type UserStore struct {
 }
 
 // Add will add a new user to the backing store
-func (u *UserStore) Add(_ *model.User) error {
+func (u *UserStore) Add(_ model.User) error {
 	panic("implement me")
 }
 
@@ -284,46 +285,46 @@ func (u *UserStore) Add(_ *model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetByPasskey(passkey string) (*model.User, error) {
+func (u *UserStore) GetByPasskey(passkey string) (model.User, error) {
 	var usr model.User
 	if passkey == "" || len(passkey) != 20 {
-		return nil, consts.ErrUnauthorized
+		return usr, consts.ErrUnauthorized
 	}
 	path := fmt.Sprintf("%s/api/user/pk/%s", u.baseURL, passkey)
 	resp, err := doRequest(u.client, "GET", path, nil)
 	if err != nil {
 		log.Errorf("Failed to make api call to backing http api: %s", err)
-		return nil, consts.ErrUnauthorized
+		return usr, consts.ErrUnauthorized
 	}
 	if err := checkResponse(resp, http.StatusOK); err != nil {
-		return nil, consts.ErrUnauthorized
+		return usr, consts.ErrUnauthorized
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("Could not read response body from backing http api: %s", err.Error())
-		return nil, consts.ErrUnauthorized
+		return usr, consts.ErrUnauthorized
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 	if err := json.Unmarshal(b, &usr); err != nil {
 		log.Warnf("Failed to decode user data from backing http api: %s", err.Error())
-		return nil, consts.ErrUnauthorized
+		return usr, consts.ErrUnauthorized
 	}
 	if !usr.Valid() {
 		log.Warnf("Received invalid user data from backing http api")
-		return nil, consts.ErrUnauthorized
+		return usr, consts.ErrUnauthorized
 	}
-	return &usr, nil
+	return usr, nil
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(_ uint32) (*model.User, error) {
+func (u *UserStore) GetByID(_ uint32) (model.User, error) {
 	panic("implement me")
 }
 
 // Delete removes a user from the backing store
-func (u *UserStore) Delete(_ *model.User) error {
+func (u *UserStore) Delete(_ model.User) error {
 	panic("implement me")
 }
 

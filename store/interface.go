@@ -72,13 +72,13 @@ func AddUserDriver(name string, driver UserDriver) {
 // To disable a user they MUST be deleted from the active user cache
 type UserStore interface {
 	// Add will add a new user to the backing store
-	Add(u *model.User) error
+	Add(u model.User) error
 	// GetByPasskey returns a user matching the passkey
-	GetByPasskey(passkey string) (*model.User, error)
+	GetByPasskey(passkey string) (model.User, error)
 	// GetByID returns a user matching the userId
-	GetByID(userID uint32) (*model.User, error)
+	GetByID(userID uint32) (model.User, error)
 	// Delete removes a user from the backing store
-	Delete(user *model.User) error
+	Delete(user model.User) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }
@@ -87,12 +87,12 @@ type UserStore interface {
 // The backing drivers should always persist the data to disk
 type TorrentStore interface {
 	// Add adds a new torrent to the backing store
-	Add(t *model.Torrent) error
+	Add(t model.Torrent) error
 	// Delete will mark a torrent as deleted in the backing store.
 	// If dropRow is true, it will permanently remove the torrent from the store
 	Delete(ih model.InfoHash, dropRow bool) error
 	// Get returns the Torrent matching the infohash
-	Get(hash model.InfoHash) (*model.Torrent, error)
+	Get(hash model.InfoHash) (model.Torrent, error)
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// WhiteListDelete removes a client from the global whitelist
@@ -110,15 +110,15 @@ type TorrentStore interface {
 // if its backed by something that can restore its in memory state, such as redis
 type PeerStore interface {
 	// Add inserts a peer into the active swarm for the torrent provided
-	Add(ih model.InfoHash, p *model.Peer) error
+	Add(ih model.InfoHash, p model.Peer) error
 	// Update will sync any new peer data with the backing store
-	Update(ih model.InfoHash, p *model.Peer) error
+	Update(ih model.InfoHash, p model.Peer) error
 	// Delete will remove a user from a torrents swarm
-	Delete(ih model.InfoHash, p *model.Peer) error
+	Delete(ih model.InfoHash, p model.Peer) error
 	// GetN will fetch peers for a torrents active swarm up to N users
 	GetN(ih model.InfoHash, limit int) (model.Swarm, error)
 	// Get will fetch the peer from the swarm if it exists
-	Get(ih model.InfoHash, id model.PeerID) (*model.Peer, error)
+	Get(ih model.InfoHash, id model.PeerID) (model.Peer, error)
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 }

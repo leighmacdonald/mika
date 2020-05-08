@@ -11,6 +11,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -25,7 +26,7 @@ type UserStore struct {
 }
 
 // Add will add a new user to the backing store
-func (us UserStore) Add(user *model.User) error {
+func (us UserStore) Add(user model.User) error {
 	if user.UserID > 0 {
 		return errors.New("User already has a user_id")
 	}
@@ -42,7 +43,8 @@ func (us UserStore) Add(user *model.User) error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
 	}
-	user.UserID = uint32(userID)
+	//user.UserID = uint32(userID)
+	log.Debugf("Inserted user id: %d", userID)
 	return nil
 }
 
@@ -50,31 +52,31 @@ func (us UserStore) Add(user *model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (us UserStore) GetByPasskey(passkey string) (*model.User, error) {
+func (us UserStore) GetByPasskey(passkey string) (model.User, error) {
 	const q = `SELECT user_id, passkey, download_enabled, is_deleted FROM users WHERE passkey = $1`
 	var user model.User
 	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
 	err := us.db.QueryRow(c, q, passkey).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch user by passkey")
+		return user, errors.Wrap(err, "Failed to fetch user by passkey")
 	}
-	return &user, nil
+	return user, nil
 }
 
 // GetByID returns a user matching the userId
-func (us UserStore) GetByID(userID uint32) (*model.User, error) {
+func (us UserStore) GetByID(userID uint32) (model.User, error) {
 	const q = `SELECT user_id, passkey, download_enabled, is_deleted FROM users WHERE user_id = $1`
 	var user model.User
 	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
 	err := us.db.QueryRow(c, q, userID).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch user by user_id")
+		return user, errors.Wrap(err, "Failed to fetch user by user_id")
 	}
-	return &user, nil
+	return user, nil
 }
 
 // Delete removes a user from the backing store
-func (us UserStore) Delete(user *model.User) error {
+func (us UserStore) Delete(user model.User) error {
 	if user.UserID <= 0 {
 		return errors.New("User doesnt have a user_id")
 	}
@@ -105,7 +107,7 @@ func (ts TorrentStore) Conn() interface{} {
 }
 
 // Add inserts a new torrent into the backing store
-func (ts TorrentStore) Add(t *model.Torrent) error {
+func (ts TorrentStore) Add(t model.Torrent) error {
 	const q = `INSERT INTO torrent (info_hash, release_name) VALUES($1, $2)`
 	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
 	commandTag, err := ts.db.Exec(c, q, t.InfoHash.Bytes(), t.ReleaseName)
@@ -141,7 +143,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns a torrent for the hash provided
-func (ts TorrentStore) Get(ih model.InfoHash) (*model.Torrent, error) {
+func (ts TorrentStore) Get(ih model.InfoHash) (model.Torrent, error) {
 	const q = `
 		SELECT 
 			info_hash, release_name, total_uploaded, total_downloaded, total_completed, 
@@ -166,11 +168,11 @@ func (ts TorrentStore) Get(ih model.InfoHash) (*model.Torrent, error) {
 	)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			return nil, consts.ErrInvalidInfoHash
+			return t, consts.ErrInvalidInfoHash
 		}
-		return nil, err
+		return t, err
 	}
-	return &t, nil
+	return t, nil
 }
 
 // Close will close the underlying postgres database connection
@@ -235,7 +237,7 @@ type PeerStore struct {
 }
 
 // Add insets the peer into the swarm of the torrent provided
-func (ps PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
+func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	const q = `
 	INSERT INTO peers 
 	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, created_on, updated_on)
@@ -254,12 +256,12 @@ func (ps PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
 }
 
 // Update will sync the new peer data with the backing store
-func (ps PeerStore) Update(ih model.InfoHash, p *model.Peer) error {
+func (ps PeerStore) Update(ih model.InfoHash, p model.Peer) error {
 	panic("implement me")
 }
 
 // Delete will remove a peer from the swarm of the torrent provided
-func (ps PeerStore) Delete(ih model.InfoHash, p *model.Peer) error {
+func (ps PeerStore) Delete(ih model.InfoHash, p model.Peer) error {
 	const q = `DELETE FROM peers WHERE info_hash = $1 AND peer_id = $2`
 	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	_, err := ps.db.Exec(c, q, ih.Bytes(), p.PeerID)
@@ -278,7 +280,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		      info_hash = $1 
 		LIMIT 
 		    $2`
-	var peers []*model.Peer
+	var peers model.Swarm
 	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	rows, err := ps.db.Query(c, q, ih, limit)
 	if err != nil {
@@ -292,7 +294,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to fetch N peers from store")
 		}
-		peers = append(peers, &p)
+		peers = append(peers, p)
 	}
 	if rows.Err() != nil {
 		return nil, errors.Wrap(err, "error in peer query")
@@ -301,7 +303,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (*model.Peer, error) {
+func (ps PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (model.Peer, error) {
 	const q = `
 		SELECT 
 		       peer_id, info_hash, user_id, addr_ip, addr_port, total_downloaded, total_announces,
@@ -316,9 +318,9 @@ func (ps PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (*model.Peer, er
 		&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
 		&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unknown peer")
+		return p, errors.Wrap(err, "Unknown peer")
 	}
-	return &p, nil
+	return p, nil
 }
 
 // Close will close the underlying database connection

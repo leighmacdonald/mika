@@ -17,10 +17,10 @@ func (u User) Valid() bool {
 }
 
 // Users is a slice of known users
-type Users []*User
+type Users []User
 
 // Remove removes a users from a Users slice
-func (users Users) Remove(p *User) []*User {
+func (users Users) Remove(p User) []User {
 	for i := len(users) - 1; i >= 0; i-- {
 		if users[i] == p {
 			return append(users[:i], users[i+1:]...)

@@ -97,12 +97,12 @@ func (peer *Peer) Valid() bool {
 }
 
 // Swarm is a set of users participating in a torrent
-type Swarm []*Peer
+type Swarm []Peer
 
 // Remove removes a peer from a slice
-func (peers Swarm) Remove(p *Peer) []*Peer {
+func (peers Swarm) Remove(p Peer) []Peer {
 	for i := len(peers) - 1; i >= 0; i-- {
-		if peers[i] == p {
+		if peers[i].PeerID == p.PeerID {
 			return append(peers[:i], peers[i+1:]...)
 		}
 	}
@@ -123,8 +123,8 @@ func (peers Swarm) Counts() (seeders uint, leechers uint) {
 }
 
 // NewPeer create a new peer instance for inserting into a swarm
-func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
-	return &Peer{
+func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
+	return Peer{
 		SpeedUP:       0,
 		SpeedDN:       0,
 		SpeedUPMax:    0,

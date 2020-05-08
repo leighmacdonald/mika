@@ -71,7 +71,7 @@ func New() (*Tracker, error) {
 
 // NewTestTracker sets up a tracker with fake data for testing
 // This shouldn't really exist here, but its currently needed by other packages so its exported
-func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer) {
+func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 	userCount := 10
 	torrentCount := 100
 	swarmSize := 10 // Swarm per torrent
@@ -87,7 +87,7 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 	if err != nil {
 		log.Panicf("Failed to setup user store: %s", err)
 	}
-	var users []*model.User
+	var users model.Users
 	for i := 0; i < userCount; i++ {
 		usr := store.GenerateTestUser()
 		if i == 0 {
@@ -101,7 +101,7 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 		log.Panicf("Failed to instantiate users")
 		return nil, nil, nil, nil
 	}
-	var torrents []*model.Torrent
+	var torrents model.Torrents
 	for i := 0; i < torrentCount; i++ {
 		t := store.GenerateTestTorrent()
 		if err := ts.Add(t); err != nil {
@@ -117,10 +117,10 @@ func NewTestTracker() (*Tracker, []*model.Torrent, []*model.User, []*model.Peer)
 	for _, cw := range wl {
 		wlm[cw.ClientPrefix] = cw
 	}
-	var peers []*model.Peer
+	var peers model.Swarm
 	for _, t := range torrents {
 		for i := 0; i < swarmSize; i++ {
-			p := store.GenerateTestPeer(users[i])
+			p := store.GenerateTestPeer()
 			if err := ps.Add(t.InfoHash, p); err != nil {
 				log.Panicf("Error adding peer: %s", err.Error())
 			}

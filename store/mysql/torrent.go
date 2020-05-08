@@ -62,21 +62,21 @@ func (s *TorrentStore) Close() error {
 }
 
 // Get returns a torrent for the hash provided
-func (s *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
+func (s *TorrentStore) Get(hash model.InfoHash) (model.Torrent, error) {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
 	var t model.Torrent
 	err := s.db.Get(&t, q, hash.Bytes())
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
-			return nil, consts.ErrInvalidInfoHash
+			return t, consts.ErrInvalidInfoHash
 		}
-		return nil, err
+		return t, err
 	}
-	return &t, nil
+	return t, nil
 }
 
 // Add inserts a new torrent into the backing store
-func (s *TorrentStore) Add(t *model.Torrent) error {
+func (s *TorrentStore) Add(t model.Torrent) error {
 	const q = `INSERT INTO torrent (info_hash, release_name) VALUES(?, ?)`
 	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName)
 	if err != nil {

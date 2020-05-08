@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -228,7 +229,7 @@ func GetStoreConfig(storeType StoreType) *StoreConfig {
 }
 
 // Read reads in config file and ENV variables if set.
-func Read(cfgFile string) {
+func Read(cfgFile string) error {
 	// Find home directory.
 	home, err := homedir.Dir()
 	if err != nil {
@@ -256,8 +257,10 @@ func Read(cfgFile string) {
 		colour := viper.GetBool(string(GeneralLogColour))
 		setupLogger(level, colour)
 		gin.SetMode(viper.GetString(string(GeneralRunMode)))
-
+		return nil
 	}
+	return consts.ErrInvalidConfig
+
 }
 
 func setupLogger(levelStr string, colour bool) {

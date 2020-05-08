@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strconv"
-	"sync"
 )
 
 const (
@@ -61,7 +60,7 @@ type UserStore struct {
 
 // Add inserts a user into redis via at the string provided by the userKey function
 // This additionally sets the passkey->user_id mapping
-func (us UserStore) Add(u *model.User) error {
+func (us UserStore) Add(u model.User) error {
 	pipe := us.client.TxPipeline()
 	pipe.HSet(userKey(u.Passkey), map[string]interface{}{
 		"user_id":          u.UserID,
@@ -77,35 +76,35 @@ func (us UserStore) Add(u *model.User) error {
 }
 
 // GetByPasskey returns the hash values set of the passkey and maps it to a User struct
-func (us UserStore) GetByPasskey(passkey string) (*model.User, error) {
+func (us UserStore) GetByPasskey(passkey string) (model.User, error) {
+	var user model.User
 	v, err := us.client.HGetAll(userKey(passkey)).Result()
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to retrieve user by passkey")
+		return user, errors.Wrap(err, "Failed to retrieve user by passkey")
 	}
-	var user model.User
 	user.Passkey = v["passkey"]
 	user.UserID = util.StringToUInt32(v["user_id"], 0)
 	if !user.Valid() {
-		return nil, consts.ErrInvalidState
+		return user, consts.ErrInvalidState
 	}
-	return &user, nil
+	return user, nil
 }
 
 // GetByID will query the passkey:user_id index for the passkey and return the matching user
-func (us UserStore) GetByID(userID uint32) (*model.User, error) {
+func (us UserStore) GetByID(userID uint32) (model.User, error) {
 	passkey, err := us.client.Get(userIDKey(userID)).Result()
 	if err != nil {
 		log.Warnf("Failed to lookup user by ID, no passkey mapped: %d", userID)
-		return nil, consts.ErrInvalidUser
+		return model.User{}, consts.ErrInvalidUser
 	}
 	if passkey == "" {
-		return nil, consts.ErrInvalidUser
+		return model.User{}, consts.ErrInvalidUser
 	}
 	return us.GetByPasskey(passkey)
 }
 
 // Delete drops a user from redis.
-func (us UserStore) Delete(user *model.User) error {
+func (us UserStore) Delete(user model.User) error {
 	if err := us.client.Del(userKey(user.Passkey)).Err(); err != nil {
 		return errors.Wrap(err, "Could not remove user from store")
 	}
@@ -176,7 +175,7 @@ func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 }
 
 // Add adds a new torrent to the redis backing store
-func (ts *TorrentStore) Add(t *model.Torrent) error {
+func (ts *TorrentStore) Add(t model.Torrent) error {
 	err := ts.client.HSet(torrentKey(t.InfoHash), map[string]interface{}{
 		"release_name":     t.ReleaseName,
 		"total_completed":  t.TotalCompleted,
@@ -211,17 +210,17 @@ func (ts *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
+func (ts *TorrentStore) Get(hash model.InfoHash) (model.Torrent, error) {
+	var t model.Torrent
 	v, err := ts.client.HGetAll(torrentKey(hash)).Result()
 	if err != nil {
-		return nil, err
+		return t, err
 	}
 	_, found := v["info_hash"]
 	if !found {
-		return nil, consts.ErrInvalidInfoHash
+		return t, consts.ErrInvalidInfoHash
 	}
-	t := model.Torrent{
-		RWMutex:         sync.RWMutex{},
+	t = model.Torrent{
 		ReleaseName:     v["release_name"],
 		InfoHash:        model.InfoHashFromString(v["info_hash"]),
 		TotalCompleted:  util.StringToInt16(v["total_completed"], 0),
@@ -233,7 +232,7 @@ func (ts *TorrentStore) Get(hash model.InfoHash) (*model.Torrent, error) {
 		MultiUp:         util.StringToFloat64(v["multi_up"], 1.0),
 		MultiDn:         util.StringToFloat64(v["multi_dn"], 1.0),
 	}
-	return &t, nil
+	return t, nil
 }
 
 // Close will close the underlying redis client and clear the caches
@@ -247,7 +246,7 @@ type PeerStore struct {
 }
 
 // Add inserts a peer into the active swarm for the torrent provided
-func (ps *PeerStore) Add(ih model.InfoHash, p *model.Peer) error {
+func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
 		"speed_up":         p.SpeedUP,
 		"speed_dn":         p.SpeedDN,
@@ -281,7 +280,7 @@ func (ps *PeerStore) findKeys(prefix string) []string {
 }
 
 // Update will sync any new peer data with the backing store
-func (ps *PeerStore) Update(ih model.InfoHash, p *model.Peer) error {
+func (ps *PeerStore) Update(ih model.InfoHash, p model.Peer) error {
 	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
 		"speed_up":         p.SpeedUP,
 		"speed_dn":         p.SpeedDN,
@@ -302,47 +301,46 @@ func (ps *PeerStore) Update(ih model.InfoHash, p *model.Peer) error {
 }
 
 // Delete will remove a user from a torrents swarm
-func (ps *PeerStore) Delete(ih model.InfoHash, p *model.Peer) error {
+func (ps *PeerStore) Delete(ih model.InfoHash, p model.Peer) error {
 	return ps.client.Del(peerKey(ih, p.PeerID)).Err()
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps *PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (*model.Peer, error) {
+func (ps *PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (model.Peer, error) {
+	var p model.Peer
 	v, err := ps.client.HGetAll(peerKey(ih, peerID)).Result()
 	if err != nil {
-		return nil, err
+		return p, err
 	}
-	p := mapPeerValues(v)
+	mapPeerValues(&p, v)
 	if !p.Valid() {
-		return nil, consts.ErrInvalidState
+		return p, consts.ErrInvalidState
 	}
-	return &p, nil
+	return p, nil
 }
 
-func mapPeerValues(v map[string]string) model.Peer {
-	return model.Peer{
-		SpeedUP:       util.StringToUInt32(v["speed_up"], 0),
-		SpeedDN:       util.StringToUInt32(v["speed_dn"], 0),
-		SpeedUPMax:    util.StringToUInt32(v["speed_dn_max"], 0),
-		SpeedDNMax:    util.StringToUInt32(v["speed_up_max"], 0),
-		Uploaded:      util.StringToUInt32(v["total_uploaded"], 0),
-		Downloaded:    util.StringToUInt32(v["total_downloaded"], 0),
-		Left:          util.StringToUInt32(v["total_left"], 0),
-		Announces:     util.StringToUInt32(v["total_announces"], 0),
-		TotalTime:     util.StringToUInt32(v["total_time"], 0),
-		IP:            net.ParseIP(v["addr_ip"]),
-		Port:          util.StringToUInt16(v["addr_port"], 0),
-		AnnounceLast:  util.StringToTime(v["last_announce"]),
-		AnnounceFirst: util.StringToTime(v["first_announce"]),
-		PeerID:        model.PeerIDFromString(v["peer_id"]),
-		Location:      geo.LatLongFromString(v["location"]),
-		UserID:        util.StringToUInt32(v["user_id"], 0),
-	}
+func mapPeerValues(p *model.Peer, v map[string]string) {
+	p.SpeedUP = util.StringToUInt32(v["speed_up"], 0)
+	p.SpeedDN = util.StringToUInt32(v["speed_dn"], 0)
+	p.SpeedUPMax = util.StringToUInt32(v["speed_dn_max"], 0)
+	p.SpeedDNMax = util.StringToUInt32(v["speed_up_max"], 0)
+	p.Uploaded = util.StringToUInt32(v["total_uploaded"], 0)
+	p.Downloaded = util.StringToUInt32(v["total_downloaded"], 0)
+	p.Left = util.StringToUInt32(v["total_left"], 0)
+	p.Announces = util.StringToUInt32(v["total_announces"], 0)
+	p.TotalTime = util.StringToUInt32(v["total_time"], 0)
+	p.IP = net.ParseIP(v["addr_ip"])
+	p.Port = util.StringToUInt16(v["addr_port"], 0)
+	p.AnnounceLast = util.StringToTime(v["last_announce"])
+	p.AnnounceFirst = util.StringToTime(v["first_announce"])
+	p.PeerID = model.PeerIDFromString(v["peer_id"])
+	p.Location = geo.LatLongFromString(v["location"])
+	p.UserID = util.StringToUInt32(v["user_id"], 0)
 }
 
 // GetN will fetch peers for a torrents active swarm up to N users
 func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
-	var peers []*model.Peer
+	var peers model.Swarm
 	for i, key := range ps.findKeys(torrentPeersKey(ih)) {
 		if i == limit {
 			break
@@ -351,8 +349,9 @@ func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "Error trying to GetN")
 		}
-		p := mapPeerValues(v)
-		peers = append(peers, &p)
+		var p model.Peer
+		mapPeerValues(&p, v)
+		peers = append(peers, p)
 	}
 	return peers, nil
 }

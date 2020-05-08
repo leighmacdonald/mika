@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 )
 
 // InfoHash is a unique 20byte identifier for a torrent
@@ -54,7 +53,6 @@ func (ih *InfoHash) RawString() string {
 
 // Torrent is the core struct for our torrent being tracked
 type Torrent struct {
-	sync.RWMutex
 	ReleaseName    string   `db:"release_name" redis:"release_name" json:"release_name"`
 	InfoHash       InfoHash `db:"info_hash" redis:"info_hash" json:"info_hash"`
 	TotalCompleted int16    `db:"total_completed" redis:"total_completed" json:"total_completed"`
@@ -87,8 +85,8 @@ type TorrentStats struct {
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
-func NewTorrent(ih InfoHash, name string) *Torrent {
-	torrent := &Torrent{
+func NewTorrent(ih InfoHash, name string) Torrent {
+	torrent := Torrent{
 		ReleaseName: name,
 		InfoHash:    ih,
 		IsDeleted:   false,
@@ -98,6 +96,8 @@ func NewTorrent(ih InfoHash, name string) *Torrent {
 	}
 	return torrent
 }
+
+type Torrents []Torrent
 
 // WhiteListClient defines a whitelisted bittorrent client allowed to participate
 // in swarms. This is not a foolproof solution as its fairly trivial for a motivated

@@ -5,6 +5,7 @@ package exampleapi
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"net/http"
@@ -25,11 +26,11 @@ func errResponse(c *gin.Context, code int, msg string) {
 type ServerExample struct {
 	Addr        string
 	Router      *gin.Engine
-	Users       []*model.User
+	Users       model.Users
 	UsersMx     *sync.RWMutex
-	Peers       map[model.InfoHash][]*model.Peer
+	Peers       map[model.InfoHash]model.Swarm
 	PeersMx     *sync.RWMutex
-	Torrents    map[model.InfoHash]*model.Torrent
+	Torrents    map[model.InfoHash]model.Torrent
 	TorrentsMx  *sync.RWMutex
 	WhiteList   map[string]model.WhiteListClient
 	WhiteListMx *sync.RWMutex
@@ -57,8 +58,8 @@ func (s *ServerExample) getUser(c *gin.Context) {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	u := s.getUserByPasskey(passKey)
-	if u == nil {
+	u, err := s.getUserByPasskey(passKey)
+	if err != nil {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
@@ -107,15 +108,15 @@ func (s *ServerExample) addWhitelist(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func (s *ServerExample) getUserByPasskey(passkey string) *model.User {
+func (s *ServerExample) getUserByPasskey(passkey string) (model.User, error) {
 	s.UsersMx.RLock()
 	defer s.UsersMx.RUnlock()
 	for _, u := range s.Users {
 		if u.Passkey == passkey {
-			return u
+			return u, nil
 		}
 	}
-	return nil
+	return model.User{}, consts.ErrUnauthorized
 }
 
 // New returns an example HTTP server implementation to test against and learn from
@@ -129,9 +130,9 @@ func New() *http.Server {
 		UsersMx:    &sync.RWMutex{},
 		PeersMx:    &sync.RWMutex{},
 		TorrentsMx: &sync.RWMutex{},
-		Torrents:   map[model.InfoHash]*model.Torrent{},
-		Peers:      map[model.InfoHash][]*model.Peer{},
-		Users:      []*model.User{},
+		Torrents:   make(map[model.InfoHash]model.Torrent),
+		Peers:      make(map[model.InfoHash]model.Swarm),
+		Users:      model.Users{},
 		WhiteList: map[string]model.WhiteListClient{
 			"qB": {
 				ClientPrefix: "qB",
@@ -161,9 +162,9 @@ func New() *http.Server {
 		s.Torrents[t.InfoHash] = t
 	}
 	for k := range s.Torrents {
-		var swarm []*model.Peer
+		var swarm model.Swarm
 		for i := 0; i < swarmSize; i++ {
-			swarm = append(swarm, store.GenerateTestPeer(s.Users[i]))
+			swarm = append(swarm, store.GenerateTestPeer())
 		}
 		s.Peers[k] = swarm
 	}

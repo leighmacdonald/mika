@@ -7,8 +7,14 @@ import (
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
+	"github.com/leighmacdonald/mika/util"
 	"net/http"
 )
+
+type StatusResp struct {
+	Error   string `json:"error,omitempty"`
+	Message string `json:"error,omitempty"`
+}
 
 // AdminAPI is the interface for administering a live server over HTTP
 type AdminAPI struct {
@@ -43,6 +49,27 @@ func infoHashFromCtx(c *gin.Context) (model.InfoHash, bool) {
 	return model.InfoHashFromString(ihStr), true
 }
 
+type TorrentAddRequest struct {
+	Name     string `json:"name"`
+	InfoHash string `json:"info_hash"`
+}
+
+func (a *AdminAPI) torrentAdd(c *gin.Context) {
+	var req TorrentAddRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: "Malformed request"})
+		return
+	}
+	var t model.Torrent
+	t.ReleaseName = req.Name
+	t.InfoHash = model.InfoHashFromString(req.InfoHash)
+	if err := a.t.Torrents.Add(t); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, StatusResp{Message: "Torrent added successfully"})
+}
+
 func (a *AdminAPI) torrentDelete(c *gin.Context) {
 	ih, ok := infoHashFromCtx(c)
 	if !ok {
@@ -52,7 +79,7 @@ func (a *AdminAPI) torrentDelete(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusOK, StatusResp{Message: "Deleted successfully"})
 }
 
 // TorrentUpdatePrams defines what parameters we accept for updating a torrent. This is only
@@ -95,8 +122,54 @@ func (a *AdminAPI) userUpdate(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) userDelete(c *gin.Context) {
+type UserDeleteRequest struct {
+	Passkey string `json:"passkey,omitempty"`
+}
 
+func (a *AdminAPI) userDelete(c *gin.Context) {
+	pk := c.Param("passkey")
+	var user model.User
+	if err := a.t.Users.GetByPasskey(&user, pk); err != nil {
+		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Error: "User not found"})
+		return
+	}
+	if err := a.t.Users.Delete(user); err != nil {
+		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Error: "Failed to delete user"})
+		return
+	}
+	c.JSON(http.StatusOK, StatusResp{Message: "Deleted user successfully"})
+}
+
+type UserAddRequest struct {
+	UserID  uint32 `json:"user_id,omitempty"`
+	Passkey string `json:"passkey,omitempty"`
+}
+
+type UserAddResponse struct {
+	Passkey string `json:"passkey"`
+}
+
+func (a *AdminAPI) userAdd(c *gin.Context) {
+	var user model.User
+	var req UserAddRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: "Malformed request"})
+		return
+	}
+	user.DownloadEnabled = true
+	if req.Passkey != "" {
+		user.Passkey = util.NewPasskey()
+	} else {
+		user.Passkey = req.Passkey
+	}
+	if req.UserID > 0 {
+		user.UserID = req.UserID
+	}
+	if err := a.t.Users.Add(user); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: "Failed to add user"})
+		return
+	}
+	c.JSON(http.StatusOK, UserAddResponse{Passkey: user.Passkey})
 }
 
 func (a *AdminAPI) configUpdate(c *gin.Context) {

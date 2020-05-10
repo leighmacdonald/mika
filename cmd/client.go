@@ -8,6 +8,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/spf13/viper"
 	"log"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -72,7 +73,38 @@ var torrentDeleteCmd = &cobra.Command{
 	},
 }
 
+var torrentAddCmd = &cobra.Command{
+	Use:     "add",
+	Aliases: []string{"a"},
+	Short:   "Delete a torrent from the tracker & store",
+	Long:    "Delete a torrent from the tracker & store",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("requires at least 1 info_hash")
+		}
+		for _, ih := range args {
+			if len(ih) != 40 {
+				return fmt.Errorf("invalid info_hash: %s", ih)
+			}
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		c := newClient()
+		for _, hashString := range args {
+			p := strings.Split(hashString, ":")
+			if len(p) != 2 {
+				log.Fatalf(`Invalid format. Expected: <info_hash>:"release name"`)
+			}
+			if err := c.TorrentAdd(model.InfoHashFromString(p[0]), p[1]); err != nil {
+				log.Fatalf("Err trying to delete %s: %s", hashString, err.Error())
+			}
+		}
+	},
+}
+
 func init() {
+	torrentCmd.AddCommand(torrentAddCmd)
 	torrentCmd.AddCommand(torrentDeleteCmd)
 	clientCmd.AddCommand(pingCmd)
 	clientCmd.AddCommand(torrentCmd)

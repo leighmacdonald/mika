@@ -56,7 +56,7 @@ var (
 		msgInfoHashNotFound:     errors.New("Unknown infohash"),
 		msgClientRequestTooFast: errors.New("Slow down there jimmy"),
 		msgMalformedRequest:     errors.New("Malformed request"),
-		msgGenericError:         errors.New("Generic Error"),
+		msgGenericError:         errors.New("Generic error"),
 		msgQueryParseFail:       errors.New("Could not parse request"),
 	}
 )
@@ -212,11 +212,16 @@ func NewAPIHandler(tkr *tracker.Tracker) *gin.Engine {
 	h := AdminAPI{
 		t: tkr,
 	}
+	r.POST("/ping", h.ping)
 	r.GET("/tracker/stats", h.stats)
+
 	r.DELETE("/torrent/:info_hash", h.torrentDelete)
 	r.PATCH("/torrent/:info_hash", h.torrentUpdate)
+	r.POST("/torrent", h.torrentAdd)
 
-	r.POST("/ping", h.ping)
+	r.POST("/user", h.userAdd)
+	r.DELETE("/user/pk/:passkey", h.userDelete)
+
 	return r
 }
 

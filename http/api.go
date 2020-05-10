@@ -11,9 +11,16 @@ import (
 	"net/http"
 )
 
+// StatusResp is a generic response struct used when simple responses are all that
+// is required.
 type StatusResp struct {
-	Error   string `json:"error,omitempty"`
+	Err     string `json:"error,omitempty"`
 	Message string `json:"error,omitempty"`
+}
+
+// Error implements the error interface for our response
+func (s StatusResp) Error() string {
+	return s.Err
 }
 
 // AdminAPI is the interface for administering a live server over HTTP
@@ -57,14 +64,14 @@ type TorrentAddRequest struct {
 func (a *AdminAPI) torrentAdd(c *gin.Context) {
 	var req TorrentAddRequest
 	if err := c.BindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: "Malformed request"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Malformed request"})
 		return
 	}
 	var t model.Torrent
 	t.ReleaseName = req.Name
 	t.InfoHash = model.InfoHashFromString(req.InfoHash)
 	if err := a.t.Torrents.Add(t); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, StatusResp{Message: "Torrent added successfully"})
@@ -130,11 +137,11 @@ func (a *AdminAPI) userDelete(c *gin.Context) {
 	pk := c.Param("passkey")
 	var user model.User
 	if err := a.t.Users.GetByPasskey(&user, pk); err != nil {
-		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Error: "User not found"})
+		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Err: "User not found"})
 		return
 	}
 	if err := a.t.Users.Delete(user); err != nil {
-		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Error: "Failed to delete user"})
+		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Err: "Failed to delete user"})
 		return
 	}
 	c.JSON(http.StatusOK, StatusResp{Message: "Deleted user successfully"})
@@ -153,7 +160,7 @@ func (a *AdminAPI) userAdd(c *gin.Context) {
 	var user model.User
 	var req UserAddRequest
 	if err := c.BindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: "Malformed request"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Malformed request"})
 		return
 	}
 	user.DownloadEnabled = true
@@ -166,7 +173,7 @@ func (a *AdminAPI) userAdd(c *gin.Context) {
 		user.UserID = req.UserID
 	}
 	if err := a.t.Users.Add(user); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Error: "Failed to add user"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Failed to add user"})
 		return
 	}
 	c.JSON(http.StatusOK, UserAddResponse{Passkey: user.Passkey})

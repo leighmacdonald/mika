@@ -8,19 +8,17 @@
 package http
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
+	h "github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
-	"net"
 	"net/http"
-	"time"
 )
 
 const (
@@ -55,7 +53,7 @@ func (ts TorrentStore) Conn() interface{} {
 // WhiteListDelete removes a client from the global whitelist
 func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	url := fmt.Sprintf(ts.baseURL, fmt.Sprintf("/whitelist/%s", client.ClientPrefix))
-	resp, err := doRequest(ts.client, "DELETE", url, nil)
+	resp, err := h.DoRequest(ts.client, "DELETE", url, nil)
 	if err != nil {
 		return err
 	}
@@ -64,7 +62,7 @@ func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	resp, err := doRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/whitelist"), client)
+	resp, err := h.DoRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/whitelist"), client)
 	if err != nil {
 		return err
 	}
@@ -74,7 +72,7 @@ func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 // WhiteListGetAll fetches all known whitelisted clients
 func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	url := fmt.Sprintf(ts.baseURL, "/whitelist")
-	resp, err := doRequest(ts.client, "GET", url, nil)
+	resp, err := h.DoRequest(ts.client, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -103,21 +101,9 @@ func checkResponse(resp *http.Response, code int) error {
 	}
 }
 
-func doRequest(client *http.Client, method string, path string, data interface{}) (*http.Response, error) {
-	b, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest(method, path, bytes.NewReader(b))
-	if err != nil {
-		return nil, err
-	}
-	return client.Do(req)
-}
-
 // Add adds a new torrent to the HTTP API backing store
 func (ts TorrentStore) Add(t model.Torrent) error {
-	resp, err := doRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/torrent"), t)
+	resp, err := h.DoRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/torrent"), t)
 	if err != nil {
 		return err
 	}
@@ -128,13 +114,13 @@ func (ts TorrentStore) Add(t model.Torrent) error {
 // If dropRow is true, it will permanently remove the torrent from the store
 func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
-		resp, err := doRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), ih.String())
+		resp, err := h.DoRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), ih.String())
 		if err != nil {
 			return err
 		}
 		return checkResponse(resp, http.StatusOK)
 	}
-	resp, err := doRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseURL, "/torrent"), map[string]interface{}{
+	resp, err := h.DoRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseURL, "/torrent"), map[string]interface{}{
 		"is_deleted": true,
 	})
 	if err != nil {
@@ -146,7 +132,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 // Get returns the Torrent matching the infohash
 func (ts TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	url := fmt.Sprintf("%s/torrent/%s", ts.baseURL, hash.String())
-	resp, err := doRequest(ts.client, "GET", url, nil)
+	resp, err := h.DoRequest(ts.client, "GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -181,7 +167,7 @@ func (ps PeerStore) Reap() {
 
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
-	resp, err := doRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", ih), p)
+	resp, err := h.DoRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", ih), p)
 	if err != nil {
 		return err
 	}
@@ -201,7 +187,7 @@ func (ps PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
 // Delete will remove a user from a torrents swarm
 func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	reqURL := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p)
-	resp, err := doRequest(ps.client, "DELETE", reqURL, nil)
+	resp, err := h.DoRequest(ps.client, "DELETE", reqURL, nil)
 	if err != nil {
 		return err
 	}
@@ -216,7 +202,7 @@ func genURL(base string, args ...interface{}) string {
 func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers model.Swarm
 	url := genURL(ps.baseURL, "/torrent/%s/peers/%d", ih.String(), limit)
-	resp, err := doRequest(ps.client, "GET", url, nil)
+	resp, err := h.DoRequest(ps.client, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +240,7 @@ func (t torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, err
 		return nil, consts.ErrInvalidConfig
 	}
 	return TorrentStore{
-		client:  newClient(c),
+		client:  h.NewClient(c),
 		baseURL: c.Host,
 	}, nil
 }
@@ -268,7 +254,7 @@ func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 		return nil, consts.ErrInvalidConfig
 	}
 	return PeerStore{
-		client:  newClient(c),
+		client:  h.NewClient(c),
 		baseURL: c.Host,
 	}, nil
 }
@@ -293,7 +279,7 @@ func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
 		return consts.ErrUnauthorized
 	}
 	path := fmt.Sprintf("%s/api/user/pk/%s", u.baseURL, passkey)
-	resp, err := doRequest(u.client, "GET", path, nil)
+	resp, err := h.DoRequest(u.client, "GET", path, nil)
 	if err != nil {
 		log.Errorf("Failed to make api call to backing http api: %s", err)
 		return consts.ErrUnauthorized
@@ -349,26 +335,11 @@ func (p userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 		return nil, consts.ErrInvalidConfig
 	}
 	return &UserStore{
-		client:  newClient(c),
+		client:  h.NewClient(c),
 		baseURL: c.Host,
 	}, nil
 }
 
-// TODO use context instead for timeouts
-func newClient(_ *config.StoreConfig) *http.Client {
-	//noinspection GoDeprecation
-	return &http.Client{
-		Transport: &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout: time.Second * 5,
-			}).Dial,
-			TLSHandshakeTimeout: time.Second * 5,
-		},
-		CheckRedirect: nil,
-		Jar:           nil,
-		Timeout:       time.Second * 5,
-	}
-}
 func init() {
 	store.AddUserDriver(driverName, userDriver{})
 	store.AddPeerDriver(driverName, peerDriver{})

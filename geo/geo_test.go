@@ -15,7 +15,7 @@ import (
 
 func TestGetLocation(t *testing.T) {
 	fp := util.FindFile(viper.GetString("geodb_path"))
-	db := New(fp)
+	db := New(fp, false)
 	defer func() { _ = db.Close() }()
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
 	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -118.0 {
@@ -28,7 +28,7 @@ func TestGetLocation(t *testing.T) {
 }
 
 func TestDistance(t *testing.T) {
-	db := New(util.FindFile(viper.GetString("geodb_path")))
+	db := New(util.FindFile(viper.GetString("geodb_path")), false)
 	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
@@ -40,7 +40,7 @@ func TestDistance(t *testing.T) {
 }
 
 func BenchmarkDistance(t *testing.B) {
-	db := New(util.FindFile(viper.GetString("geodb_path")))
+	db := New(util.FindFile(viper.GetString("geodb_path")), false)
 	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
@@ -67,7 +67,7 @@ func TestDownloadDB(t *testing.T) {
 	key := viper.GetString("geodb_api_key")
 	err2 := DownloadDB(p, key)
 	require.NoError(t, err2)
-	require.NoError(t, New(p).db.Verify(), "failed to verify downloaded mmdb")
+	require.NoError(t, New(p, false).db.Verify(), "failed to verify downloaded mmdb")
 }
 
 func init() {

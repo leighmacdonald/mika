@@ -3,8 +3,10 @@ package http
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/pkg/errors"
@@ -62,6 +64,35 @@ var (
 // TrackerErr maps a tracker error code to a error
 func TrackerErr(code trackerErrCode) error {
 	return responseStringMap[code]
+}
+
+// TODO use context instead for timeouts
+func NewClient(_ *config.StoreConfig) *http.Client {
+	//noinspection GoDeprecation
+	return &http.Client{
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: time.Second * 5,
+			}).Dial,
+			TLSHandshakeTimeout: time.Second * 5,
+		},
+		CheckRedirect: nil,
+		Jar:           nil,
+		Timeout:       time.Second * 5,
+	}
+}
+
+// DoRequest handles basic http request initialization and sending
+func DoRequest(client *http.Client, method string, path string, data interface{}) (*http.Response, error) {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(method, path, bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	return client.Do(req)
 }
 
 // getIP Parses and returns a IP from a string
@@ -184,6 +215,8 @@ func NewAPIHandler(tkr *tracker.Tracker) *gin.Engine {
 	r.GET("/tracker/stats", h.stats)
 	r.DELETE("/torrent/:info_hash", h.torrentDelete)
 	r.PATCH("/torrent/:info_hash", h.torrentUpdate)
+
+	r.POST("/ping", h.ping)
 	return r
 }
 

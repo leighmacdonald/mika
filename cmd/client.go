@@ -1,7 +1,10 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com/leighmacdonald/mika/client"
+	"github.com/leighmacdonald/mika/config"
+	"github.com/spf13/viper"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -11,12 +14,26 @@ var clientCmd = &cobra.Command{
 	Use:   "client",
 	Short: "CLI to administer a running instance",
 	Long:  `CLI to administer a running instance`,
+	//Run: func(cmd *cobra.Command, args []string) {
+	//},
+}
+
+// pingCmd represents the client command
+var pingCmd = &cobra.Command{
+	Use:   "ping",
+	Short: "CLI to administer a running instance",
+	Long:  `CLI to administer a running instance`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("client called")
+		host := viper.GetString(string(config.APIListen))
+		c := client.New(host)
+		if err := c.Ping(); err != nil {
+			log.Fatalf("Could not connect to tracker")
+		}
 	},
 }
 
 func init() {
+	clientCmd.AddCommand(pingCmd)
 	rootCmd.AddCommand(clientCmd)
 
 	// Here you will define your flags and configuration settings.

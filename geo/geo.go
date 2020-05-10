@@ -220,13 +220,15 @@ type DB struct {
 
 // New opens the .mmdb file for querying and sets up the ellipsoid configuration for more accurate
 // geo queries
-func New(path string) *DB {
+func New(path string, verify bool) *DB {
 	db, err := maxminddb.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := db.Verify(); err != nil {
-		log.Fatalf("Failed to validate maxmind geodb file: %s", err)
+	if verify {
+		if err := db.Verify(); err != nil {
+			log.Fatalf("Failed to validate maxmind geodb file: %s", err)
+		}
 	}
 	return &DB{
 		db: db,

@@ -77,6 +77,7 @@ func (t *Tracker) StatWorker() {
 // New creates a new Tracker instance with configured backend stores
 func New(ctx context.Context) (*Tracker, error) {
 	var err error
+	runMode := viper.GetString(string(config.GeneralRunMode))
 	s, err := store.NewTorrentStore(
 		viper.GetString(string(config.StoreTorrentType)),
 		config.GetStoreConfig(config.Torrent))
@@ -93,7 +94,8 @@ func New(ctx context.Context) (*Tracker, error) {
 	if err3 != nil {
 		return nil, errors.Wrap(err3, "Failed to setup user store")
 	}
-	geodb := geo.New(viper.GetString(string(config.GeodbPath)))
+
+	geodb := geo.New(viper.GetString(string(config.GeodbPath)), runMode == "release")
 	whitelist := make(map[string]model.WhiteListClient)
 	wl, err4 := s.WhiteListGetAll()
 	if err4 != nil {
@@ -181,7 +183,7 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 		Torrents:       ts,
 		Peers:          ps,
 		Users:          us,
-		Geodb:          geo.New(viper.GetString(string(config.GeodbPath))),
+		Geodb:          geo.New(viper.GetString(string(config.GeodbPath)), false),
 		WhitelistMutex: &sync.RWMutex{},
 		Whitelist:      wlm,
 		MaxPeers:       50,

@@ -10,6 +10,8 @@ import (
 	"sync"
 )
 
+const ErrNoResults = "sql: no rows in result set"
+
 // UserStore is the MySQL backed store.UserStore implementation
 type UserStore struct {
 	db      *sqlx.DB
@@ -46,7 +48,10 @@ func (u *UserStore) Add(user model.User) error {
 func (u *UserStore) GetByPasskey(user *model.User, passkey string) error {
 	const q = `SELECT * FROM users WHERE passkey = ?`
 	if err := u.db.Get(user, q, passkey); err != nil {
-		return errors.Wrap(err, "Failed to fetch user by passkey")
+		if err.Error() == ErrNoResults {
+			return consts.ErrInvalidUser
+		}
+		return errors.Wrap(err, "Could not query user by passkey")
 	}
 	return nil
 }
@@ -55,7 +60,10 @@ func (u *UserStore) GetByPasskey(user *model.User, passkey string) error {
 func (u *UserStore) GetByID(user *model.User, userID uint32) error {
 	const q = `SELECT * FROM users WHERE user_id = ?`
 	if err := u.db.Get(user, q, userID); err != nil {
-		return errors.Wrap(err, "Failed to fetch user by user_id")
+		if err.Error() == ErrNoResults {
+			return consts.ErrInvalidUser
+		}
+		return errors.Wrap(err, "Could not query user by user_id")
 	}
 	return nil
 }

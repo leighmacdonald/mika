@@ -15,6 +15,23 @@ type AdminAPI struct {
 	t *tracker.Tracker
 }
 
+type PingRequest struct {
+	Ping string `json:"ping"`
+}
+
+type PingResponse struct {
+	Pong string `json:"pong"`
+}
+
+func (a *AdminAPI) ping(c *gin.Context) {
+	var r PingRequest
+	if err := c.BindJSON(&r); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	c.JSON(http.StatusOK, PingResponse{Pong: r.Ping})
+}
+
 func infoHashFromCtx(c *gin.Context) (model.InfoHash, bool) {
 	ihStr := c.Param("info_hash")
 	if ihStr == "" {

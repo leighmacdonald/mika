@@ -4,10 +4,10 @@ package model
 // All users are considered enabled if they exist. You must remove them from the
 // backing store to ensure they cannot access any resources
 type User struct {
-	UserID          uint32 `json:"user_id"`
-	Passkey         string `json:"passkey"`
-	IsDeleted       bool   `json:"is_deleted"`
-	DownloadEnabled bool   `json:"download_enabled"`
+	UserID          uint32 `db:"user_id" json:"user_id"`
+	Passkey         string `db:"passkey" json:"passkey"`
+	IsDeleted       bool   `db:"is_deleted" json:"is_deleted"`
+	DownloadEnabled bool   `db:"download_enabled" json:"download_enabled"`
 }
 
 // Valid performs basic validation of the user info ensuring we have the minimum required

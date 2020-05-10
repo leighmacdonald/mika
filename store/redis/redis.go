@@ -247,7 +247,7 @@ type PeerStore struct {
 }
 
 func (ps *PeerStore) Reap() {
-	panic("implement me")
+	log.Debugf("Implement reaping peers..")
 }
 
 // Add inserts a peer into the active swarm for the torrent provided

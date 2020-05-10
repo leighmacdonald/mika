@@ -71,5 +71,7 @@ func TestDownloadDB(t *testing.T) {
 }
 
 func init() {
-	config.Read("mika_testing")
+	if err := config.Read("mika_testing"); err != nil {
+		log.Fatalf("Failed to read test config")
+	}
 }

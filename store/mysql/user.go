@@ -43,23 +43,21 @@ func (u *UserStore) Add(user model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetByPasskey(passkey string) (model.User, error) {
-	var user model.User
+func (u *UserStore) GetByPasskey(user *model.User, passkey string) error {
 	const q = `SELECT * FROM users WHERE passkey = ?`
-	if err := u.db.Get(&user, q, passkey); err != nil {
-		return user, errors.Wrap(err, "Failed to fetch user by passkey")
+	if err := u.db.Get(user, q, passkey); err != nil {
+		return errors.Wrap(err, "Failed to fetch user by passkey")
 	}
-	return user, nil
+	return nil
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(userID uint32) (model.User, error) {
-	var user model.User
+func (u *UserStore) GetByID(user *model.User, userID uint32) error {
 	const q = `SELECT * FROM users WHERE user_id = ?`
-	if err := u.db.Get(&user, q, userID); err != nil {
-		return user, errors.Wrap(err, "Failed to fetch user by user_id")
+	if err := u.db.Get(user, q, userID); err != nil {
+		return errors.Wrap(err, "Failed to fetch user by user_id")
 	}
-	return user, nil
+	return nil
 }
 
 // Delete removes a user from the backing store

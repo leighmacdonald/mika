@@ -264,7 +264,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		oops(c, msgGenericError)
 		return
 	}
-	c.Data(int(msgOk), "text/plain", outBytes.Bytes())
+	c.Data(int(msgOk), gin.MIMEPlain, outBytes.Bytes())
 }
 
 // Generate a compact peer field array containing the byte representations

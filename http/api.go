@@ -50,7 +50,8 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 	if !ok {
 		return
 	}
-	t, err := a.t.Torrents.Get(ih)
+	var t model.Torrent
+	err := a.t.Torrents.Get(&t, ih)
 	if err == consts.ErrInvalidInfoHash {
 		c.JSON(http.StatusNotFound, gin.H{})
 		return

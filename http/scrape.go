@@ -11,8 +11,8 @@ import (
 
 // scrape handles the bittorrent scrape protocol for
 func (h *BitTorrentHandler) scrape(c *gin.Context) {
-	_, valid := preFlightChecks(c, h.tracker)
-	if !valid {
+	var user model.User
+	if !preFlightChecks(&user, c, h.tracker) {
 		return
 	}
 	q, err := queryStringParser(c.Request.RequestURI)
@@ -34,8 +34,8 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 	resp := make(bencode.Dict, len(q.InfoHashes))
 	for _, ihStr := range q.InfoHashes {
 		ih := model.InfoHashFromString(ihStr)
-		torrent, err := h.tracker.Torrents.Get(ih)
-		if err != nil {
+		var torrent model.Torrent
+		if err := h.tracker.Torrents.Get(&torrent, ih); err != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}

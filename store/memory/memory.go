@@ -18,6 +18,10 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
+func (ts *TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
+	panic("implement me")
+}
+
 func (ts *TorrentStore) Conn() interface{} {
 	return nil
 }
@@ -60,14 +64,15 @@ func (ts *TorrentStore) Close() error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts *TorrentStore) Get(hash model.InfoHash) (model.Torrent, error) {
+func (ts *TorrentStore) Get(torrent *model.Torrent, hash model.InfoHash) error {
 	ts.RLock()
 	t, found := ts.torrents[hash]
 	ts.RUnlock()
 	if !found || t.IsDeleted {
-		return model.Torrent{}, consts.ErrInvalidInfoHash
+		return consts.ErrInvalidInfoHash
 	}
-	return t, nil
+	*torrent = t
+	return nil
 }
 
 // PeerStore is a memory backed store.PeerStore implementation
@@ -77,16 +82,21 @@ type PeerStore struct {
 	peers map[model.InfoHash]model.Swarm
 }
 
+func (ps *PeerStore) Reap() {
+	panic("implement me")
+}
+
 // Get will fetch the peer from the swarm if it exists
-func (ps *PeerStore) Get(ih model.InfoHash, p model.PeerID) (model.Peer, error) {
+func (ps *PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) error {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, peer := range ps.peers[ih] {
-		if peer.PeerID == p {
-			return peer, nil
+		if peer.PeerID == peerID {
+			*p = peer
+			return nil
 		}
 	}
-	return model.Peer{}, consts.ErrInvalidPeerID
+	return consts.ErrInvalidPeerID
 }
 
 // Close flushes allocated memory
@@ -113,7 +123,7 @@ func (ps *PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
 }
 
 // Delete will remove a user from a torrents swarm
-func (ps *PeerStore) Delete(ih model.InfoHash, p model.Peer) error {
+func (ps *PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	ps.Lock()
 	ps.peers[ih].Remove(p)
 	ps.Unlock()
@@ -193,26 +203,28 @@ func (u *UserStore) Add(usr model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetByPasskey(passkey string) (model.User, error) {
+func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
 	u.RLock()
 	user, found := u.users[passkey]
 	u.RUnlock()
 	if !found {
-		return model.User{}, consts.ErrUnauthorized
+		return consts.ErrUnauthorized
 	}
-	return user, nil
+	*usr = user
+	return nil
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(userID uint32) (model.User, error) {
+func (u *UserStore) GetByID(user *model.User, userID uint32) error {
 	u.RLock()
 	defer u.RUnlock()
 	for _, usr := range u.users {
 		if usr.UserID == userID {
-			return usr, nil
+			*user = usr
+			return nil
 		}
 	}
-	return model.User{}, consts.ErrUnauthorized
+	return consts.ErrUnauthorized
 }
 
 // Delete removes a user from the backing store

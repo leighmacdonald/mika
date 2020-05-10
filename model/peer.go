@@ -2,8 +2,8 @@ package model
 
 import (
 	"fmt"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
-	"github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	"net"
@@ -101,9 +101,9 @@ func (peer *Peer) Valid() bool {
 type Swarm []Peer
 
 // Remove removes a peer from a slice
-func (peers Swarm) Remove(p Peer) []Peer {
+func (peers Swarm) Remove(p PeerID) []Peer {
 	for i := len(peers) - 1; i >= 0; i-- {
-		if peers[i].PeerID == p.PeerID {
+		if peers[i].PeerID == p {
 			return append(peers[:i], peers[i+1:]...)
 		}
 	}
@@ -148,5 +148,5 @@ type UpdateState struct {
 	Left uint32
 	// Timestamp is the time the new stats were announced
 	Timestamp time.Time
-	Event     http.AnnounceType
+	Event     consts.AnnounceType
 }

@@ -23,6 +23,10 @@ type TorrentStore struct {
 	db *sqlx.DB
 }
 
+func (s *TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
+	panic("implement me")
+}
+
 // Conn returns the underlying database driver
 func (s *TorrentStore) Conn() interface{} {
 	return s.db
@@ -62,17 +66,16 @@ func (s *TorrentStore) Close() error {
 }
 
 // Get returns a torrent for the hash provided
-func (s *TorrentStore) Get(hash model.InfoHash) (model.Torrent, error) {
+func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
-	var t model.Torrent
-	err := s.db.Get(&t, q, hash.Bytes())
+	err := s.db.Get(t, q, hash.Bytes())
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
-			return t, consts.ErrInvalidInfoHash
+			return consts.ErrInvalidInfoHash
 		}
-		return t, err
+		return err
 	}
-	return t, nil
+	return nil
 }
 
 // Add inserts a new torrent into the backing store

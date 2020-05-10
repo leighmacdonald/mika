@@ -47,7 +47,7 @@ func findPeer(peers model.Swarm, p1 model.Peer) (model.Peer, error) {
 			return p, nil
 		}
 	}
-	return model.Peer{}, errors.New("Unknown peer")
+	return model.Peer{}, errors.New("unknown peer")
 }
 
 // TestPeerStore tests the interface implementation
@@ -91,7 +91,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	require.Equal(t, p1.Downloaded, p1Updated.Downloaded)
 	require.Equal(t, p1.Uploaded, p1Updated.Uploaded)
 	for _, peer := range peers {
-		require.NoError(t, ps.Delete(torrentA.InfoHash, peer))
+		require.NoError(t, ps.Delete(torrentA.InfoHash, peer.PeerID))
 	}
 }
 
@@ -99,15 +99,14 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	torrentA := GenerateTestTorrent()
 	require.NoError(t, ts.Add(torrentA))
-	fetchedTorrent, err := ts.Get(torrentA.InfoHash)
-	require.NoError(t, err)
+	var fetchedTorrent model.Torrent
+	require.NoError(t, ts.Get(&fetchedTorrent, torrentA.InfoHash))
 	require.Equal(t, torrentA.InfoHash, fetchedTorrent.InfoHash)
 	require.Equal(t, torrentA.IsDeleted, fetchedTorrent.IsDeleted)
 	require.Equal(t, torrentA.IsEnabled, fetchedTorrent.IsEnabled)
 	require.NoError(t, ts.Delete(torrentA.InfoHash, true))
-	deletedTorrent, err2 := ts.Get(torrentA.InfoHash)
-	require.Nil(t, deletedTorrent)
-	require.Equal(t, consts.ErrInvalidInfoHash, err2)
+	var deletedTorrent model.Torrent
+	require.Equal(t, consts.ErrInvalidInfoHash, ts.Get(&deletedTorrent, torrentA.InfoHash))
 	wlClients := []model.WhiteListClient{
 		{ClientPrefix: "UT", ClientName: "uTorrent"},
 		{ClientPrefix: "qT", ClientName: "QBittorrent"},

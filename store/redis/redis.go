@@ -76,31 +76,30 @@ func (us UserStore) Add(u model.User) error {
 }
 
 // GetByPasskey returns the hash values set of the passkey and maps it to a User struct
-func (us UserStore) GetByPasskey(passkey string) (model.User, error) {
-	var user model.User
+func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
 	v, err := us.client.HGetAll(userKey(passkey)).Result()
 	if err != nil {
-		return user, errors.Wrap(err, "Failed to retrieve user by passkey")
+		return errors.Wrap(err, "Failed to retrieve user by passkey")
 	}
 	user.Passkey = v["passkey"]
 	user.UserID = util.StringToUInt32(v["user_id"], 0)
 	if !user.Valid() {
-		return user, consts.ErrInvalidState
+		return consts.ErrInvalidState
 	}
-	return user, nil
+	return nil
 }
 
 // GetByID will query the passkey:user_id index for the passkey and return the matching user
-func (us UserStore) GetByID(userID uint32) (model.User, error) {
+func (us UserStore) GetByID(user *model.User, userID uint32) error {
 	passkey, err := us.client.Get(userIDKey(userID)).Result()
 	if err != nil {
 		log.Warnf("Failed to lookup user by ID, no passkey mapped: %d", userID)
-		return model.User{}, consts.ErrInvalidUser
+		return consts.ErrInvalidUser
 	}
 	if passkey == "" {
-		return model.User{}, consts.ErrInvalidUser
+		return consts.ErrInvalidUser
 	}
-	return us.GetByPasskey(passkey)
+	return us.GetByPasskey(user, passkey)
 }
 
 // Delete drops a user from redis.
@@ -122,6 +121,10 @@ func (us UserStore) Close() error {
 // TorrentStore is the redis backed store.TorrentStore implementation
 type TorrentStore struct {
 	client *redis.Client
+}
+
+func (ts *TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
+	panic("implement me")
 }
 
 // Conn returns the underlying connection
@@ -210,29 +213,27 @@ func (ts *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts *TorrentStore) Get(hash model.InfoHash) (model.Torrent, error) {
-	var t model.Torrent
+func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	v, err := ts.client.HGetAll(torrentKey(hash)).Result()
 	if err != nil {
-		return t, err
+		return err
 	}
 	_, found := v["info_hash"]
 	if !found {
-		return t, consts.ErrInvalidInfoHash
+		return consts.ErrInvalidInfoHash
 	}
-	t = model.Torrent{
-		ReleaseName:     v["release_name"],
-		InfoHash:        model.InfoHashFromString(v["info_hash"]),
-		TotalCompleted:  util.StringToInt16(v["total_completed"], 0),
-		TotalUploaded:   util.StringToUInt32(v["total_uploaded"], 0),
-		TotalDownloaded: util.StringToUInt32(v["total_downloaded"], 0),
-		IsDeleted:       util.StringToBool(v["is_deleted"], false),
-		IsEnabled:       util.StringToBool(v["is_enabled"], false),
-		Reason:          v["reason"],
-		MultiUp:         util.StringToFloat64(v["multi_up"], 1.0),
-		MultiDn:         util.StringToFloat64(v["multi_dn"], 1.0),
-	}
-	return t, nil
+	t.ReleaseName = v["release_name"]
+	t.InfoHash = model.InfoHashFromString(v["info_hash"])
+	t.TotalCompleted = util.StringToInt16(v["total_completed"], 0)
+	t.TotalUploaded = util.StringToUInt32(v["total_uploaded"], 0)
+	t.TotalDownloaded = util.StringToUInt32(v["total_downloaded"], 0)
+	t.IsDeleted = util.StringToBool(v["is_deleted"], false)
+	t.IsEnabled = util.StringToBool(v["is_enabled"], false)
+	t.Reason = v["reason"]
+	t.MultiUp = util.StringToFloat64(v["multi_up"], 1.0)
+	t.MultiDn = util.StringToFloat64(v["multi_dn"], 1.0)
+
+	return nil
 }
 
 // Close will close the underlying redis client and clear the caches
@@ -243,6 +244,10 @@ func (ts *TorrentStore) Close() error {
 // PeerStore is the redis backed store.PeerStore implementation
 type PeerStore struct {
 	client *redis.Client
+}
+
+func (ps *PeerStore) Reap() {
+	panic("implement me")
 }
 
 // Add inserts a peer into the active swarm for the torrent provided
@@ -301,22 +306,21 @@ func (ps *PeerStore) Update(ih model.InfoHash, p model.Peer) error {
 }
 
 // Delete will remove a user from a torrents swarm
-func (ps *PeerStore) Delete(ih model.InfoHash, p model.Peer) error {
-	return ps.client.Del(peerKey(ih, p.PeerID)).Err()
+func (ps *PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
+	return ps.client.Del(peerKey(ih, p)).Err()
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps *PeerStore) Get(ih model.InfoHash, peerID model.PeerID) (model.Peer, error) {
-	var p model.Peer
+func (ps *PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) error {
 	v, err := ps.client.HGetAll(peerKey(ih, peerID)).Result()
 	if err != nil {
-		return p, err
+		return err
 	}
-	mapPeerValues(&p, v)
+	mapPeerValues(p, v)
 	if !p.Valid() {
-		return p, consts.ErrInvalidState
+		return consts.ErrInvalidState
 	}
-	return p, nil
+	return nil
 }
 
 func mapPeerValues(p *model.Peer, v map[string]string) {

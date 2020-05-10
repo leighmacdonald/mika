@@ -42,6 +42,7 @@ func infoHashFromCtx(c *gin.Context) (model.InfoHash, bool) {
 	}
 	return model.InfoHashFromString(ihStr), true
 }
+
 func (a *AdminAPI) torrentDelete(c *gin.Context) {
 	ih, ok := infoHashFromCtx(c)
 	if !ok {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	h "github.com/leighmacdonald/mika/http"
+	"github.com/leighmacdonald/mika/model"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +27,10 @@ func New(host string) *Client {
 
 func (c *Client) u(path string) string {
 	return fmt.Sprintf("http://%s%s", c.host, path)
+}
+
+func (c *Client) TorrentDelete(ih model.InfoHash) error {
+
 }
 
 func (c *Client) Ping() error {

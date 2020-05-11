@@ -95,13 +95,13 @@ func (s *TorrentStore) Add(t model.Torrent) error {
 func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
-		_, err := s.db.Exec(dropQ, ih.String())
+		_, err := s.db.Exec(dropQ, ih.Bytes())
 		if err != nil {
 			return err
 		}
 	} else {
 		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = ?`
-		_, err := s.db.NamedExec(updateQ, ih.String())
+		_, err := s.db.NamedExec(updateQ, ih.Bytes())
 		if err != nil {
 			return err
 		}

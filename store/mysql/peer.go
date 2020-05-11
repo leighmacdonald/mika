@@ -17,7 +17,17 @@ type PeerStore struct {
 }
 
 func (ps *PeerStore) Reap() {
-	log.Debugf("Implemented mysql peer reaper")
+	const q = `DELETE FROM peers WHERE announce_last <= (NOW() - INTERVAL 15 MINUTE)`
+	rows, err := ps.db.Exec(q)
+	if err != nil {
+		log.Errorf("Failed to reap peers: %s", err.Error())
+		return
+	}
+	count, err := rows.RowsAffected()
+	if err != nil {
+		log.Errorf("Failed to get reap count: %s", err.Error())
+	}
+	log.Debugf("Reaped %d peers", count)
 }
 
 // Close will close the underlying database connection

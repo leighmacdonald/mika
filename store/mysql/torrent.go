@@ -12,6 +12,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -24,7 +25,8 @@ type TorrentStore struct {
 }
 
 func (s *TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
-	panic("implement me")
+	log.Debug("UpdateState not implemented")
+	return
 }
 
 // Conn returns the underlying database driver
@@ -93,13 +95,13 @@ func (s *TorrentStore) Add(t model.Torrent) error {
 func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
-		_, err := s.db.Exec(dropQ, ih.Bytes())
+		_, err := s.db.Exec(dropQ, ih.String())
 		if err != nil {
 			return err
 		}
 	} else {
 		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = ?`
-		_, err := s.db.NamedExec(updateQ, ih.Bytes())
+		_, err := s.db.NamedExec(updateQ, ih.String())
 		if err != nil {
 			return err
 		}

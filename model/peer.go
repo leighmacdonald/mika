@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
@@ -20,14 +21,21 @@ func PeerIDFromString(s string) PeerID {
 	return buf
 }
 
+func (p *PeerID) Value() (driver.Value, error) {
+	return p.Bytes(), nil
+}
+
 // Scan implements the sql Scanner interface for conversion to our custom type
 func (p *PeerID) Scan(v interface{}) error {
 	// Should be more strictly to check this type.
 	vt, ok := v.([]byte)
 	if !ok {
-		return errors.New("failed to convert value to infohash")
+		return errors.New("failed to convert value to peer_id")
 	}
-	copy(p[:], vt)
+	cnt := copy(p[:], vt)
+	if cnt != 20 {
+		return errors.New(fmt.Sprintf("invalid data length received: %d, expected 20", cnt))
+	}
 	return nil
 }
 
@@ -72,9 +80,9 @@ type Peer struct {
 	// Total number of announces the peer has made
 	Announces uint32 `db:"total_announces" redis:"total_announces" json:"total_announces"`
 	// Last announce timestamp
-	AnnounceLast time.Time `redis:"last_announce" json:"last_announce"`
+	AnnounceLast time.Time `db:"announce_last" redis:"announce_last" json:"announce_last"`
 	// First announce timestamp
-	AnnounceFirst time.Time `redis:"first_announce" json:"first_announce"`
+	AnnounceFirst time.Time `db:"announce_first" redis:"announce_first" json:"announce_first"`
 	// Peer id, reported by client. Must have white-listed prefix
 	PeerID   PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
 	InfoHash InfoHash    `db:"info_hash" redis:"info_hash" json:"info_hash"`

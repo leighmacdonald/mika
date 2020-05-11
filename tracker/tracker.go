@@ -75,6 +75,7 @@ func (t *Tracker) StatWorker() {
 }
 
 // New creates a new Tracker instance with configured backend stores
+// TODO pass these in as deps
 func New(ctx context.Context) (*Tracker, error) {
 	var err error
 	runMode := viper.GetString(string(config.GeneralRunMode))

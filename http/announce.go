@@ -148,10 +148,11 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	if err != nil {
 		return nil, msgMalformedRequest
 	}
-	infoHash, exists := q.Params[paramInfoHash]
-	if !exists {
+	infoHashStr, ihExists := q.Params[paramInfoHash]
+	if !ihExists {
 		return nil, msgInvalidInfoHash
 	}
+	infoHash := model.InfoHashFromString(infoHashStr)
 	peerID, exists := q.Params[paramPeerID]
 	if !exists {
 		return nil, msgInvalidPeerID
@@ -163,7 +164,8 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	}
 	if util.IsPrivateIP(ipv4) {
 		log.Warnf("Attempt to use non-routable IP value: %s", ipv4.String())
-		return nil, msgMalformedRequest
+		// TODO make this configurable
+		// return nil, msgMalformedRequest
 	}
 	port := getUint16Key(q, paramPort, 0)
 	if port < 1024 || port > 65535 {
@@ -182,7 +184,7 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 		Downloaded: downloaded,
 		Event:      event,
 		IP:         ipv4,
-		InfoHash:   model.InfoHashFromString(infoHash),
+		InfoHash:   infoHash,
 		Left:       left,
 		NumWant:    numWant,
 		PeerID:     model.PeerIDFromString(peerID),
@@ -233,6 +235,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 			oops(c, msgGenericError)
 			return
 		}
+	} else {
+		peer.AnnounceLast = time.Now()
 	}
 	h.tracker.StateUpdateChan <- model.UpdateState{
 		InfoHash:   tor.InfoHash,

@@ -3,6 +3,7 @@
 package geo
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/oschwald/maxminddb-golang"
@@ -12,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -41,9 +43,38 @@ type LatLong struct {
 	Longitude float64 `maxminddb:"longitude"`
 }
 
+func (ll *LatLong) Value() (driver.Value, error) {
+	return fmt.Sprintf("POINT(%s)", ll.String()), nil
+}
+
+// Scan implements the sql Scanner interface for conversion to our custom type
+func (ll *LatLong) Scan(v interface{}) error {
+	// Should be more strictly to check this type.
+	llStrB, ok := v.([]byte)
+	if !ok {
+		return errors.New("failed to convert value to string")
+	}
+	llStr := string(llStrB)
+	pcs := strings.Split(strings.Split(strings.Replace(llStr, ")", "", 1), "(")[1], " ")
+	if len(pcs) != 2 {
+		return errors.New("Failed to parse location")
+	}
+	lon, err := strconv.ParseFloat(pcs[0], 64)
+	if err != nil {
+		return errors.New("Failed to parse longitude")
+	}
+	lat, err2 := strconv.ParseFloat(pcs[1], 64)
+	if err2 != nil {
+		return errors.New("Failed to parse latitude")
+	}
+	ll.Longitude = lon
+	ll.Latitude = lat
+	return nil
+}
+
 // String returns a comma separated lat long pair string
 func (ll LatLong) String() string {
-	return fmt.Sprintf("%f,%f", ll.Latitude, ll.Longitude)
+	return fmt.Sprintf("%f %f", ll.Latitude, ll.Longitude)
 }
 
 // LatLongFromString will return a LatLong from a string formatted like N,-N

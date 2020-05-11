@@ -20,8 +20,6 @@ var clientCmd = &cobra.Command{
 	Short:   "CLI to administer a running instance",
 	Long:    `CLI to administer a running instance`,
 	Aliases: []string{"c"},
-	//Run: func(cmd *cobra.Command, args []string) {
-	//},
 }
 
 func newClient() *client.Client {
@@ -85,7 +83,11 @@ var torrentAddCmd = &cobra.Command{
 			return errors.New("requires at least 1 info_hash")
 		}
 		for _, ih := range args {
-			if len(ih) != 40 {
+			p := strings.SplitN(ih, ":", 2)
+			if len(p) != 2 {
+				log.Fatalf(`Invalid format. Expected: <info_hash>:"release name"`)
+			}
+			if len(p[0]) != 40 {
 				return fmt.Errorf("invalid info_hash: %s", ih)
 			}
 		}
@@ -94,12 +96,12 @@ var torrentAddCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		c := newClient()
 		for _, hashString := range args {
-			p := strings.Split(hashString, ":")
+			p := strings.SplitN(hashString, ":", 2)
 			if len(p) != 2 {
 				log.Fatalf(`Invalid format. Expected: <info_hash>:"release name"`)
 			}
 			if err := c.TorrentAdd(model.InfoHashFromString(p[0]), p[1]); err != nil {
-				log.Fatalf("Err trying to delete %s: %s", hashString, err.Error())
+				log.Fatalf("Error trying to add %s: %s", hashString, err.Error())
 			}
 		}
 	},

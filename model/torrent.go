@@ -2,9 +2,11 @@ package model
 
 import (
 	"database/sql/driver"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
+	"log"
 	"strings"
 )
 
@@ -44,6 +46,8 @@ func (ih *InfoHash) Bytes() []byte {
 
 // String implements fmt.Stringer, returning the base16 encoded PeerID.
 func (ih *InfoHash) String() string {
+	hv := hex.EncodeToString(ih[:])
+	log.Println(hv)
 	return fmt.Sprintf("%x", ih[:])
 }
 

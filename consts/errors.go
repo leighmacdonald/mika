@@ -10,7 +10,7 @@ var (
 	// ErrDuplicate duplicate entry error
 	ErrDuplicate = errors.New("Duplicate entry")
 	// ErrInvalidInfoHash returned to clients on unknown hash
-	ErrInvalidInfoHash = errors.New("Info hash not supplied")
+	ErrInvalidInfoHash = errors.New("Info hash invalid")
 	// ErrInvalidTorrentID failure to find mapped torrent_id
 	ErrInvalidTorrentID = errors.New("Invalid torrent_id")
 	// ErrInvalidPeerID failure to find a peer by peer_id

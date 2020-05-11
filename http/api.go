@@ -164,7 +164,7 @@ func (a *AdminAPI) userAdd(c *gin.Context) {
 		return
 	}
 	user.DownloadEnabled = true
-	if req.Passkey != "" {
+	if req.Passkey == "" {
 		user.Passkey = util.NewPasskey()
 	} else {
 		user.Passkey = req.Passkey

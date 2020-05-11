@@ -102,11 +102,7 @@ func (c *Client) UserAdd(passkey string) error {
 		return sr
 	}
 	var uar h.UserAddResponse
-	if err := json.Unmarshal(b, &uar); err != nil {
-		return err
-	}
-	log.Debugf("User added successfully w/passkey: %s", uar.Passkey)
-	return nil
+	return json.Unmarshal(b, &uar)
 }
 
 func (c *Client) Ping() error {

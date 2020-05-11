@@ -6,8 +6,9 @@ import (
 	"github.com/leighmacdonald/mika/client"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/util"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"log"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,9 +16,10 @@ import (
 
 // clientCmd represents the client command
 var clientCmd = &cobra.Command{
-	Use:   "client",
-	Short: "CLI to administer a running instance",
-	Long:  `CLI to administer a running instance`,
+	Use:     "client",
+	Short:   "CLI to administer a running instance",
+	Long:    `CLI to administer a running instance`,
+	Aliases: []string{"c"},
 	//Run: func(cmd *cobra.Command, args []string) {
 	//},
 }
@@ -103,10 +105,60 @@ var torrentAddCmd = &cobra.Command{
 	},
 }
 
+// torrentCmd represents the base client torrent command set
+var userCmd = &cobra.Command{
+	Use:     "user",
+	Aliases: []string{"u"},
+	Short:   "User administration related operations",
+	Long:    "User administration related operations",
+}
+
+var userAddCmd = &cobra.Command{
+	Use:     "add",
+	Aliases: []string{"a"},
+	Short:   "Add a user to the tracker & store",
+	Args:    cobra.MaximumNArgs(1),
+	Long:    "Add a user to the tracker & store",
+	Run: func(cmd *cobra.Command, args []string) {
+		c := newClient()
+		passkey := cmd.Flag("passkey").Value.String()
+		if passkey == "" {
+			passkey = util.NewPasskey()
+		}
+		if err := c.UserAdd(passkey); err != nil {
+			log.Errorf("Error adding user: %s", err.Error())
+		}
+		log.Infof("Added user with passkey: %s", passkey)
+	},
+}
+
+var userDeleteCmd = &cobra.Command{
+	Use:     "delete",
+	Aliases: []string{"del", "d"},
+	Short:   "Delete a user from the tracker & store",
+	Long:    "Delete a user from the tracker & store",
+	//Args:    cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		passkey := cmd.Flag("passkey").Value.String()
+		if passkey == "" {
+			log.Fatalf("Invalid passkey")
+		}
+		if err := newClient().UserDelete(passkey); err != nil {
+			log.Errorf("Failed to remove user: %s", err.Error())
+		}
+	},
+}
+
 func init() {
+	userAddCmd.PersistentFlags().StringP("passkey", "p", "", "User Passkey")
+	userDeleteCmd.PersistentFlags().StringP("passkey", "p", "", "User Passkey")
+
 	torrentCmd.AddCommand(torrentAddCmd)
 	torrentCmd.AddCommand(torrentDeleteCmd)
+	userCmd.AddCommand(userAddCmd)
+	userCmd.AddCommand(userDeleteCmd)
 	clientCmd.AddCommand(pingCmd)
 	clientCmd.AddCommand(torrentCmd)
+	clientCmd.AddCommand(userCmd)
 	rootCmd.AddCommand(clientCmd)
 }

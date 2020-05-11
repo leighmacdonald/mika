@@ -3,21 +3,23 @@ package cmd
 import (
 	"fmt"
 	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
 )
 
-var cfgFile string
+var (
+	cfgFile string
+)
 
 // rootCmd represents the base command when called without any subcommands
+// TODO remove build time for easier reproducible builds?
 var rootCmd = &cobra.Command{
-	Use:   "mika",
-	Short: "",
-	Long:  ``,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
+	Use:     "mika",
+	Short:   "",
+	Long:    ``,
+	Version: fmt.Sprintf("mika (git:%s) (date:%s)", consts.BuildVersion, consts.BuildTime),
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

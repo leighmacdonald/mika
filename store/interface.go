@@ -81,6 +81,7 @@ type UserStore interface {
 	Delete(user model.User) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
+	Sync(b map[string]model.UserStats) error
 }
 
 // TorrentStore defines where we can store permanent torrent data
@@ -101,10 +102,9 @@ type TorrentStore interface {
 	WhiteListAdd(client model.WhiteListClient) error
 	// WhiteListGetAll fetches all known whitelisted clients
 	WhiteListGetAll() ([]model.WhiteListClient, error)
+	Sync(b map[model.InfoHash]model.TorrentStats) error
 	// Conn returns the underlying connection, if any
 	Conn() interface{}
-
-	UpdateState(ih model.InfoHash, state model.TorrentStats)
 }
 
 // PeerStore defines our interface for storing peer data
@@ -125,6 +125,7 @@ type PeerStore interface {
 	Close() error
 	// Reap will loop through the peers removing any stale entries from active swarms
 	Reap()
+	Sync(b map[model.PeerHash]model.PeerStats) error
 }
 
 // NewTorrentStore will attempt to initialize a TorrentStore using the driver name provided

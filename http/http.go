@@ -129,16 +129,15 @@ func oops(ctx *gin.Context, errCode trackerErrCode) {
 	if !exists {
 		msg = responseStringMap[msgGenericError]
 	}
-	ctx.String(int(errCode), responseError(msg.Error()))
+	ctx.Data(int(errCode), gin.MIMEPlain, responseError(msg.Error()))
 	log.Errorf("Error in request from: %s (%d)", ctx.Request.RequestURI, errCode)
 }
 
 // preFlightChecks ensures our user meets the requirements to make an authorized request
 // THis is used within the request handler itself and not as a middleware because of the
 // slightly higher cost of passing data in through the request context
-func preFlightChecks(usr *model.User, c *gin.Context, t *tracker.Tracker) bool {
+func preFlightChecks(usr *model.User, pk string, c *gin.Context, t *tracker.Tracker) bool {
 	// Check that the user is valid before parsing anything
-	pk := c.Param("passkey")
 	if pk == "" {
 		oops(c, msgInvalidAuth)
 		return false
@@ -175,15 +174,14 @@ func handleTrackerErrors(ctx *gin.Context) {
 //
 // Note that this function does not generate or support a warning reason, which are rarely if
 // ever used.
-func responseError(message string) string {
+func responseError(message string) []byte {
 	var buf bytes.Buffer
-	encoder := bencode.NewEncoder(&buf)
-	if err := encoder.Encode(bencode.Dict{
+	if err := bencode.NewEncoder(&buf).Encode(bencode.Dict{
 		"failure reason": message,
 	}); err != nil {
 		log.Errorf("Failed to encode error response: %s", err)
 	}
-	return buf.String()
+	return buf.Bytes()
 }
 
 // newRouter creates and returns a newly configured router instance using

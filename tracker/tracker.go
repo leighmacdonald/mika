@@ -19,23 +19,36 @@ import (
 
 // Tracker is the main application struct used to tie all the discreet components together
 type Tracker struct {
-	ctx               context.Context
-	Torrents          store.TorrentStore
-	Peers             store.PeerStore
-	Users             store.UserStore
-	Geodb             *geo.DB
-	AnnInterval       int
-	AnnIntervalMin    int
-	MaxPeers          int
-	StateUpdateChan   chan model.UpdateState
-	TorrentUpdateChan chan model.TorrentStats
+	// ctx is the master context used in the tracker, children contexts must use
+	// this for their parent
+	ctx      context.Context
+	Torrents store.TorrentStore
+	Peers    store.PeerStore
+	Users    store.UserStore
+	Geodb    *geo.DB
+	// GeodbEnabled will enable the lookup of location data for peers
+	GeodbEnabled bool
+	// Public if true means we dont require a passkey / authorized user
+	Public bool
+	// If Public is true, this will allow unknown info_hashes to be automatically tracked
+	AutoRegister bool
+	// ReaperInterval is how often we can for dead peers in swarms
+	ReaperInterval time.Duration
+	AnnInterval    time.Duration
+	AnnIntervalMin time.Duration
+	BatchInterval  time.Duration
+	// MaxPeers is the max number of peers we send in an announce
+	MaxPeers        int
+	StateUpdateChan chan model.UpdateState
 	// Whitelist and whitelist lock
 	WhitelistMutex *sync.RWMutex
 	Whitelist      map[string]model.WhiteListClient
 }
 
+// PeerReaper will call the store.PeerStore.Reap() function periodically. This is
+// used to clean peers that have not announced in a while from the swarm.
 func (t *Tracker) PeerReaper() {
-	peerTicker := time.NewTicker(30 * time.Second)
+	peerTicker := time.NewTicker(t.ReaperInterval)
 	for {
 		select {
 		case <-peerTicker.C:
@@ -44,30 +57,107 @@ func (t *Tracker) PeerReaper() {
 			return
 		}
 	}
-
 }
 
+// StatWorker handles summing up stats for users/peers/torrents to be sent to the
+// backing stores for long term storage.
+// No locking required for these data sets
 func (t *Tracker) StatWorker() {
+	syncTicker := time.NewTicker(t.BatchInterval)
+	userBatch := make(map[string]model.UserStats)
+	peerBatch := make(map[model.PeerHash]model.PeerStats)
+	torrentBatch := make(map[model.InfoHash]model.TorrentStats)
 	for {
 		select {
+		case <-syncTicker.C:
+			// Copy the maps to pass into the go routine call. At the same time deleting
+			// the existing values
+			userBatchCopy := make(map[string]model.UserStats)
+			for k, v := range userBatch {
+				userBatchCopy[k] = v
+				delete(userBatch, k)
+			}
+			peerBatchCopy := make(map[model.PeerHash]model.PeerStats)
+			for k, v := range peerBatch {
+				peerBatchCopy[k] = v
+				delete(peerBatch, k)
+			}
+			torrentBatchCopy := make(map[model.InfoHash]model.TorrentStats)
+			for k, v := range torrentBatch {
+				torrentBatchCopy[k] = v
+				delete(torrentBatch, k)
+			}
+			// TODO make sure we dont exec this more than once at a time
+			go func() {
+				// Send current copies of data to stores
+				if err := t.Users.Sync(userBatchCopy); err != nil {
+					log.Errorf(err.Error())
+				}
+				if err := t.Peers.Sync(peerBatchCopy); err != nil {
+					log.Errorf(err.Error())
+				}
+				if err := t.Torrents.Sync(torrentBatchCopy); err != nil {
+					log.Errorf(err.Error())
+				}
+			}()
 		case u := <-t.StateUpdateChan:
-			switch u.Event {
+			ub, found := userBatch[u.Passkey]
+			if !found {
+				ub = model.UserStats{}
+			}
+			tb, found := torrentBatch[u.InfoHash]
+			if !found {
+				tb = model.TorrentStats{}
+			}
+			pHash := model.NewPeerHash(u.InfoHash, u.PeerID)
+			pb, found := peerBatch[pHash]
+			if !found {
+				pb = model.PeerStats{}
+			}
+			// Global user stats
+			ub.Uploaded += u.Uploaded
+			ub.Downloaded += u.Downloaded
+			ub.Announces++
 
+			// Peer stats
+			pb.Downloaded += u.Downloaded
+			pb.Uploaded += u.Uploaded
+			pb.LastAnnounce = u.Timestamp
+			pb.Announces++
+
+			// Global torrent stats
+			tb.Announces++
+			tb.Uploaded += u.Uploaded
+			tb.Downloaded += u.Downloaded
+
+			switch u.Event {
+			case consts.ANNOUNCE:
+
+			case consts.STARTED:
+				if u.Left == 0 {
+					tb.Seeders++
+				} else {
+					tb.Leechers++
+				}
 			case consts.COMPLETED:
 				// TODO does a complete event get sent for a torrent when the user only downloads a specific file from the torrent
 				// Do we force left=0 for this? Or trust the client?
-				//tor.TotalCompleted++
+				tb.Snatches++
+				tb.Seeders++
+				tb.Leechers--
 			case consts.STOPPED:
+				if u.Left > 0 {
+					tb.Leechers--
+				} else {
+					tb.Seeders--
+				}
 				if err := t.Peers.Delete(u.InfoHash, u.PeerID); err != nil {
 					log.Errorf("Could not remove peer from swarm: %s", err.Error())
 				}
 			}
-			t.Torrents.UpdateState(u.InfoHash, model.TorrentStats{
-				Seeders:  0,
-				Leechers: 0,
-				Snatches: 0,
-				Event:    u.Event,
-			})
+			userBatch[u.Passkey] = ub
+			torrentBatch[u.InfoHash] = tb
+			peerBatch[pHash] = pb
 		case <-t.ctx.Done():
 			return
 		}
@@ -77,7 +167,6 @@ func (t *Tracker) StatWorker() {
 // New creates a new Tracker instance with configured backend stores
 // TODO pass these in as deps
 func New(ctx context.Context) (*Tracker, error) {
-	var err error
 	runMode := viper.GetString(string(config.GeneralRunMode))
 	s, err := store.NewTorrentStore(
 		viper.GetString(string(config.StoreTorrentType)),
@@ -107,18 +196,19 @@ func New(ctx context.Context) (*Tracker, error) {
 		}
 	}
 	return &Tracker{
-		ctx:               ctx,
-		StateUpdateChan:   make(chan model.UpdateState),
-		TorrentUpdateChan: make(chan model.TorrentStats),
-		Torrents:          s,
-		Peers:             p,
-		Users:             u,
-		Geodb:             geodb,
-		Whitelist:         whitelist,
-		WhitelistMutex:    &sync.RWMutex{},
-		MaxPeers:          50,
-		AnnInterval:       viper.GetInt(string(config.TrackerAnnounceInterval)),
-		AnnIntervalMin:    viper.GetInt(string(config.TrackerAnnounceIntervalMin)),
+		ctx:             ctx,
+		StateUpdateChan: make(chan model.UpdateState, 1000),
+		Torrents:        s,
+		Peers:           p,
+		Users:           u,
+		Geodb:           geodb,
+		GeodbEnabled:    viper.GetBool(string(config.GeodbEnabled)),
+		Whitelist:       whitelist,
+		WhitelistMutex:  &sync.RWMutex{},
+		MaxPeers:        50,
+		ReaperInterval:  viper.GetDuration(string(config.TrackerReaperInterval)),
+		AnnInterval:     viper.GetDuration(string(config.TrackerAnnounceInterval)),
+		AnnIntervalMin:  viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
 	}, nil
 }
 
@@ -185,10 +275,12 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 		Peers:          ps,
 		Users:          us,
 		Geodb:          geo.New(viper.GetString(string(config.GeodbPath)), false),
+		GeodbEnabled:   viper.GetBool(string(config.GeodbEnabled)),
 		WhitelistMutex: &sync.RWMutex{},
 		Whitelist:      wlm,
 		MaxPeers:       50,
-		AnnInterval:    viper.GetInt(string(config.TrackerAnnounceInterval)),
-		AnnIntervalMin: viper.GetInt(string(config.TrackerAnnounceIntervalMin)),
+		ReaperInterval: viper.GetDuration(string(config.TrackerReaperInterval)),
+		AnnInterval:    viper.GetDuration(string(config.TrackerAnnounceInterval)),
+		AnnIntervalMin: viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
 	}, torrents, users, peers
 }

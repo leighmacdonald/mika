@@ -9,6 +9,7 @@ import (
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	"net/http"
+	"time"
 )
 
 // StatusResp is a generic response struct used when simple responses are all that
@@ -189,9 +190,19 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 		// TODO lock tracker
 		switch k {
 		case config.TrackerAnnounceInterval:
-			a.t.AnnInterval = v.(int)
+			d, err := time.ParseDuration(v.(string))
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Announce interval invalid format"})
+				return
+			}
+			a.t.AnnInterval = d
 		case config.TrackerAnnounceIntervalMin:
-			a.t.AnnIntervalMin = v.(int)
+			d, err := time.ParseDuration(v.(string))
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Announce interval min invalid format"})
+				return
+			}
+			a.t.AnnIntervalMin = d
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{})

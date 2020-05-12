@@ -54,6 +54,10 @@ const (
 	// TrackerIPv6Only disables ipv4 peers
 	// true|false
 	TrackerIPv6Only Key = "tracker_ipv6_only"
+	// TrackerReaperInterval defines how often we do a sweep of active swarms looking for stale
+	// peers that can be removed.
+	// 60s|1m
+	TrackerReaperInterval Key = "tracker_reaper_interval"
 	// TrackerAnnounceInterval defines how often peers should announce. The lower this is
 	// the more load on your system you can expect
 	// 60s|1m
@@ -61,16 +65,11 @@ const (
 	// TrackerAnnounceIntervalMin is the minimum interval a client is allowed
 	// 60s|1m
 	TrackerAnnounceIntervalMin Key = "tracker_announce_interval_minimum"
-	// TrackerReapInterval defines how often we do a sweep of active swarms looking for stale
-	// peers that can be removed.
-	// 60s|1m
-	TrackerReapInterval Key = "tracker_reap_internal"
 	// TrackerHNRThreshold is how much time must pass before we mark a peer as Hit-N-Run
 	// 1d|12h|60m
 	TrackerHNRThreshold Key = "tracker_hnr_threshold"
-	// TrackerIndexInterval is the amount of time between updating the torrent stats
-	// 60s|1m
-	TrackerIndexInterval Key = "tracker_index_interval"
+	// TrackerBatchUpdateInterval defines how often we sync user stats to the back store
+	TrackerBatchUpdateInterval Key = "tracker_batch_update_interval"
 
 	// APIListen sets the host and port that the admin API should bind to
 	// localhost:34001

@@ -139,7 +139,7 @@ func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
 		AnnounceLast:  time.Now(),
 		AnnounceFirst: time.Now(),
 		PeerID:        peerID,
-		Location:      geo.LatLong{Latitude: 50, Longitude: -114},
+		Location:      geo.LatLong{Latitude: 0, Longitude: 0},
 		UserID:        userID,
 		User:          nil,
 	}
@@ -148,6 +148,7 @@ func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
 type UpdateState struct {
 	InfoHash InfoHash
 	PeerID   PeerID
+	Passkey  string
 	// Total amount uploaded as reported by client
 	Uploaded uint32
 	// Total amount downloaded as reported by client

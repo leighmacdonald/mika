@@ -8,7 +8,19 @@ import (
 	"github.com/leighmacdonald/mika/consts"
 	"log"
 	"strings"
+	"time"
 )
+
+// PeerHash is a merge of the infohash and peer_id, used for simpler map operations
+type PeerHash [40]byte
+
+// NewPeerHash created a new PeerHash from the existing infohash and peer_id
+func NewPeerHash(ih InfoHash, pid PeerID) PeerHash {
+	var buf [40]byte
+	copy(buf[0:20], ih.Bytes())
+	copy(buf[20:], pid.Bytes())
+	return buf
+}
 
 // InfoHash is a unique 20byte identifier for a torrent
 type InfoHash [20]byte
@@ -81,10 +93,26 @@ type Torrent struct {
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats
 // from peer info as well as the normal torrent stats.
 type TorrentStats struct {
-	Seeders  int `json:"seeders"`
-	Leechers int `json:"leechers"`
-	Snatches int `json:"snatches"`
-	Event    consts.AnnounceType
+	Seeders    int `json:"seeders"`
+	Leechers   int `json:"leechers"`
+	Snatches   int `json:"snatches"`
+	Uploaded   uint32
+	Downloaded uint32
+	Event      consts.AnnounceType
+	Announces  uint64
+}
+
+type UserStats struct {
+	Uploaded   uint32
+	Downloaded uint32
+	Announces  uint64
+}
+
+type PeerStats struct {
+	Uploaded     uint32
+	Downloaded   uint32
+	LastAnnounce time.Time
+	Announces    uint64
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all

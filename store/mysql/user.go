@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
@@ -17,6 +18,38 @@ type UserStore struct {
 	db      *sqlx.DB
 	users   map[string]model.User
 	usersMx sync.RWMutex
+}
+
+func (u *UserStore) Sync(b map[string]model.UserStats) error {
+	const q = `
+		UPDATE 
+			users 
+		SET 
+		    announces = (announces + ?), 
+		    uploaded = (uploaded + ?),
+		    downloaded = (downloaded + ?)
+		WHERE
+			passkey = ?`
+	// TODO use ctx for timeout
+	ctx := context.Background()
+	tx, err := u.db.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "Failed to being user Sync() tx")
+	}
+	stmt, err := tx.Prepare(q)
+	if err != nil {
+		return errors.Wrap(err, "Failed to prepare user Sync() tx")
+	}
+	for passkey, stats := range b {
+		_, err := stmt.Exec(stats.Announces, stats.Uploaded, stats.Downloaded, passkey)
+		if err != nil {
+			return errors.Wrap(err, "Failed to exec user Sync() tx")
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "Failed to commit user Sync() tx")
+	}
+	return nil
 }
 
 // Add will add a new user to the backing store

@@ -199,8 +199,9 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 // There is no reason to support the older less efficient model for private needs
 func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// Check that the user is valid before parsing anything
+	pk := c.Param("passkey")
 	var usr model.User
-	if valid := preFlightChecks(&usr, c, h.tracker); !valid {
+	if valid := preFlightChecks(&usr, pk, c, h.tracker); !valid {
 		oops(c, msgInvalidAuth)
 		return
 	}
@@ -222,7 +223,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	//
 	// TODO send this as a "warning message" field of a normal announce response instead?
 	if !tor.IsEnabled && tor.Reason != "" {
-		c.String(int(msgInvalidInfoHash), responseError(tor.Reason))
+		c.Data(int(msgInvalidInfoHash), gin.MIMEPlain, responseError(tor.Reason))
 		return
 	}
 	var peer model.Peer
@@ -235,10 +236,16 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 			oops(c, msgGenericError)
 			return
 		}
+		if h.tracker.GeodbEnabled {
+			peer.Location = h.tracker.Geodb.GetLocation(peer.IP).Location
+		}
 	} else {
 		peer.AnnounceLast = time.Now()
 	}
+	// Send state to another go channel for updating outside of the announce request
+	// so that we can respond asap
 	h.tracker.StateUpdateChan <- model.UpdateState{
+		Passkey:    pk,
 		InfoHash:   tor.InfoHash,
 		PeerID:     peer.PeerID,
 		Uploaded:   req.Uploaded,
@@ -258,8 +265,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	dict := bencode.Dict{
 		"complete":     seeders,
 		"incomplete":   leechers,
-		"interval":     h.tracker.AnnInterval,
-		"min interval": h.tracker.AnnIntervalMin,
+		"interval":     int(h.tracker.AnnInterval.Seconds()),
+		"min interval": int(h.tracker.AnnIntervalMin.Seconds()),
 		"peers":        makeCompactPeers(peers, peer.PeerID),
 	}
 

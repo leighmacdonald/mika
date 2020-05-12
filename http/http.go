@@ -220,6 +220,9 @@ func NewAPIHandler(tkr *tracker.Tracker) *gin.Engine {
 	r.POST("/user", h.userAdd)
 	r.DELETE("/user/pk/:passkey", h.userDelete)
 
+	r.POST("/whitelist", h.whitelistAdd)
+	r.DELETE("/whitelist/:prefix", h.whitelistDelete)
+	r.GET("/whitelist", h.whitelistGet)
 	return r
 }
 

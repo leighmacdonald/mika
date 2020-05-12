@@ -37,6 +37,63 @@ type PingResponse struct {
 	Pong string `json:"pong"`
 }
 
+func (a *AdminAPI) whitelistAdd(c *gin.Context) {
+	var wcl model.WhiteListClient
+	if err := c.BindJSON(&wcl); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	if wcl.ClientPrefix == "" || wcl.ClientName == "" {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	if err := a.t.Torrents.WhiteListAdd(wcl); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+	}
+	a.t.WhitelistMutex.Lock()
+	a.t.Whitelist[wcl.ClientPrefix] = wcl
+	a.t.WhitelistMutex.Unlock()
+	c.JSON(http.StatusOK, nil)
+}
+
+func (a *AdminAPI) whitelistDelete(c *gin.Context) {
+	prefix := c.Param("prefix")
+	if prefix == "" {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	a.t.WhitelistMutex.RLock()
+	defer a.t.WhitelistMutex.RUnlock()
+	wlc := a.t.Whitelist[prefix]
+	if err := a.t.Torrents.WhiteListDelete(wlc); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	newWL := make(map[string]model.WhiteListClient)
+	wl, err := a.t.Torrents.WhiteListGetAll()
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	for _, w := range wl {
+		newWL[w.ClientPrefix] = w
+	}
+	a.t.WhitelistMutex.Lock()
+	a.t.Whitelist = newWL
+	a.t.WhitelistMutex.Unlock()
+	c.JSON(http.StatusOK, nil)
+}
+
+func (a *AdminAPI) whitelistGet(c *gin.Context) {
+	var wl []model.WhiteListClient
+	a.t.WhitelistMutex.RLock()
+	defer a.t.WhitelistMutex.RUnlock()
+	for _, c := range a.t.Whitelist {
+		wl = append(wl, c)
+	}
+	c.JSON(http.StatusOK, wl)
+}
+
 func (a *AdminAPI) ping(c *gin.Context) {
 	var r PingRequest
 	if err := c.BindJSON(&r); err != nil {
@@ -126,7 +183,7 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) userUpdate(c *gin.Context) {
+func (a *AdminAPI) userUpdate(_ *gin.Context) {
 
 }
 

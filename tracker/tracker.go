@@ -285,3 +285,12 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 		AnnIntervalMin: viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
 	}, torrents, users, peers
 }
+
+func (t *Tracker) Stats() GlobalStats {
+	var s GlobalStats
+
+	return s
+}
+
+type GlobalStats struct {
+}

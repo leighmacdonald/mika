@@ -24,9 +24,44 @@ type TorrentStore struct {
 	db *sqlx.DB
 }
 
-func (s *TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
-	log.Debug("UpdateState not implemented")
-	return
+func (s *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
+	const q = `
+		UPDATE 
+		    torrent
+		SET 
+			total_downloaded = (total_downloaded + ?),
+		    total_uploaded = (total_uploaded + ?),
+		    announces = (announces + ?),
+		    total_completed = (total_completed + ?)
+		WHERE
+			info_hash = ?
+		`
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "Failed to being torrent Sync() tx")
+	}
+	stmt, err := tx.Prepare(q)
+	if err != nil {
+		return errors.Wrap(err, "Failed to prepare torrent Sync() tx")
+	}
+	for ih, stats := range b {
+		_, err := stmt.Exec(
+			stats.Downloaded,
+			stats.Uploaded,
+			stats.Announces,
+			stats.Snatches,
+			ih.Bytes())
+		if err != nil {
+			if err := tx.Rollback(); err != nil {
+				log.Errorf("Failed to roll back torrent Sync() tx")
+			}
+			return errors.Wrap(err, "Failed to exec torrent Sync() tx")
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "Failed to commit torrent Sync() tx")
+	}
+	return nil
 }
 
 // Conn returns the underlying database driver

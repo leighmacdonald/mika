@@ -82,7 +82,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	p1.TotalTime = 5000
 	p1.Downloaded = 10000
 	p1.Uploaded = 10000
-	require.NoError(t, ps.Update(torrentA.InfoHash, p1))
+
 	updatedPeers, err2 := ps.GetN(torrentA.InfoHash, 5)
 	require.NoError(t, err2)
 	p1Updated, _ := findPeer(updatedPeers, p1)

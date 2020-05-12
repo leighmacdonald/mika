@@ -8,6 +8,9 @@ type User struct {
 	Passkey         string `db:"passkey" json:"passkey"`
 	IsDeleted       bool   `db:"is_deleted" json:"is_deleted"`
 	DownloadEnabled bool   `db:"download_enabled" json:"download_enabled"`
+	Downloaded      uint64
+	Uploaded        uint64
+	Announces       uint32
 }
 
 // Valid performs basic validation of the user info ensuring we have the minimum required

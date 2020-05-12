@@ -206,6 +206,7 @@ func New(ctx context.Context) (*Tracker, error) {
 		Whitelist:       whitelist,
 		WhitelistMutex:  &sync.RWMutex{},
 		MaxPeers:        50,
+		BatchInterval:   viper.GetDuration(string(config.TrackerBatchUpdateInterval)),
 		ReaperInterval:  viper.GetDuration(string(config.TrackerReaperInterval)),
 		AnnInterval:     viper.GetDuration(string(config.TrackerAnnounceInterval)),
 		AnnIntervalMin:  viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),

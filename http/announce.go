@@ -95,10 +95,8 @@ type announceRequest struct {
 type announceResponse struct {
 	//  (optional) Minimum announce interval. If present clients must not reannounce more frequently than this.
 	MinInterval int `bencode:"min interval"`
-
-	Complete int `bencode:"complete"`
-
-	Incomplete int `bencode:"incomplete"`
+	Complete    int `bencode:"complete"`
+	Incomplete  int `bencode:"incomplete"`
 	// Interval in seconds that the client should wait between sending regular requests to the tracker
 	Interval int    `bencode:"interval"`
 	Peers    string `bencode:"peers"`
@@ -248,8 +246,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		Passkey:    pk,
 		InfoHash:   tor.InfoHash,
 		PeerID:     peer.PeerID,
-		Uploaded:   req.Uploaded,
-		Downloaded: req.Downloaded,
+		Uploaded:   uint64(req.Uploaded),
+		Downloaded: uint64(req.Downloaded),
 		Left:       req.Left,
 		Event:      req.Event,
 		Timestamp:  time.Now(),

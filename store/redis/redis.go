@@ -58,6 +58,10 @@ type UserStore struct {
 	client *redis.Client
 }
 
+func (us UserStore) Sync(b map[string]model.UserStats) error {
+	panic("implement me")
+}
+
 // Add inserts a user into redis via at the string provided by the userKey function
 // This additionally sets the passkey->user_id mapping
 func (us UserStore) Add(u model.User) error {
@@ -123,7 +127,7 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
-func (ts *TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
+func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
 
@@ -224,9 +228,9 @@ func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	}
 	t.ReleaseName = v["release_name"]
 	t.InfoHash = model.InfoHashFromString(v["info_hash"])
-	t.TotalCompleted = util.StringToInt16(v["total_completed"], 0)
-	t.TotalUploaded = util.StringToUInt32(v["total_uploaded"], 0)
-	t.TotalDownloaded = util.StringToUInt32(v["total_downloaded"], 0)
+	t.TotalCompleted = util.StringToUInt16(v["total_completed"], 0)
+	t.TotalUploaded = util.StringToUInt64(v["total_uploaded"], 0)
+	t.TotalDownloaded = util.StringToUInt64(v["total_downloaded"], 0)
 	t.IsDeleted = util.StringToBool(v["is_deleted"], false)
 	t.IsEnabled = util.StringToBool(v["is_enabled"], false)
 	t.Reason = v["reason"]
@@ -244,6 +248,10 @@ func (ts *TorrentStore) Close() error {
 // PeerStore is the redis backed store.PeerStore implementation
 type PeerStore struct {
 	client *redis.Client
+}
+
+func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
+	panic("implement me")
 }
 
 func (ps *PeerStore) Reap() {
@@ -328,8 +336,8 @@ func mapPeerValues(p *model.Peer, v map[string]string) {
 	p.SpeedDN = util.StringToUInt32(v["speed_dn"], 0)
 	p.SpeedUPMax = util.StringToUInt32(v["speed_dn_max"], 0)
 	p.SpeedDNMax = util.StringToUInt32(v["speed_up_max"], 0)
-	p.Uploaded = util.StringToUInt32(v["total_uploaded"], 0)
-	p.Downloaded = util.StringToUInt32(v["total_downloaded"], 0)
+	p.Uploaded = util.StringToUInt64(v["total_uploaded"], 0)
+	p.Downloaded = util.StringToUInt64(v["total_downloaded"], 0)
 	p.Left = util.StringToUInt32(v["total_left"], 0)
 	p.Announces = util.StringToUInt32(v["total_announces"], 0)
 	p.TotalTime = util.StringToUInt32(v["total_time"], 0)

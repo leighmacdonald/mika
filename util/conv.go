@@ -36,6 +36,16 @@ func StringToUInt32(s string, def uint32) uint32 {
 	return uint32(v)
 }
 
+// StringToUInt64 converts a string to a uint32 returning a default value on failure
+func StringToUInt64(s string, def uint64) uint64 {
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		log.Warnf("failed to parse uint64 value from redis: %s", s)
+		return def
+	}
+	return uint64(v)
+}
+
 // StringToFloat64 converts a string to a float64 returning a default value on failure
 func StringToFloat64(s string, def float64) float64 {
 	v, err := strconv.ParseFloat(s, 64)

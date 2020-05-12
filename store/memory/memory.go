@@ -18,8 +18,22 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
-func (ts *TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
-	panic("implement me")
+func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
+	ts.Lock()
+	defer ts.Unlock()
+	for ih, stats := range b {
+		t, found := ts.torrents[ih]
+		if !found {
+			// Deleted torrent before sync occurred
+			continue
+		}
+		t.TotalUploaded += stats.Uploaded
+		t.TotalDownloaded += stats.Downloaded
+		t.TotalCompleted += stats.Snatches
+		ts.torrents[ih] = t
+
+	}
+	return nil
 }
 
 func (ts *TorrentStore) Conn() interface{} {
@@ -76,14 +90,43 @@ func (ts *TorrentStore) Get(torrent *model.Torrent, hash model.InfoHash) error {
 }
 
 // PeerStore is a memory backed store.PeerStore implementation
-// TODO shard peer storage
+// TODO shard peer storage?
 type PeerStore struct {
 	sync.RWMutex
 	peers map[model.InfoHash]model.Swarm
 }
 
+func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
+	ps.Lock()
+	defer ps.Unlock()
+	// TODO reduce the cyclic complexity of this
+	for ph, stats := range b {
+		ih := ph.InfoHash()
+		pid := ph.PeerID()
+		for idx, peer := range ps.peers[ih] {
+			if pid == peer.PeerID {
+				peer.Uploaded += stats.Uploaded
+				peer.Downloaded += stats.Downloaded
+				peer.Announces += stats.Announces
+				peer.AnnounceLast = stats.LastAnnounce
+				ps.peers[ih][idx] = peer
+				break
+			}
+		}
+	}
+	return nil
+}
+
 func (ps *PeerStore) Reap() {
-	panic("implement me")
+	ps.Lock()
+	defer ps.Unlock()
+	for _, swarm := range ps.peers {
+		for _, peer := range swarm {
+			if peer.Expired() {
+				swarm.Remove(peer.PeerID)
+			}
+		}
+	}
 }
 
 // Get will fetch the peer from the swarm if it exists
@@ -189,6 +232,23 @@ func (pd peerDriver) NewPeerStore(_ interface{}) (store.PeerStore, error) {
 type UserStore struct {
 	sync.RWMutex
 	users map[string]model.User
+}
+
+func (u *UserStore) Sync(b map[string]model.UserStats) error {
+	u.Lock()
+	defer u.Unlock()
+	for passkey, stats := range b {
+		user, found := u.users[passkey]
+		if !found {
+			// Deleted user
+			continue
+		}
+		user.Announces += stats.Announces
+		user.Downloaded += stats.Downloaded
+		user.Uploaded += stats.Uploaded
+		u.users[passkey] = user
+	}
+	return nil
 }
 
 // Add will add a new user to the backing store

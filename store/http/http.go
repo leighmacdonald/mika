@@ -42,7 +42,7 @@ type TorrentStore struct {
 	baseURL string
 }
 
-func (ts TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
+func (ts TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
 
@@ -161,6 +161,10 @@ type PeerStore struct {
 	baseURL string
 }
 
+func (ps PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
+	panic("implement me")
+}
+
 func (ps PeerStore) Reap() {
 	panic("implement me")
 }
@@ -263,6 +267,10 @@ func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 type UserStore struct {
 	client  *http.Client
 	baseURL string
+}
+
+func (u *UserStore) Sync(b map[string]model.UserStats) error {
+	panic("implement me")
 }
 
 // Add will add a new user to the backing store

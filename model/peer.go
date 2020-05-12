@@ -58,9 +58,9 @@ func (p PeerID) RawString() string {
 // Peer represents a single unique peer in a swarm
 type Peer struct {
 	// Total amount uploaded as reported by client
-	Uploaded uint32 `db:"total_uploaded" redis:"total_uploaded" json:"total_uploaded"`
+	Uploaded uint64 `db:"total_uploaded" redis:"total_uploaded" json:"total_uploaded"`
 	// Total amount downloaded as reported by client
-	Downloaded uint32 `db:"total_downloaded" redis:"total_downloaded" json:"total_downloaded"`
+	Downloaded uint64 `db:"total_downloaded" redis:"total_downloaded" json:"total_downloaded"`
 	// Clients reported bytes left of the download
 	Left uint32 `db:"total_left" redis:"total_left" json:"total_left"`
 	// Total active swarm participation time
@@ -93,6 +93,12 @@ type Peer struct {
 	//UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
 
 	User *User
+}
+
+// Expired checks if the peer last lost contact with us
+// TODO remove hard coded expiration time
+func (peer *Peer) Expired() bool {
+	return time.Now().Sub(peer.AnnounceLast).Seconds() > 300
 }
 
 // IsNew checks if the peer is making its first announce request
@@ -150,9 +156,9 @@ type UpdateState struct {
 	PeerID   PeerID
 	Passkey  string
 	// Total amount uploaded as reported by client
-	Uploaded uint32
+	Uploaded uint64
 	// Total amount downloaded as reported by client
-	Downloaded uint32
+	Downloaded uint64
 	// Clients reported bytes left of the download
 	Left uint32
 	// Timestamp is the time the new stats were announced

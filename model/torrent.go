@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/leighmacdonald/mika/consts"
 	"log"
 	"strings"
 	"time"
@@ -86,11 +85,11 @@ func (ih *InfoHash) RawString() string {
 type Torrent struct {
 	ReleaseName    string   `db:"release_name" redis:"release_name" json:"release_name"`
 	InfoHash       InfoHash `db:"info_hash" redis:"info_hash" json:"info_hash"`
-	TotalCompleted int16    `db:"total_completed" redis:"total_completed" json:"total_completed"`
+	TotalCompleted uint16   `db:"total_completed" redis:"total_completed" json:"total_completed"`
 	// This is stored as MB to reduce storage costs
-	TotalUploaded uint32 `db:"total_uploaded" redis:"total_uploaded" json:"total_uploaded"`
+	TotalUploaded uint64 `db:"total_uploaded" redis:"total_uploaded" json:"total_uploaded"`
 	// This is stored as MB to reduce storage costs
-	TotalDownloaded uint32 `db:"total_downloaded" redis:"total_downloaded" json:"total_downloaded"`
+	TotalDownloaded uint64 `db:"total_downloaded" redis:"total_downloaded" json:"total_downloaded"`
 	IsDeleted       bool   `db:"is_deleted" redis:"is_deleted" json:"is_deleted"`
 	// When you have a message to pass to a client set enabled = false and set the reason message.
 	// If IsDeleted is true, then nothing will be returned to the client
@@ -107,28 +106,27 @@ type Torrent struct {
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats
 // from peer info as well as the normal torrent stats.
 type TorrentStats struct {
-	Seeders    int `json:"seeders"`
-	Leechers   int `json:"leechers"`
-	Snatches   int `json:"snatches"`
-	Uploaded   uint32
-	Downloaded uint32
-	Event      consts.AnnounceType
+	Seeders    int    `json:"seeders"`
+	Leechers   int    `json:"leechers"`
+	Snatches   uint16 `json:"snatches"`
+	Uploaded   uint64
+	Downloaded uint64
 	Announces  uint64
 }
 
 // UserStats is any info we want to batch update for a user
 type UserStats struct {
-	Uploaded   uint32
-	Downloaded uint32
-	Announces  uint64
+	Uploaded   uint64
+	Downloaded uint64
+	Announces  uint32
 }
 
 // PeerStats is any info to batch peer updates
 type PeerStats struct {
-	Uploaded     uint32
-	Downloaded   uint32
+	Uploaded     uint64
+	Downloaded   uint64
 	LastAnnounce time.Time
-	Announces    uint64
+	Announces    uint32
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all

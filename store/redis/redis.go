@@ -58,8 +58,35 @@ type UserStore struct {
 	client *redis.Client
 }
 
+// TODO leverage cache layer so we can pipeline the updates w/o query first
 func (us UserStore) Sync(b map[string]model.UserStats) error {
-	panic("implement me")
+	for passkey, stats := range b {
+		old, err := us.client.HGetAll(userKey(passkey)).Result()
+		if err != nil {
+			return errors.Wrap(err, "Failed to get user from redis")
+		}
+		var downloaded uint64
+		var uploaded uint64
+		var announces uint32
+		downloadedStr, found := old["downloaded"]
+		if found {
+			downloaded = util.StringToUInt64(downloadedStr, 0)
+		}
+		uploadedStr, found := old["uploaded"]
+		if found {
+			uploaded = util.StringToUInt64(uploadedStr, 0)
+		}
+		announcesStr, found := old["announces"]
+		if found {
+			announces = util.StringToUInt32(announcesStr, 0)
+		}
+		us.client.HSet(userKey(passkey), map[string]interface{}{
+			"downloaded": downloaded + stats.Downloaded,
+			"uploaded":   uploaded + stats.Uploaded,
+			"announces":  announces + stats.Announces,
+		})
+	}
+	return nil
 }
 
 // Add inserts a user into redis via at the string provided by the userKey function
@@ -71,6 +98,9 @@ func (us UserStore) Add(u model.User) error {
 		"passkey":          u.Passkey,
 		"download_enabled": true,
 		"is_deleted":       false,
+		"downloaded":       0,
+		"uploaded":         0,
+		"announces":        0,
 	})
 	pipe.Set(userIDKey(u.UserID), u.Passkey, 0)
 	if _, err := pipe.Exec(); err != nil {

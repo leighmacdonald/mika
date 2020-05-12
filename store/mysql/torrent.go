@@ -21,7 +21,8 @@ const (
 
 // TorrentStore implements the store.TorrentStore interface for mysql
 type TorrentStore struct {
-	db *sqlx.DB
+	db    *sqlx.DB
+	cache *store.TorrentCache
 }
 
 func (s *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
@@ -105,6 +106,10 @@ func (s *TorrentStore) Close() error {
 // Get returns a torrent for the hash provided
 func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
+	if err := s.cache.Get(t, hash); err == nil {
+		log.Debugf("Got cached torrent: %s", t.InfoHash.String())
+		return nil
+	}
 	err := s.db.Get(t, q, hash.Bytes())
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
@@ -112,6 +117,8 @@ func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 		}
 		return err
 	}
+	s.cache.Add(*t)
+	log.Debugf("Added torrent to cache (Get()): %s", t.InfoHash.String())
 	return nil
 }
 
@@ -122,6 +129,8 @@ func (s *TorrentStore) Add(t model.Torrent) error {
 	if err != nil {
 		return err
 	}
+	s.cache.Add(t)
+	log.Debugf("Added torrent to cache (Add()): %s", t.InfoHash.String())
 	return nil
 }
 
@@ -141,6 +150,7 @@ func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 			return err
 		}
 	}
+	s.cache.Delete(ih, dropRow)
 	return nil
 }
 
@@ -154,7 +164,8 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 	}
 	db := sqlx.MustConnect(driverName, c.DSN())
 	return &TorrentStore{
-		db: db,
+		db:    db,
+		cache: store.NewTorrentCache(true),
 	}, nil
 }
 

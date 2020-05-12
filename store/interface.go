@@ -113,8 +113,6 @@ type TorrentStore interface {
 type PeerStore interface {
 	// Add inserts a peer into the active swarm for the torrent provided
 	Add(ih model.InfoHash, p model.Peer) error
-	// Update will sync any new peer data with the backing store
-	Update(ih model.InfoHash, p model.Peer) error
 	// Delete will remove a user from a torrents swarm
 	Delete(ih model.InfoHash, p model.PeerID) error
 	// GetN will fetch peers for a torrents active swarm up to N users

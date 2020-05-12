@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// PeerHash is a merge of the infohash and peer_id, used for simpler map operations
+// PeerHash is a merger of the infohash and peer_id, used for simpler map lookups
 type PeerHash [40]byte
 
 // NewPeerHash created a new PeerHash from the existing infohash and peer_id
@@ -19,6 +19,20 @@ func NewPeerHash(ih InfoHash, pid PeerID) PeerHash {
 	var buf [40]byte
 	copy(buf[0:20], ih.Bytes())
 	copy(buf[20:], pid.Bytes())
+	return buf
+}
+
+// InfoHash returns the first 20 bytes of the data
+func (ph PeerHash) InfoHash() InfoHash {
+	var buf [20]byte
+	copy(buf[:], ph[0:20])
+	return buf
+}
+
+// PeerID returns the last 20 bytes of the data
+func (ph PeerHash) PeerID() PeerID {
+	var buf [20]byte
+	copy(buf[:], ph[20:])
 	return buf
 }
 
@@ -102,12 +116,14 @@ type TorrentStats struct {
 	Announces  uint64
 }
 
+// UserStats is any info we want to batch update for a user
 type UserStats struct {
 	Uploaded   uint32
 	Downloaded uint32
 	Announces  uint64
 }
 
+// PeerStats is any info to batch peer updates
 type PeerStats struct {
 	Uploaded     uint32
 	Downloaded   uint32

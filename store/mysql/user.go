@@ -8,6 +8,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -43,6 +44,9 @@ func (u *UserStore) Sync(b map[string]model.UserStats) error {
 	for passkey, stats := range b {
 		_, err := stmt.Exec(stats.Announces, stats.Uploaded, stats.Downloaded, passkey)
 		if err != nil {
+			if err := tx.Rollback(); err != nil {
+				log.Errorf("Failed to roll back user Sync() tx")
+			}
 			return errors.Wrap(err, "Failed to exec user Sync() tx")
 		}
 	}

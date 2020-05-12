@@ -16,6 +16,49 @@ type PeerStore struct {
 	db *sqlx.DB
 }
 
+func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
+	const q = `
+		UPDATE 
+			peers
+		SET
+			total_announces = (total_announces + ?),
+		    total_downloaded = (total_downloaded + ?),
+		    total_uploaded = (total_uploaded + ?),
+		    announce_last = ?
+		WHERE
+			info_hash = ? AND peer_id = ?
+	`
+	tx, err := ps.db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "Failed to being user Sync() tx")
+	}
+	stmt, err := tx.Prepare(q)
+	if err != nil {
+		return errors.Wrap(err, "Failed to prepare user Sync() tx")
+	}
+	for ph, stats := range b {
+		ih := ph.InfoHash()
+		pid := ph.PeerID()
+		_, err := stmt.Exec(
+			stats.Announces,
+			stats.Downloaded,
+			stats.Uploaded,
+			stats.LastAnnounce,
+			ih.Bytes(),
+			pid.Bytes())
+		if err != nil {
+			if err := tx.Rollback(); err != nil {
+				log.Errorf("Failed to roll back peer Sync() tx")
+			}
+			return errors.Wrap(err, "Failed to exec peer Sync() tx")
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "Failed to commit user Sync() tx")
+	}
+	return nil
+}
+
 func (ps *PeerStore) Reap() {
 	const q = `DELETE FROM peers WHERE announce_last <= (NOW() - INTERVAL 15 MINUTE)`
 	rows, err := ps.db.Exec(q)
@@ -33,11 +76,6 @@ func (ps *PeerStore) Reap() {
 // Close will close the underlying database connection
 func (ps *PeerStore) Close() error {
 	return ps.db.Close()
-}
-
-// Update will sync the new peer data with the backing store
-func (ps *PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
-	panic("implement me")
 }
 
 // Add insets the peer into the swarm of the torrent provided

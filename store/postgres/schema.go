@@ -13,6 +13,7 @@ create table torrent
     reason varchar(255) default '' not null,
     multi_up decimal(5,2) default 1.00 not null,
     multi_dn decimal(5,2) default 1.00 not null,
+	announces int default 0 not null,
     constraint uq_release_name
         unique (release_name)
 );
@@ -24,6 +25,9 @@ create table users
     passkey varchar(20) not null,
     download_enabled bool default 't' not null,
     is_deleted bool default 'f' not null,
+    downloaded bigint default 0 not null,
+    uploaded bigint default 0 not null,
+    announces int default 0 not null,
     constraint user_passkey_uindex
         unique (passkey)
 );
@@ -33,7 +37,7 @@ create table peers
     peer_id bytea  check (octet_length(peer_id) = 20) not null,
     info_hash bytea  check (octet_length(info_hash) = 20) not null,
     user_id int not null,
-    addr_ip int not null,
+    addr_ip inet not null,
     addr_port smallint not null,
     total_downloaded int default 0 not null,
     total_uploaded int default 0 not null,
@@ -45,8 +49,8 @@ create table peers
     speed_up_max int default 0 not null,
     speed_dn_max int default 0 not null,
     location point not null,
-    created_on timestamp not null,
-    updated_on timestamp not null,
+    announce_first timestamptz not null,
+    announce_last timestamptz not null,
     primary key (info_hash, peer_id),
     constraint peers_torrent_fk
         foreign key (info_hash) references torrent (info_hash)

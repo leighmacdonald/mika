@@ -45,11 +45,12 @@ func InfoHashFromString(infoHash *InfoHash, s string) error {
 	return nil
 }
 
+// Value implements the database.Valuer interface
 func (ih *InfoHash) Value() (driver.Value, error) {
 	return ih.Bytes(), nil
 }
 
-// Scan implements the sql Scanner interface for conversion to our custom type
+// Scan implements the sql.Scanner interface for conversion to our custom type
 func (ih *InfoHash) Scan(v interface{}) error {
 	// Should be more strictly to check this type.
 	vt, ok := v.([]byte)
@@ -58,7 +59,7 @@ func (ih *InfoHash) Scan(v interface{}) error {
 	}
 	cnt := copy(ih[:], vt)
 	if cnt != 20 {
-		return errors.New(fmt.Sprintf("invalid data length received: %d, expected 20", cnt))
+		return fmt.Errorf("invalid data length received: %d, expected 20", cnt)
 	}
 	return nil
 }
@@ -142,6 +143,7 @@ func NewTorrent(ih InfoHash, name string) Torrent {
 	return torrent
 }
 
+// Torrents is a basic type alias for multiple torrents
 type Torrents []Torrent
 
 // WhiteListClient defines a whitelisted bittorrent client allowed to participate

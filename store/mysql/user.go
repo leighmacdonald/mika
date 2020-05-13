@@ -12,6 +12,7 @@ import (
 	"sync"
 )
 
+// ErrNoResults is the string returned from the driver when no rows are returned
 const ErrNoResults = "sql: no rows in result set"
 
 // UserStore is the MySQL backed store.UserStore implementation
@@ -21,6 +22,7 @@ type UserStore struct {
 	usersMx sync.RWMutex
 }
 
+// Sync batch updates the backing store with the new UserStats provided
 func (u *UserStore) Sync(b map[string]model.UserStats) error {
 	const q = `
 		UPDATE 

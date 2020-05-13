@@ -13,6 +13,8 @@ func GenRandomBytes(size int) (blk []byte, err error) {
 	_, err = rand.Read(blk)
 	return
 }
+
+// MinInt returns the smallest of two int values
 func MinInt(a, b int) int {
 	if a < b {
 		return a

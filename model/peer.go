@@ -21,11 +21,12 @@ func PeerIDFromString(s string) PeerID {
 	return buf
 }
 
+// Value implements the driver.Valuer interface
 func (p *PeerID) Value() (driver.Value, error) {
 	return p.Bytes(), nil
 }
 
-// Scan implements the sql Scanner interface for conversion to our custom type
+// Scan implements the sql.Scanner interface for conversion to our custom type
 func (p *PeerID) Scan(v interface{}) error {
 	// Should be more strictly to check this type.
 	vt, ok := v.([]byte)
@@ -34,7 +35,7 @@ func (p *PeerID) Scan(v interface{}) error {
 	}
 	cnt := copy(p[:], vt)
 	if cnt != 20 {
-		return errors.New(fmt.Sprintf("invalid data length received: %d, expected 20", cnt))
+		return fmt.Errorf("invalid data length received: %d, expected 20", cnt)
 	}
 	return nil
 }
@@ -151,6 +152,7 @@ func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
 	}
 }
 
+// UpdateState is used to store temporary data used for batch updates
 type UpdateState struct {
 	InfoHash InfoHash
 	PeerID   PeerID

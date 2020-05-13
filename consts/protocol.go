@@ -1,5 +1,6 @@
 package consts
 
+// AnnounceType is valid announce event values
 type AnnounceType string
 
 // Announce types
@@ -10,6 +11,7 @@ const (
 	ANNOUNCE  AnnounceType = ""
 )
 
+// ParseAnnounceType returns the AnnounceType from a string
 func ParseAnnounceType(t string) AnnounceType {
 	switch t {
 	case "started":

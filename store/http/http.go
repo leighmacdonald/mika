@@ -43,10 +43,12 @@ type TorrentStore struct {
 	baseURL string
 }
 
+// Sync batch updates the backing store with the new TorrentStats provided
 func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
 
+// Conn returns the underlying http client
 func (ts TorrentStore) Conn() interface{} {
 	return ts.client
 }

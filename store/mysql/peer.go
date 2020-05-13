@@ -16,6 +16,7 @@ type PeerStore struct {
 	db *sqlx.DB
 }
 
+// Sync batch updates the backing store with the new PeerStats provided
 func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
 	const q = `
 		UPDATE 
@@ -59,6 +60,7 @@ func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
 	return nil
 }
 
+// Reap will loop through the peers removing any stale entries from active swarms
 func (ps *PeerStore) Reap() {
 	const q = `DELETE FROM peers WHERE announce_last <= (NOW() - INTERVAL 15 MINUTE)`
 	rows, err := ps.db.Exec(q)

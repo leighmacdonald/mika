@@ -19,6 +19,7 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
+// Sync batch updates the backing store with the new TorrentStats provided
 func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 	ts.Lock()
 	defer ts.Unlock()
@@ -37,6 +38,7 @@ func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 	return nil
 }
 
+// Conn always returns nil for in-memory store
 func (ts *TorrentStore) Conn() interface{} {
 	return nil
 }
@@ -98,6 +100,7 @@ type PeerStore struct {
 	peers map[model.InfoHash]model.Swarm
 }
 
+// Sync batch updates the backing store with the new PeerStats provided
 func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
 	ps.Lock()
 	defer ps.Unlock()
@@ -119,6 +122,7 @@ func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
 	return nil
 }
 
+// Reap will loop through the peers removing any stale entries from active swarms
 func (ps *PeerStore) Reap() {
 	ps.Lock()
 	defer ps.Unlock()
@@ -236,6 +240,7 @@ type UserStore struct {
 	users map[string]model.User
 }
 
+// Sync batch updates the backing store with the new UserStats provided
 func (u *UserStore) Sync(b map[string]model.UserStats) error {
 	u.Lock()
 	defer u.Unlock()

@@ -63,6 +63,8 @@ func TrackerErr(code trackerErrCode) error {
 	return responseStringMap[code]
 }
 
+// NewClient returns a http.Client with reasonable default configuration values, notably
+// actual timeout values.
 // TODO use context instead for timeouts
 func NewClient(_ *config.StoreConfig) *http.Client {
 	//noinspection GoDeprecation

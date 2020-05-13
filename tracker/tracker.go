@@ -289,11 +289,13 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 	}, torrents, users, peers
 }
 
+// Stats returns the current cumulative stats for the tracker
 func (t *Tracker) Stats() GlobalStats {
 	var s GlobalStats
 
 	return s
 }
 
+// GlobalStats holds basic stats for the running tracker
 type GlobalStats struct {
 }

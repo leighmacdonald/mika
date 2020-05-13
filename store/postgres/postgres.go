@@ -1,4 +1,4 @@
-// Package postgre provides the backing store for postgresql
+// Package postgres provides the backing store for postgresql
 // TODO create domains for the uint types, eg: create domain uint64 as numeric(20,0);
 package postgres
 
@@ -25,6 +25,7 @@ type UserStore struct {
 	ctx context.Context
 }
 
+// Sync batch updates the backing store with the new UserStats provided
 func (us UserStore) Sync(_ map[string]model.UserStats) error {
 	panic("implement me")
 }
@@ -103,6 +104,7 @@ type TorrentStore struct {
 	ctx context.Context
 }
 
+// Sync batch updates the backing store with the new TorrentStats provided
 func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
@@ -245,10 +247,12 @@ type PeerStore struct {
 	ctx context.Context
 }
 
+// Sync batch updates the backing store with the new PeerStats provided
 func (ps PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
 	panic("implement me")
 }
 
+// Reap will loop through the peers removing any stale entries from active swarms
 func (ps PeerStore) Reap() {
 	panic("implement me")
 }

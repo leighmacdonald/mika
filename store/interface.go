@@ -81,6 +81,7 @@ type UserStore interface {
 	Delete(user model.User) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
+	// Sync batch updates the backing store with the new UserStats provided
 	Sync(b map[string]model.UserStats) error
 }
 
@@ -102,6 +103,7 @@ type TorrentStore interface {
 	WhiteListAdd(client model.WhiteListClient) error
 	// WhiteListGetAll fetches all known whitelisted clients
 	WhiteListGetAll() ([]model.WhiteListClient, error)
+	// Sync batch updates the backing store with the new TorrentStats provided
 	Sync(b map[model.InfoHash]model.TorrentStats) error
 	// Conn returns the underlying connection, if any
 	Conn() interface{}
@@ -123,6 +125,7 @@ type PeerStore interface {
 	Close() error
 	// Reap will loop through the peers removing any stale entries from active swarms
 	Reap()
+	// Sync batch updates the backing store with the new PeerStats provided
 	Sync(b map[model.PeerHash]model.PeerStats) error
 }
 

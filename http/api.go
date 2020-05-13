@@ -30,10 +30,12 @@ type AdminAPI struct {
 	t *tracker.Tracker
 }
 
+// PingRequest represents a JSON ping request
 type PingRequest struct {
 	Ping string `json:"ping"`
 }
 
+// PingResponse represents a JSON ping response
 type PingResponse struct {
 	Pong string `json:"pong"`
 }
@@ -119,6 +121,7 @@ func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context) bool {
 	return true
 }
 
+// TorrentAddRequest represents a JSON request for adding a new torrent
 type TorrentAddRequest struct {
 	Name     string `json:"name"`
 	InfoHash string `json:"info_hash"`
@@ -197,8 +200,9 @@ func (a *AdminAPI) userUpdate(_ *gin.Context) {
 
 }
 
+// UserDeleteRequest represents a JSON API requests to delete a user via passkey
 type UserDeleteRequest struct {
-	Passkey string `json:"passkey,omitempty"`
+	Passkey string `json:"passkey"`
 }
 
 func (a *AdminAPI) userDelete(c *gin.Context) {
@@ -215,11 +219,13 @@ func (a *AdminAPI) userDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, StatusResp{Message: "Deleted user successfully"})
 }
 
+// UserAddRequest represents a JSON API requests to add a user
 type UserAddRequest struct {
 	UserID  uint32 `json:"user_id,omitempty"`
 	Passkey string `json:"passkey,omitempty"`
 }
 
+// UserAddResponse represents a JSON API response to adding a user
 type UserAddResponse struct {
 	Passkey string `json:"passkey"`
 }

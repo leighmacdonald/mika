@@ -43,11 +43,12 @@ type LatLong struct {
 	Longitude float64 `maxminddb:"longitude"`
 }
 
+// Value implements the driver.Valuer interface for our custom type
 func (ll *LatLong) Value() (driver.Value, error) {
 	return fmt.Sprintf("POINT(%s)", ll.String()), nil
 }
 
-// Scan implements the sql Scanner interface for conversion to our custom type
+// Scan implements the sql.Scanner interface for conversion to our custom type
 func (ll *LatLong) Scan(v interface{}) error {
 	// Should be more strictly to check this type.
 	llStrB, ok := v.([]byte)

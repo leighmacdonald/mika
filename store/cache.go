@@ -6,12 +6,15 @@ import (
 	"sync"
 )
 
+// TorrentCache is a simple (dumb) in-memory cache for torrent items
+// TODO replace with something that wont invoke so much GC overhead
 type TorrentCache struct {
 	*sync.RWMutex
 	torrents map[model.InfoHash]model.Torrent
 	enabled  bool
 }
 
+// NewTorrentCache configures and returns a new instance of TorrentCache
 func NewTorrentCache(enabled bool) *TorrentCache {
 	return &TorrentCache{
 		RWMutex:  &sync.RWMutex{},
@@ -20,6 +23,7 @@ func NewTorrentCache(enabled bool) *TorrentCache {
 	}
 }
 
+// Add inserts a torrent into the cache
 func (cache *TorrentCache) Add(t model.Torrent) {
 	if !cache.enabled {
 		return
@@ -50,7 +54,8 @@ func (cache *TorrentCache) Delete(ih model.InfoHash, dropRow bool) {
 	return
 }
 
-// Get returns the Torrent matching the infohash
+// Get returns the Torrent matching the infohash.
+// consts.ErrInvalidInfoHash is returned on failed lookup
 func (cache *TorrentCache) Get(torrent *model.Torrent, hash model.InfoHash) error {
 	if !cache.enabled {
 		return consts.ErrInvalidInfoHash

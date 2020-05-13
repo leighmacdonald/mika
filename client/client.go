@@ -17,6 +17,7 @@ type Client struct {
 	client *http.Client
 }
 
+// New initializes an API client for the specified host
 func New(host string) *Client {
 	c := h.NewClient(nil)
 	return &Client{
@@ -29,6 +30,7 @@ func (c *Client) u(path string) string {
 	return fmt.Sprintf("http://%s%s", c.host, path)
 }
 
+// TorrentDelete will delete the torrent matching the info_hash provided
 func (c *Client) TorrentDelete(ih model.InfoHash) error {
 	resp, err := h.DoRequest(c.client, "DELETE", c.u(fmt.Sprintf("/torrent/%s", ih.String())), nil)
 	if err != nil {
@@ -41,6 +43,7 @@ func (c *Client) TorrentDelete(ih model.InfoHash) error {
 	return nil
 }
 
+// TorrentAdd add a new info_hash and associated name to be tracked
 func (c *Client) TorrentAdd(ih model.InfoHash, name string) error {
 	tar := h.TorrentAddRequest{
 		InfoHash: ih.String(),
@@ -70,6 +73,7 @@ func readStatus(resp *http.Response) error {
 	return sr
 }
 
+// UserDelete deletes the user matching the passkey provided
 func (c *Client) UserDelete(passkey string) error {
 	resp, err := h.DoRequest(c.client, "DELETE", c.u(fmt.Sprintf("/user/pk/%s", passkey)), nil)
 	if err != nil {
@@ -82,6 +86,7 @@ func (c *Client) UserDelete(passkey string) error {
 	return nil
 }
 
+// UserAdd creates a new user with the passkey provided
 func (c *Client) UserAdd(passkey string) error {
 	var req h.UserAddRequest
 	req.Passkey = passkey
@@ -105,6 +110,7 @@ func (c *Client) UserAdd(passkey string) error {
 	return json.Unmarshal(b, &uar)
 }
 
+// Ping tests communication between the API server and the client
 func (c *Client) Ping() error {
 	const msg = "hello world"
 	t0 := time.Now()

@@ -48,7 +48,8 @@ func TestMain(m *testing.M) {
 			fmt.Printf("Error serving test api server: %s", err.Error())
 		}
 	}()
-	time.Sleep(1 * time.Second)
+	// Give the server enough time to init
+	time.Sleep(500 * time.Millisecond)
 	retVal := m.Run()
 	if err := server.Shutdown(ctx); err != nil {
 		fmt.Printf("Error shutting down test api server: %s", err.Error())

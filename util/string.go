@@ -18,6 +18,7 @@ func randStringWithCharset(length int, charset string) string {
 	return string(b)
 }
 
+// NewPasskey generated a string suitable for use as a passkey
 func NewPasskey() string {
 	return randStringWithCharset(passkeyLen, charset)
 }

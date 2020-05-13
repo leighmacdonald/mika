@@ -25,6 +25,7 @@ type TorrentStore struct {
 	cache *store.TorrentCache
 }
 
+// Sync batch updates the backing store with the new TorrentStats provided
 func (s *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 	const q = `
 		UPDATE 

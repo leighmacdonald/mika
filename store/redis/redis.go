@@ -57,6 +57,7 @@ type UserStore struct {
 	client *redis.Client
 }
 
+// Sync batch updates the backing store with the new UserStats provided
 // TODO leverage cache layer so we can pipeline the updates w/o query first
 func (us UserStore) Sync(b map[string]model.UserStats) error {
 	for passkey, stats := range b {
@@ -156,6 +157,7 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
+// Sync batch updates the backing store with the new TorrentStats provided
 func (ts *TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
@@ -283,10 +285,12 @@ type PeerStore struct {
 	client *redis.Client
 }
 
+// Sync batch updates the backing store with the new PeerStats provided
 func (ps *PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
 	panic("implement me")
 }
 
+// Reap will loop through the peers removing any stale entries from active swarms
 func (ps *PeerStore) Reap() {
 	log.Debugf("Implement reaping peers..")
 }

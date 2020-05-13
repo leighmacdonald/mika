@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
@@ -26,8 +27,9 @@ func GenerateTestUser() model.User {
 // GenerateTestTorrent creates a torrent using fake data. Used for testing.
 func GenerateTestTorrent() model.Torrent {
 	token, _ := util.GenRandomBytes(20)
+	val := hex.EncodeToString(token)
 	var ih model.InfoHash
-	if err := model.InfoHashFromString(&ih, string(token)); err != nil {
+	if err := model.InfoHashFromString(&ih, val); err != nil {
 		log.Panicf("Failed to generate info_hash: %s", err.Error())
 	}
 	return model.NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)))

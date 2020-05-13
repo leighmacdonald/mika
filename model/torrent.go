@@ -2,9 +2,9 @@ package model
 
 import (
 	"database/sql/driver"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/leighmacdonald/mika/consts"
 	"strings"
 	"time"
 )
@@ -39,11 +39,10 @@ type InfoHash [20]byte
 
 // InfoHashFromString returns a binary infohash from the info string
 func InfoHashFromString(infoHash *InfoHash, s string) error {
-	bVal, err := hex.DecodeString(s)
-	if err != nil {
-		return err
+	if len(s) != 40 {
+		return consts.ErrInvalidInfoHash
 	}
-	copy(infoHash[:], bVal)
+	copy(infoHash[:], s)
 	return nil
 }
 
@@ -67,12 +66,12 @@ func (ih *InfoHash) Scan(v interface{}) error {
 
 // Bytes returns the raw bytes of the info_hash. This is primarily useful for inserting to SQL stores since
 // they have trouble with the sized variant
-func (ih *InfoHash) Bytes() []byte {
+func (ih InfoHash) Bytes() []byte {
 	return ih[:]
 }
 
 // String implements fmt.Stringer, returning the base16 encoded PeerID.
-func (ih *InfoHash) String() string {
+func (ih InfoHash) String() string {
 	return fmt.Sprintf("%x", ih[:])
 }
 
@@ -100,7 +99,8 @@ type Torrent struct {
 	MultiUp float64 `db:"multi_up" redis:"multi_up" json:"multi_up"`
 	// Download multiplier added to the users totals
 	// 0 denotes freeleech status
-	MultiDn float64 `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
+	MultiDn   float64 `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
+	Announces uint32  `db:"announces"`
 }
 
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats

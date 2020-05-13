@@ -114,7 +114,8 @@ func (ts TorrentStore) Conn() interface{} {
 
 // Add inserts a new torrent into the backing store
 func (ts TorrentStore) Add(t model.Torrent) error {
-	const q = `INSERT INTO torrent (info_hash, release_name) VALUES($1, $2)`
+	const q = `INSERT INTO torrent (info_hash, release_name) VALUES($1::bytea, $2)`
+	//log.Println(t.InfoHash.Bytes())
 	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
 	commandTag, err := ts.db.Exec(c, q, t.InfoHash.Bytes(), t.ReleaseName)
 	if err != nil {
@@ -152,25 +153,28 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 func (ts TorrentStore) Get(t *model.Torrent, ih model.InfoHash) error {
 	const q = `
 		SELECT 
-			info_hash, release_name, total_uploaded, total_downloaded, total_completed, 
-			is_deleted, is_enabled, reason, multi_up, multi_dn
+			info_hash::bytea, release_name, total_uploaded, total_downloaded, total_completed, 
+			is_deleted, is_enabled, reason, multi_up, multi_dn, announces
 		FROM 
 		    torrent 
 		WHERE 
 		    info_hash = $1 AND is_deleted = false`
 	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	var b []byte
 	err := ts.db.QueryRow(c, q, ih.Bytes()).Scan(
-		t.InfoHash,
-		t.ReleaseName,
-		t.TotalUploaded,
-		t.TotalDownloaded,
-		t.TotalCompleted,
-		t.IsDeleted,
-		t.IsEnabled,
-		t.Reason,
-		t.MultiUp,
-		t.MultiDn,
+		&b, // TODO implement pgx custom types to map automatically
+		&t.ReleaseName,
+		&t.TotalUploaded,
+		&t.TotalDownloaded,
+		&t.TotalCompleted,
+		&t.IsDeleted,
+		&t.IsEnabled,
+		&t.Reason,
+		&t.MultiUp,
+		&t.MultiDn,
+		&t.Announces,
 	)
+	copy(t.InfoHash[:], b)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return consts.ErrInvalidInfoHash

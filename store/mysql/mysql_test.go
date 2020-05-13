@@ -16,7 +16,7 @@ func TestTorrentDriver(t *testing.T) {
 	dsn := fmt.Sprintf("%s?multiStatements=true", config.GetStoreConfig(config.Torrent).DSN())
 	db := sqlx.MustConnect(driverName, dsn)
 	setupDB(t, db)
-	store.TestTorrentStore(t, &TorrentStore{db: db})
+	store.TestTorrentStore(t, &TorrentStore{db: db, cache: store.NewTorrentCache(false)})
 }
 
 func clearDB(db *sqlx.DB) {

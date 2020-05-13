@@ -274,17 +274,18 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 	}
 	geoPath := util.FindFile(viper.GetString(string(config.GeodbPath)))
 	return &Tracker{
-		Torrents:       ts,
-		Peers:          ps,
-		Users:          us,
-		Geodb:          geo.New(geoPath, false),
-		GeodbEnabled:   viper.GetBool(string(config.GeodbEnabled)),
-		WhitelistMutex: &sync.RWMutex{},
-		Whitelist:      wlm,
-		MaxPeers:       50,
-		ReaperInterval: viper.GetDuration(string(config.TrackerReaperInterval)),
-		AnnInterval:    viper.GetDuration(string(config.TrackerAnnounceInterval)),
-		AnnIntervalMin: viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
+		Torrents:        ts,
+		Peers:           ps,
+		Users:           us,
+		Geodb:           geo.New(geoPath, false),
+		GeodbEnabled:    viper.GetBool(string(config.GeodbEnabled)),
+		WhitelistMutex:  &sync.RWMutex{},
+		Whitelist:       wlm,
+		MaxPeers:        50,
+		StateUpdateChan: make(chan model.UpdateState, 1000),
+		ReaperInterval:  viper.GetDuration(string(config.TrackerReaperInterval)),
+		AnnInterval:     viper.GetDuration(string(config.TrackerAnnounceInterval)),
+		AnnIntervalMin:  viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
 	}, torrents, users, peers
 }
 

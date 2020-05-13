@@ -18,7 +18,7 @@ func TestGetLocation(t *testing.T) {
 	db := New(fp, false)
 	defer func() { _ = db.Close() }()
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
-	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -118.0 {
+	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -84.0 {
 		t.Errorf("Invalid coord value: %f", ip4.Location)
 	}
 	ip6 := db.GetLocation(net.ParseIP("2600::")) // Sprint owned IP6

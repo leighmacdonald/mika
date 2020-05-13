@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	host   = "localhost:34000"
+	host   = "localhost:34100"
 	server *http.Server
 	ihStr  = "ff503e9ca036f1647c2dfc1337b163e2c54f13f8"
 )
@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	}
 	tkr, _, _, _ := tracker.NewTestTracker()
 	handler := h.NewAPIHandler(tkr)
-	server = h.CreateServer(handler, "localhost:34000", false)
+	server = h.CreateServer(handler, host, false)
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			fmt.Printf("Error serving test api server: %s", err.Error())

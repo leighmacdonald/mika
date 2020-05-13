@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/leighmacdonald/mika/consts"
 	"strings"
 	"time"
 )
@@ -39,9 +38,9 @@ type InfoHash [20]byte
 
 // InfoHashFromString returns a binary infohash from the info string
 func InfoHashFromString(infoHash *InfoHash, s string) error {
-	if len(s) != 40 {
-		return consts.ErrInvalidInfoHash
-	}
+	//if len(s) != 40 {
+	//	return consts.ErrInvalidInfoHash
+	//}
 	copy(infoHash[:], s)
 	return nil
 }

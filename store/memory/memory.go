@@ -4,6 +4,7 @@ import (
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
 	"sync"
 )
 
@@ -43,6 +44,7 @@ func (ts *TorrentStore) Conn() interface{} {
 // WhiteListDelete removes a client from the global whitelist
 func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	ts.Lock()
+	defer ts.Unlock()
 	// Remove removes a peer from a slice
 	for i := len(ts.whitelist) - 1; i >= 0; i-- {
 		if ts.whitelist[i].ClientPrefix == client.ClientPrefix {
@@ -181,7 +183,7 @@ func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	if !found {
 		return nil, consts.ErrInvalidTorrentID
 	}
-	return p[0:limit], nil
+	return p[0:util.MinInt(limit, len(p))], nil
 }
 
 // Add adds a new torrent to the memory store

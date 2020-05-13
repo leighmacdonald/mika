@@ -13,6 +13,12 @@ func GenRandomBytes(size int) (blk []byte, err error) {
 	_, err = rand.Read(blk)
 	return
 }
+func MinInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 // UMax64 is math.Max for uint64
 func UMax64(a, b uint64) uint64 {

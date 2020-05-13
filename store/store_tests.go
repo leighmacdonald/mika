@@ -63,7 +63,9 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	require.NoError(t, ts.Add(torrentA))
 	var peers model.Swarm
 	for i := 0; i < 5; i++ {
-		peers = append(peers, GenerateTestPeer())
+		p := GenerateTestPeer()
+		p.InfoHash = torrentA.InfoHash
+		peers = append(peers, p)
 	}
 	for _, peer := range peers {
 		require.NoError(t, ps.Add(torrentA.InfoHash, peer))
@@ -85,10 +87,17 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	}
 	p1 := peers[2]
 	p1.Announces = 5
-	p1.TotalTime = 5000
-	p1.Downloaded = 10000
 	p1.Uploaded = 10000
-
+	p1.Downloaded = 20000
+	ph := model.NewPeerHash(p1.InfoHash, p1.PeerID)
+	require.NoError(t, ps.Sync(map[model.PeerHash]model.PeerStats{
+		ph: {
+			Uploaded:     10000,
+			Downloaded:   20000,
+			LastAnnounce: time.Now(),
+			Announces:    5,
+		},
+	}))
 	updatedPeers, err2 := ps.GetN(torrentA.InfoHash, 5)
 	require.NoError(t, err2)
 	p1Updated, _ := findPeer(updatedPeers, p1)

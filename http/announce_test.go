@@ -39,7 +39,6 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 				"uploaded":   {"5678"},
 				"downloaded": {"1234"},
 				"left":       {"9234"},
-				"event":      {""},
 			},
 			200,
 		},
@@ -47,6 +46,6 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 	for _, ann := range v {
 		u := fmt.Sprintf("/%s/announce?%s", ann.key, ann.v.Encode())
 		w := performRequest(rh, "GET", u)
-		assert.EqualValues(t, w.Code, ann.resp)
+		assert.EqualValues(t, ann.resp, w.Code)
 	}
 }

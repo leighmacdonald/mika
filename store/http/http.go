@@ -2,7 +2,7 @@
 // This is meant to make basic interoperability possible for users
 // who do not want to change their data model (or use views on compatible RDBMS systems)
 //
-// Users will only need to create compatible endpoints in their codebases that we can communicate with
+// Users will only need to create compatible endpoints in their codebase that we can communicate with
 // It is the users job at that point to do any conversions of data type, names, etc. required to be
 // compatible with their system
 package http
@@ -28,6 +28,7 @@ const (
 // authMode defines what type of authentication to use when talking to the http backing store api
 type authMode int
 
+//noinspection GoUnusedConst
 const (
 	basic authMode = iota
 	bearerToken
@@ -42,7 +43,7 @@ type TorrentStore struct {
 	baseURL string
 }
 
-func (ts TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
+func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
 
@@ -161,7 +162,7 @@ type PeerStore struct {
 	baseURL string
 }
 
-func (ps PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
+func (ps PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
 	panic("implement me")
 }
 
@@ -179,7 +180,7 @@ func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps PeerStore) Get(peer *model.Peer, ih model.InfoHash, id model.PeerID) error {
+func (ps PeerStore) Get(_ *model.Peer, _ model.InfoHash, _ model.PeerID) error {
 	panic("implement me")
 }
 
@@ -269,7 +270,7 @@ type UserStore struct {
 	baseURL string
 }
 
-func (u *UserStore) Sync(b map[string]model.UserStats) error {
+func (u *UserStore) Sync(_ map[string]model.UserStats) error {
 	panic("implement me")
 }
 
@@ -315,7 +316,7 @@ func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(user *model.User, _ uint32) error {
+func (u *UserStore) GetByID(_ *model.User, _ uint32) error {
 	panic("implement me")
 }
 

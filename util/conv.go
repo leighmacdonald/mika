@@ -7,6 +7,7 @@ import (
 )
 
 // StringToInt16 converts a string to a int16 returning a default value on failure
+//noinspection GoUnusedExportedFunction
 func StringToInt16(s string, def int16) int16 {
 	v, err := strconv.ParseInt(s, 10, 16)
 	if err != nil {

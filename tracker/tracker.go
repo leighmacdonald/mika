@@ -7,6 +7,7 @@ import (
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -271,11 +272,12 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 			peers = append(peers, p)
 		}
 	}
+	geoPath := util.FindFile(viper.GetString(string(config.GeodbPath)))
 	return &Tracker{
 		Torrents:       ts,
 		Peers:          ps,
 		Users:          us,
-		Geodb:          geo.New(viper.GetString(string(config.GeodbPath)), false),
+		Geodb:          geo.New(geoPath, false),
 		GeodbEnabled:   viper.GetBool(string(config.GeodbEnabled)),
 		WhitelistMutex: &sync.RWMutex{},
 		Whitelist:      wlm,

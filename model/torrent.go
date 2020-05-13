@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -39,10 +38,13 @@ func (ph PeerHash) PeerID() PeerID {
 type InfoHash [20]byte
 
 // InfoHashFromString returns a binary infohash from the info string
-func InfoHashFromString(s string) InfoHash {
-	var buf [20]byte
-	copy(buf[:], s)
-	return buf
+func InfoHashFromString(infoHash *InfoHash, s string) error {
+	bVal, err := hex.DecodeString(s)
+	if err != nil {
+		return err
+	}
+	copy(infoHash[:], bVal)
+	return nil
 }
 
 func (ih *InfoHash) Value() (driver.Value, error) {
@@ -71,8 +73,6 @@ func (ih *InfoHash) Bytes() []byte {
 
 // String implements fmt.Stringer, returning the base16 encoded PeerID.
 func (ih *InfoHash) String() string {
-	hv := hex.EncodeToString(ih[:])
-	log.Println(hv)
 	return fmt.Sprintf("%x", ih[:])
 }
 

@@ -25,6 +25,10 @@ type UserStore struct {
 	ctx context.Context
 }
 
+func (us UserStore) Sync(_ map[string]model.UserStats) error {
+	panic("implement me")
+}
+
 // Add will add a new user to the backing store
 func (us UserStore) Add(user model.User) error {
 	if user.UserID > 0 {
@@ -99,7 +103,7 @@ type TorrentStore struct {
 	ctx context.Context
 }
 
-func (ts TorrentStore) UpdateState(ih model.InfoHash, state model.TorrentStats) {
+func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
 
@@ -237,6 +241,10 @@ type PeerStore struct {
 	ctx context.Context
 }
 
+func (ps PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
+	panic("implement me")
+}
+
 func (ps PeerStore) Reap() {
 	panic("implement me")
 }
@@ -261,7 +269,7 @@ func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 }
 
 // Update will sync the new peer data with the backing store
-func (ps PeerStore) Update(ih model.InfoHash, p model.Peer) error {
+func (ps PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
 	panic("implement me")
 }
 

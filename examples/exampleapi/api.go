@@ -42,7 +42,11 @@ func (s *ServerExample) getTorrent(c *gin.Context) {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return
 	}
-	infoHash := model.InfoHashFromString(infoHashStr)
+	var infoHash model.InfoHash
+	if err := model.InfoHashFromString(&infoHash, infoHashStr); err != nil {
+		errResponse(c, http.StatusBadRequest, "Malformed info_hash")
+		return
+	}
 	s.TorrentsMx.RLock()
 	t, found := s.Torrents[infoHash]
 	if !found || t.IsDeleted == true {

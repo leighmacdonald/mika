@@ -26,6 +26,7 @@ const (
 // Key represents a known configuration key
 type Key string
 
+//noinspection GoUnusedConst
 const (
 	// GeneralRunMode defines the application run mode.
 	// debug|release|testing

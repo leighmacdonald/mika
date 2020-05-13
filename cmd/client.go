@@ -65,8 +65,12 @@ var torrentDeleteCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		c := newClient()
+		var ih model.InfoHash
 		for _, hashString := range args {
-			if err := c.TorrentDelete(model.InfoHashFromString(hashString)); err != nil {
+			if err := model.InfoHashFromString(&ih, hashString); err != nil {
+				log.Fatalf("Error trying to parse infohash %s: %s", hashString, err.Error())
+			}
+			if err := c.TorrentDelete(ih); err != nil {
 				log.Fatalf("Error trying to delete %s: %s", hashString, err.Error())
 			}
 		}
@@ -95,12 +99,16 @@ var torrentAddCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		c := newClient()
+		var infoHash model.InfoHash
 		for _, hashString := range args {
 			p := strings.SplitN(hashString, ":", 2)
 			if len(p) != 2 {
 				log.Fatalf(`Invalid format. Expected: <info_hash>:"release name"`)
 			}
-			if err := c.TorrentAdd(model.InfoHashFromString(p[0]), p[1]); err != nil {
+			if err := model.InfoHashFromString(&infoHash, p[0]); err != nil {
+				log.Fatalf(err.Error())
+			}
+			if err := c.TorrentAdd(infoHash, p[1]); err != nil {
 				log.Fatalf("Error trying to add %s: %s", hashString, err.Error())
 			}
 		}

@@ -92,6 +92,7 @@ type announceRequest struct {
 	TrackerID string `form:"tracker_id"`
 }
 
+//noinspection GoUnusedType
 type announceResponse struct {
 	//  (optional) Minimum announce interval. If present clients must not reannounce more frequently than this.
 	MinInterval int `bencode:"min interval"`
@@ -108,6 +109,7 @@ type announceResponse struct {
 	Warning string `bencode:"warning message"`
 }
 
+//noinspection GoUnusedFunction
 func getUint64Key(q *query, key announceParam, def uint64) uint64 {
 	left, err := q.Uint64(key)
 	if err != nil {
@@ -150,7 +152,11 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	if !ihExists {
 		return nil, msgInvalidInfoHash
 	}
-	infoHash := model.InfoHashFromString(infoHashStr)
+	var infoHash model.InfoHash
+	if err := model.InfoHashFromString(&infoHash, infoHashStr); err != nil {
+		log.Warnf("Got malformed info_hash: %s", infoHashStr)
+		return nil, msgInvalidInfoHash
+	}
 	peerID, exists := q.Params[paramPeerID]
 	if !exists {
 		return nil, msgInvalidPeerID

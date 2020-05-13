@@ -57,7 +57,7 @@ Custom storage adapters can be created simply by implementing the `store.PeerSto
 
 This is a special and unique option in the tracker space. Instead of storing data in a database directly, An external 
 API conforming to our specification can be called when the tracker wants to read or write any data. This operates similar
-to a [Webhook](https://en.wikipedia.org/wiki/Webhook) or callback. The http service can store the data in any 
+to a [WebHook](https://en.wikipedia.org/wiki/Webhook) or callback. The http service can store the data in any 
 way it desires as long as the API conforms. A basic example of the data flow is shown below.
     
     # Get a requested torrent from the frontend API service

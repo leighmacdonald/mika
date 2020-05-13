@@ -84,6 +84,7 @@ func humanizeBytes(s uint64, base float64, sizes []string) string {
 // HumanBytesString produces a human readable representation of an SI size.
 //
 // Bytes(82854982) -> 83MB
+//noinspection GoUnusedExportedFunction
 func HumanBytesString(s uint64) string {
 	sizes := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
 	return humanizeBytes(s, 1000, sizes)
@@ -92,6 +93,7 @@ func HumanBytesString(s uint64) string {
 // HumanIBytesString produces a human readable representation of an IEC size.
 //
 // IBytes(82854982) -> 79MiB
+//noinspection GoUnusedExportedFunction
 func HumanIBytesString(s uint64) string {
 	sizes := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
 	return humanizeBytes(s, 1024, sizes)

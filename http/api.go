@@ -8,6 +8,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 )
@@ -103,15 +104,19 @@ func (a *AdminAPI) ping(c *gin.Context) {
 	c.JSON(http.StatusOK, PingResponse{Pong: r.Ping})
 }
 
-func infoHashFromCtx(c *gin.Context) (model.InfoHash, bool) {
+func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context) bool {
 	ihStr := c.Param("info_hash")
 	if ihStr == "" {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"message": "Invalid info hash",
 		})
-		return model.InfoHash{}, false
+		return false
 	}
-	return model.InfoHashFromString(ihStr), true
+	if err := model.InfoHashFromString(infoHash, ihStr); err != nil {
+		log.Warnf("failed to parse info hash from request context: %s", err.Error())
+		return false
+	}
+	return true
 }
 
 type TorrentAddRequest struct {
@@ -126,8 +131,13 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 		return
 	}
 	var t model.Torrent
+	var ih model.InfoHash
+	if err := model.InfoHashFromString(&ih, req.InfoHash); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
+		return
+	}
 	t.ReleaseName = req.Name
-	t.InfoHash = model.InfoHashFromString(req.InfoHash)
+	t.InfoHash = ih
 	if err := a.t.Torrents.Add(t); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
@@ -136,11 +146,11 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 }
 
 func (a *AdminAPI) torrentDelete(c *gin.Context) {
-	ih, ok := infoHashFromCtx(c)
-	if !ok {
+	var infoHash model.InfoHash
+	if !infoHashFromCtx(&infoHash, c) {
 		return
 	}
-	if err := a.t.Torrents.Delete(ih, true); err != nil {
+	if err := a.t.Torrents.Delete(infoHash, true); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
@@ -156,8 +166,8 @@ type TorrentUpdatePrams struct {
 }
 
 func (a *AdminAPI) torrentUpdate(c *gin.Context) {
-	ih, ok := infoHashFromCtx(c)
-	if !ok {
+	var ih model.InfoHash
+	if !infoHashFromCtx(&ih, c) {
 		return
 	}
 	var t model.Torrent
@@ -265,6 +275,6 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func (a *AdminAPI) stats(c *gin.Context) {
+func (a *AdminAPI) stats(_ *gin.Context) {
 
 }

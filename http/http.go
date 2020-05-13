@@ -17,10 +17,6 @@ import (
 	"time"
 )
 
-type errorResponse struct {
-	FailReason string `bencode:"failure reason"`
-}
-
 type trackerErrCode int
 
 const (
@@ -62,6 +58,7 @@ var (
 )
 
 // TrackerErr maps a tracker error code to a error
+//noinspection GoUnusedExportedFunction
 func TrackerErr(code trackerErrCode) error {
 	return responseStringMap[code]
 }

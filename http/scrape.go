@@ -32,8 +32,12 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 	}
 	// Todo limit scrape to N torrents
 	resp := make(bencode.Dict, len(q.InfoHashes))
+	var ih model.InfoHash
 	for _, ihStr := range q.InfoHashes {
-		ih := model.InfoHashFromString(ihStr)
+		if err := model.InfoHashFromString(&ih, ihStr); err != nil {
+			log.Errorf("Failed to decode info hash in scrape: %s", ihStr)
+			continue
+		}
 		var torrent model.Torrent
 		if err := h.tracker.Torrents.Get(&torrent, ih); err != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)

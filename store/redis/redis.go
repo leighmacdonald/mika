@@ -21,12 +21,11 @@ const (
 )
 
 const (
-	prefixWhitelist    = "whitelist"
-	prefixTorrent      = "t"
-	prefixTorrentPeers = "tp"
-	prefixPeer         = "p"
-	prefixUser         = "u"
-	prefixUserID       = "user_id_pk"
+	prefixWhitelist = "whitelist"
+	prefixTorrent   = "t"
+	prefixPeer      = "p"
+	prefixUser      = "u"
+	prefixUserID    = "user_id_pk"
 )
 
 func whiteListKey(prefix string) string {
@@ -157,7 +156,7 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
-func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
+func (ts *TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")
 }
 
@@ -252,12 +251,16 @@ func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	if err != nil {
 		return err
 	}
-	_, found := v["info_hash"]
+	ihStr, found := v["info_hash"]
 	if !found {
 		return consts.ErrInvalidInfoHash
 	}
+	var infoHash model.InfoHash
+	if err := model.InfoHashFromString(&infoHash, ihStr); err != nil {
+		return errors.Wrap(err, "Failed to decode info_hash")
+	}
 	t.ReleaseName = v["release_name"]
-	t.InfoHash = model.InfoHashFromString(v["info_hash"])
+	t.InfoHash = infoHash
 	t.TotalCompleted = util.StringToUInt16(v["total_completed"], 0)
 	t.TotalUploaded = util.StringToUInt64(v["total_uploaded"], 0)
 	t.TotalDownloaded = util.StringToUInt64(v["total_downloaded"], 0)
@@ -280,7 +283,7 @@ type PeerStore struct {
 	client *redis.Client
 }
 
-func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
+func (ps *PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
 	panic("implement me")
 }
 
@@ -414,7 +417,7 @@ func newRedisConfig(c *config.StoreConfig) *redis.Options {
 		DB:       int(database),
 		OnConnect: func(conn *redis.Conn) error {
 			if err := conn.ClientSetName(clientName).Err(); err != nil {
-				log.Fatalf("Could not setname, bailing: %s", err)
+				log.Fatalf("Could not SetName, bailing: %s", err)
 			}
 			return nil
 		},

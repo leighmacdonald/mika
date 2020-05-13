@@ -4,7 +4,7 @@ This document will describe the required actions you need to perform to have int
 tracker into your own code bases. This document assumes that you are at least proficient enough
 in your language of choice to implement the ideas expressed here. You do not need to be 
 proficient in Go, but a good understanding of unix command line environment will make it easier.
-We are also assuming that you are using the tracker for a private site which has its own users and
+We are also assuming you are using the tracker for a private site which has its own users and
 its own database and authentication systems in place.
 
 
@@ -83,7 +83,7 @@ to catch cheaters with this alone. For a list of common prefixes, please see the
 
 Keeping this data up to date required you to fetch the data from the API and store it in
 your own database as leecher/seeder counts. Without this information being stored in your
-own system it becomes very difficult to do sorting based on those attributes. Because of
+own system it becomes very difficult to sort based on those attributes. Because of
 this, its recommended to fetch this periodically and update your own counts.
 
     GET /api/counts

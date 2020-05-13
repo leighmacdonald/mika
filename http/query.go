@@ -1,4 +1,4 @@
-// package http contains functionality related to external HTTP requests, responses and
+// Package http contains functionality related to external HTTP requests, responses and
 // services
 //
 // This file contains functions derived originally from the chihaya project

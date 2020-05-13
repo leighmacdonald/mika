@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// Client is the API client implementation
 type Client struct {
 	host   string
 	client *http.Client

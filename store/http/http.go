@@ -164,10 +164,12 @@ type PeerStore struct {
 	baseURL string
 }
 
+// Sync batch updates the backing store with the new PeerStats provided
 func (ps PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
 	panic("implement me")
 }
 
+// Reap will loop through the peers removing any stale entries from active swarms
 func (ps PeerStore) Reap() {
 	panic("implement me")
 }
@@ -272,6 +274,7 @@ type UserStore struct {
 	baseURL string
 }
 
+// Sync batch updates the backing store with the new UserStats provided
 func (u *UserStore) Sync(_ map[string]model.UserStats) error {
 	panic("implement me")
 }

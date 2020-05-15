@@ -49,7 +49,8 @@ port differing from the standard tracker port. This port is configured for TLS1.
 - Optional smarter peer selection [strategies](docs/DESIGN_GOALS.md).
 - Either a single datastore read (which is cached, no future reads for the same resource made) or no database reads, depending on storage backends chosen on incoming announces/scrapes.
 - User bonus point system built into the tracker which is updated on each request instead of large batches.
-- Go/PHP based API Client examples
+- [Go](https://github.com/leighmacdonald/mika/tree/master/client) / [PHP](https://github.com/leighmacdonald/mika-client-php) 
+based API Client examples. Contributions for other languages welcomed.
 - Client whitelists for only allowing specific torrent clients
 - Multi platform support. Should run on anything that go can target.
 - User authentication via passkey

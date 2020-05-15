@@ -283,8 +283,9 @@ func (ts *TorrentStore) Close() error {
 
 // PeerStore is the redis backed store.PeerStore implementation
 type PeerStore struct {
-	client *redis.Client
-	pubSub *redis.PubSub
+	client  *redis.Client
+	pubSub  *redis.PubSub
+	peerTTL time.Duration
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
@@ -292,14 +293,11 @@ func (ps *PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
 	pipe := ps.client.Pipeline()
 	for ph, stats := range batch {
 		k := peerKey(ph.InfoHash(), ph.PeerID())
-		pipe.HSet(k, map[string]interface{}{
-			"announces":     stats.Announces,
-			"uploaded":      stats.Uploaded,
-			"downloaded":    stats.Downloaded,
-			"last_announce": util.TimeToString(stats.LastAnnounce),
-		})
-		pipe.Expire(k, time.Second*600)
-		log.Debugf("Set key: %s", k)
+		pipe.HIncrBy(k, "announces", int64(stats.Announces))
+		pipe.HIncrBy(k, "downloaded", int64(stats.Downloaded))
+		pipe.HIncrBy(k, "uploaded", int64(stats.Uploaded))
+		pipe.HSet(k, "last_announce", util.TimeToString(stats.LastAnnounce))
+		pipe.Expire(k, ps.peerTTL)
 	}
 	if _, err := pipe.Exec(); err != nil {
 		return errors.Wrap(err, "Error trying to Sync peerstore (redis)")
@@ -315,22 +313,22 @@ func (ps *PeerStore) Reap() {
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
-		"speed_up":         p.SpeedUP,
-		"speed_dn":         p.SpeedDN,
-		"speed_up_max":     p.SpeedUPMax,
-		"speed_dn_max":     p.SpeedDNMax,
-		"total_uploaded":   p.Uploaded,
-		"total_downloaded": p.Downloaded,
-		"total_left":       p.Left,
-		"total_announces":  p.Announces,
-		"total_time":       p.TotalTime,
-		"addr_ip":          p.IP.String(),
-		"addr_port":        p.Port,
-		"last_announce":    util.TimeToString(p.AnnounceLast),
-		"first_announce":   util.TimeToString(p.AnnounceFirst),
-		"peer_id":          p.PeerID.RawString(),
-		"location":         p.Location.String(),
-		"user_id":          p.UserID,
+		"speed_up":       p.SpeedUP,
+		"speed_dn":       p.SpeedDN,
+		"speed_up_max":   p.SpeedUPMax,
+		"speed_dn_max":   p.SpeedDNMax,
+		"uploaded":       p.Uploaded,
+		"downloaded":     p.Downloaded,
+		"total_left":     p.Left,
+		"total_time":     p.TotalTime,
+		"addr_ip":        p.IP.String(),
+		"addr_port":      p.Port,
+		"last_announce":  util.TimeToString(p.AnnounceLast),
+		"first_announce": util.TimeToString(p.AnnounceFirst),
+		"peer_id":        p.PeerID.RawString(),
+		"location":       p.Location.String(),
+		"user_id":        p.UserID,
+		"announces":      p.Announces,
 	}).Err()
 	if err != nil {
 		return errors.Wrap(err, "Failed to Add")
@@ -347,19 +345,20 @@ func (ps *PeerStore) findKeys(prefix string) []string {
 }
 
 // Update will sync any new peer data with the backing store
+// Note that this OVERWRITES the values, doesnt add
 func (ps *PeerStore) Update(ih model.InfoHash, p model.Peer) error {
 	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
-		"speed_up":         p.SpeedUP,
-		"speed_dn":         p.SpeedDN,
-		"speed_up_max":     p.SpeedUPMax,
-		"speed_dn_max":     p.SpeedDNMax,
-		"total_uploaded":   p.Uploaded,
-		"total_downloaded": p.Downloaded,
-		"total_left":       p.Left,
-		"total_announces":  p.Announces,
-		"total_time":       p.TotalTime,
-		"last_announce":    util.TimeToString(p.AnnounceLast),
-		"first_announce":   util.TimeToString(p.AnnounceFirst),
+		"speed_up":       p.SpeedUP,
+		"speed_dn":       p.SpeedDN,
+		"speed_up_max":   p.SpeedUPMax,
+		"speed_dn_max":   p.SpeedDNMax,
+		"uploaded":       p.Uploaded,
+		"downloaded":     p.Downloaded,
+		"total_left":     p.Left,
+		"announces":      p.Announces,
+		"total_time":     p.TotalTime,
+		"last_announce":  util.TimeToString(p.AnnounceLast),
+		"first_announce": util.TimeToString(p.AnnounceFirst),
 	}).Err()
 	if err != nil {
 		return errors.Wrap(err, "Failed to Update")
@@ -393,11 +392,10 @@ func mapPeerValues(p *model.Peer, v map[string]string) {
 	p.Uploaded = util.StringToUInt64(v["uploaded"], 0)
 	p.Downloaded = util.StringToUInt64(v["downloaded"], 0)
 	p.Left = util.StringToUInt32(v["total_left"], 0)
-	p.Announces = util.StringToUInt32(v["total_announces"], 0)
+	p.Announces = util.StringToUInt32(v["announces"], 0)
 	p.TotalTime = util.StringToUInt32(v["total_time"], 0)
 	p.IP = net.ParseIP(v["addr_ip"])
 	p.Port = util.StringToUInt16(v["addr_port"], 0)
-	p.Announces = util.StringToUInt32(v["announces"], 0)
 	p.AnnounceLast = util.StringToTime(v["last_announce"])
 	p.AnnounceFirst = util.StringToTime(v["first_announce"])
 	p.PeerID = model.PeerIDFromString(v["peer_id"])

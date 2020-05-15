@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // StoreType is a mapping to the backing store types used
@@ -164,12 +165,14 @@ const (
 
 // StoreConfig provides a common config struct for backing stores
 type StoreConfig struct {
-	Type       string
-	Host       string
-	Port       int
-	Username   string
-	Password   string
-	Database   string
+	Type     string
+	Host     string
+	Port     int
+	Username string
+	Password string
+	Database string
+	// Properties will append a string of query args to the DSN
+	// Format: arg1=foo&arg2=bar
 	Properties string
 }
 
@@ -178,7 +181,7 @@ type StoreConfig struct {
 // protocol//[user]:[password]@tcp([host]:[port])[/database][?properties]
 func (c StoreConfig) DSN() string {
 	props := c.Properties
-	if props != "" {
+	if props != "" && !strings.HasPrefix(props, "?") {
 		props = "?" + props
 	}
 	s := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s%s",

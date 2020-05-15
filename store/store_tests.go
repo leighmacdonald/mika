@@ -86,9 +86,6 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 		t.Fatalf("Invalid peer count")
 	}
 	p1 := peers[2]
-	p1.Announces = 5
-	p1.Uploaded = 10000
-	p1.Downloaded = 20000
 	ph := model.NewPeerHash(p1.InfoHash, p1.PeerID)
 	require.NoError(t, ps.Sync(map[model.PeerHash]model.PeerStats{
 		ph: {
@@ -101,10 +98,10 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore) {
 	updatedPeers, err2 := ps.GetN(torrentA.InfoHash, 5)
 	require.NoError(t, err2)
 	p1Updated, _ := findPeer(updatedPeers, p1)
-	require.Equal(t, p1.Announces, p1Updated.Announces)
+	require.Equal(t, uint32(5), p1Updated.Announces)
 	require.Equal(t, p1.TotalTime, p1Updated.TotalTime)
-	require.Equal(t, p1.Downloaded, p1Updated.Downloaded)
-	require.Equal(t, p1.Uploaded, p1Updated.Uploaded)
+	require.Equal(t, uint64(20000), p1Updated.Downloaded)
+	require.Equal(t, uint64(10000), p1Updated.Uploaded)
 	for _, peer := range peers {
 		require.NoError(t, ps.Delete(torrentA.InfoHash, peer.PeerID))
 	}

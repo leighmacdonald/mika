@@ -21,7 +21,7 @@ func StringToInt16(s string, def int16) int16 {
 func StringToUInt16(s string, def uint16) uint16 {
 	v, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
-		log.Warnf("failed to parse uint16 value from redis: %s", s)
+		log.Warnf("failed to parse uint16 value: %s", s)
 		return def
 	}
 	return uint16(v)
@@ -31,7 +31,7 @@ func StringToUInt16(s string, def uint16) uint16 {
 func StringToUInt32(s string, def uint32) uint32 {
 	v, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
-		log.Warnf("failed to parse uint32 value from redis: %s", s)
+		log.Warnf("failed to parse uint32 value: %s", s)
 		return def
 	}
 	return uint32(v)
@@ -41,7 +41,7 @@ func StringToUInt32(s string, def uint32) uint32 {
 func StringToUInt64(s string, def uint64) uint64 {
 	v, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		log.Warnf("failed to parse uint64 value from redis: %s", s)
+		log.Warnf("failed to parse uint64 value: %s", s)
 		return def
 	}
 	return uint64(v)
@@ -51,7 +51,7 @@ func StringToUInt64(s string, def uint64) uint64 {
 func StringToFloat64(s string, def float64) float64 {
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		log.Warnf("failed to parse float64 value from redis: %s", s)
+		log.Warnf("failed to parse float64 value: %s", s)
 		return def
 	}
 	return v
@@ -61,7 +61,7 @@ func StringToFloat64(s string, def float64) float64 {
 func StringToBool(s string, def bool) bool {
 	v, err := strconv.ParseBool(s)
 	if err != nil {
-		log.Warnf("failed to parse bool value from redis: %s", s)
+		log.Warnf("failed to parse bool value: %s", s)
 		return def
 	}
 	return v
@@ -71,7 +71,7 @@ func StringToBool(s string, def bool) bool {
 func StringToTime(s string) time.Time {
 	v, err := time.Parse(time.RFC1123Z, s)
 	if err != nil {
-		log.Warnf("failed to parse time value from redis: %s", s)
+		log.Warnf("failed to parse time value: %s", s)
 		return time.Now()
 	}
 	return v

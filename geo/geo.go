@@ -80,7 +80,7 @@ func (ll LatLong) String() string {
 
 // LatLongFromString will return a LatLong from a string formatted like N,-N
 func LatLongFromString(s string) LatLong {
-	p := strings.Split(s, ",")
+	p := strings.Split(s, " ")
 	if len(p) != 2 {
 		log.Warnf("Received invalid lat long string: %s", s)
 		return LatLong{0, 0}

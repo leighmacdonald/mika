@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strconv"
+	"time"
 )
 
 const (
@@ -181,7 +182,7 @@ func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	valueMap := map[string]string{
+	valueMap := map[string]interface{}{
 		"client_prefix": client.ClientPrefix,
 		"client_name":   client.ClientName,
 	}
@@ -283,11 +284,27 @@ func (ts *TorrentStore) Close() error {
 // PeerStore is the redis backed store.PeerStore implementation
 type PeerStore struct {
 	client *redis.Client
+	pubSub *redis.PubSub
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps *PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
-	panic("implement me")
+func (ps *PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
+	pipe := ps.client.Pipeline()
+	for ph, stats := range batch {
+		k := peerKey(ph.InfoHash(), ph.PeerID())
+		pipe.HSet(k, map[string]interface{}{
+			"announces":     stats.Announces,
+			"uploaded":      stats.Uploaded,
+			"downloaded":    stats.Downloaded,
+			"last_announce": util.TimeToString(stats.LastAnnounce),
+		})
+		pipe.Expire(k, time.Second*600)
+		log.Debugf("Set key: %s", k)
+	}
+	if _, err := pipe.Exec(); err != nil {
+		return errors.Wrap(err, "Error trying to Sync peerstore (redis)")
+	}
+	return nil
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
@@ -373,13 +390,14 @@ func mapPeerValues(p *model.Peer, v map[string]string) {
 	p.SpeedDN = util.StringToUInt32(v["speed_dn"], 0)
 	p.SpeedUPMax = util.StringToUInt32(v["speed_dn_max"], 0)
 	p.SpeedDNMax = util.StringToUInt32(v["speed_up_max"], 0)
-	p.Uploaded = util.StringToUInt64(v["total_uploaded"], 0)
-	p.Downloaded = util.StringToUInt64(v["total_downloaded"], 0)
+	p.Uploaded = util.StringToUInt64(v["uploaded"], 0)
+	p.Downloaded = util.StringToUInt64(v["downloaded"], 0)
 	p.Left = util.StringToUInt32(v["total_left"], 0)
 	p.Announces = util.StringToUInt32(v["total_announces"], 0)
 	p.TotalTime = util.StringToUInt32(v["total_time"], 0)
 	p.IP = net.ParseIP(v["addr_ip"])
 	p.Port = util.StringToUInt16(v["addr_port"], 0)
+	p.Announces = util.StringToUInt32(v["announces"], 0)
 	p.AnnounceLast = util.StringToTime(v["last_announce"])
 	p.AnnounceFirst = util.StringToTime(v["first_announce"])
 	p.PeerID = model.PeerIDFromString(v["peer_id"])
@@ -442,6 +460,17 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 	}, nil
 }
 
+func (ps *PeerStore) peerExpireHandler() {
+	psChan := ps.pubSub.Channel()
+	for {
+		select {
+		case m := <-psChan:
+			// TODO cleanup any cache if it exists?
+			log.Println(m)
+		}
+	}
+}
+
 type peerDriver struct{}
 
 // NewPeerStore initialize a NewPeerStore implementation using the redis backing store
@@ -451,9 +480,12 @@ func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 		return nil, consts.ErrInvalidConfig
 	}
 	client := redis.NewClient(newRedisConfig(c))
-	return &PeerStore{
+	ps := &PeerStore{
 		client: client,
-	}, nil
+		pubSub: client.Subscribe("peer_expired"),
+	}
+	go ps.peerExpireHandler()
+	return ps, nil
 }
 
 type userDriver struct{}

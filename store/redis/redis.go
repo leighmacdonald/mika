@@ -466,11 +466,9 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 func (ps *PeerStore) peerExpireHandler() {
 	psChan := ps.pubSub.Channel()
 	for {
-		select {
-		case m := <-psChan:
-			// TODO cleanup any cache if it exists?
-			log.Println(m)
-		}
+		m := <-psChan
+		// TODO cleanup any cache if it exists?
+		log.Println(m)
 	}
 }
 

@@ -17,7 +17,7 @@ import (
 // is required.
 type StatusResp struct {
 	Err     string `json:"error,omitempty"`
-	Message string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // Error implements the error interface for our response
@@ -196,9 +196,9 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 
 }
 
-func (a *AdminAPI) userUpdate(_ *gin.Context) {
-
-}
+//func (a *AdminAPI) userUpdate(_ *gin.Context) {
+//
+//}
 
 // UserDeleteRequest represents a JSON API requests to delete a user via passkey
 type UserDeleteRequest struct {

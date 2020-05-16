@@ -51,7 +51,7 @@ const (
 	paramUploaded   announceParam = "uploaded"
 	paramCorrupt    announceParam = "corrupt"
 	paramNumWant    announceParam = "numwant"
-	paramCompact    announceParam = "compact"
+	//paramCompact    announceParam = "compact"
 )
 
 type query struct {

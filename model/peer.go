@@ -99,7 +99,7 @@ type Peer struct {
 // Expired checks if the peer last lost contact with us
 // TODO remove hard coded expiration time
 func (peer *Peer) Expired() bool {
-	return time.Now().Sub(peer.AnnounceLast).Seconds() > 300
+	return time.Since(peer.AnnounceLast).Seconds() > 300
 }
 
 // IsNew checks if the peer is making its first announce request

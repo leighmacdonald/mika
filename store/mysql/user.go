@@ -107,7 +107,7 @@ func (u *UserStore) GetByID(user *model.User, userID uint32) error {
 
 // Delete removes a user from the backing store
 func (u *UserStore) Delete(user model.User) error {
-	if user.UserID <= 0 {
+	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
 	const q = `DELETE FROM users WHERE user_id = ?`

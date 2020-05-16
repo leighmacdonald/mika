@@ -92,32 +92,6 @@ type announceRequest struct {
 	TrackerID string `form:"tracker_id"`
 }
 
-//noinspection GoUnusedType
-type announceResponse struct {
-	//  (optional) Minimum announce interval. If present clients must not reannounce more frequently than this.
-	MinInterval int `bencode:"min interval"`
-	Complete    int `bencode:"complete"`
-	Incomplete  int `bencode:"incomplete"`
-	// Interval in seconds that the client should wait between sending regular requests to the tracker
-	Interval int    `bencode:"interval"`
-	Peers    string `bencode:"peers"`
-	//  A string that the client should send back on its next announcements. If absent and a previous
-	//  announce sent a tracker id, do not discard the old value; keep using it.
-	TrackerID []byte
-	// ( optional ) Similar to failure reason, but the response still gets processed normally. The warning message is
-	// shown just like an error.
-	Warning string `bencode:"warning message"`
-}
-
-//noinspection GoUnusedFunction
-func getUint64Key(q *query, key announceParam, def uint64) uint64 {
-	left, err := q.Uint64(key)
-	if err != nil {
-		return def
-	}
-	return util.UMax64(0, left)
-}
-
 func getUint32Key(q *query, key announceParam, def uint32) uint32 {
 	left, err := q.Uint32key(key)
 	if err != nil {

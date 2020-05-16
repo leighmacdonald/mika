@@ -37,7 +37,8 @@ func (us UserStore) Sync(batch map[string]model.UserStats) error {
 		WHERE
 			passkey = $4
 `
-	c, _ := context.WithDeadline(us.ctx, time.Now().Add(time.Second*10))
+	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(time.Second*10))
+	defer cancel()
 	tx, err := us.db.Begin(c)
 	if err != nil {
 		return errors.Wrap(err, "postgres.UserStore.Sync Failed to being transaction")
@@ -61,7 +62,8 @@ func (us UserStore) Sync(batch map[string]model.UserStats) error {
 
 // Add will add a new user to the backing store
 func (us UserStore) Add(user model.User) error {
-	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	const q = `
 		INSERT INTO users 
 		    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces) 
@@ -87,7 +89,8 @@ func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
 		    users 
 		WHERE 
 		    passkey = $1`
-	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	err := us.db.QueryRow(c, q, passkey).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
 		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
@@ -105,7 +108,8 @@ func (us UserStore) GetByID(user *model.User, userID uint32) error {
 		    users 
 		WHERE 
 		    user_id = $1`
-	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	err := us.db.QueryRow(c, q, userID).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
 		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
@@ -116,11 +120,12 @@ func (us UserStore) GetByID(user *model.User, userID uint32) error {
 
 // Delete removes a user from the backing store
 func (us UserStore) Delete(user model.User) error {
-	if user.UserID <= 0 {
+	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
 	const q = `DELETE FROM users WHERE user_id = $1`
-	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	if _, err := us.db.Exec(c, q, user.UserID); err != nil {
 		return errors.Wrap(err, "Failed to delete user")
 	}
@@ -130,7 +135,8 @@ func (us UserStore) Delete(user model.User) error {
 
 // Close will close the underlying database connection and clear the local caches
 func (us UserStore) Close() error {
-	c, _ := context.WithDeadline(us.ctx, time.Now().Add(15*time.Second))
+	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(15*time.Second))
+	defer cancel()
 	return us.db.Close(c)
 }
 
@@ -154,7 +160,8 @@ func (ts TorrentStore) Conn() interface{} {
 func (ts TorrentStore) Add(t model.Torrent) error {
 	const q = `INSERT INTO torrent (info_hash, release_name) VALUES($1::bytea, $2)`
 	//log.Println(t.InfoHash.Bytes())
-	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	commandTag, err := ts.db.Exec(c, q, t.InfoHash.Bytes(), t.ReleaseName)
 	if err != nil {
 		return err
@@ -176,7 +183,8 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	} else {
 		query = updateQ
 	}
-	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	commandTag, err := ts.db.Exec(c, query, ih.Bytes())
 	if err != nil {
 		return err
@@ -197,7 +205,8 @@ func (ts TorrentStore) Get(t *model.Torrent, ih model.InfoHash) error {
 		    torrent 
 		WHERE 
 		    info_hash = $1 AND is_deleted = false`
-	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	var b []byte
 	err := ts.db.QueryRow(c, q, ih.Bytes()).Scan(
 		&b, // TODO implement pgx custom types to map automatically
@@ -224,14 +233,16 @@ func (ts TorrentStore) Get(t *model.Torrent, ih model.InfoHash) error {
 
 // Close will close the underlying postgres database connection
 func (ts TorrentStore) Close() error {
-	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(15*time.Second))
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(15*time.Second))
+	defer cancel()
 	return ts.db.Close(c)
 }
 
 // WhiteListDelete removes a client from the global whitelist
 func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	const q = `DELETE FROM whitelist WHERE client_prefix = $1`
-	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	commandTag, err := ts.db.Exec(c, q, client.ClientPrefix)
 	if err != nil {
 		return errors.Wrap(err, "Failed to delete client whitelist")
@@ -245,7 +256,8 @@ func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES ($1, $2)`
-	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	commandTag, err := ts.db.Exec(c, q, client.ClientPrefix, client.ClientName)
 	if err != nil {
 		return errors.Wrap(err, "Failed to insert new whitelist entry")
@@ -260,7 +272,8 @@ func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	var wl []model.WhiteListClient
 	const q = `SELECT client_prefix, client_name FROM whitelist`
-	c, _ := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	rows, err := ts.db.Query(c, q)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to select client whitelists")
@@ -301,7 +314,8 @@ func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	VALUES 
 	    (:peer_id, :info_hash, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
 	`
-	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	commandTag, err := ps.db.Exec(c, q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
 	if err != nil {
 		return err
@@ -320,7 +334,8 @@ func (ps PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
 // Delete will remove a peer from the swarm of the torrent provided
 func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	const q = `DELETE FROM peers WHERE info_hash = $1 AND peer_id = $2`
-	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	_, err := ps.db.Exec(c, q, ih.Bytes(), p)
 	return err
 }
@@ -338,7 +353,8 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		LIMIT 
 		    $2`
 	var peers model.Swarm
-	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	rows, err := ps.db.Query(c, q, ih, limit)
 	if err != nil {
 		return nil, err
@@ -369,7 +385,8 @@ func (ps PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) e
 		    peers 
 		WHERE 
 			info_hash = $1 AND peer_id = $2`
-	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
 	err := ps.db.QueryRow(c, q, ih, peerID).Scan(
 		p.PeerID, p.InfoHash, p.UserID, p.IP, p.Port, p.Downloaded, p.Uploaded,
 		p.Announces, p.SpeedUP, p.SpeedDN, p.SpeedUPMax, p.SpeedDNMax, p.Location)
@@ -381,7 +398,8 @@ func (ps PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) e
 
 // Close will close the underlying database connection
 func (ps PeerStore) Close() error {
-	c, _ := context.WithDeadline(ps.ctx, time.Now().Add(15*time.Second))
+	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(15*time.Second))
+	defer cancel()
 	return ps.db.Close(c)
 }
 

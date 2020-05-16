@@ -2,7 +2,6 @@ package http
 
 import (
 	"fmt"
-	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -19,9 +18,6 @@ func performRequest(r http.Handler, method, path string) *httptest.ResponseRecor
 }
 
 func TestBitTorrentHandler_Announce(t *testing.T) {
-	if err := config.Read("mika_testing"); err != nil {
-		t.Skipf("No mika_testing.yaml loaded. Skipping.")
-	}
 	tkr, torrents, users, peers := tracker.NewTestTracker()
 	rh := NewBitTorrentHandler(tkr)
 	type testAnn struct {

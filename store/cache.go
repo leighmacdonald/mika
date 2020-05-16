@@ -51,7 +51,6 @@ func (cache *TorrentCache) Delete(ih model.InfoHash, dropRow bool) {
 		t.IsDeleted = true
 		cache.torrents[ih] = t
 	}
-	return
 }
 
 // Get returns the Torrent matching the infohash.

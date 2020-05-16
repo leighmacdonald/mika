@@ -211,6 +211,7 @@ func NewAPIHandler(tkr *tracker.Tracker) *gin.Engine {
 	}
 	r.POST("/ping", h.ping)
 	r.GET("/tracker/stats", h.stats)
+	r.PATCH("/config", h.configUpdate)
 
 	r.DELETE("/torrent/:info_hash", h.torrentDelete)
 	r.PATCH("/torrent/:info_hash", h.torrentUpdate)

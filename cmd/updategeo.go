@@ -22,7 +22,7 @@ var updategeoCmd = &cobra.Command{
 		if err := geo.DownloadDB(outPath, key); err != nil {
 			log.Errorf("failed to download database: %s", err.Error())
 		} else {
-			d := time.Now().Sub(t0).String()
+			d := time.Since(t0).String()
 			log.Infof("Successfully downloaded geoip db to: %s (%s)", outPath, d)
 		}
 	},

@@ -72,7 +72,7 @@ func TestDownloadDB(t *testing.T) {
 		if err != nil {
 			log.Fatalf("failed to stat file: %s", err)
 		}
-		if time.Now().Sub(file.ModTime()).Hours() >= 6 {
+		if time.Since(file.ModTime()).Hours() >= 6 {
 			if err := os.Remove(p); err != nil {
 				t.Fatalf("Could not remove mmdb file: %s", err)
 			}
@@ -87,8 +87,5 @@ func TestDownloadDB(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	if err := config.Read("mika_testing"); err != nil {
-		os.Exit(1)
-	}
 	os.Exit(m.Run())
 }

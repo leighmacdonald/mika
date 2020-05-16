@@ -26,14 +26,14 @@ const (
 )
 
 // authMode defines what type of authentication to use when talking to the http backing store api
-type authMode int
-
-//noinspection GoUnusedConst
-const (
-	basic authMode = iota
-	bearerToken
-	keyToken
-)
+//type authMode int
+//
+////noinspection GoUnusedConst
+//const (
+//	basic authMode = iota
+//	bearerToken
+//	keyToken
+//)
 
 type torrentDriver struct{}
 

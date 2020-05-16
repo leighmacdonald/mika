@@ -207,7 +207,7 @@ func (ellipsoid ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 
 	var c2a, c, cx, cy, cz, d, del, e, sx, sy, y float64
 	// This originally was a do-while loop. Exit condition is at end of loop.
-	for true {
+	for {
 		sx = math.Sin(x)
 		cx = math.Cos(x)
 		tu1 = cu2 * sx

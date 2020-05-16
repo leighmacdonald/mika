@@ -2,10 +2,10 @@ package client
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	h "github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/model"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
@@ -117,15 +117,18 @@ func (c *Client) Ping() error {
 	t0 := time.Now()
 	resp, err := h.DoRequest(c.client, "POST", c.u("/ping"), h.PingRequest{Ping: msg})
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to make request")
 	}
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err2 := ioutil.ReadAll(resp.Body)
+	if err2 != nil {
+		return errors.Wrap(err, "Failed to read ping body")
+	}
 	defer func() { _ = resp.Body.Close() }()
 	var pong h.PingResponse
 	if err := json.Unmarshal(b, &pong); err != nil {
 		return err
 	}
-	log.Debugf("Ping successful: %s", time.Now().Sub(t0).String())
+	log.Debugf("Ping successful: %s", time.Since(t0).String())
 	if pong.Pong != msg {
 		return errors.New("invalid response to message")
 	}

@@ -4,7 +4,6 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"math"
 	"net"
@@ -14,6 +13,9 @@ import (
 )
 
 func TestGetLocation(t *testing.T) {
+	if config.GetString(config.GeodbAPIKey) == "" {
+		t.SkipNow()
+	}
 	fp := util.FindFile(config.GetString(config.GeodbPath))
 	if !util.Exists(fp) {
 		t.Skipf("No mmdb found")
@@ -31,6 +33,9 @@ func TestGetLocation(t *testing.T) {
 }
 
 func TestDistance(t *testing.T) {
+	if config.GetString(config.GeodbAPIKey) == "" {
+		t.SkipNow()
+	}
 	fp := util.FindFile(config.GetString(config.GeodbPath))
 	if !util.Exists(fp) {
 		t.Skipf("No mmdb found")
@@ -57,6 +62,10 @@ func BenchmarkDistance(t *testing.B) {
 }
 
 func TestDownloadDB(t *testing.T) {
+	key := config.GetString(config.GeodbAPIKey)
+	if key == "" {
+		t.SkipNow()
+	}
 	p := util.FindFile(config.GetString(config.GeodbPath))
 	if util.Exists(p) {
 		file, err := os.Stat(p)
@@ -71,12 +80,15 @@ func TestDownloadDB(t *testing.T) {
 			t.Skipf("Skipping download test, file age too new")
 		}
 	}
-	key := viper.GetString("geodb_api_key")
+
 	err2 := DownloadDB(p, key)
 	require.NoError(t, err2)
 	require.NoError(t, New(p, false).db.Verify(), "failed to verify downloaded mmdb")
 }
 
 func TestMain(m *testing.M) {
+	if err := config.Read("mika_testing"); err != nil {
+		os.Exit(1)
+	}
 	os.Exit(m.Run())
 }

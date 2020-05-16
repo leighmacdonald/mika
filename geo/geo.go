@@ -26,6 +26,28 @@ const (
 	geoDownloadURL = "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=%s&suffix=tar.gz"
 )
 
+type Provider interface {
+	GetLocation(ip net.IP) City
+	Close() error
+}
+
+type DummyProvider struct{}
+
+func (d *DummyProvider) DownloadDB(_ string, _ string) error {
+	return nil
+}
+
+func (d *DummyProvider) Close() error {
+	return nil
+}
+
+func (d *DummyProvider) GetLocation(_ net.IP) City {
+	return City{
+		Country:  Country{ISOCode: "XX"},
+		Location: LatLong{Latitude: 0.0, Longitude: 0.0},
+	}
+}
+
 // City provides the country and lat/long
 type City struct {
 	Country  Country `maxminddb:"country"`

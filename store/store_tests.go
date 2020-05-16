@@ -17,10 +17,9 @@ import (
 
 // GenerateTestUser creates a peer using fake data. Used for testing.
 func GenerateTestUser() model.User {
-	passkey, _ := util.GenRandomBytes(20)
 	return model.User{
 		UserID:  uint32(rand.Intn(10000)),
-		Passkey: string(passkey),
+		Passkey: util.NewPasskey(),
 	}
 }
 
@@ -132,6 +131,37 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.NoError(t, ts.WhiteListDelete(wlClients[0]))
 	clientsUpdated, _ := ts.WhiteListGetAll()
 	require.Equal(t, len(wlClients)-1, len(clientsUpdated))
+}
+
+func TestUserStore(t *testing.T, s UserStore) {
+	var users []model.User
+	for i := 0; i < 5; i++ {
+		users = append(users, GenerateTestUser())
+	}
+	if users == nil {
+		t.Fatalf("Failed to setup users")
+	}
+	require.NoError(t, s.Add(users[0]))
+	var fetchedUserID model.User
+	var fetchedUserPasskey model.User
+	require.NoError(t, s.GetByID(&fetchedUserID, users[0].UserID))
+	require.Equal(t, users[0], fetchedUserID)
+	require.NoError(t, s.GetByPasskey(&fetchedUserPasskey, users[0].Passkey))
+	require.Equal(t, users[0], fetchedUserPasskey)
+
+	batchUpdate := map[string]model.UserStats{
+		users[0].Passkey: {
+			Uploaded:   1000,
+			Downloaded: 2000,
+			Announces:  10,
+		},
+	}
+	require.NoError(t, s.Sync(batchUpdate))
+	var updatedUser model.User
+	require.NoError(t, s.GetByPasskey(&updatedUser, users[0].Passkey))
+	require.Equal(t, uint64(1000), updatedUser.Uploaded)
+	require.Equal(t, uint64(2000), updatedUser.Downloaded)
+	require.Equal(t, uint32(10), updatedUser.Announces)
 }
 
 func init() {

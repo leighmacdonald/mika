@@ -25,7 +25,7 @@ test:
 	@go test $(GO_FLAGS) -cover . ./...
 
 cover:
-	@go test -coverprofile=coverage.out $(GO_FLAGS) */*_test.go
+	@go test -coverprofile=coverage.out $(GO_FLAGS) ./...
 	@go tool cover -html=coverage.out
 
 bench:

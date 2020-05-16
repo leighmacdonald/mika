@@ -1,21 +1,22 @@
-# release/debug
+# release/debug/test
 general_run_mode: debug
-general_log_level: info
+general_log_level: debug
 general_log_colour: true
 
 # Allow anyone to participate in swarms. This disables passkey support.
 tracker_public: false
-tracker_listen: ":34000"
+tracker_listen: "0.0.0.0:34000"
 tracker_tls: false
 tracker_ipv6: false
 tracker_ipv6_only: false
-tracker_announce_interval: 300s
-tracker_announce_interval_minimum: 10s
-tracker_reap_interval: 400s
+tracker_reaper_interval: 90s
+tracker_annouce_interval: 30s
+tracker_annouce_interval_minimum: 10s
 tracker_hnr_threshold: 1d
-tracker_index_interval: 60s
+tracker_batch_update_interval: 30s
 
 api_listen: ":34001"
+api_tls: false
 api_ipv6: false
 api_ipv6_only: false
 
@@ -23,33 +24,35 @@ api_ipv6_only: false
 # postgres and mysql support requires that mika is built with the matching build tags
 # go build -tags postgres
 store_torrent_type: mysql
-store_torrent_host: 127.1
+store_torrent_host: 127.0.0.1
 store_torrent_port: 3306
 # For redis, the dbname should be the numeric db value and should differ from the redis cache db value
 store_torrent_user: mika
 store_torrent_password: mika
 store_torrent_database: mika
-store_torrent_properties:
+store_torrent_properties: parseTime=true
 
-  // Live peer cache backend storage config
-store_peers_type: redis
-store_peers_host: localhost
-store_peers_port: 6379
+# Live peer cache backend storage config
+store_peers_type: memory
+store_peers_host:
+store_peers_port:
 store_peers_user:
 store_peers_password:
-store_peers_database: 0
+store_peers_database:
+store_peers_properties:
 store_peers_max_idle: 500
 
-  // User backend storage config
+# User backend storage config
 store_users_type: mysql
-store_users_host: localhost
+store_users_host: 127.0.0.1
 store_users_port: 3306
 store_users_user: mika
 store_users_password: mika
 store_users_database: mika
+store_users_properties: parseTime=true
 store_users_max_idle: 500
 
 # Visit https://www.maxmind.com and sign up to get a license key
-geodb_path: "./geodb.mmdb"
+geodb_path: "geodb.mmdb"
 geodb_api_key:
-geodb_enabled: true
+geodb_enabled: false

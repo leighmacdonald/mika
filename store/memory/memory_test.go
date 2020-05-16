@@ -6,15 +6,13 @@ import (
 )
 
 func TestMemoryTorrentStore(t *testing.T) {
-	td := torrentDriver{}
-	ts, _ := td.NewTorrentStore(nil)
-	store.TestTorrentStore(t, ts)
+	store.TestTorrentStore(t, NewTorrentStore())
 }
 
 func TestMemoryPeerStore(t *testing.T) {
-	td := torrentDriver{}
-	ts, _ := td.NewTorrentStore(nil)
-	pd := peerDriver{}
-	ps, _ := pd.NewPeerStore(nil)
-	store.TestPeerStore(t, ps, ts)
+	store.TestPeerStore(t, NewPeerStore(), NewTorrentStore(), NewUserStore())
+}
+
+func TestMemoryUserStore(t *testing.T) {
+	store.TestUserStore(t, NewUserStore())
 }

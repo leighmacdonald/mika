@@ -26,7 +26,7 @@ type Tracker struct {
 	Torrents store.TorrentStore
 	Peers    store.PeerStore
 	Users    store.UserStore
-	Geodb    *geo.DB
+	Geodb    geo.Provider
 	// GeodbEnabled will enable the lookup of location data for peers
 	GeodbEnabled bool
 	// Public if true means we dont require a passkey / authorized user
@@ -186,7 +186,12 @@ func New(ctx context.Context) (*Tracker, error) {
 		return nil, errors.Wrap(err3, "Failed to setup user store")
 	}
 
-	geodb := geo.New(viper.GetString(string(config.GeodbPath)), runMode == "release")
+	var geodb geo.Provider
+	if config.GetBool(config.GeodbEnabled) {
+		geodb = geo.New(config.GetString(config.GeodbPath), runMode == "release")
+	} else {
+		geodb = &geo.DummyProvider{}
+	}
 	whitelist := make(map[string]model.WhiteListClient)
 	wl, err4 := s.WhiteListGetAll()
 	if err4 != nil {
@@ -273,11 +278,17 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 		}
 	}
 	geoPath := util.FindFile(viper.GetString(string(config.GeodbPath)))
+	var geodb geo.Provider
+	if config.GetBool(config.GeodbEnabled) {
+		geodb = geo.New(geoPath, false)
+	} else {
+		geodb = &geo.DummyProvider{}
+	}
 	return &Tracker{
 		Torrents:        ts,
 		Peers:           ps,
 		Users:           us,
-		Geodb:           geo.New(geoPath, false),
+		Geodb:           geodb,
 		GeodbEnabled:    viper.GetBool(string(config.GeodbEnabled)),
 		WhitelistMutex:  &sync.RWMutex{},
 		Whitelist:       wlm,

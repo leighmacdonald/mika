@@ -19,6 +19,14 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
+func NewTorrentStore() *TorrentStore {
+	return &TorrentStore{
+		RWMutex:   sync.RWMutex{},
+		torrents:  map[model.InfoHash]model.Torrent{},
+		whitelist: []model.WhiteListClient{},
+	}
+}
+
 // Sync batch updates the backing store with the new TorrentStats provided
 func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 	ts.Lock()
@@ -98,6 +106,13 @@ func (ts *TorrentStore) Get(torrent *model.Torrent, hash model.InfoHash) error {
 type PeerStore struct {
 	sync.RWMutex
 	peers map[model.InfoHash]model.Swarm
+}
+
+func NewPeerStore() *PeerStore {
+	return &PeerStore{
+		RWMutex: sync.RWMutex{},
+		peers:   map[model.InfoHash]model.Swarm{},
+	}
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
@@ -217,27 +232,27 @@ type torrentDriver struct{}
 
 // NewTorrentStore initialize a TorrentStore implementation using the memory backing store
 func (td torrentDriver) NewTorrentStore(_ interface{}) (store.TorrentStore, error) {
-	return &TorrentStore{
-		sync.RWMutex{},
-		make(map[model.InfoHash]model.Torrent),
-		[]model.WhiteListClient{},
-	}, nil
+	return NewTorrentStore(), nil
 }
 
 type peerDriver struct{}
 
 // NewPeerStore initialize a NewPeerStore implementation using the memory backing store
 func (pd peerDriver) NewPeerStore(_ interface{}) (store.PeerStore, error) {
-	return &PeerStore{
-		sync.RWMutex{},
-		make(map[model.InfoHash]model.Swarm),
-	}, nil
+	return NewPeerStore(), nil
 }
 
 // UserStore is the memory backed store.UserStore implementation
 type UserStore struct {
 	sync.RWMutex
 	users map[string]model.User
+}
+
+func NewUserStore() *UserStore {
+	return &UserStore{
+		RWMutex: sync.RWMutex{},
+		users:   map[string]model.User{},
+	}
 }
 
 // Sync batch updates the backing store with the new UserStats provided
@@ -314,10 +329,7 @@ type userDriver struct{}
 
 // NewUserStore creates a new memory backed user store.
 func (pd userDriver) NewUserStore(_ interface{}) (store.UserStore, error) {
-	return &UserStore{
-		sync.RWMutex{},
-		make(map[string]model.User),
-	}, nil
+	return NewUserStore(), nil
 }
 
 func init() {

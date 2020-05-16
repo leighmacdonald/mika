@@ -236,6 +236,11 @@ func GetString(key Key) string {
 	return viper.GetString(string(key))
 }
 
+// GetBool enforces use of our consts for config keys
+func GetBool(key Key) bool {
+	return viper.GetBool(string(key))
+}
+
 // Read reads in config file and ENV variables if set.
 func Read(cfgFile string) error {
 	// Find home directory.

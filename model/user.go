@@ -16,7 +16,7 @@ type User struct {
 // Valid performs basic validation of the user info ensuring we have the minimum required
 // data to be considered valid by the tracker
 func (u User) Valid() bool {
-	return u.UserID > 0 && len(u.Passkey) == 20
+	return u.UserID > 0 && len(u.Passkey) == 20 && !u.IsDeleted
 }
 
 // Users is a slice of known users

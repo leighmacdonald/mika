@@ -479,8 +479,9 @@ func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	}
 	client := redis.NewClient(newRedisConfig(c))
 	ps := &PeerStore{
-		client: client,
-		pubSub: client.Subscribe("peer_expired"),
+		client:  client,
+		pubSub:  client.Subscribe("peer_expired"),
+		peerTTL: time.Minute * 10,
 	}
 	go ps.peerExpireHandler()
 	return ps, nil

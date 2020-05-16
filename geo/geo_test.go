@@ -14,7 +14,10 @@ import (
 )
 
 func TestGetLocation(t *testing.T) {
-	fp := util.FindFile(viper.GetString("geodb_path"))
+	fp := util.FindFile(config.GetString(config.GeodbPath))
+	if !util.Exists(fp) {
+		t.Skipf("No mmdb found")
+	}
 	db := New(fp, false)
 	defer func() { _ = db.Close() }()
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
@@ -28,7 +31,11 @@ func TestGetLocation(t *testing.T) {
 }
 
 func TestDistance(t *testing.T) {
-	db := New(util.FindFile(viper.GetString("geodb_path")), false)
+	fp := util.FindFile(config.GetString(config.GeodbPath))
+	if !util.Exists(fp) {
+		t.Skipf("No mmdb found")
+	}
+	db := New(fp, false)
 	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
@@ -40,7 +47,7 @@ func TestDistance(t *testing.T) {
 }
 
 func BenchmarkDistance(t *testing.B) {
-	db := New(util.FindFile(viper.GetString("geodb_path")), false)
+	db := New(util.FindFile(config.GetString(config.GeodbPath)), false)
 	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
@@ -50,7 +57,7 @@ func BenchmarkDistance(t *testing.B) {
 }
 
 func TestDownloadDB(t *testing.T) {
-	p := util.FindFile(viper.GetString("geodb_path"))
+	p := util.FindFile(config.GetString(config.GeodbPath))
 	if util.Exists(p) {
 		file, err := os.Stat(p)
 		if err != nil {
@@ -70,8 +77,6 @@ func TestDownloadDB(t *testing.T) {
 	require.NoError(t, New(p, false).db.Verify(), "failed to verify downloaded mmdb")
 }
 
-func init() {
-	if err := config.Read("mika_testing"); err != nil {
-		log.Fatalf("Failed to read test config")
-	}
+func TestMain(m *testing.M) {
+	os.Exit(m.Run())
 }

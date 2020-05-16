@@ -231,6 +231,11 @@ func GetStoreConfig(storeType StoreType) *StoreConfig {
 	return nil
 }
 
+// GetString enforces use of our consts for config keys
+func GetString(key Key) string {
+	return viper.GetString(string(key))
+}
+
 // Read reads in config file and ENV variables if set.
 func Read(cfgFile string) error {
 	// Find home directory.

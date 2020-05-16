@@ -13,6 +13,10 @@ between instances will be shown as needed.
 Both are equally supported currently, but you should use MariaDB if you have the option (Larry
 Ellison is a not so cool dude).
 
+For proper time conversions this must be set in any configured mysql stores.
+    
+    store_*_properties: parseTime=true
+
 ### PostgreSQL
 
 - PostgreSQL 10+

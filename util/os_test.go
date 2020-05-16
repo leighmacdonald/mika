@@ -10,7 +10,7 @@ import (
 
 func TestExists(t *testing.T) {
 	require.False(t, Exists("1234567890.txt"))
-	file, err := ioutil.TempFile("dir", "prefix")
+	file, err := ioutil.TempFile("", "prefix")
 	require.NoError(t, err)
 	defer func() { _ = os.Remove(file.Name()) }()
 	require.True(t, Exists(file.Name()))

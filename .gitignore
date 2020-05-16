@@ -40,3 +40,5 @@ src
 *.mmdb
 *.pdf
 *.torrent
+*coverage*
+/cc-test-reporter

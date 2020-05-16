@@ -5,11 +5,14 @@ git:
   depth: 1
 before_script:
   - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $GOPATH/bin v1.25.1
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
+  - ./cc-test-reporter before-build
+script:
+  - golangci-lint run
+  - make testcover
+after_script:
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
 go:
   - 1.14.x
 install: true
-script:
-  - golangci-lint run
-  - make test
-notifications:
-  webhooks: http://hooks.verimap.com:5556/hook/travis

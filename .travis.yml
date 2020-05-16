@@ -1,0 +1,5 @@
+language: go
+notifications:
+  webhooks: http://68.144.239.193:5556/hook/travis
+    on_success: never # default: change
+    on_failure: always # default: always

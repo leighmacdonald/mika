@@ -1,6 +1,7 @@
 # Mika - Bittorrent Tracker
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+[![TravisBuild](https://api.travis-ci.com/leighmacdonald/mika.svg?branch=master)](https://api.travis-ci.com/leighmacdonald/mika.svg?branch=master)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/f06234b0551a49cc8ac111d7b77827b2)](https://www.codacy.com/manual/leighmacdonald/mika?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=leighmacdonald/mika&amp;utm_campaign=Badge_Grade)
 [![Maintainability](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/maintainability)](https://codeclimate.com/github/leighmacdonald/mika/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/4e3242de961462b0edc7/test_coverage)](https://codeclimate.com/github/leighmacdonald/mika/test_coverage)

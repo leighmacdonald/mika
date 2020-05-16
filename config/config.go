@@ -278,3 +278,54 @@ func setupLogger(levelStr string, colour bool) {
 	}
 	log.SetLevel(level)
 }
+
+func init() {
+	// Setup our defaults
+	viper.SetDefault(string(GeneralRunMode), "release")
+	viper.SetDefault(string(GeneralLogLevel), "info")
+	viper.SetDefault(string(GeneralLogColour), false)
+
+	viper.SetDefault(string(TrackerPublic), false)
+	viper.SetDefault(string(TrackerListen), "0.0.0.0:34000")
+	viper.SetDefault(string(TrackerTLS), false)
+	viper.SetDefault(string(TrackerIPv6), false)
+	viper.SetDefault(string(TrackerIPv6Only), false)
+	viper.SetDefault(string(TrackerReaperInterval), "300s")
+	viper.SetDefault(string(TrackerAnnounceInterval), "30s")
+	viper.SetDefault(string(TrackerAnnounceIntervalMin), "10s")
+	viper.SetDefault(string(TrackerHNRThreshold), "6h")
+	viper.SetDefault(string(TrackerBatchUpdateInterval), "30s")
+
+	viper.SetDefault(string(APIListen), "0.0.0.0:34001")
+	viper.SetDefault(string(APITLS), false)
+	viper.SetDefault(string(APIIPv6), false)
+	viper.SetDefault(string(APIIPv6Only), false)
+
+	viper.SetDefault(string(StoreTorrentType), "memory")
+	viper.SetDefault(string(StoreTorrentHost), "")
+	viper.SetDefault(string(StoreTorrentPort), "")
+	viper.SetDefault(string(StoreTorrentUser), "")
+	viper.SetDefault(string(StoreTorrentPassword), "")
+	viper.SetDefault(string(StoreTorrentDatabase), "")
+	viper.SetDefault(string(StoreTorrentProperties), "")
+
+	viper.SetDefault(string(StorePeersType), "memory")
+	viper.SetDefault(string(StorePeersHost), "")
+	viper.SetDefault(string(StorePeersPort), "")
+	viper.SetDefault(string(StorePeersUser), "")
+	viper.SetDefault(string(StorePeersPassword), "")
+	viper.SetDefault(string(StorePeersDatabase), "")
+	viper.SetDefault(string(StorePeersProperties), "")
+
+	viper.SetDefault(string(StoreUsersType), "memory")
+	viper.SetDefault(string(StoreUsersHost), "")
+	viper.SetDefault(string(StoreUsersPort), "")
+	viper.SetDefault(string(StoreUsersUser), "")
+	viper.SetDefault(string(StoreUsersPassword), "")
+	viper.SetDefault(string(StoreUsersDatabase), "")
+	viper.SetDefault(string(StoreUsersProperties), "")
+
+	viper.SetDefault(string(GeodbEnabled), false)
+	viper.SetDefault(string(GeodbAPIKey), "")
+	viper.SetDefault(string(GeodbPath), "geodb.mmdb")
+}

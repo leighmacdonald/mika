@@ -4,6 +4,7 @@ import (
 	"github.com/go-redis/redis/v7"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/store/memory"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,12 @@ func TestRedisTorrentStore(t *testing.T) {
 	store.TestTorrentStore(t, ts)
 }
 
+func TestRedisUserStore(t *testing.T) {
+	us, e := store.NewUserStore("redis", config.GetStoreConfig(config.Users))
+	require.NoError(t, e, e)
+	store.TestUserStore(t, us)
+}
+
 func TestRedisPeerStore(t *testing.T) {
 	client := redis.NewClient(newRedisConfig(config.GetStoreConfig(config.Torrent)))
 	setupDB(t, client)
@@ -24,7 +31,7 @@ func TestRedisPeerStore(t *testing.T) {
 	require.NoError(t, err)
 	ps, err := store.NewPeerStore("redis", config.GetStoreConfig(config.Peers))
 	require.NoError(t, err, err)
-	store.TestPeerStore(t, ps, ts)
+	store.TestPeerStore(t, ps, ts, memory.NewUserStore())
 }
 
 func clearDB(c *redis.Client) {

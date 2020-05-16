@@ -97,11 +97,11 @@ func (us UserStore) Add(u model.User) error {
 	pipe.HSet(userKey(u.Passkey), map[string]interface{}{
 		"user_id":          u.UserID,
 		"passkey":          u.Passkey,
-		"download_enabled": true,
-		"is_deleted":       false,
-		"downloaded":       0,
-		"uploaded":         0,
-		"announces":        0,
+		"download_enabled": u.DownloadEnabled,
+		"is_deleted":       u.IsDeleted,
+		"downloaded":       u.Downloaded,
+		"uploaded":         u.Uploaded,
+		"announces":        u.Announces,
 	})
 	pipe.Set(userIDKey(u.UserID), u.Passkey, 0)
 	if _, err := pipe.Exec(); err != nil {
@@ -118,6 +118,11 @@ func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
 	}
 	user.Passkey = v["passkey"]
 	user.UserID = util.StringToUInt32(v["user_id"], 0)
+	user.Downloaded = util.StringToUInt64(v["downloaded"], 0)
+	user.Uploaded = util.StringToUInt64(v["uploaded"], 0)
+	user.Announces = util.StringToUInt32(v["announces"], 0)
+	user.DownloadEnabled = util.StringToBool(v["download_enabled"], false)
+	user.IsDeleted = util.StringToBool(v["is_deleted"], false)
 	if !user.Valid() {
 		return consts.ErrInvalidState
 	}

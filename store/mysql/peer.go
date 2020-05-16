@@ -100,7 +100,7 @@ func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 // Delete will remove a peer from the swarm of the torrent provided
 func (ps *PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	const q = `DELETE FROM peers WHERE info_hash = ? AND peer_id = ?`
-	_, err := ps.db.Exec(q, ih, p)
+	_, err := ps.db.Exec(q, ih.Bytes(), p.Bytes())
 	return err
 }
 

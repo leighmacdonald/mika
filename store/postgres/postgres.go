@@ -11,7 +11,6 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -26,30 +25,53 @@ type UserStore struct {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (us UserStore) Sync(_ map[string]model.UserStats) error {
-	panic("implement me")
+func (us UserStore) Sync(batch map[string]model.UserStats) error {
+	const txName = "userSync"
+	const q = `
+		UPDATE 
+			users
+		SET
+			downloaded = (downloaded + $1),
+		    uploaded = (uploaded + $2),
+		    announces = (announces + $3)
+		WHERE
+			passkey = $4
+`
+	c, _ := context.WithDeadline(us.ctx, time.Now().Add(time.Second*10))
+	tx, err := us.db.Begin(c)
+	if err != nil {
+		return errors.Wrap(err, "postgres.UserStore.Sync Failed to being transaction")
+	}
+	defer func() { _ = tx.Rollback(c) }()
+	_, err = tx.Prepare(c, txName, q)
+	if err != nil {
+		return errors.Wrap(err, "postgres.UserStore.Sync Failed to being transaction")
+	}
+
+	for passkey, stats := range batch {
+		if _, err := tx.Exec(c, txName, stats.Downloaded, stats.Uploaded, stats.Announces, passkey); err != nil {
+			return errors.Wrapf(err, "postgres.UserStore.Sync failed to Exec tx")
+		}
+	}
+	if err := tx.Commit(c); err != nil {
+		return errors.Wrapf(err, "postgres.UserStore.Sync failed to commit tx")
+	}
+	return nil
 }
 
 // Add will add a new user to the backing store
 func (us UserStore) Add(user model.User) error {
-	if user.UserID > 0 {
-		return errors.New("User already has a user_id")
-	}
 	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
 	const q = `
 		INSERT INTO users 
-		    (passkey, download_enabled, is_deleted) 
+		    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces) 
 		VALUES
-		    ($1, $2, $3)
-		RETURNING 
-		    (user_id)`
-	var userID int
-	err := us.db.QueryRow(c, q, user.Passkey, true, false).Scan(&userID)
+		    ($1, $2, $3, $4, $5, $6, $7)`
+	_, err := us.db.Exec(c, q, user.UserID, user.Passkey, user.DownloadEnabled, user.IsDeleted,
+		user.Downloaded, user.Uploaded, user.Announces)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
 	}
-	//user.UserID = uint32(userID)
-	log.Debugf("Inserted user id: %d", userID)
 	return nil
 }
 
@@ -58,9 +80,16 @@ func (us UserStore) Add(user model.User) error {
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
 func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
-	const q = `SELECT user_id, passkey, download_enabled, is_deleted FROM users WHERE passkey = $1`
+	const q = `
+		SELECT 
+		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
+		FROM 
+		    users 
+		WHERE 
+		    passkey = $1`
 	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
-	err := us.db.QueryRow(c, q, passkey).Scan(user.UserID, user.Passkey, user.DownloadEnabled, user.IsDeleted)
+	err := us.db.QueryRow(c, q, passkey).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
+		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
 		return errors.Wrap(err, "Failed to fetch user by passkey")
 	}
@@ -69,9 +98,16 @@ func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
 
 // GetByID returns a user matching the userId
 func (us UserStore) GetByID(user *model.User, userID uint32) error {
-	const q = `SELECT user_id, passkey, download_enabled, is_deleted FROM users WHERE user_id = $1`
+	const q = `
+		SELECT 
+		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
+		FROM 
+		    users 
+		WHERE 
+		    user_id = $1`
 	c, _ := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
-	err := us.db.QueryRow(c, q, userID).Scan(user.UserID, user.Passkey, user.DownloadEnabled, user.IsDeleted)
+	err := us.db.QueryRow(c, q, userID).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
+		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
 		return errors.Wrap(err, "Failed to fetch user by user_id")
 	}

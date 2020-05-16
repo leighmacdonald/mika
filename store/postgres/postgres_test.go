@@ -23,6 +23,19 @@ func TestTorrentDriver(t *testing.T) {
 	store.TestTorrentStore(t, &TorrentStore{db: db, ctx: context.Background()})
 }
 
+func TestUserDriver(t *testing.T) {
+	db, err := pgx.Connect(context.Background(), makeDSN(config.GetStoreConfig(config.Users)))
+	if err != nil {
+		t.Skipf("failed to connect to postgres user store: %s", err.Error())
+		return
+	}
+	setupDB(t, db)
+	store.TestUserStore(t, &UserStore{
+		db:  db,
+		ctx: context.Background(),
+	})
+}
+
 func clearDB(db *pgx.Conn) {
 	ctx := context.Background()
 	for _, table := range []string{"peers", "torrent", "users", "whitelist"} {

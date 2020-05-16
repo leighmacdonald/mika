@@ -60,15 +60,13 @@ func (u *UserStore) Sync(b map[string]model.UserStats) error {
 
 // Add will add a new user to the backing store
 func (u *UserStore) Add(user model.User) error {
-	if user.UserID > 0 {
-		return errors.New("User already has a user_id")
-	}
 	const q = `
 		INSERT INTO users 
-		    (passkey, download_enabled, is_deleted) 
+		    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded) 
 		VALUES
-		    (?, ?, ?)`
-	res, err := u.db.Exec(q, user.Passkey, true, false)
+		    (?, ?, ?, ?, ?, ?)`
+	res, err := u.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
+		user.IsDeleted, user.Downloaded, user.Uploaded)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
 	}

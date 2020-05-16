@@ -54,9 +54,6 @@ create table peers
     primary key (info_hash, peer_id),
     constraint peers_torrent_fk
         foreign key (info_hash) references torrent (info_hash)
-            on update cascade on delete cascade,
-    constraint peers_user_id_fk
-        foreign key (user_id) references users (user_id)
             on update cascade on delete cascade
 );
 

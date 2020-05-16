@@ -25,6 +25,9 @@ create table users
 	passkey varchar(20) not null,
 	download_enabled tinyint(1) default 1 not null,
 	is_deleted tinyint(1) default 0 not null,
+	downloaded bigint default 0 not null,
+	uploaded bigint default 0 not null,
+	announces int default 0 not null,
 	constraint user_passkey_uindex unique (passkey)
 );
 
@@ -44,11 +47,10 @@ create table peers
 	speed_dn int unsigned default 0 not null,
 	speed_up_max int unsigned default 0 not null,
 	speed_dn_max int unsigned default 0 not null,
+	announce_first datetime not null,
+	announce_last datetime not null,
 	location point not null,
-	constraint peers_pk primary key (info_hash, peer_id),
-	constraint peers_user_user_id_fk
-		foreign key (user_id) references users (user_id)
-			on update cascade on delete cascade
+	constraint peers_pk primary key (info_hash, peer_id)
 );
 
 

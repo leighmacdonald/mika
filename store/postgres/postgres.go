@@ -11,6 +11,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -297,26 +298,72 @@ type PeerStore struct {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
-	panic("implement me")
+func (ps PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
+	const txName = "peerSync"
+	const q = `
+		UPDATE 
+			peers
+		SET
+			downloaded = (downloaded + $1),
+		    uploaded = (uploaded + $2),
+		    announces = (announces + $3),
+		    announce_last = $4
+		WHERE
+			peer_id = $5 AND info_hash = $6
+`
+	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(time.Second*10))
+	defer cancel()
+	tx, err := ps.db.Begin(c)
+	if err != nil {
+		return errors.Wrap(err, "postgres.PeerStore.Sync Failed to being transaction")
+	}
+	defer func() { _ = tx.Rollback(c) }()
+	_, err = tx.Prepare(c, txName, q)
+	if err != nil {
+		return errors.Wrap(err, "postgres.PeerStore.Sync Failed to being transaction")
+	}
+
+	for peerHash, stats := range batch {
+		if _, err := tx.Exec(c, txName, stats.Downloaded, stats.Uploaded, stats.Announces, stats.LastAnnounce,
+			peerHash.PeerID().Bytes(), peerHash.InfoHash().Bytes()); err != nil {
+			return errors.Wrapf(err, "postgres.PeerStore.Sync failed to Exec tx")
+		}
+	}
+	if err := tx.Commit(c); err != nil {
+		return errors.Wrapf(err, "postgres.PeerStore.Sync failed to commit tx")
+	}
+	return nil
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
 func (ps PeerStore) Reap() {
-	panic("implement me")
+	// NOW() - INTERVAL '15 minutes'
+	const q = `DELETE FROM peers WHERE announce_last < $1`
+	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
+	rows, err := ps.db.Exec(c, q, time.Now().Add(-(15 * time.Minute)))
+	if err != nil {
+		log.Errorf("failed to reap peers: %s", err.Error())
+		return
+	}
+	if rows.RowsAffected() > 0 {
+		log.Debugf("Reaped %d peers", rows.RowsAffected())
+	}
 }
 
 // Add insets the peer into the swarm of the torrent provided
 func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	const q = `
 	INSERT INTO peers 
-	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, created_on, updated_on)
+	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, announce_first, announce_last)
 	VALUES 
-	    (:peer_id, :info_hash, :addr_ip, :addr_port, :location, :user_id, now(), :updated_on)
+	    ($1, $2, $3, $4::int, ST_MakePoint($6, $5), $7, $8, $9)
 	`
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
-	commandTag, err := ps.db.Exec(c, q, p.PeerID, ih, p.IP, p.Port, p.Location, p.UserID)
+	commandTag, err := ps.db.Exec(c, q,
+		p.PeerID.Bytes(), ih.Bytes(), p.IP, p.Port, p.Location.Latitude, p.Location.Longitude, p.UserID,
+		p.AnnounceFirst, p.AnnounceLast)
 	if err != nil {
 		return err
 	}
@@ -326,17 +373,12 @@ func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	return nil
 }
 
-// Update will sync the new peer data with the backing store
-func (ps PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
-	panic("implement me")
-}
-
 // Delete will remove a peer from the swarm of the torrent provided
 func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	const q = `DELETE FROM peers WHERE info_hash = $1 AND peer_id = $2`
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
-	_, err := ps.db.Exec(c, q, ih.Bytes(), p)
+	_, err := ps.db.Exec(c, q, ih.Bytes(), p.Bytes())
 	return err
 }
 
@@ -344,8 +386,8 @@ func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	const q = `
 		SELECT 
-		       peer_id, info_hash, user_id, addr_ip, addr_port, total_downloaded, total_announces,
-		       speed_up, speed_dn, speed_up_max, speed_dn_max, location
+		    peer_id::bytea, info_hash::bytea, user_id, addr_ip, addr_port, downloaded, uploaded, 
+			announces, speed_up, speed_dn, speed_up_max, speed_dn_max, ST_x(location), ST_y(location)
 		FROM
 		    peers 
 		WHERE
@@ -355,7 +397,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers model.Swarm
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
-	rows, err := ps.db.Query(c, q, ih, limit)
+	rows, err := ps.db.Query(c, q, ih.Bytes(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +405,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	for rows.Next() {
 		var p model.Peer
 		err = rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
-			&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location)
+			&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location.Longitude, &p.Location.Latitude)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to fetch N peers from store")
 		}
@@ -379,7 +421,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 func (ps PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) error {
 	const q = `
 		SELECT 
-		       peer_id, info_hash, user_id, addr_ip, addr_port, total_downloaded, total_announces,
+		       peer_id, info_hash, user_id, addr_ip, addr_port, downloaded, uploaded, announces,
 		       speed_up, speed_dn, speed_up_max, speed_dn_max, location
 		FROM
 		    peers 
@@ -415,9 +457,7 @@ func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres user store")
 	}
-	return &UserStore{
-		db: db,
-	}, nil
+	return NewUserStore(db), nil
 }
 
 type peerDriver struct{}
@@ -432,9 +472,17 @@ func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres peer store")
 	}
-	return &PeerStore{
-		db: db,
-	}, nil
+	return NewPeerStore(db), nil
+}
+func NewUserStore(db *pgx.Conn) *UserStore {
+	return &UserStore{db: db, ctx: context.Background()}
+}
+
+func NewPeerStore(db *pgx.Conn) *PeerStore {
+	return &PeerStore{db: db, ctx: context.Background()}
+}
+func NewTorrentStore(db *pgx.Conn) *TorrentStore {
+	return &TorrentStore{db: db, ctx: context.Background()}
 }
 
 type torrentDriver struct{}
@@ -449,9 +497,7 @@ func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, er
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres torrent store")
 	}
-	return &TorrentStore{
-		db: db,
-	}, nil
+	return NewTorrentStore(db), nil
 }
 
 func makeDSN(c *config.StoreConfig) string {

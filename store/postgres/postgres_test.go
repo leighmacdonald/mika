@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/store/memory"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"os"
@@ -34,6 +35,16 @@ func TestUserDriver(t *testing.T) {
 		db:  db,
 		ctx: context.Background(),
 	})
+}
+
+func TestPeerDriver(t *testing.T) {
+	db, err := pgx.Connect(context.Background(), makeDSN(config.GetStoreConfig(config.Peers)))
+	if err != nil {
+		t.Skipf("failed to connect to postgres user store: %s", err.Error())
+		return
+	}
+	setupDB(t, db)
+	store.TestPeerStore(t, NewPeerStore(db), memory.NewTorrentStore(), memory.NewUserStore())
 }
 
 func clearDB(db *pgx.Conn) {

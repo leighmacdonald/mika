@@ -28,6 +28,7 @@ type Tracker struct {
 	Users    store.UserStore
 	Geodb    geo.Provider
 	// GeodbEnabled will enable the lookup of location data for peers
+	// TODO the dummy provider is probably sufficient
 	GeodbEnabled bool
 	// Public if true means we dont require a passkey / authorized user
 	Public bool

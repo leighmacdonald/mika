@@ -14,16 +14,18 @@ import (
 
 // Client is the API client implementation
 type Client struct {
-	host   string
-	client *http.Client
+	host    string
+	authKey string
+	client  *http.Client
 }
 
 // New initializes an API client for the specified host
-func New(host string) *Client {
+func New(host string, authKey string) *Client {
 	c := h.NewClient(nil)
 	return &Client{
-		host:   host,
-		client: c,
+		host:    host,
+		authKey: authKey,
+		client:  c,
 	}
 }
 
@@ -31,9 +33,18 @@ func (c *Client) u(path string) string {
 	return fmt.Sprintf("http://%s%s", c.host, path)
 }
 
+func (c *Client) headers() map[string]string {
+	if c.authKey == "" {
+		return nil
+	}
+	return map[string]string{
+		"Authorization": c.authKey,
+	}
+}
+
 // TorrentDelete will delete the torrent matching the info_hash provided
 func (c *Client) TorrentDelete(ih model.InfoHash) error {
-	resp, err := h.DoRequest(c.client, "DELETE", c.u(fmt.Sprintf("/torrent/%s", ih.String())), nil)
+	resp, err := h.DoRequest(c.client, "DELETE", c.u(fmt.Sprintf("/torrent/%s", ih.String())), nil, c.headers())
 	if err != nil {
 		return err
 	}
@@ -50,7 +61,7 @@ func (c *Client) TorrentAdd(ih model.InfoHash, name string) error {
 		InfoHash: ih.String(),
 		Name:     name,
 	}
-	resp, err := h.DoRequest(c.client, "POST", c.u("/torrent"), tar)
+	resp, err := h.DoRequest(c.client, "POST", c.u("/torrent"), tar, c.headers())
 	if err != nil {
 		return err
 	}
@@ -76,7 +87,7 @@ func readStatus(resp *http.Response) error {
 
 // UserDelete deletes the user matching the passkey provided
 func (c *Client) UserDelete(passkey string) error {
-	resp, err := h.DoRequest(c.client, "DELETE", c.u(fmt.Sprintf("/user/pk/%s", passkey)), nil)
+	resp, err := h.DoRequest(c.client, "DELETE", c.u(fmt.Sprintf("/user/pk/%s", passkey)), nil, c.headers())
 	if err != nil {
 		return err
 	}
@@ -91,7 +102,7 @@ func (c *Client) UserDelete(passkey string) error {
 func (c *Client) UserAdd(passkey string) error {
 	var req h.UserAddRequest
 	req.Passkey = passkey
-	resp, err := h.DoRequest(c.client, "POST", c.u("/user"), req)
+	resp, err := h.DoRequest(c.client, "POST", c.u("/user"), req, c.headers())
 	if err != nil {
 		return err
 	}
@@ -115,7 +126,7 @@ func (c *Client) UserAdd(passkey string) error {
 func (c *Client) Ping() error {
 	const msg = "hello world"
 	t0 := time.Now()
-	resp, err := h.DoRequest(c.client, "POST", c.u("/ping"), h.PingRequest{Ping: msg})
+	resp, err := h.DoRequest(c.client, "POST", c.u("/ping"), h.PingRequest{Ping: msg}, c.headers())
 	if err != nil {
 		return errors.Wrapf(err, "Failed to make request")
 	}

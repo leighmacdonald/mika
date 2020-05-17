@@ -5,6 +5,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	h "github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
@@ -15,35 +16,65 @@ import (
 	"time"
 )
 
-type errMsg struct {
-	Status  int    `json:"status"`
-	Message string `json:"message"`
-}
+const (
+	DefaultAuthKey = "12345678901234567890"
+)
+
+type (
+	// ServerExample provides and example / demo server implementation that conforms to mika's HTTP store backend.
+	ServerExample struct {
+		Addr        string
+		Router      *gin.Engine
+		Users       store.UserStore
+		Peers       store.PeerStore
+		Torrents    store.TorrentStore
+		WhiteList   map[string]model.WhiteListClient
+		WhiteListMx *sync.RWMutex
+	}
+
+	errMsg struct {
+		Status int    `json:"status"`
+		Error  string `json:"error"`
+	}
+	okMsg struct {
+		Message string `json:"message"`
+	}
+)
 
 func errResponse(c *gin.Context, code int, msg string) {
 	c.JSON(code, errMsg{code, msg})
 }
 
-// ServerExample provides and example / demo server implementation that conforms to mika's HTTP store backend.
-type ServerExample struct {
-	Addr        string
-	Router      *gin.Engine
-	Users       store.UserStore
-	Peers       store.PeerStore
-	Torrents    store.TorrentStore
-	WhiteList   map[string]model.WhiteListClient
-	WhiteListMx *sync.RWMutex
+func okResponse(c *gin.Context, msg string) {
+	c.JSON(http.StatusOK, okMsg{msg})
 }
 
-func (s *ServerExample) getTorrent(c *gin.Context) {
+func getInfoHashParam(ih *model.InfoHash, c *gin.Context) bool {
 	infoHashStr := c.Param("info_hash")
 	if infoHashStr == "" {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
-		return
+		return false
 	}
-	var infoHash model.InfoHash
-	if err := model.InfoHashFromString(&infoHash, infoHashStr); err != nil {
+	if err := model.InfoHashFromString(ih, infoHashStr); err != nil {
 		errResponse(c, http.StatusBadRequest, "Malformed info_hash")
+		return false
+	}
+	return true
+}
+
+func getPeerIDParam(peerId *model.PeerID, c *gin.Context) bool {
+	peerIdStr := c.Param("peer_id")
+	if peerIdStr == "" {
+		errResponse(c, http.StatusNotFound, "Unknown info_hash")
+		return false
+	}
+	*peerId = model.PeerIDFromString(peerIdStr)
+	return true
+}
+
+func (s *ServerExample) getTorrent(c *gin.Context) {
+	var infoHash model.InfoHash
+	if !getInfoHashParam(&infoHash, c) {
 		return
 	}
 	var t model.Torrent
@@ -96,7 +127,7 @@ func (s *ServerExample) deleteWhitelist(c *gin.Context) {
 	s.WhiteListMx.Lock()
 	delete(s.WhiteList, prefix)
 	s.WhiteListMx.Unlock()
-	c.JSON(http.StatusOK, gin.H{})
+	okResponse(c, "Deleted prefix successfully")
 }
 
 func (s *ServerExample) addWhitelist(c *gin.Context) {
@@ -112,7 +143,7 @@ func (s *ServerExample) addWhitelist(c *gin.Context) {
 	s.WhiteListMx.Lock()
 	s.WhiteList[wlc.ClientPrefix] = wlc
 	s.WhiteListMx.Unlock()
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusOK, wlc)
 }
 
 func (s *ServerExample) getUserByPasskey(c *gin.Context) {
@@ -129,14 +160,205 @@ func (s *ServerExample) getUserByPasskey(c *gin.Context) {
 	c.JSON(http.StatusOK, u)
 }
 
+func (s *ServerExample) deleteTorrent(c *gin.Context) {
+	var infoHash model.InfoHash
+	if !getInfoHashParam(&infoHash, c) {
+		return
+	}
+	if err := s.Torrents.Delete(infoHash, true); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "Deleted torrent successfully")
+}
+
+func (s *ServerExample) addTorrent(c *gin.Context) {
+	var torrent model.Torrent
+	if err := c.BindJSON(&torrent); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.Torrents.Add(torrent); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "Added torrent successfully")
+}
+
+func (s *ServerExample) userAdd(c *gin.Context) {
+	var userReq h.UserAddRequest
+	if err := c.BindJSON(&userReq); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	user := model.User{
+		UserID:  userReq.UserID,
+		Passkey: userReq.Passkey,
+	}
+	if err := s.Users.Add(user); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.Users.GetByID(&user, user.UserID); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
+
+func (s *ServerExample) userSync(c *gin.Context) {
+	var batch map[string]model.UserStats
+	if err := c.BindJSON(batch); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.Users.Sync(batch); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "sync successful")
+}
+
+func (s *ServerExample) userDelete(c *gin.Context) {
+	var us h.UserDeleteRequest
+	if err := c.BindJSON(&us); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	var user model.User
+	if err := s.Users.GetByPasskey(&user, us.Passkey); err != nil {
+		errResponse(c, http.StatusNotFound, "User does not exist")
+		return
+	}
+	if err := s.Users.Delete(user); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "Deleted user successfully")
+}
+
+func (s *ServerExample) torrentSync(c *gin.Context) {
+	var batch map[model.InfoHash]model.TorrentStats
+	if err := c.BindJSON(batch); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.Torrents.Sync(batch); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "torrent sync successful")
+}
+
+func (s *ServerExample) peersSync(c *gin.Context) {
+	var batch map[model.PeerHash]model.PeerStats
+	if err := c.BindJSON(batch); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.Peers.Sync(batch); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "peer sync successful")
+}
+
+func (s *ServerExample) peersAdd(c *gin.Context) {
+	var (
+		peer     model.Peer
+		infoHash model.InfoHash
+	)
+	if !getInfoHashParam(&infoHash, c) {
+		return
+	}
+	if err := c.BindJSON(&peer); err != nil {
+		errResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.Peers.Add(infoHash, peer); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "Peer added to swarm successfully")
+}
+
+func (s *ServerExample) peersDelete(c *gin.Context) {
+	var (
+		peerID   model.PeerID
+		infoHash model.InfoHash
+	)
+	if !getPeerIDParam(&peerID, c) || !getInfoHashParam(&infoHash, c) {
+		return
+	}
+	if err := s.Peers.Delete(infoHash, peerID); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	okResponse(c, "Successfully deleted peer")
+}
+
+func (s *ServerExample) peersGetN(c *gin.Context) {
+	var infoHash model.InfoHash
+	if !getInfoHashParam(&infoHash, c) {
+		return
+	}
+	maxLimit := 100
+	limit := 25
+	limitStr, found := c.GetQuery("limit")
+	if found {
+		limit = util.StringToUInt(limitStr, limit)
+	}
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+	peers, err := s.Peers.GetN(infoHash, limit)
+	if err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, peers)
+}
+
+func (s *ServerExample) peersGet(c *gin.Context) {
+	var (
+		peer     model.Peer
+		peerID   model.PeerID
+		infoHash model.InfoHash
+	)
+	if !getPeerIDParam(&peerID, c) || !getInfoHashParam(&infoHash, c) {
+		return
+	}
+	if err := s.Peers.Get(&peer, infoHash, peerID); err != nil {
+		errResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, peer)
+}
+
+func (s *ServerExample) peersReap(c *gin.Context) {
+	s.Peers.Reap()
+	okResponse(c, "reaped")
+}
+
 // New returns an example HTTP server implementation to test against and learn from
-func New() *http.Server {
+// Set the Authorization header to the Auth
+func New(pathPrefix string, authKey string) *http.Server {
 	userCount := 10
 	torrentCount := 100
 	swarmSize := 10 // Swarm per torrent
+	router := gin.Default()
+	router.Use(func(c *gin.Context) {
+		clientKey := c.GetHeader("Authorization")
+		if authKey != clientKey {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+		// Continue down the chain to handler etc
+		c.Next()
+	})
 	s := &ServerExample{
 		Addr:     "localhost:35000",
-		Router:   gin.Default(),
+		Router:   router,
 		Torrents: memory.NewTorrentStore(),
 		Peers:    memory.NewPeerStore(),
 		Users:    memory.NewUserStore(),
@@ -181,12 +403,55 @@ func New() *http.Server {
 			}
 		}
 	}
-	s.Router.GET("/api/whitelist", s.getWhitelist)
-	s.Router.DELETE("/api/whitelist/:prefix", s.deleteWhitelist)
-	s.Router.POST("/api/whitelist", s.addWhitelist)
-	s.Router.GET("/api/torrent/:info_hash", s.getTorrent)
-	s.Router.GET("/api/user/pk/:passkey", s.getUserByPasskey)
-	s.Router.GET("/api/user/id/:user_id", s.getUserByID)
+
+	// Conn() and Close() do not need any endpoints, they are noop when using http backed
+	// stores.
+
+	// UserStore implementations
+
+	// UserStore.Add
+	s.Router.POST(pathPrefix+"/api/user", s.userAdd)
+	// UserStore.Delete
+	s.Router.DELETE(pathPrefix+"/api/user/:passkey", s.userDelete)
+	// UserStore.Sync
+	s.Router.POST(pathPrefix+"/api/user/sync", s.userSync)
+	// UserStore.GetByPasskey
+	s.Router.GET(pathPrefix+"/api/user/pk/:passkey", s.getUserByPasskey)
+	// UserStore.GetByID
+	s.Router.GET(pathPrefix+"/api/user/id/:user_id", s.getUserByID)
+
+	// TorrentStore implementations
+
+	// TorrentStore.WhiteListGetAll
+	s.Router.GET(pathPrefix+"/api/whitelist", s.getWhitelist)
+	// TorrentStore.WhiteListDelete
+	s.Router.DELETE(pathPrefix+"/api/whitelist/:prefix", s.deleteWhitelist)
+	// TorrentStore.WhiteListAdd
+	s.Router.POST(pathPrefix+"/api/whitelist", s.addWhitelist)
+	// TorrentStore.Add
+	s.Router.POST(pathPrefix+"/api/torrent", s.addTorrent)
+	// TorrentStore.Get
+	s.Router.GET(pathPrefix+"/api/torrent/:info_hash", s.getTorrent)
+	// TorrentStore.Delete
+	s.Router.DELETE(pathPrefix+"/api/torrent/:info_hash", s.deleteTorrent)
+	// TorrentStore.Sync
+	s.Router.POST(pathPrefix+"/api/torrent/sync", s.torrentSync)
+
+	// PeerStore implementations
+
+	// PeerStore.Add
+	s.Router.POST(pathPrefix+"/api/torrent/:info_hash/peers", s.peersAdd)
+	// PeerStore.Delete
+	s.Router.DELETE(pathPrefix+"/api/torrent/:info_hash/peers/:peer_id", s.peersDelete)
+	// PeerStore.GetN
+	s.Router.GET(pathPrefix+"/api/torrent/:info_hash/peers/:count", s.peersGetN)
+	// PeerStore.Get
+	s.Router.GET(pathPrefix+"/api/torrent/:info_hash/peer/:peer_id", s.peersGet)
+	// PeerStore.Reap
+	s.Router.GET(pathPrefix+"/api/peers/reap", s.peersReap)
+	// PeerStore.Sync
+	s.Router.POST(pathPrefix+"/api/peers/sync", s.peersSync)
+
 	return &http.Server{
 		Addr:           s.Addr,
 		Handler:        s.Router,

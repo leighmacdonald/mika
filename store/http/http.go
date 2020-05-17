@@ -56,7 +56,7 @@ func (ts TorrentStore) Conn() interface{} {
 // WhiteListDelete removes a client from the global whitelist
 func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 	url := fmt.Sprintf(ts.baseURL, fmt.Sprintf("/whitelist/%s", client.ClientPrefix))
-	resp, err := h.DoRequest(ts.client, "DELETE", url, nil)
+	resp, err := h.DoRequest(ts.client, "DELETE", url, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	resp, err := h.DoRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/whitelist"), client)
+	resp, err := h.DoRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/whitelist"), client, nil)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 // WhiteListGetAll fetches all known whitelisted clients
 func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	url := fmt.Sprintf(ts.baseURL, "/whitelist")
-	resp, err := h.DoRequest(ts.client, "GET", url, nil)
+	resp, err := h.DoRequest(ts.client, "GET", url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func checkResponse(resp *http.Response, code int) error {
 
 // Add adds a new torrent to the HTTP API backing store
 func (ts TorrentStore) Add(t model.Torrent) error {
-	resp, err := h.DoRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/torrent"), t)
+	resp, err := h.DoRequest(ts.client, "POST", fmt.Sprintf(ts.baseURL, "/torrent"), t, nil)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (ts TorrentStore) Add(t model.Torrent) error {
 // If dropRow is true, it will permanently remove the torrent from the store
 func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
-		resp, err := h.DoRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), ih.String())
+		resp, err := h.DoRequest(ts.client, "DELETE", fmt.Sprintf(ts.baseURL, "/torrent"), ih.String(), nil)
 		if err != nil {
 			return err
 		}
@@ -125,7 +125,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	}
 	resp, err := h.DoRequest(ts.client, "PATCH", fmt.Sprintf(ts.baseURL, "/torrent"), map[string]interface{}{
 		"is_deleted": true,
-	})
+	}, nil)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 // Get returns the Torrent matching the infohash
 func (ts TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	url := fmt.Sprintf("%s/torrent/%s", ts.baseURL, hash.String())
-	resp, err := h.DoRequest(ts.client, "GET", url, nil)
+	resp, err := h.DoRequest(ts.client, "GET", url, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func (ps PeerStore) Reap() {
 
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
-	resp, err := h.DoRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", ih), p)
+	resp, err := h.DoRequest(ps.client, "POST", fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", ih), p, nil)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (ps PeerStore) Get(_ *model.Peer, _ model.InfoHash, _ model.PeerID) error {
 // Delete will remove a user from a torrents swarm
 func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	reqURL := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p)
-	resp, err := h.DoRequest(ps.client, "DELETE", reqURL, nil)
+	resp, err := h.DoRequest(ps.client, "DELETE", reqURL, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func genURL(base string, args ...interface{}) string {
 func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers model.Swarm
 	url := genURL(ps.baseURL, "/torrent/%s/peers/%d", ih.String(), limit)
-	resp, err := h.DoRequest(ps.client, "GET", url, nil)
+	resp, err := h.DoRequest(ps.client, "GET", url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -224,11 +224,6 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		return nil, err
 	}
 	return peers, nil
-}
-
-// GetScrape returns scrape data for the torrent provided
-func (ps PeerStore) GetScrape(_ model.InfoHash) {
-	panic("implement me")
 }
 
 // Close will close all the remaining http connections
@@ -284,11 +279,11 @@ func (u *UserStore) Add(_ model.User) error {
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
 func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
-	if passkey == "" || len(passkey) != 20 {
+	if len(passkey) != 20 {
 		return consts.ErrUnauthorized
 	}
 	path := fmt.Sprintf("%s/api/user/pk/%s", u.baseURL, passkey)
-	resp, err := h.DoRequest(u.client, "GET", path, nil)
+	resp, err := h.DoRequest(u.client, "GET", path, nil, nil)
 	if err != nil {
 		log.Errorf("Failed to make api call to backing http api: %s", err)
 		return consts.ErrUnauthorized

@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/leighmacdonald/mika/examples/api"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -17,7 +18,7 @@ var demoapiCmd = &cobra.Command{
 	Long:  `A example implementation of a HTTP backed store`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		e := exampleapi.New()
+		e := api.New("", api.DefaultAuthKey)
 		go func() {
 			if err := e.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen: %s\n", err)

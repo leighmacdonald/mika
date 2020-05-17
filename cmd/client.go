@@ -24,7 +24,7 @@ var clientCmd = &cobra.Command{
 
 func newClient() *client.Client {
 	host := viper.GetString(string(config.APIListen))
-	return client.New(host)
+	return client.New("", host)
 }
 
 // pingCmd represents the client command

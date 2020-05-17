@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/leighmacdonald/mika/examples/api"
 	h "github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
@@ -20,7 +21,7 @@ var (
 )
 
 func TestClient_Torrent(t *testing.T) {
-	c := New(host)
+	c := New(host, api.DefaultAuthKey)
 	var ih model.InfoHash
 	_ = model.InfoHashFromString(&ih, ihStr)
 	require.NoError(t, c.TorrentAdd(ih, "test torrent"))
@@ -29,7 +30,7 @@ func TestClient_Torrent(t *testing.T) {
 }
 
 func TestClient_Ping(t *testing.T) {
-	c := New(host)
+	c := New(host, api.DefaultAuthKey)
 	require.NoError(t, c.Ping())
 }
 

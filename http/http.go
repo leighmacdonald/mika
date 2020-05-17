@@ -82,7 +82,7 @@ func NewClient(_ *config.StoreConfig) *http.Client {
 }
 
 // DoRequest handles basic http request initialization and sending
-func DoRequest(client *http.Client, method string, path string, data interface{}) (*http.Response, error) {
+func DoRequest(client *http.Client, method string, path string, data interface{}, headers map[string]string) (*http.Response, error) {
 	b, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -90,6 +90,9 @@ func DoRequest(client *http.Client, method string, path string, data interface{}
 	req, err := http.NewRequest(method, path, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 	return client.Do(req)
 }

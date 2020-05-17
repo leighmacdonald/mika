@@ -1,6 +1,16 @@
 package postgres
 
 const schema = `
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+DO $$ BEGIN
+   CREATE DOMAIN uint2 AS int4 
+   CHECK(VALUE >= 0 AND VALUE < 65536);
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+
 create table torrent
 (
     info_hash bytea check (octet_length(info_hash) = 20) not null primary key,
@@ -38,23 +48,20 @@ create table peers
     info_hash bytea  check (octet_length(info_hash) = 20) not null,
     user_id int not null,
     addr_ip inet not null,
-    addr_port smallint not null,
-    total_downloaded int default 0 not null,
-    total_uploaded int default 0 not null,
+    addr_port uint2 not null,
+    downloaded int default 0 not null,
+    uploaded int default 0 not null,
     total_left int default 0 not null,
     total_time int default 0 not null,
-    total_announces int default 0 not null,
+    announces int default 0 not null,
     speed_up int default 0 not null,
     speed_dn int default 0 not null,
     speed_up_max int default 0 not null,
     speed_dn_max int default 0 not null,
-    location point not null,
+    location geometry not null,
     announce_first timestamptz not null,
     announce_last timestamptz not null,
-    primary key (info_hash, peer_id),
-    constraint peers_torrent_fk
-        foreign key (info_hash) references torrent (info_hash)
-            on update cascade on delete cascade
+    primary key (info_hash, peer_id)
 );
 
 create table whitelist

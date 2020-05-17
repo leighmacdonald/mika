@@ -188,11 +188,6 @@ func (ps PeerStore) Get(_ *model.Peer, _ model.InfoHash, _ model.PeerID) error {
 	panic("implement me")
 }
 
-// Update will sync any new peer data with the backing store
-func (ps PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
-	panic("implement me")
-}
-
 // Delete will remove a user from a torrents swarm
 func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	reqURL := fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p)

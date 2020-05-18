@@ -10,8 +10,8 @@ tracker_tls: false
 tracker_ipv6: false
 tracker_ipv6_only: false
 tracker_reaper_interval: 90s
-tracker_annouce_interval: 30s
-tracker_annouce_interval_minimum: 10s
+tracker_announce_interval: 30s
+tracker_announce_interval_minimum: 10s
 tracker_hnr_threshold: 1d
 tracker_batch_update_interval: 30s
 

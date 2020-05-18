@@ -18,7 +18,7 @@ var demoapiCmd = &cobra.Command{
 	Long:  `A example implementation of a HTTP backed store`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		e := api.New("", api.DefaultAuthKey)
+		e := api.New("0.0.0.0:35000", "", api.DefaultAuthKey)
 		go func() {
 			if err := e.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen: %s\n", err)

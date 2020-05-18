@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
-	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
@@ -66,7 +67,7 @@ func TrackerErr(code trackerErrCode) error {
 // NewClient returns a http.Client with reasonable default configuration values, notably
 // actual timeout values.
 // TODO use context instead for timeouts
-func NewClient(_ *config.StoreConfig) *http.Client {
+func NewClient() *http.Client {
 	//noinspection GoDeprecation
 	return &http.Client{
 		Transport: &http.Transport{
@@ -81,20 +82,63 @@ func NewClient(_ *config.StoreConfig) *http.Client {
 	}
 }
 
-// DoRequest handles basic http request initialization and sending
-func DoRequest(client *http.Client, method string, path string, data interface{}, headers map[string]string) (*http.Response, error) {
-	b, err := json.Marshal(data)
+// Opts defines the request and response parameters of a HTTP operation
+type Opts struct {
+	Method  string
+	URL     string
+	JSON    interface{}
+	Data    []byte
+	Headers map[string]string
+	Recv    interface{}
+}
+
+// Do handles http requests & response initialization and (un)marshalling of JSON payloads.
+// If JSON is not nil, it will be JSON encoded before sending to the host, otherwise Data will
+// be sent instead.
+// If Recv is not nil the response will be unmarshalled into its address
+// If a response gets a non-2xx response code, it will exit early and not read the body. The http.Response
+// will however get returned in that case.
+func Do(client *http.Client, opts Opts) (*http.Response, error) {
+	var err error
+	var payload []byte
+	if opts.JSON != nil {
+		payload, err = json.Marshal(opts.JSON)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		payload = opts.Data
+	}
+	req, err := http.NewRequest(opts.Method, opts.URL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(method, path, bytes.NewReader(b))
-	if err != nil {
-		return nil, err
-	}
-	for k, v := range headers {
+	for k, v := range opts.Headers {
 		req.Header.Set(k, v)
 	}
-	return client.Do(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		// Let the caller handle this condition
+		return resp, consts.ErrBadResponseCode
+	}
+	if opts.Recv != nil {
+		recvPayload, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return resp, errors.Wrapf(err, "Could not read response body")
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.Warnf("Failed to close response body: %s", err.Error())
+			}
+		}()
+		if err := json.Unmarshal(recvPayload, &opts.Recv); err != nil {
+			return resp, errors.Wrapf(err, "Could not decode response body")
+		}
+	}
+	return resp, nil
 }
 
 // getIP Parses and returns a IP from a string

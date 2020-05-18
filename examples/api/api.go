@@ -342,11 +342,11 @@ func (s *ServerExample) peersReap(c *gin.Context) {
 
 // New returns an example HTTP server implementation to test against and learn from
 // Set the Authorization header to the Auth
-func New(pathPrefix string, authKey string) *http.Server {
+func New(listenAddr string, pathPrefix string, authKey string) *http.Server {
 	userCount := 10
 	torrentCount := 100
 	swarmSize := 10 // Swarm per torrent
-	router := gin.Default()
+	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		clientKey := c.GetHeader("Authorization")
 		if authKey != clientKey {
@@ -357,7 +357,7 @@ func New(pathPrefix string, authKey string) *http.Server {
 		c.Next()
 	})
 	s := &ServerExample{
-		Addr:     "localhost:35000",
+		Addr:     listenAddr,
 		Router:   router,
 		Torrents: memory.NewTorrentStore(),
 		Peers:    memory.NewPeerStore(),
@@ -439,18 +439,18 @@ func New(pathPrefix string, authKey string) *http.Server {
 
 	// PeerStore implementations
 
-	// PeerStore.Add
-	s.Router.POST(pathPrefix+"/api/torrent/:info_hash/peers", s.peersAdd)
-	// PeerStore.Delete
-	s.Router.DELETE(pathPrefix+"/api/torrent/:info_hash/peers/:peer_id", s.peersDelete)
-	// PeerStore.GetN
-	s.Router.GET(pathPrefix+"/api/torrent/:info_hash/peers/:count", s.peersGetN)
-	// PeerStore.Get
-	s.Router.GET(pathPrefix+"/api/torrent/:info_hash/peer/:peer_id", s.peersGet)
 	// PeerStore.Reap
 	s.Router.GET(pathPrefix+"/api/peers/reap", s.peersReap)
 	// PeerStore.Sync
 	s.Router.POST(pathPrefix+"/api/peers/sync", s.peersSync)
+	// PeerStore.Add
+	s.Router.POST(pathPrefix+"/api/peer/create/:info_hash", s.peersAdd)
+	// PeerStore.Delete
+	s.Router.DELETE(pathPrefix+"/api/peers/delete/:info_hash/:peer_id", s.peersDelete)
+	// PeerStore.GetN
+	s.Router.GET(pathPrefix+"/api/peers/swarm/:info_hash/:count", s.peersGetN)
+	// PeerStore.Get
+	s.Router.GET(pathPrefix+"/api/peer/:info_hash/:peer_id", s.peersGet)
 
 	return &http.Server{
 		Addr:           s.Addr,

@@ -56,7 +56,7 @@ func findPeer(peers model.Swarm, p1 model.Peer) (model.Peer, error) {
 }
 
 // TestPeerStore tests the interface implementation
-func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, us UserStore) {
+func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 	torrentA := GenerateTestTorrent()
 	defer func() { _ = ts.Delete(torrentA.InfoHash, true) }()
 	require.NoError(t, ts.Add(torrentA))

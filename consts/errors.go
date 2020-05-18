@@ -20,9 +20,6 @@ var (
 	ErrInvalidDriver = errors.New("invalid driver")
 	// ErrInvalidConfig is issued when a invalid config value is used
 	ErrInvalidConfig = errors.New("invalid configuration")
-	// ErrInvalidResponseCode is a generic error code representing a invalid response code
-	// was received from the server
-	ErrInvalidResponseCode = errors.New("invalid response code")
 	// ErrUnauthorized is a general non-info disclosing auth error
 	ErrUnauthorized = errors.New("not authorized")
 	// ErrInvalidState is used when the state of the data returned is not what we expect or invalid
@@ -33,4 +30,6 @@ var (
 
 	// ErrInvalidClient is used when an invalid client is requested/used
 	ErrInvalidClient = errors.New("invalid torrent client")
+	// ErrBadResponseCode is returned when a HTTP request returns a non 200 code
+	ErrBadResponseCode = errors.New("bad response code returned")
 )

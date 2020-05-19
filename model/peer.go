@@ -56,6 +56,10 @@ func (p PeerID) RawString() string {
 	return string(p.Bytes())
 }
 
+func (p PeerID) URLEncode() string {
+	return fmt.Sprintf("%s", p.Bytes())
+}
+
 // Peer represents a single unique peer in a swarm
 type Peer struct {
 	// Total amount uploaded as reported by client

@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql/driver"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -26,6 +27,11 @@ func (ph PeerHash) InfoHash() InfoHash {
 	return buf
 }
 
+// String implements fmt.Stringer, returning the base16 encoded PeerID.
+func (ph PeerHash) String() string {
+	return fmt.Sprintf("%x", ph[:])
+}
+
 // PeerID returns the last 20 bytes of the data
 func (ph PeerHash) PeerID() PeerID {
 	var buf [20]byte
@@ -38,10 +44,33 @@ type InfoHash [20]byte
 
 // InfoHashFromString returns a binary infohash from the info string
 func InfoHashFromString(infoHash *InfoHash, s string) error {
-	//if len(s) != 40 {
-	//	return consts.ErrInvalidInfoHash
-	//}
 	copy(infoHash[:], s)
+	return nil
+}
+
+// InfoHashFromHex returns a binary infohash from a byte array
+func InfoHashFromHex(infoHash *InfoHash, h string) error {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		return err
+	}
+	copy(infoHash[:], b)
+	return nil
+}
+
+// PeerHashFromHex returns a binary infohash from a byte array
+func PeerHashFromHex(peerHash *PeerHash, h string) error {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		return err
+	}
+	copy(peerHash[:], b)
+	return nil
+}
+
+// InfoHashFromBytes returns a binary infohash from a byte array
+func InfoHashFromBytes(infoHash *InfoHash, b []byte) error {
+	copy(infoHash[:], b)
 	return nil
 }
 
@@ -68,6 +97,10 @@ func (ih *InfoHash) Scan(v interface{}) error {
 // they have trouble with the sized variant
 func (ih InfoHash) Bytes() []byte {
 	return ih[:]
+}
+
+func (ih InfoHash) URLEncode() string {
+	return fmt.Sprintf("%s", ih.Bytes())
 }
 
 // String implements fmt.Stringer, returning the base16 encoded PeerID.

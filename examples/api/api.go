@@ -55,7 +55,7 @@ func getInfoHashParam(ih *model.InfoHash, c *gin.Context) bool {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return false
 	}
-	if err := model.InfoHashFromString(ih, infoHashStr); err != nil {
+	if err := model.InfoHashFromHex(ih, infoHashStr); err != nil {
 		errResponse(c, http.StatusBadRequest, "Malformed info_hash")
 		return false
 	}
@@ -208,7 +208,7 @@ func (s *ServerExample) userAdd(c *gin.Context) {
 
 func (s *ServerExample) userSync(c *gin.Context) {
 	var batch map[string]model.UserStats
-	if err := c.BindJSON(batch); err != nil {
+	if err := c.BindJSON(&batch); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -251,12 +251,21 @@ func (s *ServerExample) torrentSync(c *gin.Context) {
 }
 
 func (s *ServerExample) peersSync(c *gin.Context) {
-	var batch map[model.PeerHash]model.PeerStats
-	if err := c.BindJSON(batch); err != nil {
+	var batch map[string]model.PeerStats
+	if err := c.BindJSON(&batch); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := s.Peers.Sync(batch); err != nil {
+	rb := make(map[model.PeerHash]model.PeerStats)
+	for k, v := range batch {
+		var ph model.PeerHash
+		if err := model.PeerHashFromHex(&ph, k); err != nil {
+			errResponse(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		rb[ph] = v
+	}
+	if err := s.Peers.Sync(rb); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -357,25 +366,12 @@ func New(listenAddr string, pathPrefix string, authKey string) *http.Server {
 		c.Next()
 	})
 	s := &ServerExample{
-		Addr:     listenAddr,
-		Router:   router,
-		Torrents: memory.NewTorrentStore(),
-		Peers:    memory.NewPeerStore(),
-		Users:    memory.NewUserStore(),
-		WhiteList: map[string]model.WhiteListClient{
-			"qB": {
-				ClientPrefix: "qB",
-				ClientName:   "qBittorrent",
-			},
-			"UT": {
-				ClientPrefix: "UT",
-				ClientName:   "uTorrent",
-			},
-			"TR": {
-				ClientPrefix: "TR",
-				ClientName:   "Transmission",
-			},
-		},
+		Addr:        listenAddr,
+		Router:      router,
+		Torrents:    memory.NewTorrentStore(),
+		Peers:       memory.NewPeerStore(),
+		Users:       memory.NewUserStore(),
+		WhiteList:   map[string]model.WhiteListClient{},
 		WhiteListMx: &sync.RWMutex{},
 	}
 	for i := 0; i < userCount; i++ {

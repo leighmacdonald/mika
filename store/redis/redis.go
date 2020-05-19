@@ -228,7 +228,7 @@ func (ts *TorrentStore) Add(t model.Torrent) error {
 		"reason":           t.Reason,
 		"multi_up":         t.MultiUp,
 		"multi_dn":         t.MultiDn,
-		"info_hash":        t.InfoHash.RawString(),
+		"info_hash":        t.InfoHash.String(),
 		"is_deleted":       t.IsDeleted,
 		"is_enabled":       t.IsEnabled,
 	}).Err()
@@ -264,7 +264,7 @@ func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 		return consts.ErrInvalidInfoHash
 	}
 	var infoHash model.InfoHash
-	if err := model.InfoHashFromString(&infoHash, ihStr); err != nil {
+	if err := model.InfoHashFromHex(&infoHash, ihStr); err != nil {
 		return errors.Wrap(err, "Failed to decode info_hash")
 	}
 	t.ReleaseName = v["release_name"]

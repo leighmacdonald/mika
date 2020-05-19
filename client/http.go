@@ -71,26 +71,29 @@ func (c *AuthedClient) Exec(opts Opts) (*http.Response, error) {
 	if opts.JSON != nil {
 		payload, err = json.Marshal(opts.JSON)
 		if err != nil {
+			if syntaxErr, ok := err.(*json.SyntaxError); ok {
+				return nil, syntaxErr
+			}
 			return nil, err
 		}
 	} else {
 		payload = opts.Data
 	}
 	url := c.u(opts.Path)
-	req, err := http.NewRequest(opts.Method, url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, err
+	req, err2 := http.NewRequest(opts.Method, url, bytes.NewReader(payload))
+	if err2 != nil {
+		return nil, err2
 	}
+	// Set authorization first so it can be overridden if the user requires it
 	if c.authKey != "" {
 		req.Header.Set("Authorization", c.authKey)
 	}
 	for k, v := range opts.Headers {
 		req.Header.Set(k, v)
 	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return nil, err
+	resp, err3 := c.Do(req)
+	if err3 != nil {
+		return nil, err3
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// Let the caller handle this condition

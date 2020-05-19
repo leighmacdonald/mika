@@ -14,6 +14,7 @@ import (
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"strings"
 )
@@ -53,7 +54,7 @@ func (ts TorrentStore) Conn() interface{} {
 func (ts TorrentStore) WhiteListDelete(wlc model.WhiteListClient) error {
 	_, err := ts.Exec(client.Opts{
 		Method: "DELETE",
-		Path:   fmt.Sprintf("/whitelist/%s", wlc.ClientPrefix),
+		Path:   fmt.Sprintf("/api/whitelist/%s", wlc.ClientPrefix),
 	})
 	if err != nil {
 		return err
@@ -65,7 +66,7 @@ func (ts TorrentStore) WhiteListDelete(wlc model.WhiteListClient) error {
 func (ts TorrentStore) WhiteListAdd(wlc model.WhiteListClient) error {
 	_, err := ts.Exec(client.Opts{
 		Method: "POST",
-		Path:   "/whitelist",
+		Path:   "/api/whitelist",
 		JSON:   wlc,
 	})
 	if err != nil {
@@ -79,7 +80,7 @@ func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	var wl []model.WhiteListClient
 	_, err := ts.Exec(client.Opts{
 		Method: "GET",
-		Path:   "/whitelist",
+		Path:   "/api/whitelist",
 		Recv:   &wl,
 	})
 	if err != nil {
@@ -92,7 +93,7 @@ func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 func (ts TorrentStore) Add(t model.Torrent) error {
 	_, err := ts.Exec(client.Opts{
 		Method: "POST",
-		Path:   "/torrent",
+		Path:   "/api/torrent",
 		JSON:   t,
 	})
 	return err
@@ -104,13 +105,13 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
 		_, err := ts.Exec(client.Opts{
 			Method: "DELETE",
-			Path:   fmt.Sprintf("/torrent/%s", ih.String()),
+			Path:   fmt.Sprintf("/api/torrent/%s", ih.String()),
 		})
 		return err
 	}
 	_, err := ts.Exec(client.Opts{
 		Method: "PATCH",
-		Path:   fmt.Sprintf("/torrent/%s", ih.String()),
+		Path:   fmt.Sprintf("/api/torrent/%s", ih.String()),
 		JSON: map[string]interface{}{
 			"is_deleted": true,
 		}})
@@ -119,12 +120,19 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 
 // Get returns the Torrent matching the infohash
 func (ts TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
-	_, err := ts.Exec(client.Opts{
+	resp, err := ts.Exec(client.Opts{
 		Method: "GET",
-		Path:   fmt.Sprintf("/torrent/%s", hash.String()),
+		Path:   fmt.Sprintf("/api/torrent/%s", hash.String()),
 		Recv:   t,
 	})
-	return err
+	if err != nil && resp != nil {
+		if resp.StatusCode == 404 {
+			return consts.ErrInvalidInfoHash
+		}
+	} else if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Close will close all the remaining http connections
@@ -139,8 +147,17 @@ type PeerStore struct {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps PeerStore) Sync(_ map[model.PeerHash]model.PeerStats) error {
-	panic("implement me")
+func (ps PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
+	rb := make(map[string]model.PeerStats)
+	for k, v := range batch {
+		rb[k.String()] = v
+	}
+	_, err := ps.Exec(client.Opts{
+		Method: "POST",
+		Path:   "/api/peers/sync",
+		JSON:   rb,
+	})
+	return err
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
@@ -152,7 +169,7 @@ func (ps PeerStore) Reap() {
 func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	_, err := ps.Exec(client.Opts{
 		Method: "POST",
-		Path:   fmt.Sprintf("/torrent/%s/peer", ih.String()),
+		Path:   fmt.Sprintf("/api/peer/create/%s", ih.String()),
 		JSON:   p,
 	})
 	return err
@@ -167,7 +184,7 @@ func (ps PeerStore) Get(_ *model.Peer, _ model.InfoHash, _ model.PeerID) error {
 func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 	_, err := ps.Exec(client.Opts{
 		Method: "DELETE",
-		Path:   fmt.Sprintf("/torrent/%s/peer/%s", ih.String(), p.String()),
+		Path:   fmt.Sprintf("/api/peers/delete/%s/%s", ih.String(), p.String()),
 	})
 	return err
 }
@@ -177,8 +194,8 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers model.Swarm
 	_, err := ps.Exec(client.Opts{
 		Method: "GET",
-		Path:   fmt.Sprintf("/torrent/%s/peers/%d", ih.String(), limit),
-		Recv:   peers,
+		Path:   fmt.Sprintf("/api/peers/swarm/%s/%d", ih.String(), limit),
+		Recv:   &peers,
 	})
 	return peers, err
 }
@@ -225,8 +242,13 @@ type UserStore struct {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (u *UserStore) Sync(_ map[string]model.UserStats) error {
-	panic("implement me")
+func (u *UserStore) Sync(batch map[string]model.UserStats) error {
+	_, err := u.Exec(client.Opts{
+		Method: "POST",
+		Path:   "/api/user/sync",
+		JSON:   batch,
+	})
+	return err
 }
 
 // Add will add a new user to the backing store
@@ -268,8 +290,22 @@ func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(_ *model.User, _ uint32) error {
-	panic("implement me")
+func (u *UserStore) GetByID(user *model.User, userID uint32) error {
+	if userID == 0 {
+		return consts.ErrUnauthorized
+	}
+	_, err := u.Exec(client.Opts{
+		Method: "GET",
+		Path:   fmt.Sprintf("/api/user/id/%d", userID),
+		Recv:   user,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "Failed to fetch user from backing store api")
+	}
+	if !user.Valid() {
+		return consts.ErrUnauthorized
+	}
+	return nil
 }
 
 // Delete removes a user from the backing store

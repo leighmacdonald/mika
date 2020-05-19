@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"github.com/leighmacdonald/mika/examples/api"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
@@ -13,7 +12,7 @@ import (
 
 const (
 	listenAddr = "localhost:35999"
-	pathPrefix = "/testing"
+	pathPrefix = ""
 )
 
 func TestUserStore(t *testing.T) {
@@ -36,8 +35,5 @@ func TestMain(m *testing.M) {
 	// Give the server enough time to init
 	time.Sleep(500 * time.Millisecond)
 	retVal := m.Run()
-	if err := server.Shutdown(ctx); err != nil {
-		fmt.Printf("Error shutting down test api server: %s", err.Error())
-	}
 	os.Exit(retVal)
 }

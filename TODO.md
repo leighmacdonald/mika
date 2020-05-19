@@ -10,9 +10,11 @@
     - Verifies results
     - More unit/integration tests
 - Apply ratio multipliers
-
 - Implementations for all currently support store interfaces with tests
-
+    - http is mostly all that remains
+    - Add test for all fields that are transmitted
+    
+    
 ## Future
 - Implement cheater detection mechanisms
 - 

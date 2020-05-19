@@ -27,8 +27,8 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 	v := []testAnn{
 		{users[0].Passkey,
 			url.Values{
-				"info_hash":  {torrents[0].InfoHash.RawString()},
-				"peer_id":    {peers[0].PeerID.RawString()},
+				"info_hash":  {torrents[0].InfoHash.URLEncode()},
+				"peer_id":    {peers[0].PeerID.URLEncode()},
 				"ip":         {"255.255.255.255"},
 				"port":       {"6881"},
 				"uploaded":   {"5678"},

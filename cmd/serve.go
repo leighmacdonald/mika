@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"github.com/leighmacdonald/mika/config"
-	h "github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/spf13/cobra"
@@ -25,13 +24,13 @@ var serveCmd = &cobra.Command{
 		}
 		listenBT := viper.GetString(string(config.TrackerListen))
 		listenBTTLS := viper.GetBool(string(config.TrackerTLS))
-		btHandler := h.NewBitTorrentHandler(tkr)
-		btServer := h.CreateServer(btHandler, listenBT, listenBTTLS)
+		btHandler := tracker.NewBitTorrentHandler(tkr)
+		btServer := tracker.CreateServer(btHandler, listenBT, listenBTTLS)
 
 		listenAPI := viper.GetString(string(config.APIListen))
 		listenAPITLS := viper.GetBool(string(config.APITLS))
-		apiHandler := h.NewAPIHandler(tkr)
-		apiServer := h.CreateServer(apiHandler, listenAPI, listenAPITLS)
+		apiHandler := tracker.NewAPIHandler(tkr)
+		apiServer := tracker.CreateServer(apiHandler, listenAPI, listenAPITLS)
 
 		go tkr.PeerReaper()
 		go tkr.StatWorker()

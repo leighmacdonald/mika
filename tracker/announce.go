@@ -1,4 +1,4 @@
-package http
+package tracker
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
-	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net"
@@ -16,7 +15,7 @@ import (
 // BitTorrentHandler is the public HTTP interface for the tracker handling announces and
 // scrape requests
 type BitTorrentHandler struct {
-	tracker *tracker.Tracker
+	tracker *Tracker
 }
 
 // Represents an announce received from the bittorrent client

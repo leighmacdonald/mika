@@ -1,12 +1,11 @@
 // Package http is used to remotely control all aspects of the tracker.
-package http
+package tracker
 
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
-	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -27,7 +26,7 @@ func (s StatusResp) Error() string {
 
 // AdminAPI is the interface for administering a live server over HTTP
 type AdminAPI struct {
-	t *tracker.Tracker
+	t *Tracker
 }
 
 // PingRequest represents a JSON ping request

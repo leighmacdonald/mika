@@ -4,18 +4,19 @@ import (
 	"context"
 	"fmt"
 	"github.com/leighmacdonald/mika/examples/api"
-	h "github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/stretchr/testify/require"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"testing"
 	"time"
 )
 
 var (
-	host   = "localhost:34100"
+	host   = "http://localhost:34100"
 	server *http.Server
 	ihStr  = "ff503e9ca036f1647c2dfc1337b163e2c54f13f8"
 )
@@ -37,8 +38,13 @@ func TestClient_Ping(t *testing.T) {
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 	tkr, _, _, _ := tracker.NewTestTracker()
-	handler := h.NewAPIHandler(tkr)
-	server = h.CreateServer(handler, host, false)
+	handler := tracker.NewAPIHandler(tkr)
+	parsedHost, err := url.Parse(host)
+	if err != nil {
+		log.Fatalf("Could not parse listen host: %s", host)
+	}
+	listenHost := fmt.Sprintf("%s", parsedHost.Host)
+	server = tracker.CreateServer(handler, listenHost, false)
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			fmt.Printf("Error serving test api server: %s", err.Error())

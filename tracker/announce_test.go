@@ -1,8 +1,7 @@
-package http
+package tracker
 
 import (
 	"fmt"
-	"github.com/leighmacdonald/mika/tracker"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +17,7 @@ func performRequest(r http.Handler, method, path string) *httptest.ResponseRecor
 }
 
 func TestBitTorrentHandler_Announce(t *testing.T) {
-	tkr, torrents, users, peers := tracker.NewTestTracker()
+	tkr, torrents, users, peers := NewTestTracker()
 	rh := NewBitTorrentHandler(tkr)
 	type testAnn struct {
 		key  string

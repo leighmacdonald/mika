@@ -5,10 +5,10 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	h "github.com/leighmacdonald/mika/http"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
+	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	"log"
 	"net/http"
@@ -186,7 +186,7 @@ func (s *ServerExample) addTorrent(c *gin.Context) {
 }
 
 func (s *ServerExample) userAdd(c *gin.Context) {
-	var userReq h.UserAddRequest
+	var userReq tracker.UserAddRequest
 	if err := c.BindJSON(&userReq); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -220,7 +220,7 @@ func (s *ServerExample) userSync(c *gin.Context) {
 }
 
 func (s *ServerExample) userDelete(c *gin.Context) {
-	var us h.UserDeleteRequest
+	var us tracker.UserDeleteRequest
 	if err := c.BindJSON(&us); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -350,7 +350,7 @@ func New(listenAddr string, pathPrefix string, authKey string) *http.Server {
 	router.Use(func(c *gin.Context) {
 		clientKey := c.GetHeader("Authorization")
 		if authKey != clientKey {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized token"})
 			return
 		}
 		// Continue down the chain to handler etc

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/consts"
@@ -82,10 +83,28 @@ func NewClient() *http.Client {
 	}
 }
 
+type AuthedClient struct {
+	*http.Client
+	authKey  string
+	basePath string
+}
+
+func NewAuthedClient(authKey string, basePath string) *AuthedClient {
+	return &AuthedClient{
+		Client:   NewClient(),
+		authKey:  authKey,
+		basePath: basePath,
+	}
+}
+
+func (c AuthedClient) u(path string) string {
+	return fmt.Sprintf("%s%s", c.basePath, path)
+}
+
 // Opts defines the request and response parameters of a HTTP operation
 type Opts struct {
 	Method  string
-	URL     string
+	Path    string
 	JSON    interface{}
 	Data    []byte
 	Headers map[string]string
@@ -98,7 +117,7 @@ type Opts struct {
 // If Recv is not nil the response will be unmarshalled into its address
 // If a response gets a non-2xx response code, it will exit early and not read the body. The http.Response
 // will however get returned in that case.
-func Do(client *http.Client, opts Opts) (*http.Response, error) {
+func (c *AuthedClient) Exec(opts Opts) (*http.Response, error) {
 	var err error
 	var payload []byte
 	if opts.JSON != nil {
@@ -109,14 +128,19 @@ func Do(client *http.Client, opts Opts) (*http.Response, error) {
 	} else {
 		payload = opts.Data
 	}
-	req, err := http.NewRequest(opts.Method, opts.URL, bytes.NewReader(payload))
+	url := c.u(opts.Path)
+	req, err := http.NewRequest(opts.Method, url, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
+	}
+	if c.authKey != "" {
+		req.Header.Set("Authorization", c.authKey)
 	}
 	for k, v := range opts.Headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := client.Do(req)
+
+	resp, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}

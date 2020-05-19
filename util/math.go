@@ -47,12 +47,12 @@ func UMax16(a, b uint16) uint16 {
 }
 
 // Max is math.Max for int
-func Max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
+//func Max(a, b int) int {
+//	if a > b {
+//		return a
+//	}
+//	return b
+//}
 
 // UMax is math.Max for uint
 func UMax(a, b uint) uint {

@@ -85,7 +85,8 @@ const (
 	// APIIPv6Only disabled ipv4 to the admin interface
 	// true|false
 	APIIPv6Only Key = "api_ipv6_only"
-
+	// APIKey Basic key authentication token for API calls
+	APIKey Key = "api_key"
 	// StoreTorrentType sets the backing store type to be used for torrents
 	// memory|redis|postgres|mysql|http
 	StoreTorrentType Key = "store_torrent_type"

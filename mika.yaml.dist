@@ -19,6 +19,7 @@ api_listen: ":34001"
 api_tls: false
 api_ipv6: false
 api_ipv6_only: false
+api_key:
 
 # memory, mysql, postgres, redis
 # postgres and mysql support requires that mika is built with the matching build tags

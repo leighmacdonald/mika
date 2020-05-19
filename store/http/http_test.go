@@ -17,15 +17,15 @@ const (
 )
 
 func TestUserStore(t *testing.T) {
-	store.TestUserStore(t, NewUserStore(listenAddr))
+	store.TestUserStore(t, NewUserStore(api.DefaultAuthKey, listenAddr))
 }
 
 func TestPeerStore(t *testing.T) {
-	store.TestPeerStore(t, NewPeerStore(listenAddr), memory.NewTorrentStore(), memory.NewUserStore())
+	store.TestPeerStore(t, NewPeerStore(api.DefaultAuthKey, listenAddr), memory.NewTorrentStore(), memory.NewUserStore())
 }
 
 func TestTorrentStore(t *testing.T) {
-	store.TestTorrentStore(t, NewTorrentStore(listenAddr))
+	store.TestTorrentStore(t, NewTorrentStore(api.DefaultAuthKey, listenAddr))
 }
 
 func TestMain(m *testing.M) {

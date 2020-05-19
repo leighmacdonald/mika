@@ -15,7 +15,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	log "github.com/sirupsen/logrus"
-	"net/http"
+	"strings"
 )
 
 const (
@@ -36,8 +36,7 @@ type torrentDriver struct{}
 
 // TorrentStore is the HTTP API backed store.TorrentStore implementation
 type TorrentStore struct {
-	client  *http.Client
-	baseURL string
+	*h.AuthedClient
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
@@ -47,13 +46,15 @@ func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 
 // Conn returns the underlying http client
 func (ts TorrentStore) Conn() interface{} {
-	return ts.client
+	return ts
 }
 
 // WhiteListDelete removes a client from the global whitelist
 func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
-	url := fmt.Sprintf(ts.baseURL, fmt.Sprintf("/whitelist/%s", client.ClientPrefix))
-	_, err := h.Do(ts.client, h.Opts{Method: "DELETE", URL: url})
+	_, err := ts.Exec(h.Opts{
+		Method: "DELETE",
+		Path:   fmt.Sprintf("/whitelist/%s", client.ClientPrefix),
+	})
 	if err != nil {
 		return err
 	}
@@ -62,12 +63,11 @@ func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
-	opts := h.Opts{
+	_, err := ts.Exec(h.Opts{
 		Method: "POST",
-		URL:    fmt.Sprintf(ts.baseURL, "/whitelist"),
+		Path:   "/whitelist",
 		JSON:   client,
-	}
-	_, err := h.Do(ts.client, opts)
+	})
 	if err != nil {
 		return err
 	}
@@ -77,8 +77,11 @@ func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 // WhiteListGetAll fetches all known whitelisted clients
 func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	var wl []model.WhiteListClient
-	url := fmt.Sprintf(ts.baseURL, "/whitelist")
-	_, err := h.Do(ts.client, h.Opts{Method: "GET", URL: url, Recv: &wl})
+	_, err := ts.Exec(h.Opts{
+		Method: "GET",
+		Path:   "/whitelist",
+		Recv:   &wl,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -87,9 +90,9 @@ func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 
 // Add adds a new torrent to the HTTP API backing store
 func (ts TorrentStore) Add(t model.Torrent) error {
-	_, err := h.Do(ts.client, h.Opts{
+	_, err := ts.Exec(h.Opts{
 		Method: "POST",
-		URL:    fmt.Sprintf(ts.baseURL, "/torrent"),
+		Path:   "/torrent",
 		JSON:   t,
 	})
 	return err
@@ -99,37 +102,40 @@ func (ts TorrentStore) Add(t model.Torrent) error {
 // If dropRow is true, it will permanently remove the torrent from the store
 func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if dropRow {
-		_, err := h.Do(ts.client, h.Opts{
+		_, err := ts.Exec(h.Opts{
 			Method: "DELETE",
-			URL:    fmt.Sprintf(ts.baseURL, "/torrent", ih.String()),
+			Path:   fmt.Sprintf("/torrent/%s", ih.String()),
 		})
 		return err
 	}
-	_, err := h.Do(ts.client, h.Opts{Method: "PATCH", URL: fmt.Sprintf(ts.baseURL, "/torrent"), JSON: map[string]interface{}{
-		"is_deleted": true,
-	}})
+	_, err := ts.Exec(h.Opts{
+		Method: "PATCH",
+		Path:   fmt.Sprintf("/torrent/%s", ih.String()),
+		JSON: map[string]interface{}{
+			"is_deleted": true,
+		}})
 	return err
 }
 
 // Get returns the Torrent matching the infohash
 func (ts TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
-	_, err := h.Do(ts.client, h.Opts{
+	_, err := ts.Exec(h.Opts{
 		Method: "GET",
-		URL:    fmt.Sprintf("%s/torrent/%s", ts.baseURL, hash.String()),
-		Recv:   t})
+		Path:   fmt.Sprintf("/torrent/%s", hash.String()),
+		Recv:   t,
+	})
 	return err
 }
 
 // Close will close all the remaining http connections
 func (ts TorrentStore) Close() error {
-	ts.client.CloseIdleConnections()
+	ts.CloseIdleConnections()
 	return nil
 }
 
 // PeerStore is the HTTP API backed store.PeerStore implementation
 type PeerStore struct {
-	client  *http.Client
-	baseURL string
+	*h.AuthedClient
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
@@ -144,9 +150,9 @@ func (ps PeerStore) Reap() {
 
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
-	_, err := h.Do(ps.client, h.Opts{
+	_, err := ps.Exec(h.Opts{
 		Method: "POST",
-		URL:    fmt.Sprintf(ps.baseURL, "/torrent/%s/peer", ih),
+		Path:   fmt.Sprintf("/torrent/%s/peer", ih.String()),
 		JSON:   p,
 	})
 	return err
@@ -159,23 +165,19 @@ func (ps PeerStore) Get(_ *model.Peer, _ model.InfoHash, _ model.PeerID) error {
 
 // Delete will remove a user from a torrents swarm
 func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
-	_, err := h.Do(ps.client, h.Opts{
+	_, err := ps.Exec(h.Opts{
 		Method: "DELETE",
-		URL:    fmt.Sprintf(ps.baseURL, "/torrent/%s/peer/%s", ih, p),
+		Path:   fmt.Sprintf("/torrent/%s/peer/%s", ih.String(), p.String()),
 	})
 	return err
-}
-
-func genURL(base string, args ...interface{}) string {
-	return fmt.Sprintf(base, fmt.Sprintf("/torrent/%s/peers", args))
 }
 
 // GetN will fetch peers for a torrents active swarm up to N users
 func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	var peers model.Swarm
-	_, err := h.Do(ps.client, h.Opts{
+	_, err := ps.Exec(h.Opts{
 		Method: "GET",
-		URL:    genURL(ps.baseURL, "/torrent/%s/peers/%d", ih.String(), limit),
+		Path:   fmt.Sprintf("/torrent/%s/peers/%d", ih.String(), limit),
 		Recv:   peers,
 	})
 	return peers, err
@@ -183,15 +185,12 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 
 // Close will close all the remaining http connections
 func (ps PeerStore) Close() error {
-	ps.client.CloseIdleConnections()
+	ps.CloseIdleConnections()
 	return nil
 }
 
-func NewTorrentStore(host string) *TorrentStore {
-	return &TorrentStore{
-		client:  h.NewClient(),
-		baseURL: host,
-	}
+func NewTorrentStore(key string, baseUrl string) *TorrentStore {
+	return &TorrentStore{h.NewAuthedClient(key, fullSchema(baseUrl))}
 }
 
 // NewTorrentStore initialize a TorrentStore implementation using the HTTP API backing store
@@ -200,17 +199,16 @@ func (t torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, err
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	return NewTorrentStore(c.Host), nil
+	return NewTorrentStore(c.Password, c.Host), nil
 }
 
-func NewPeerStore(host string) *PeerStore {
-	return &PeerStore{
-		client:  h.NewClient(),
-		baseURL: host,
-	}
+func NewPeerStore(key string, baseUrl string) *PeerStore {
+	return &PeerStore{h.NewAuthedClient(key, fullSchema(baseUrl))}
 }
 
-type peerDriver struct{}
+type peerDriver struct {
+	*h.AuthedClient
+}
 
 // NewPeerStore initialize a NewPeerStore implementation using the HTTP API backing store
 func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
@@ -218,13 +216,12 @@ func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	return NewPeerStore(c.Host), nil
+	return NewPeerStore(c.Password, c.Host), nil
 }
 
 // UserStore is the HTTP API backed store.UserStore implementation
 type UserStore struct {
-	client  *http.Client
-	baseURL string
+	*h.AuthedClient
 }
 
 // Sync batch updates the backing store with the new UserStats provided
@@ -234,12 +231,11 @@ func (u *UserStore) Sync(_ map[string]model.UserStats) error {
 
 // Add will add a new user to the backing store
 func (u *UserStore) Add(user model.User) error {
-	opts := h.Opts{
+	_, err := u.Exec(h.Opts{
 		Method: "POST",
-		URL:    fmt.Sprintf("%s/api/user", u.baseURL),
+		Path:   "/api/user",
 		JSON:   user,
-	}
-	_, err := h.Do(u.client, opts)
+	})
 	if err != nil {
 		log.Errorf("Failed to make api call to backing http api: %s", err)
 		return consts.ErrUnauthorized
@@ -255,9 +251,9 @@ func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
 	if len(passkey) != 20 {
 		return consts.ErrUnauthorized
 	}
-	_, err := h.Do(u.client, h.Opts{
+	_, err := u.Exec(h.Opts{
 		Method: "GET",
-		URL:    fmt.Sprintf("%s/api/user/pk/%s", u.baseURL, passkey),
+		Path:   fmt.Sprintf("/api/user/pk/%s", passkey),
 		Recv:   usr,
 	})
 	if err != nil {
@@ -283,15 +279,20 @@ func (u *UserStore) Delete(_ model.User) error {
 
 // Close will close all the remaining http connections
 func (u *UserStore) Close() error {
-	u.client.CloseIdleConnections()
+	u.CloseIdleConnections()
 	return nil
 }
 
-func NewUserStore(baseUrl string) *UserStore {
-	return &UserStore{
-		client:  h.NewClient(),
-		baseURL: baseUrl,
+func NewUserStore(key string, baseUrl string) *UserStore {
+	return &UserStore{h.NewAuthedClient(key, fullSchema(baseUrl))}
+}
+
+// TODO handle https
+func fullSchema(host string) string {
+	if !strings.HasPrefix(host, "http://") || !strings.HasPrefix(host, "https://") {
+		return "http://" + host
 	}
+	return host
 }
 
 type userDriver struct{}
@@ -306,7 +307,8 @@ func (p userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	return NewUserStore(c.Host), nil
+
+	return NewUserStore(c.Password, c.Host), nil
 }
 
 func init() {

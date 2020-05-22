@@ -133,7 +133,6 @@ type PeerStore interface {
 func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error) {
 	torrentDriversMutex.RLock()
 	defer torrentDriversMutex.RUnlock()
-	var driver TorrentDriver
 	driver, found := torrentDrivers[storeType]
 	if !found {
 		return nil, consts.ErrInvalidDriver
@@ -145,7 +144,6 @@ func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error)
 func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 	peerDriversMutex.RLock()
 	defer peerDriversMutex.RUnlock()
-	var driver PeerDriver
 	driver, found := peerDrivers[storeType]
 	if !found {
 		return nil, consts.ErrInvalidDriver
@@ -157,7 +155,6 @@ func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 func NewUserStore(storeType string, config interface{}) (UserStore, error) {
 	userDriverMutex.RLock()
 	defer userDriverMutex.RUnlock()
-	var driver UserDriver
 	driver, found := userDrivers[storeType]
 	if !found {
 		return nil, consts.ErrInvalidDriver

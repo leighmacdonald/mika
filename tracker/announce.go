@@ -116,7 +116,7 @@ func getUintKey(q *query, key announceParam, def uint) uint {
 }
 
 // Parse the query string into an announceRequest struct
-func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
+func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	q, err := queryStringParser(c.Request.URL.RawQuery)
 	if err != nil {
 		return nil, msgMalformedRequest
@@ -134,15 +134,15 @@ func newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
 	if !exists {
 		return nil, msgInvalidPeerID
 	}
-	ipv4, err := getIP(q, c)
-	if err != nil {
+	ipv4, err2 := getIP(q, c)
+	if err2 != nil {
 		log.Warn("Could not get user IP from request")
 		return nil, msgMalformedRequest
 	}
-	if util.IsPrivateIP(ipv4) {
+	if !h.tracker.AllowNonRoutable && util.IsPrivateIP(ipv4) {
 		log.Warnf("Attempt to use non-routable IP value: %s", ipv4.String())
 		// TODO make this configurable
-		// return nil, msgMalformedRequest
+		return nil, msgInvalidAuth
 	}
 	port := getUint16Key(q, paramPort, 0)
 	if port < 1024 || port > 65535 {
@@ -183,7 +183,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		return
 	}
 	// Parse the announce into an announceRequest
-	req, code := newAnnounce(c)
+	req, code := h.newAnnounce(c)
 	if code != msgOk {
 		oops(c, code)
 		return
@@ -206,15 +206,20 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	var peer model.Peer
 	err := h.tracker.Peers.Get(&peer, tor.InfoHash, req.PeerID)
 	if err != nil {
-		// Create a new peer for the swarm
-		peer = model.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
-		if err := h.tracker.Peers.Add(tor.InfoHash, peer); err != nil {
-			log.Errorf("Failed to insert peer into swarm: %s", err.Error())
+		if err == consts.ErrInvalidPeerID {
+			// Create a new peer for the swarm
+			peer = model.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
+			if err := h.tracker.Peers.Add(tor.InfoHash, peer); err != nil {
+				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
+				oops(c, msgGenericError)
+				return
+			}
+			if h.tracker.GeodbEnabled {
+				peer.Location = h.tracker.Geodb.GetLocation(peer.IP).Location
+			}
+		} else {
 			oops(c, msgGenericError)
 			return
-		}
-		if h.tracker.GeodbEnabled {
-			peer.Location = h.tracker.Geodb.GetLocation(peer.IP).Location
 		}
 	} else {
 		peer.AnnounceLast = time.Now()

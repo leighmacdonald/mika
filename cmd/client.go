@@ -1,14 +1,16 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/leighmacdonald/mika/client"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/util"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -78,11 +80,47 @@ var torrentDeleteCmd = &cobra.Command{
 	},
 }
 
+var torrentAddFileCmd = &cobra.Command{
+	Use:     "addfile",
+	Aliases: []string{"af"},
+	Short:   "Add a torrent from a file",
+	Long:    "Add a torrent from a file",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("requires at least 1 torrent file")
+		}
+		for _, arg := range args {
+			if !util.Exists(arg) {
+				return errors.Errorf("Unable to find file: %s", arg)
+			}
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		c := newClient()
+		var infoHash model.InfoHash
+		for _, fileName := range args {
+			mi, err := metainfo.LoadFromFile(fileName)
+			if err != nil {
+				return
+			}
+			if err := model.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
+				log.Fatalf(err.Error())
+			}
+			basename := filepath.Base(fileName)
+			name := strings.TrimSuffix(basename, filepath.Ext(basename))
+			if err := c.TorrentAdd(infoHash, p[1]); err != nil {
+				log.Fatalf("Error trying to add %s: %s", name, err.Error())
+			}
+		}
+	},
+}
+
 var torrentAddCmd = &cobra.Command{
 	Use:     "add",
 	Aliases: []string{"a"},
-	Short:   "Delete a torrent from the tracker & store",
-	Long:    "Delete a torrent from the tracker & store",
+	Short:   "Add a torrent to the tracker & store",
+	Long:    "Add a torrent to the tracker & store",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("requires at least 1 info_hash")
@@ -165,6 +203,7 @@ func init() {
 	userDeleteCmd.PersistentFlags().StringP("passkey", "p", "", "User Passkey")
 
 	torrentCmd.AddCommand(torrentAddCmd)
+	torrentCmd.AddCommand(torrentAddFileCmd)
 	torrentCmd.AddCommand(torrentDeleteCmd)
 	userCmd.AddCommand(userAddCmd)
 	userCmd.AddCommand(userDeleteCmd)

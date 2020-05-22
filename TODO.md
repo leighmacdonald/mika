@@ -1,7 +1,7 @@
 # TODO
 
 ## Next Release (v.2.0.0)
-
+- Caching layer for backing stores
 - Fully working announces
     - Verify peers and their states
     - Verify batch recording stats
@@ -17,7 +17,7 @@
     
 ## Future
 - Implement cheater detection mechanisms
-- 
+- Directory watcher for registering torrents to serve
 - [BEP0015 UDP Tracker](http://bittorrent.org/beps/bep_0015.html)
 - [BEP0007 IPv6 Peers](http://bittorrent.org/beps/bep_0007.html)
 - Limit concurrent downloads for a user. This means having user classes/roles of some sort that can

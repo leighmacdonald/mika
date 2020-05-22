@@ -33,7 +33,8 @@ type Tracker struct {
 	// Public if true means we dont require a passkey / authorized user
 	Public bool
 	// If Public is true, this will allow unknown info_hashes to be automatically tracked
-	AutoRegister bool
+	AutoRegister     bool
+	AllowNonRoutable bool
 	// ReaperInterval is how often we can for dead peers in swarms
 	ReaperInterval time.Duration
 	AnnInterval    time.Duration
@@ -203,20 +204,21 @@ func New(ctx context.Context) (*Tracker, error) {
 		}
 	}
 	return &Tracker{
-		ctx:             ctx,
-		StateUpdateChan: make(chan model.UpdateState, 1000),
-		Torrents:        s,
-		Peers:           p,
-		Users:           u,
-		Geodb:           geodb,
-		GeodbEnabled:    viper.GetBool(string(config.GeodbEnabled)),
-		Whitelist:       whitelist,
-		WhitelistMutex:  &sync.RWMutex{},
-		MaxPeers:        50,
-		BatchInterval:   viper.GetDuration(string(config.TrackerBatchUpdateInterval)),
-		ReaperInterval:  viper.GetDuration(string(config.TrackerReaperInterval)),
-		AnnInterval:     viper.GetDuration(string(config.TrackerAnnounceInterval)),
-		AnnIntervalMin:  viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
+		ctx:              ctx,
+		StateUpdateChan:  make(chan model.UpdateState, 1000),
+		Torrents:         s,
+		Peers:            p,
+		Users:            u,
+		Geodb:            geodb,
+		GeodbEnabled:     viper.GetBool(string(config.GeodbEnabled)),
+		Whitelist:        whitelist,
+		WhitelistMutex:   &sync.RWMutex{},
+		MaxPeers:         50,
+		BatchInterval:    viper.GetDuration(string(config.TrackerBatchUpdateInterval)),
+		ReaperInterval:   viper.GetDuration(string(config.TrackerReaperInterval)),
+		AnnInterval:      viper.GetDuration(string(config.TrackerAnnounceInterval)),
+		AnnIntervalMin:   viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
+		AllowNonRoutable: viper.GetBool(string(config.TrackerAllowNonRoutable)),
 	}, nil
 }
 
@@ -286,18 +288,19 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 		geodb = &geo.DummyProvider{}
 	}
 	return &Tracker{
-		Torrents:        ts,
-		Peers:           ps,
-		Users:           us,
-		Geodb:           geodb,
-		GeodbEnabled:    viper.GetBool(string(config.GeodbEnabled)),
-		WhitelistMutex:  &sync.RWMutex{},
-		Whitelist:       wlm,
-		MaxPeers:        50,
-		StateUpdateChan: make(chan model.UpdateState, 1000),
-		ReaperInterval:  viper.GetDuration(string(config.TrackerReaperInterval)),
-		AnnInterval:     viper.GetDuration(string(config.TrackerAnnounceInterval)),
-		AnnIntervalMin:  viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
+		Torrents:         ts,
+		Peers:            ps,
+		Users:            us,
+		Geodb:            geodb,
+		GeodbEnabled:     viper.GetBool(string(config.GeodbEnabled)),
+		WhitelistMutex:   &sync.RWMutex{},
+		Whitelist:        wlm,
+		MaxPeers:         50,
+		StateUpdateChan:  make(chan model.UpdateState, 1000),
+		ReaperInterval:   viper.GetDuration(string(config.TrackerReaperInterval)),
+		AnnInterval:      viper.GetDuration(string(config.TrackerAnnounceInterval)),
+		AnnIntervalMin:   viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
+		AllowNonRoutable: true,
 	}, torrents, users, peers
 }
 

@@ -72,6 +72,8 @@ const (
 	TrackerHNRThreshold Key = "tracker_hnr_threshold"
 	// TrackerBatchUpdateInterval defines how often we sync user stats to the back store
 	TrackerBatchUpdateInterval Key = "tracker_batch_update_interval"
+	// TrackerAllowNonRoutable defines whether we allow peers who are using non-public/routable addresses
+	TrackerAllowNonRoutable Key = "tracker_allow_non_routable"
 
 	// APIListen sets the host and port that the admin API should bind to
 	// localhost:34001
@@ -306,7 +308,7 @@ func init() {
 	viper.SetDefault(string(TrackerAnnounceIntervalMin), "10s")
 	viper.SetDefault(string(TrackerHNRThreshold), "6h")
 	viper.SetDefault(string(TrackerBatchUpdateInterval), "30s")
-
+	viper.SetDefault(string(TrackerAllowNonRoutable), false)
 	viper.SetDefault(string(APIListen), "0.0.0.0:34001")
 	viper.SetDefault(string(APITLS), false)
 	viper.SetDefault(string(APIIPv6), false)

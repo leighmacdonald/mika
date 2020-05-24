@@ -33,6 +33,7 @@ package tracker
 
 import (
 	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/util"
 	"net/url"
 	"strconv"
 	"strings"
@@ -130,6 +131,30 @@ func queryStringParser(qStr string) (*query, error) {
 	}
 
 	return q, nil
+}
+
+func getUint32Key(q *query, key announceParam, def uint32) uint32 {
+	left, err := q.Uint32key(key)
+	if err != nil {
+		return def
+	}
+	return util.UMax32(0, left)
+}
+
+func getUint16Key(q *query, key announceParam, def uint16) uint16 {
+	left, err := q.Uint16(key)
+	if err != nil {
+		return def
+	}
+	return util.UMax16(0, left)
+}
+
+func getUintKey(q *query, key announceParam, def uint) uint {
+	left, err := q.Uint(key)
+	if err != nil {
+		return def
+	}
+	return util.UMax(0, left)
 }
 
 // Uint64 is a helper to obtain a uint64 of any length from a Query. After being

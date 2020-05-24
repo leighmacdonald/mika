@@ -2,6 +2,7 @@
 package tracker
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
@@ -141,6 +142,12 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 	t.ReleaseName = req.Name
 	t.InfoHash = ih
 	if err := a.t.Torrents.Add(t); err != nil {
+		if errors.Is(err, consts.ErrDuplicate) {
+			c.AbortWithStatusJSON(http.StatusConflict, StatusResp{
+				Err: err.Error(),
+			})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
 	}

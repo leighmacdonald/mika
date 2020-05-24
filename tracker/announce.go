@@ -22,25 +22,25 @@ type BitTorrentHandler struct {
 //
 // TODO use gin binding func?
 type announceRequest struct {
-	Compact bool `form:"compact"` // Force compact always?
+	Compact bool // Force compact always?
 
 	// The total amount downloaded (since the client sent the 'started' event to the tracker) in
 	// base ten ASCII. While not explicitly stated in the official specification, the consensus is that
 	// this should be the total number of bytes downloaded.
-	Downloaded uint32 `form:"downloaded" binding:"required"`
+	Downloaded uint32
 
 	// The number of bytes this peer still has to download, encoded in base ten ascii.
 	// Note that this can'tracker be computed from downloaded and the file length since it
 	// might be a resume, and there's a chance that some of the downloaded data failed an
 	// integrity check and had to be re-downloaded.
-	Left uint32 `form:"left" binding:"required"`
+	Left uint32
 
 	// The total amount uploaded (since the client sent the 'started' event to the tracker) in base ten
 	// ASCII. While not explicitly stated in the official specification, the consensus is that this should
 	// be the total number of bytes uploaded.
-	Uploaded uint32 `form:"uploaded" binding:"required"`
+	Uploaded uint32
 
-	Corrupt uint32 `form:"corrupt"`
+	Corrupt uint32
 
 	// This is an optional key which maps to started, completed, or stopped (or empty,
 	// which is the same as not being present). If not present, this is one of the
@@ -48,7 +48,7 @@ type announceRequest struct {
 	// when a download first begins, and one using completed is sent when the download
 	// is complete. No completed is sent if the file was complete when started. Downloaders
 	// send an announcement using stopped when they cease downloading.
-	Event consts.AnnounceType `form:"event" binding:"required"`
+	Event consts.AnnounceType
 
 	//  Optional. The true IP address of the client machine, in dotted quad format or rfc3513
 	// defined hexed IPv6 address. Notes: In general this parameter is not necessary as the address
@@ -63,15 +63,15 @@ type announceRequest struct {
 	// it only if the IP address that the request came in on is in RFC1918 space. Others honor it
 	// unconditionally, while others ignore it completely. In case of IPv6 address (e.g.: 2001:db8:1:2::100)
 	// it indicates only that client can communicate via IPv6.
-	IP net.IP `form:"ip" binding:"required"`
+	IP net.IP
 
 	// urlencoded 20-byte SHA1 hash of the value of the info key from the Metainfo file. Note that the
 	// value will be a bencoded dictionary, given the definition of the info key above.
-	InfoHash model.InfoHash `form:"info_hash" binding:"required"`
+	InfoHash model.InfoHash
 
 	// Optional. Number of peers that the client would like to receive from the tracker. This value is
 	// permitted to be zero. If omitted, typically defaults to 50 peers.
-	NumWant uint `form:"numwant" `
+	NumWant uint
 
 	// Required for private tracker use. Authentication key to authenticate requests
 	Passkey string
@@ -81,38 +81,14 @@ type announceRequest struct {
 	// generating this peer ID. However, one may rightly presume that it must at least be unique for
 	// your local machine, thus should probably incorporate things like process ID and perhaps a timestamp
 	// recorded at startup. See peer_id below for common client encodings of this field.
-	PeerID model.PeerID `form:"peer_id" binding:"required"`
+	PeerID model.PeerID
 
 	// The port number that the client is listening on. Ports reserved for BitTorrent are typically
 	// 6881-6889. Clients may choose to give up if it cannot establish a port within this range.
-	Port uint16 `binding:"required"`
+	Port uint16
 
 	// Optional. If a previous announce contained a tracker id, it should be set here.
-	TrackerID string `form:"tracker_id"`
-}
-
-func getUint32Key(q *query, key announceParam, def uint32) uint32 {
-	left, err := q.Uint32key(key)
-	if err != nil {
-		return def
-	}
-	return util.UMax32(0, left)
-}
-
-func getUint16Key(q *query, key announceParam, def uint16) uint16 {
-	left, err := q.Uint16(key)
-	if err != nil {
-		return def
-	}
-	return util.UMax16(0, left)
-}
-
-func getUintKey(q *query, key announceParam, def uint) uint {
-	left, err := q.Uint(key)
-	if err != nil {
-		return def
-	}
-	return util.UMax(0, left)
+	TrackerID string
 }
 
 // Parse the query string into an announceRequest struct
@@ -145,8 +121,8 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, track
 		return nil, msgInvalidAuth
 	}
 	port := getUint16Key(q, paramPort, 0)
-	if port < 1024 || port > 65535 {
-		// Don'tracker allow privileged ports which require root to bind to on unix
+	if port < 1024 {
+		// Don't allow privileged ports which require root to bind to on unix
 		return nil, msgInvalidPort
 	}
 	left := getUint32Key(q, paramLeft, 0)
@@ -191,6 +167,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// Get & Validate the torrent associated with the info_hash supplies
 	var tor model.Torrent
 	if err := h.tracker.Torrents.Get(&tor, req.InfoHash); err != nil || tor.IsDeleted {
+		log.Debugf("No torrent found matching: %x", req.InfoHash.Bytes())
 		oops(c, msgInvalidInfoHash)
 		return
 	}
@@ -200,6 +177,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	//
 	// TODO send this as a "warning message" field of a normal announce response instead?
 	if !tor.IsEnabled && tor.Reason != "" {
+		log.Debugf("Torrent found but is disabled: %x", req.InfoHash.Bytes())
 		c.Data(int(msgInvalidInfoHash), gin.MIMEPlain, responseError(tor.Reason))
 		return
 	}

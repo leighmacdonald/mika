@@ -8,6 +8,7 @@ import (
 	"github.com/leighmacdonald/mika/model"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/toorop/gin-logrus"
 	"net"
 	"net/http"
 	"strings"
@@ -95,7 +96,7 @@ func oops(ctx *gin.Context, errCode trackerErrCode) {
 		msg = responseStringMap[msgGenericError]
 	}
 	ctx.Data(int(errCode), gin.MIMEPlain, responseError(msg.Error()))
-	log.Errorf("Error in request from: %s (%d)", ctx.Request.RequestURI, errCode)
+	log.Errorf("Error in request from: %s (%d : %s)", ctx.Request.RequestURI, errCode, msg.Error())
 }
 
 // preFlightChecks ensures our user meets the requirements to make an authorized request
@@ -108,6 +109,7 @@ func preFlightChecks(usr *model.User, pk string, c *gin.Context, t *Tracker) boo
 		return false
 	}
 	if err := t.Users.GetByPasskey(usr, pk); err != nil {
+		log.Debugf("Got invalid passkey")
 		oops(c, msgInvalidAuth)
 		return false
 	}
@@ -124,7 +126,6 @@ func handleTrackerErrors(ctx *gin.Context) {
 	errorReturned := ctx.Errors.Last()
 	if errorReturned != nil {
 		meta := errorReturned.JSON().(gin.H)
-
 		status := msgGenericError
 		customStatus, found := meta["status"]
 		if found {
@@ -153,7 +154,7 @@ func responseError(message string) []byte {
 // the default middleware handlers.
 func newRouter() *gin.Engine {
 	router := gin.New()
-	router.Use(gin.Recovery())
+	router.Use(ginlogrus.Logger(log.New()), gin.Recovery())
 	return router
 }
 

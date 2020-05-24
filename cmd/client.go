@@ -27,6 +27,12 @@ var clientCmd = &cobra.Command{
 func newClient() *client.Client {
 	host := viper.GetString(string(config.APIListen))
 	key := viper.GetString(string(config.APIKey))
+	if strings.HasPrefix(host, ":") {
+		host = "http://localhost" + host
+	}
+	if !strings.HasPrefix(host, "http") {
+		host = "http://" + host
+	}
 	return client.New(host, key)
 }
 
@@ -109,7 +115,7 @@ var torrentAddFileCmd = &cobra.Command{
 			}
 			basename := filepath.Base(fileName)
 			name := strings.TrimSuffix(basename, filepath.Ext(basename))
-			if err := c.TorrentAdd(infoHash, p[1]); err != nil {
+			if err := c.TorrentAdd(infoHash, basename); err != nil {
 				log.Fatalf("Error trying to add %s: %s", name, err.Error())
 			}
 		}

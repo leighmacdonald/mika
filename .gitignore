@@ -42,3 +42,4 @@ src
 *.torrent
 *coverage*
 /cc-test-reporter
+/examples/data/.torrent.bolt.db

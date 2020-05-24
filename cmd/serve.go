@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"context"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/spf13/cobra"
@@ -21,6 +23,29 @@ var serveCmd = &cobra.Command{
 		tkr, err := tracker.New(ctx)
 		if err != nil {
 			log.Fatalf("Failed to initialize tracker: %s", err)
+		}
+
+		var infoHash model.InfoHash
+		mi, err := metainfo.LoadFromFile("examples/data/demo_torrent_data.torrent")
+		if err != nil {
+			return
+		}
+		if err := model.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
+			log.Fatalf(err.Error())
+		}
+		if err := tkr.Torrents.Add(model.Torrent{
+			ReleaseName: "demo torrent",
+			InfoHash:    infoHash,
+		}); err != nil {
+			panic("bad torrent")
+		}
+		if err := tkr.Users.Add(model.User{
+			UserID:          1,
+			Passkey:         "01234567890123456789",
+			IsDeleted:       false,
+			DownloadEnabled: true,
+		}); err != nil {
+			panic("bad user")
 		}
 		listenBT := viper.GetString(string(config.TrackerListen))
 		listenBTTLS := viper.GetBool(string(config.TrackerTLS))

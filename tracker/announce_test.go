@@ -100,7 +100,6 @@ func TestBitTorrentSession(t *testing.T) {
 		return
 	case <-waitChan:
 	}
-
 }
 
 func TestBitTorrentHandler_Announce(t *testing.T) {

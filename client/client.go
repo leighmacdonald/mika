@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/pkg/errors"
@@ -31,7 +32,7 @@ func (c *Client) TorrentDelete(ih model.InfoHash) error {
 
 // TorrentAdd add a new info_hash and associated name to be tracked
 func (c *Client) TorrentAdd(ih model.InfoHash, name string) error {
-	_, err := c.Exec(Opts{
+	resp, err := c.Exec(Opts{
 		Method: "POST",
 		Path:   "/torrent",
 		JSON: tracker.TorrentAddRequest{
@@ -39,6 +40,11 @@ func (c *Client) TorrentAdd(ih model.InfoHash, name string) error {
 			Name:     name,
 		},
 	})
+	if err != nil && resp != nil {
+		if resp.StatusCode == 409 {
+			return consts.ErrDuplicate
+		}
+	}
 	return err
 }
 

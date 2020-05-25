@@ -138,18 +138,17 @@ func (s *TorrentStore) Add(t model.Torrent) error {
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
 func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
+	var err error
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
-		_, err := s.db.Exec(dropQ, ih.Bytes())
-		if err != nil {
-			return err
-		}
+		_, err = s.db.Exec(dropQ, ih.Bytes())
 	} else {
 		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = ?`
-		_, err := s.db.NamedExec(updateQ, ih.Bytes())
-		if err != nil {
-			return err
-		}
+		_, err = s.db.NamedExec(updateQ, ih.Bytes())
+
+	}
+	if err != nil {
+		return err
 	}
 	s.cache.Delete(ih, dropRow)
 	return nil

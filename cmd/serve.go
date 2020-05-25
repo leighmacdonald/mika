@@ -62,7 +62,7 @@ var serveCmd = &cobra.Command{
 		if err4 != nil {
 			log.Fatalf("Failed to initialize tracker: %s", err)
 		}
-
+		_ = tkr.LoadWhitelist()
 		var infoHash model.InfoHash
 		mi, err5 := metainfo.LoadFromFile("examples/data/demo_torrent_data.torrent")
 		if err5 != nil {

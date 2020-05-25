@@ -193,12 +193,32 @@ func NewAPIHandler(tkr *Tracker) *gin.Engine {
 	return r
 }
 
+type HTTPOpts struct {
+	ListenAPI      string
+	ListenAPITLS   bool
+	Handler        http.Handler
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	MaxHeaderBytes int
+}
+
+func DefaultHTTPOpts() *HTTPOpts {
+	return &HTTPOpts{
+		ListenAPI:      "",
+		ListenAPITLS:   false,
+		Handler:        nil,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+}
+
 // CreateServer will configure and return a *http.Server suitable for serving requests.
 // This should be used over the default ListenAndServe options as they do not set certain
 // parameters, notably timeouts, which can negatively effect performance.
-func CreateServer(router http.Handler, addr string, useTLS bool) *http.Server {
+func CreateServer(opts *HTTPOpts) *http.Server {
 	var tlsCfg *tls.Config
-	if useTLS {
+	if opts.ListenAPITLS {
 		tlsCfg = &tls.Config{
 			MinVersion:               tls.VersionTLS12,
 			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -214,12 +234,12 @@ func CreateServer(router http.Handler, addr string, useTLS bool) *http.Server {
 		tlsCfg = nil
 	}
 	srv := &http.Server{
-		Addr:           addr,
-		Handler:        router,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+		Addr:           opts.ListenAPI,
+		Handler:        opts.Handler,
 		TLSConfig:      tlsCfg,
+		ReadTimeout:    opts.ReadTimeout,
+		WriteTimeout:   opts.WriteTimeout,
+		MaxHeaderBytes: opts.MaxHeaderBytes,
 	}
 	return srv
 }

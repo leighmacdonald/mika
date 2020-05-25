@@ -7,8 +7,8 @@ import (
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/store/memory"
 	"github.com/leighmacdonald/mika/util"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"time"
@@ -46,6 +46,46 @@ type Tracker struct {
 	// Whitelist and whitelist lock
 	WhitelistMutex *sync.RWMutex
 	Whitelist      map[string]model.WhiteListClient
+}
+
+type Opts struct {
+	Torrents store.TorrentStore
+	Peers    store.PeerStore
+	Users    store.UserStore
+	Geodb    geo.Provider
+	// GeodbEnabled will enable the lookup of location data for peers
+	// TODO the dummy provider is probably sufficient
+	GeodbEnabled bool
+	// Public if true means we dont require a passkey / authorized user
+	Public bool
+	// If Public is true, this will allow unknown info_hashes to be automatically tracked
+	AutoRegister     bool
+	AllowNonRoutable bool
+	// ReaperInterval is how often we can for dead peers in swarms
+	ReaperInterval time.Duration
+	AnnInterval    time.Duration
+	AnnIntervalMin time.Duration
+	BatchInterval  time.Duration
+	// MaxPeers is the max number of peers we send in an announce
+	MaxPeers int
+}
+
+func NewDefaultOpts() *Opts {
+	return &Opts{
+		Torrents:         memory.NewTorrentStore(),
+		Peers:            memory.NewPeerStore(),
+		Users:            memory.NewUserStore(),
+		Geodb:            &geo.DummyProvider{},
+		GeodbEnabled:     false,
+		Public:           false,
+		AutoRegister:     false,
+		AllowNonRoutable: false,
+		ReaperInterval:   time.Second * 300,
+		AnnInterval:      time.Second * 60,
+		AnnIntervalMin:   time.Second * 30,
+		BatchInterval:    time.Second * 60,
+		MaxPeers:         100,
+	}
 }
 
 // PeerReaper will call the store.PeerStore.Reap() function periodically. This is
@@ -169,56 +209,23 @@ func (t *Tracker) StatWorker() {
 
 // New creates a new Tracker instance with configured backend stores
 // TODO pass these in as deps
-func New(ctx context.Context) (*Tracker, error) {
-	runMode := viper.GetString(string(config.GeneralRunMode))
-	s, err := store.NewTorrentStore(
-		viper.GetString(string(config.StoreTorrentType)),
-		config.GetStoreConfig(config.Torrent))
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to setup torrent store")
-	}
-	p, err2 := store.NewPeerStore(viper.GetString(string(config.StorePeersType)),
-		config.GetStoreConfig(config.Peers))
-	if err2 != nil {
-		return nil, errors.Wrap(err2, "Failed to setup peer store")
-	}
-	u, err3 := store.NewUserStore(viper.GetString(string(config.StoreUsersType)),
-		config.GetStoreConfig(config.Users))
-	if err3 != nil {
-		return nil, errors.Wrap(err3, "Failed to setup user store")
-	}
-
-	var geodb geo.Provider
-	if config.GetBool(config.GeodbEnabled) {
-		geodb = geo.New(config.GetString(config.GeodbPath), runMode == "release")
-	} else {
-		geodb = &geo.DummyProvider{}
-	}
-	whitelist := make(map[string]model.WhiteListClient)
-	wl, err4 := s.WhiteListGetAll()
-	if err4 != nil {
-		log.Warnf("Whitelist empty, all clients are allowed")
-	} else {
-		for _, cw := range wl {
-			whitelist[cw.ClientPrefix] = cw
-		}
-	}
+func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 	return &Tracker{
 		ctx:              ctx,
 		StateUpdateChan:  make(chan model.UpdateState, 1000),
-		Torrents:         s,
-		Peers:            p,
-		Users:            u,
-		Geodb:            geodb,
-		GeodbEnabled:     viper.GetBool(string(config.GeodbEnabled)),
-		Whitelist:        whitelist,
+		Torrents:         opts.Torrents,
+		Peers:            opts.Peers,
+		Users:            opts.Users,
+		Geodb:            opts.Geodb,
+		GeodbEnabled:     opts.GeodbEnabled,
+		Whitelist:        make(map[string]model.WhiteListClient),
 		WhitelistMutex:   &sync.RWMutex{},
-		MaxPeers:         50,
-		BatchInterval:    viper.GetDuration(string(config.TrackerBatchUpdateInterval)),
-		ReaperInterval:   viper.GetDuration(string(config.TrackerReaperInterval)),
-		AnnInterval:      viper.GetDuration(string(config.TrackerAnnounceInterval)),
-		AnnIntervalMin:   viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
-		AllowNonRoutable: viper.GetBool(string(config.TrackerAllowNonRoutable)),
+		MaxPeers:         opts.MaxPeers,
+		BatchInterval:    opts.BatchInterval,
+		ReaperInterval:   opts.ReaperInterval,
+		AnnInterval:      opts.AnnInterval,
+		AnnIntervalMin:   opts.AnnIntervalMin,
+		AllowNonRoutable: opts.AllowNonRoutable,
 	}, nil
 }
 
@@ -302,6 +309,22 @@ func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
 		AnnIntervalMin:   viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
 		AllowNonRoutable: true,
 	}, torrents, users, peers
+}
+
+func (t *Tracker) LoadWhitelist() error {
+	whitelist := make(map[string]model.WhiteListClient)
+	wl, err4 := t.Torrents.WhiteListGetAll()
+	if err4 != nil {
+		log.Warnf("Whitelist empty, all clients are allowed")
+	} else {
+		for _, cw := range wl {
+			whitelist[cw.ClientPrefix] = cw
+		}
+	}
+	t.WhitelistMutex.Lock()
+	t.Whitelist = whitelist
+	t.WhitelistMutex.Unlock()
+	return nil
 }
 
 // Stats returns the current cumulative stats for the tracker

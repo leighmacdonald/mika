@@ -43,7 +43,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("Could not parse listen host: %s", host)
 	}
-	server = tracker.CreateServer(handler, parsedHost.Host, false)
+	httpOpts := tracker.DefaultHTTPOpts()
+	httpOpts.Handler = handler
+	httpOpts.ListenAPI = parsedHost.Host
+	server = tracker.CreateServer(httpOpts)
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			fmt.Printf("Error serving test api server: %s", err.Error())

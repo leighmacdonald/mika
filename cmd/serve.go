@@ -4,7 +4,9 @@ import (
 	"context"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/spf13/cobra"
@@ -20,14 +22,50 @@ var serveCmd = &cobra.Command{
 	Long:  `Start the tracker and serve requests`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		tkr, err := tracker.New(ctx)
+
+		opts := tracker.NewDefaultOpts()
+		opts.GeodbEnabled = viper.GetBool(string(config.GeodbEnabled))
+		opts.BatchInterval = viper.GetDuration(string(config.TrackerBatchUpdateInterval))
+		opts.ReaperInterval = viper.GetDuration(string(config.TrackerReaperInterval))
+		opts.AnnInterval = viper.GetDuration(string(config.TrackerAnnounceInterval))
+		opts.AnnIntervalMin = viper.GetDuration(string(config.TrackerAnnounceIntervalMin))
+		opts.AllowNonRoutable = viper.GetBool(string(config.TrackerAllowNonRoutable))
+
+		runMode := viper.GetString(string(config.GeneralRunMode))
+		ts, err := store.NewTorrentStore(
+			viper.GetString(string(config.StoreTorrentType)),
+			config.GetStoreConfig(config.Torrent))
 		if err != nil {
+			log.Fatalf("Failed to setup torrent store: %s", err)
+		}
+		opts.Torrents = ts
+		p, err2 := store.NewPeerStore(viper.GetString(string(config.StorePeersType)),
+			config.GetStoreConfig(config.Peers))
+		if err2 != nil {
+			log.Fatalf("Failed to setup peer store: %s", err2)
+		}
+		opts.Peers = p
+		u, err3 := store.NewUserStore(viper.GetString(string(config.StoreUsersType)),
+			config.GetStoreConfig(config.Users))
+		if err3 != nil {
+			log.Fatalf("Failed to setup user store: %s", err3)
+		}
+		opts.Users = u
+		var geodb geo.Provider
+		if config.GetBool(config.GeodbEnabled) {
+			geodb = geo.New(config.GetString(config.GeodbPath), runMode == "release")
+		} else {
+			geodb = &geo.DummyProvider{}
+		}
+		opts.Geodb = geodb
+		tkr, err4 := tracker.New(ctx, opts)
+		if err4 != nil {
 			log.Fatalf("Failed to initialize tracker: %s", err)
 		}
 
 		var infoHash model.InfoHash
-		mi, err := metainfo.LoadFromFile("examples/data/demo_torrent_data.torrent")
-		if err != nil {
+		mi, err5 := metainfo.LoadFromFile("examples/data/demo_torrent_data.torrent")
+		if err5 != nil {
 			return
 		}
 		if err := model.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
@@ -47,28 +85,34 @@ var serveCmd = &cobra.Command{
 		}); err != nil {
 			panic("bad user")
 		}
-		listenBT := viper.GetString(string(config.TrackerListen))
-		listenBTTLS := viper.GetBool(string(config.TrackerTLS))
-		btHandler := tracker.NewBitTorrentHandler(tkr)
-		btServer := tracker.CreateServer(btHandler, listenBT, listenBTTLS)
 
-		listenAPI := viper.GetString(string(config.APIListen))
-		listenAPITLS := viper.GetBool(string(config.APITLS))
-		apiHandler := tracker.NewAPIHandler(tkr)
-		apiServer := tracker.CreateServer(apiHandler, listenAPI, listenAPITLS)
+		btOpts := tracker.DefaultHTTPOpts()
+		btOpts.ListenAPI = viper.GetString(string(config.TrackerListen))
+		btOpts.ListenAPITLS = viper.GetBool(string(config.TrackerTLS))
+		btOpts.Handler = tracker.NewBitTorrentHandler(tkr)
+		btServer := tracker.CreateServer(btOpts)
+
+		apiOpts := tracker.DefaultHTTPOpts()
+		apiOpts.ListenAPI = viper.GetString(string(config.APIListen))
+		apiOpts.ListenAPITLS = viper.GetBool(string(config.APITLS))
+		apiOpts.Handler = tracker.NewAPIHandler(tkr)
+		apiServer := tracker.CreateServer(apiOpts)
 
 		go tkr.PeerReaper()
 		go tkr.StatWorker()
+
 		go func() {
 			if err := btServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen: %s\n", err)
 			}
 		}()
+
 		go func() {
 			if err := apiServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen: %s\n", err)
 			}
 		}()
+
 		util.WaitForSignal(ctx, func(ctx context.Context) error {
 			if err := apiServer.Shutdown(ctx); err != nil {
 				log.Fatalf("Error closing servers gracefully; %s", err)

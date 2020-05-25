@@ -1,22 +1,13 @@
 package tracker
 
 import (
-	"context"
 	"fmt"
-	tlog "github.com/anacrolix/log"
-	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anacrolix/torrent/storage"
 	"github.com/leighmacdonald/mika/model"
-	"github.com/leighmacdonald/mika/util"
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 )
@@ -28,105 +19,81 @@ func performRequest(r http.Handler, method, path string) *httptest.ResponseRecor
 	return w
 }
 
-func newClientConfig(port int, storage storage.ClientImpl, name string) *torrent.ClientConfig {
-	c := torrent.NewDefaultClientConfig()
-	c.ListenPort = port
-	c.Debug = true
-	c.DisablePEX = true
-	c.DisableUTP = true
-	c.NoDHT = true
-	c.NoDefaultPortForwarding = true
-	c.Seed = true
-	c.DefaultStorage = storage
-	c.Logger = tlog.Logger{LoggerImpl: tlog.StreamLogger{
-		W: os.Stderr,
-		Fmt: func(msg tlog.Msg) []byte {
-			return []byte(fmt.Sprintf("%s - %s", name, tlog.LineFormatter(msg)))
-		},
-	}}
-	return c
+type testReq struct {
+	PK         string
+	Ih         model.InfoHash
+	PID        model.PeerID
+	IP         string
+	Port       int
+	Uploaded   int
+	Downloaded int
+	left       int
 }
 
-func TestBitTorrentSession(t *testing.T) {
-	tkr, _, _, _ := NewTestTracker()
-	require.NoError(t, tkr.Users.Add(model.User{
-		UserID:          100,
-		Passkey:         "01234567890123456789", // Example torrent uses this passkey
-		IsDeleted:       false,
-		DownloadEnabled: true,
-	}))
-	server := &http.Server{Addr: "localhost:34000", Handler: NewBitTorrentHandler(tkr)}
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			log.Infof("Failed to shutdown tracker cleanly")
-		}
-	}()
-	port := 4000
-	torrentPath := util.FindFile("examples/data/demo_torrent_data.torrent")
-	mi, _ := metainfo.LoadFromFile(torrentPath)
-
-	var ih model.InfoHash
-	copy(ih[:], mi.HashInfoBytes().Bytes())
-	require.NoError(t, tkr.Torrents.Add(model.Torrent{
-		ReleaseName: "demo_torrent_data",
-		InfoHash:    ih,
-	}), "Failed to insert test torrent")
-
-	seeder, _ := torrent.NewClient(newClientConfig(port, storage.NewFile(util.FindFile("examples/data")), "seeder "))
-	defer seeder.Close()
-	seederDl, err := seeder.AddTorrentFromFile(torrentPath)
-	require.NoError(t, err)
-	<-seederDl.GotInfo()
-	seederDl.DownloadAll()
-	seeder.WaitAll()
-	dir, err2 := ioutil.TempDir("", "mika-test-")
-	require.NoError(t, err2, "Failed to make temp dir for torrent client")
-	defer func() { _ = os.RemoveAll(dir) }()
-	leecherStore := storage.NewFile(dir)
-	leecher, _ := torrent.NewClient(newClientConfig(port+1, leecherStore, "leecher"))
-	defer leecher.Close()
-	dlT, _ := leecher.AddTorrentFromFile(torrentPath)
-	<-dlT.GotInfo()
-	waitChan := make(chan bool, 1)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	go func() {
-		leecher.WaitAll()
-		waitChan <- true
-	}()
-	select {
-	case <-ctx.Done():
-		t.Fatalf("Timeout waiting for client to finish download")
-		return
-	case <-waitChan:
+func (t testReq) ToValues() url.Values {
+	return url.Values{
+		"info_hash":  {t.Ih.URLEncode()},
+		"peer_id":    {t.PID.URLEncode()},
+		"ip":         {t.IP},
+		"port":       {fmt.Sprintf("%d", t.Port)},
+		"uploaded":   {fmt.Sprintf("%d", t.Uploaded)},
+		"downloaded": {fmt.Sprintf("%d", t.Downloaded)},
+		"left":       {fmt.Sprintf("%d", t.left)},
 	}
 }
 
 func TestBitTorrentHandler_Announce(t *testing.T) {
-	tkr, torrents, users, peers := NewTestTracker()
+	torrent0 := store.GenerateTestTorrent()
+	peer0 := store.GenerateTestPeer()
+	user0 := store.GenerateTestUser()
+	tkr, err := NewTestTracker()
+	require.NoError(t, err, "Failed to init tracker")
+	time.Sleep(time.Millisecond * 200)
+	go tkr.StatWorker()
 	rh := NewBitTorrentHandler(tkr)
+
+	require.NoError(t, tkr.Torrents.Add(torrent0), "Failed to add test torrent")
+	require.NoError(t, tkr.Users.Add(user0), "Failed to add test user")
+
+	type stateExpected struct {
+		Uploaded   uint64
+		Downloaded uint64
+		Left       uint32
+		Seeders    uint
+		Leechers   uint
+		Completed  uint
+		Port       uint16
+		Ip         string
+		Status     int
+	}
 	type testAnn struct {
-		key  string
-		v    url.Values
-		resp int
+		req   testReq
+		state stateExpected
 	}
 	v := []testAnn{
-		{users[0].Passkey,
-			url.Values{
-				"info_hash":  {torrents[0].InfoHash.URLEncode()},
-				"peer_id":    {peers[0].PeerID.URLEncode()},
-				"ip":         {"255.255.255.255"},
-				"port":       {"6881"},
-				"uploaded":   {"5678"},
-				"downloaded": {"1234"},
-				"left":       {"9234"},
-			},
-			200,
+		// 1 Leecher
+		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
+			Port: 4000, Uploaded: 5678, Downloaded: 1000, left: 5000, PK: user0.Passkey},
+			stateExpected{Uploaded: 5678, Downloaded: 1000, Left: 5000,
+				Seeders: 0, Leechers: 1, Completed: 0, Port: 4000, Ip: "12.34.56.78", Status: 200},
 		},
 	}
-	for _, ann := range v {
-		u := fmt.Sprintf("/%s/announce?%s", ann.key, ann.v.Encode())
+	for i, ann := range v {
+		u := fmt.Sprintf("/%s/announce?%s", ann.req.PK, ann.req.ToValues().Encode())
 		w := performRequest(rh, "GET", u)
-		assert.EqualValues(t, ann.resp, w.Code)
+		time.Sleep(time.Millisecond * 200) // Wait for batch update call
+		require.EqualValues(t, ann.state.Status, w.Code)
+		var peer model.Peer
+		require.NoError(t, tkr.Peers.Get(&peer, ann.req.Ih, ann.req.PID), "Failed to get peer (%d)", i)
+		require.Equal(t, peer.Uploaded, ann.state.Uploaded, "Invalid uploaded (%d)", i)
+		require.Equal(t, peer.Downloaded, ann.state.Downloaded, "Invalid downloaded (%d)", i)
+		require.Equal(t, peer.Left, ann.state.Left, "Invalid left (%d)", i)
+		require.Equal(t, peer.Port, ann.state.Port, "Invalid port (%d)", i)
+		require.Equal(t, peer.IP.String(), ann.state.Ip, "Invalid ip (%d)", i)
+		swarm, err := tkr.Peers.GetN(torrent0.InfoHash, 1000)
+		require.NoError(t, err, "Failed to fetch all peers (%d)", i)
+		seeds, leechers := swarm.Counts()
+		require.Equal(t, ann.state.Seeders, seeds)
+		require.Equal(t, ann.state.Leechers, leechers)
 	}
 }

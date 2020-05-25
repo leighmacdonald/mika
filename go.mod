@@ -3,7 +3,6 @@ module github.com/leighmacdonald/mika
 go 1.14
 
 require (
-	github.com/anacrolix/log v0.7.0
 	github.com/anacrolix/torrent v1.15.2
 	github.com/chihaya/bencode v0.0.0-20160403015629-641906563e26
 	github.com/fsnotify/fsnotify v1.4.9 // indirect

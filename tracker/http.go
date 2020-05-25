@@ -158,6 +158,10 @@ func newRouter() *gin.Engine {
 	return router
 }
 
+func noRoute(c *gin.Context) {
+	c.Data(http.StatusNotFound, gin.MIMEPlain, []byte("nope"))
+}
+
 // NewBitTorrentHandler configures a router to handle tracker announce/scrape requests
 func NewBitTorrentHandler(tkr *Tracker) *gin.Engine {
 	r := newRouter()
@@ -167,6 +171,7 @@ func NewBitTorrentHandler(tkr *Tracker) *gin.Engine {
 	}
 	r.GET("/:passkey/announce", h.announce)
 	r.GET("/:passkey/scrape", h.scrape)
+	r.NoRoute(noRoute)
 	return r
 }
 
@@ -190,35 +195,38 @@ func NewAPIHandler(tkr *Tracker) *gin.Engine {
 	r.POST("/whitelist", h.whitelistAdd)
 	r.DELETE("/whitelist/:prefix", h.whitelistDelete)
 	r.GET("/whitelist", h.whitelistGet)
+	r.NoRoute(noRoute)
 	return r
 }
 
 type HTTPOpts struct {
-	ListenAPI      string
-	ListenAPITLS   bool
+	ListenAddr     string
+	UseTLS         bool
 	Handler        http.Handler
 	ReadTimeout    time.Duration
 	WriteTimeout   time.Duration
 	MaxHeaderBytes int
+	TLSConfig      *tls.Config
 }
 
 func DefaultHTTPOpts() *HTTPOpts {
 	return &HTTPOpts{
-		ListenAPI:      "",
-		ListenAPITLS:   false,
+		ListenAddr:     ":34000",
+		UseTLS:         false,
 		Handler:        nil,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
+		TLSConfig:      nil,
 	}
 }
 
-// CreateServer will configure and return a *http.Server suitable for serving requests.
+// NewHTTPServer will configure and return a *http.Server suitable for serving requests.
 // This should be used over the default ListenAndServe options as they do not set certain
 // parameters, notably timeouts, which can negatively effect performance.
-func CreateServer(opts *HTTPOpts) *http.Server {
+func NewHTTPServer(opts *HTTPOpts) *http.Server {
 	var tlsCfg *tls.Config
-	if opts.ListenAPITLS {
+	if opts.UseTLS && opts.TLSConfig == nil {
 		tlsCfg = &tls.Config{
 			MinVersion:               tls.VersionTLS12,
 			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -234,7 +242,7 @@ func CreateServer(opts *HTTPOpts) *http.Server {
 		tlsCfg = nil
 	}
 	srv := &http.Server{
-		Addr:           opts.ListenAPI,
+		Addr:           opts.ListenAddr,
 		Handler:        opts.Handler,
 		TLSConfig:      tlsCfg,
 		ReadTimeout:    opts.ReadTimeout,

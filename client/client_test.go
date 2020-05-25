@@ -37,7 +37,10 @@ func TestClient_Ping(t *testing.T) {
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
-	tkr, _, _, _ := tracker.NewTestTracker()
+	tkr, err := tracker.NewTestTracker()
+	if err != nil {
+		log.Fatalf("Failed to init tracker: %s", err)
+	}
 	handler := tracker.NewAPIHandler(tkr)
 	parsedHost, err := url.Parse(host)
 	if err != nil {
@@ -45,8 +48,8 @@ func TestMain(m *testing.M) {
 	}
 	httpOpts := tracker.DefaultHTTPOpts()
 	httpOpts.Handler = handler
-	httpOpts.ListenAPI = parsedHost.Host
-	server = tracker.CreateServer(httpOpts)
+	httpOpts.ListenAddr = parsedHost.Host
+	server = tracker.NewHTTPServer(httpOpts)
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			fmt.Printf("Error serving test api server: %s", err.Error())

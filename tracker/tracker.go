@@ -2,15 +2,13 @@ package tracker
 
 import (
 	"context"
-	"github.com/leighmacdonald/mika/config"
+	"fmt"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
-	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"time"
 
 	// Imported for side-effects for NewTestTracker
@@ -65,7 +63,8 @@ type Opts struct {
 	ReaperInterval time.Duration
 	AnnInterval    time.Duration
 	AnnIntervalMin time.Duration
-	BatchInterval  time.Duration
+	// How often we sync batch updates to backing stores
+	BatchInterval time.Duration
 	// MaxPeers is the max number of peers we send in an announce
 	MaxPeers int
 }
@@ -110,38 +109,54 @@ func (t *Tracker) StatWorker() {
 	userBatch := make(map[string]model.UserStats)
 	peerBatch := make(map[model.PeerHash]model.PeerStats)
 	torrentBatch := make(map[model.InfoHash]model.TorrentStats)
+	userBatchMu := &sync.RWMutex{}
+	peerBatchMu := &sync.RWMutex{}
+	torrentBatchMu := &sync.RWMutex{}
 	for {
 		select {
 		case <-syncTicker.C:
 			// Copy the maps to pass into the go routine call. At the same time deleting
 			// the existing values
 			userBatchCopy := make(map[string]model.UserStats)
+			userBatchMu.Lock()
 			for k, v := range userBatch {
 				userBatchCopy[k] = v
 				delete(userBatch, k)
 			}
+			userBatchMu.Unlock()
 			peerBatchCopy := make(map[model.PeerHash]model.PeerStats)
+			peerBatchMu.Lock()
 			for k, v := range peerBatch {
 				peerBatchCopy[k] = v
 				delete(peerBatch, k)
 			}
+			peerBatchMu.Unlock()
 			torrentBatchCopy := make(map[model.InfoHash]model.TorrentStats)
+			torrentBatchMu.Lock()
 			for k, v := range torrentBatch {
 				torrentBatchCopy[k] = v
 				delete(torrentBatch, k)
 			}
+			torrentBatchMu.Unlock()
 			// TODO make sure we dont exec this more than once at a time
 			go func() {
 				// Send current copies of data to stores
+				userBatchMu.RLock()
 				if err := t.Users.Sync(userBatchCopy); err != nil {
 					log.Errorf(err.Error())
 				}
+				userBatchMu.RUnlock()
+				peerBatchMu.RLock()
 				if err := t.Peers.Sync(peerBatchCopy); err != nil {
 					log.Errorf(err.Error())
 				}
+				peerBatchMu.RUnlock()
+
+				torrentBatchMu.RLock()
 				if err := t.Torrents.Sync(torrentBatchCopy); err != nil {
 					log.Errorf(err.Error())
 				}
+				torrentBatchMu.RUnlock()
 			}()
 		case u := <-t.StateUpdateChan:
 			ub, found := userBatch[u.Passkey]
@@ -166,6 +181,7 @@ func (t *Tracker) StatWorker() {
 			pb.Downloaded += u.Downloaded
 			pb.Uploaded += u.Uploaded
 			pb.LastAnnounce = u.Timestamp
+			pb.Left = u.Left
 			pb.Announces++
 
 			// Global torrent stats
@@ -202,13 +218,13 @@ func (t *Tracker) StatWorker() {
 			torrentBatch[u.InfoHash] = tb
 			peerBatch[pHash] = pb
 		case <-t.ctx.Done():
+			log.Debugf("Batch context closed")
 			return
 		}
 	}
 }
 
 // New creates a new Tracker instance with configured backend stores
-// TODO pass these in as deps
 func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 	return &Tracker{
 		ctx:              ctx,
@@ -231,84 +247,37 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 
 // NewTestTracker sets up a tracker with fake data for testing
 // This shouldn't really exist here, but its currently needed by other packages so its exported
-func NewTestTracker() (*Tracker, model.Torrents, model.Users, model.Swarm) {
+func NewTestTracker() (*Tracker, error) {
+	ctx := context.Background()
 	userCount := 10
 	torrentCount := 100
-	swarmSize := 10 // Swarm per torrent
-	ps, err := store.NewPeerStore("memory", config.StoreConfig{})
+	opts := NewDefaultOpts()
+	opts.BatchInterval = time.Millisecond * 100
+	opts.ReaperInterval = time.Second * 10
+	opts.AnnInterval = time.Second * 10
+	opts.AnnIntervalMin = time.Second * 5
+	opts.MaxPeers = 50
+	opts.AllowNonRoutable = true
+	tracker, err := New(ctx, opts)
 	if err != nil {
-		log.Panicf("Failed to setup peer store: %s", err)
+		return nil, err
 	}
-	ts, err := store.NewTorrentStore("memory", config.StoreConfig{})
-	if err != nil {
-		log.Panicf("Failed to setup torrent store: %s", err)
+	if err := tracker.LoadWhitelist(); err != nil {
+		return nil, err
 	}
-	us, err := store.NewUserStore("memory", config.StoreConfig{})
-	if err != nil {
-		log.Panicf("Failed to setup user store: %s", err)
-	}
-	var users model.Users
 	for i := 0; i < userCount; i++ {
 		usr := store.GenerateTestUser()
-		if i == 0 {
-			// Give user 0 a known passkey for testing
-			usr.Passkey = "12345678901234567890"
+		usr.Passkey = fmt.Sprintf("1234567890123456789%d", i)
+		if err := tracker.Users.Add(usr); err != nil {
+			return nil, err
 		}
-		_ = us.Add(usr)
-		users = append(users, usr)
 	}
-	if users == nil {
-		log.Panicf("Failed to instantiate users")
-		return nil, nil, nil, nil
-	}
-	var torrents model.Torrents
 	for i := 0; i < torrentCount; i++ {
-		t := store.GenerateTestTorrent()
-		if err := ts.Add(t); err != nil {
+		if err := tracker.Torrents.Add(store.GenerateTestTorrent()); err != nil {
 			log.Panicf("Error adding torrent: %s", err.Error())
 		}
-		torrents = append(torrents, t)
 	}
-	wl, err := ts.WhiteListGetAll()
-	if err != nil {
-		log.Warnf("Failed to read any client whitelists, all clients allowed")
-	}
-	wlm := make(map[string]model.WhiteListClient)
-	for _, cw := range wl {
-		wlm[cw.ClientPrefix] = cw
-	}
-	var peers model.Swarm
-	for _, t := range torrents {
-		for i := 0; i < swarmSize; i++ {
-			p := store.GenerateTestPeer()
-			if err := ps.Add(t.InfoHash, p); err != nil {
-				log.Panicf("Error adding peer: %s", err.Error())
-			}
-			peers = append(peers, p)
-		}
-	}
-	geoPath := util.FindFile(viper.GetString(string(config.GeodbPath)))
-	var geodb geo.Provider
-	if config.GetBool(config.GeodbEnabled) {
-		geodb = geo.New(geoPath, false)
-	} else {
-		geodb = &geo.DummyProvider{}
-	}
-	return &Tracker{
-		Torrents:         ts,
-		Peers:            ps,
-		Users:            us,
-		Geodb:            geodb,
-		GeodbEnabled:     viper.GetBool(string(config.GeodbEnabled)),
-		WhitelistMutex:   &sync.RWMutex{},
-		Whitelist:        wlm,
-		MaxPeers:         50,
-		StateUpdateChan:  make(chan model.UpdateState, 1000),
-		ReaperInterval:   viper.GetDuration(string(config.TrackerReaperInterval)),
-		AnnInterval:      viper.GetDuration(string(config.TrackerAnnounceInterval)),
-		AnnIntervalMin:   viper.GetDuration(string(config.TrackerAnnounceIntervalMin)),
-		AllowNonRoutable: true,
-	}, torrents, users, peers
+	return tracker, nil
 }
 
 func (t *Tracker) LoadWhitelist() error {

@@ -129,6 +129,7 @@ func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
 				peer.Downloaded += stats.Downloaded
 				peer.Announces += stats.Announces
 				peer.AnnounceLast = stats.LastAnnounce
+				peer.Left = stats.Left
 				ps.peers[ih][idx] = peer
 				break
 			}

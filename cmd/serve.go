@@ -87,16 +87,16 @@ var serveCmd = &cobra.Command{
 		}
 
 		btOpts := tracker.DefaultHTTPOpts()
-		btOpts.ListenAPI = viper.GetString(string(config.TrackerListen))
-		btOpts.ListenAPITLS = viper.GetBool(string(config.TrackerTLS))
+		btOpts.ListenAddr = viper.GetString(string(config.TrackerListen))
+		btOpts.UseTLS = viper.GetBool(string(config.TrackerTLS))
 		btOpts.Handler = tracker.NewBitTorrentHandler(tkr)
-		btServer := tracker.CreateServer(btOpts)
+		btServer := tracker.NewHTTPServer(btOpts)
 
 		apiOpts := tracker.DefaultHTTPOpts()
-		apiOpts.ListenAPI = viper.GetString(string(config.APIListen))
-		apiOpts.ListenAPITLS = viper.GetBool(string(config.APITLS))
+		apiOpts.ListenAddr = viper.GetString(string(config.APIListen))
+		apiOpts.UseTLS = viper.GetBool(string(config.APITLS))
 		apiOpts.Handler = tracker.NewAPIHandler(tkr)
-		apiServer := tracker.CreateServer(apiOpts)
+		apiServer := tracker.NewHTTPServer(apiOpts)
 
 		go tkr.PeerReaper()
 		go tkr.StatWorker()

@@ -158,6 +158,7 @@ type UserStats struct {
 type PeerStats struct {
 	Uploaded     uint64
 	Downloaded   uint64
+	Left         uint32
 	LastAnnounce time.Time
 	Announces    uint32
 }

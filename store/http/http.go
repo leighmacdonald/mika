@@ -211,8 +211,8 @@ func (ps PeerStore) Close() error {
 }
 
 // NewTorrentStore instantiates a new http torrent store
-func NewTorrentStore(key string, baseUrl string) *TorrentStore {
-	return &TorrentStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
+func NewTorrentStore(key string, baseURL string) *TorrentStore {
+	return &TorrentStore{client.NewAuthedClient(key, fullSchema(baseURL))}
 }
 
 // New initialize a TorrentStore implementation using the HTTP API backing store
@@ -225,8 +225,8 @@ func (t torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 }
 
 // NewPeerStore instantiates a new http peer store
-func NewPeerStore(key string, baseUrl string) *PeerStore {
-	return &PeerStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
+func NewPeerStore(key string, baseURL string) *PeerStore {
+	return &PeerStore{client.NewAuthedClient(key, fullSchema(baseURL))}
 }
 
 type peerDriver struct {
@@ -326,8 +326,8 @@ func (u *UserStore) Close() error {
 }
 
 // NewUserStore instantiated a new http user store
-func NewUserStore(key string, baseUrl string) *UserStore {
-	return &UserStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
+func NewUserStore(key string, baseURL string) *UserStore {
+	return &UserStore{client.NewAuthedClient(key, fullSchema(baseURL))}
 }
 
 // TODO handle https

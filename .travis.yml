@@ -8,11 +8,13 @@ before_script:
   - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
   - chmod +x ./cc-test-reporter
   - ./cc-test-reporter before-build
+  - go get github.com/schrej/godacov
 script:
   - golangci-lint run
   - make testcover
 after_script:
   - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+  - godacov -t $CODACY_KEY -r ./c.out -c $TRAVIS_COMMIT
 go:
   - 1.14.x
 install: true

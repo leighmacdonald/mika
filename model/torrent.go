@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/leighmacdonald/mika/consts"
 	"strings"
 	"time"
 )
@@ -50,6 +51,9 @@ func InfoHashFromString(infoHash *InfoHash, s string) error {
 
 // InfoHashFromHex returns a binary infohash from a byte array
 func InfoHashFromHex(infoHash *InfoHash, h string) error {
+	if len(h) != 40 {
+		return consts.ErrInvalidInfoHash
+	}
 	b, err := hex.DecodeString(h)
 	if err != nil {
 		return err

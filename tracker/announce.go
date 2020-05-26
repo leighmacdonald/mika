@@ -9,6 +9,7 @@ import (
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -92,7 +93,7 @@ type announceRequest struct {
 }
 
 // Parse the query string into an announceRequest struct
-func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, trackerErrCode) {
+func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCode) {
 	q, err := queryStringParser(c.Request.URL.RawQuery)
 	if err != nil {
 		return nil, msgMalformedRequest
@@ -110,15 +111,18 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, track
 	if !exists {
 		return nil, msgInvalidPeerID
 	}
-	ipv4, err2 := getIP(q, c)
+	ipAddr, err2 := getIP(q, c)
 	if err2 != nil {
 		log.Warn("Could not get user IP from request")
 		return nil, msgMalformedRequest
 	}
-	if !h.tracker.AllowNonRoutable && util.IsPrivateIP(ipv4) {
-		log.Warnf("Attempt to use non-routable IP value: %s", ipv4.String())
-		// TODO make this configurable
-		return nil, msgInvalidAuth
+	if strings.Contains(ipAddr.String(), ":") {
+		log.Warn("Got ipv6 peer request")
+		return nil, msgMalformedRequest
+	}
+	if !h.tracker.AllowNonRoutable && util.IsPrivateIP(ipAddr) {
+		log.Warnf("Attempt to use non-routable IP value: %s", ipAddr.String())
+		return nil, msgGenericError
 	}
 	port := getUint16Key(q, paramPort, 0)
 	if port < 1024 {
@@ -136,7 +140,7 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, track
 		Corrupt:    corrupt,
 		Downloaded: downloaded,
 		Event:      event,
-		IP:         ipv4,
+		IP:         ipAddr,
 		InfoHash:   infoHash,
 		Left:       left,
 		NumWant:    numWant,

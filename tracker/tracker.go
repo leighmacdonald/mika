@@ -247,7 +247,7 @@ func NewTestTracker() (*Tracker, error) {
 	opts.AnnInterval = time.Second * 10
 	opts.AnnIntervalMin = time.Second * 5
 	opts.MaxPeers = 50
-	opts.AllowNonRoutable = true
+	opts.AllowNonRoutable = false
 	tracker, err := New(ctx, opts)
 	if err != nil {
 		return nil, err

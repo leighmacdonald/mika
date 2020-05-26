@@ -5,39 +5,39 @@ import (
 	"crypto/tls"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/toorop/gin-logrus"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
-type trackerErrCode int
+type errCode int
 
 const (
-	msgInvalidReqType       trackerErrCode = 100
-	msgMissingInfoHash      trackerErrCode = 101
-	msgMissingPeerID        trackerErrCode = 102
-	msgMissingPort          trackerErrCode = 103
-	msgInvalidPort          trackerErrCode = 104
-	msgInvalidInfoHash      trackerErrCode = 150
-	msgInvalidPeerID        trackerErrCode = 151
-	msgInvalidNumWant       trackerErrCode = 152
-	msgOk                   trackerErrCode = 200
-	msgInfoHashNotFound     trackerErrCode = 480
-	msgInvalidAuth          trackerErrCode = 490
-	msgClientRequestTooFast trackerErrCode = 500
-	msgGenericError         trackerErrCode = 900
-	msgMalformedRequest     trackerErrCode = 901
-	msgQueryParseFail       trackerErrCode = 902
+	msgInvalidReqType       errCode = 100
+	msgMissingInfoHash      errCode = 101
+	msgMissingPeerID        errCode = 102
+	msgMissingPort          errCode = 103
+	msgInvalidPort          errCode = 104
+	msgInvalidInfoHash      errCode = 150
+	msgInvalidPeerID        errCode = 151
+	msgInvalidNumWant       errCode = 152
+	msgOk                   errCode = 200
+	msgInfoHashNotFound     errCode = 480
+	msgInvalidAuth          errCode = 490
+	msgClientRequestTooFast errCode = 500
+	msgGenericError         errCode = 900
+	msgMalformedRequest     errCode = 901
+	msgQueryParseFail       errCode = 902
 )
 
 var (
 	// Error code to message mappings
-	responseStringMap = map[trackerErrCode]error{
+	responseStringMap = map[errCode]error{
 		msgInvalidReqType:       errors.New("Invalid request type"),
 		msgMissingInfoHash:      errors.New("info_hash missing from request"),
 		msgMissingPeerID:        errors.New("peer_id missing from request"),
@@ -57,40 +57,38 @@ var (
 
 // Err maps a tracker error code to a error
 //noinspection GoUnusedExportedFunction
-func Err(code trackerErrCode) error {
+func Err(code errCode) error {
 	return responseStringMap[code]
 }
 
-// getIP Parses and returns a IP from a string
+// getIP Parses and returns a IP from a query
+// If a IP header exists, it will be used instead of the client provided query parameter
+// If no query IP is provided, the
 func getIP(q *query, c *gin.Context) (net.IP, error) {
+	// Look for forwarded ip in headers
+	for _, header := range []string{"X-Real-IP", "X-Forwarded-For"} {
+		headerIP := c.Request.Header.Get(header)
+		if headerIP != "" {
+			ip := net.ParseIP(headerIP)
+			if ip != nil {
+				return ip.To4(), nil
+			}
+		}
+	}
+	// Use client provided IP
 	ipStr, found := q.Params[paramIP]
 	if found {
 		ip := net.ParseIP(ipStr)
 		if ip != nil {
-			return ip.To4(), nil
+			return ip, nil
 		}
 	}
-	// Look for forwarded ip in header then default to remote address
-	forwardedIP := c.Request.Header.Get("X-Forwarded-For")
-	if forwardedIP != "" {
-		ip := net.ParseIP(forwardedIP)
-		if ip != nil {
-			return ip.To4(), nil
-		}
-		return ip, nil
-	}
-	s := strings.Split(c.Request.RemoteAddr, ":")
-	ipReq, _ := s[0], s[1]
-	ip := net.ParseIP(ipReq)
-	if ip != nil {
-		return ip.To4(), nil
-	}
-	return ip, nil
+	return nil, consts.ErrMalformedRequest
 }
 
 // oops will output a bencoded error code to the torrent client using
 // a preset message code constant
-func oops(ctx *gin.Context, errCode trackerErrCode) {
+func oops(ctx *gin.Context, errCode errCode) {
 	msg, exists := responseStringMap[errCode]
 	if !exists {
 		msg = responseStringMap[msgGenericError]
@@ -129,7 +127,7 @@ func handleTrackerErrors(ctx *gin.Context) {
 		status := msgGenericError
 		customStatus, found := meta["status"]
 		if found {
-			status = customStatus.(trackerErrCode)
+			status = customStatus.(errCode)
 		}
 		oops(ctx, status)
 	}

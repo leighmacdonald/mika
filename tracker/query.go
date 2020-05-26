@@ -1,3 +1,5 @@
+package tracker
+
 // This file contains functions derived originally from the chihaya project
 // https://github.com/chihaya/chihaya
 //
@@ -26,7 +28,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-package tracker
 
 import (
 	"github.com/leighmacdonald/mika/consts"

@@ -151,10 +151,7 @@ func (ps *PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) 
 	if !ok {
 		return consts.ErrInvalidPeerID
 	}
-	if err := swarm.Get(p, peerID); err != nil {
-		return err
-	}
-	return nil
+	return swarm.Get(p, peerID)
 }
 
 // Close flushes allocated memory

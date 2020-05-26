@@ -210,7 +210,7 @@ func (ps PeerStore) Close() error {
 	return nil
 }
 
-// New instantiates a new http torrent store
+// NewTorrentStore instantiates a new http torrent store
 func NewTorrentStore(key string, baseUrl string) *TorrentStore {
 	return &TorrentStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
 }
@@ -224,7 +224,7 @@ func (t torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	return NewTorrentStore(c.Password, c.Host), nil
 }
 
-// New instantiates a new http peer store
+// NewPeerStore instantiates a new http peer store
 func NewPeerStore(key string, baseUrl string) *PeerStore {
 	return &PeerStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
 }
@@ -325,7 +325,7 @@ func (u *UserStore) Close() error {
 	return nil
 }
 
-// New instantiated a new http user store
+// NewUserStore instantiated a new http user store
 func NewUserStore(key string, baseUrl string) *UserStore {
 	return &UserStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
 }

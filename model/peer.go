@@ -126,6 +126,7 @@ type Swarm struct {
 	*sync.RWMutex
 }
 
+// NewSwarm instantiates a new swarm
 func NewSwarm() Swarm {
 	return Swarm{
 		Peers:    make(map[PeerID]Peer),
@@ -142,12 +143,14 @@ func (swarm Swarm) Remove(p PeerID) {
 	swarm.Unlock()
 }
 
-// Remove removes a peer from a slice
+// Add inserts a new peer into the swarm
 func (swarm Swarm) Add(p Peer) {
 	swarm.Lock()
 	swarm.Peers[p.PeerID] = p
 	swarm.Unlock()
 }
+
+// UpdatePeer will update a swarm member with new stats
 func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) {
 	swarm.Lock()
 	peer, ok := swarm.Peers[peerID]
@@ -164,6 +167,7 @@ func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) {
 	swarm.Unlock()
 }
 
+// ReapExpired will delete any peers from the swarm that are considered expired
 func (swarm Swarm) ReapExpired() {
 	swarm.Lock()
 	for k, peer := range swarm.Peers {
@@ -174,6 +178,7 @@ func (swarm Swarm) ReapExpired() {
 	swarm.Unlock()
 }
 
+// Get will copy a peer into the peer pointer passed in if it exists.
 func (swarm Swarm) Get(peer *Peer, peerID PeerID) error {
 	swarm.RLock()
 	defer swarm.RUnlock()

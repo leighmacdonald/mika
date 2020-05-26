@@ -129,7 +129,7 @@ type PeerStore interface {
 	Sync(b map[model.PeerHash]model.PeerStats) error
 }
 
-// New will attempt to initialize a TorrentStore using the driver name provided
+// NewTorrentStore will attempt to initialize a TorrentStore using the driver name provided
 func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error) {
 	torrentDriversMutex.RLock()
 	defer torrentDriversMutex.RUnlock()
@@ -140,7 +140,7 @@ func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error)
 	return driver.New(config)
 }
 
-// New will attempt to initialize a PeerStore using the driver name provided
+// NewPeerStore will attempt to initialize a PeerStore using the driver name provided
 func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 	peerDriversMutex.RLock()
 	defer peerDriversMutex.RUnlock()
@@ -151,7 +151,7 @@ func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 	return driver.New(config)
 }
 
-// New will attempt to initialize a UserStore using the driver name provided
+// NewUserStore will attempt to initialize a UserStore using the driver name provided
 func NewUserStore(storeType string, config interface{}) (UserStore, error) {
 	userDriverMutex.RLock()
 	defer userDriverMutex.RUnlock()

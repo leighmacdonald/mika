@@ -99,6 +99,7 @@ func (ih InfoHash) Bytes() []byte {
 	return ih[:]
 }
 
+// URLEncode returns the peer id suitably  encoded for a URL
 func (ih InfoHash) URLEncode() string {
 	return fmt.Sprintf("%s", ih.Bytes())
 }

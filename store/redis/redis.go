@@ -410,20 +410,20 @@ func mapPeerValues(p *model.Peer, v map[string]string) {
 
 // GetN will fetch peers for a torrents active swarm up to N users
 func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
-	var peers model.Swarm
+	swarm := model.NewSwarm()
 	for i, key := range ps.findKeys(torrentPeersKey(ih)) {
 		if i == limit {
 			break
 		}
 		v, err := ps.client.HGetAll(key).Result()
 		if err != nil {
-			return nil, errors.Wrap(err, "Error trying to GetN")
+			return swarm, errors.Wrap(err, "Error trying to GetN")
 		}
 		var p model.Peer
 		mapPeerValues(&p, v)
-		peers = append(peers, p)
+		swarm.Peers[p.PeerID] = p
 	}
-	return peers, nil
+	return swarm, nil
 }
 
 // Close will close the underlying redis client and clear in-memory caches
@@ -451,8 +451,8 @@ func newRedisConfig(c *config.StoreConfig) *redis.Options {
 
 type torrentDriver struct{}
 
-// NewTorrentStore initialize a TorrentStore implementation using the redis backing store
-func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
+// New initialize a TorrentStore implementation using the redis backing store
+func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -474,8 +474,8 @@ func (ps *PeerStore) peerExpireHandler() {
 
 type peerDriver struct{}
 
-// NewPeerStore initialize a NewPeerStore implementation using the redis backing store
-func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
+// New initialize a New implementation using the redis backing store
+func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -492,8 +492,8 @@ func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 
 type userDriver struct{}
 
-// NewPeerStore initialize a NewPeerStore implementation using the redis backing store
-func (pd userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
+// New initialize a New implementation using the redis backing store
+func (pd userDriver) New(cfg interface{}) (store.UserStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig

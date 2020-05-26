@@ -26,21 +26,26 @@ const (
 	geoDownloadURL = "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=%s&suffix=tar.gz"
 )
 
+// Provider defines our interface for querying geo location data stores
 type Provider interface {
 	GetLocation(ip net.IP) City
 	Close() error
 }
 
+// DummyProvider is used when we dont want to use this feature. It will always return 0, 0
 type DummyProvider struct{}
 
+// DownloadDB does nothing for the dummy provider
 func (d *DummyProvider) DownloadDB(_ string, _ string) error {
 	return nil
 }
 
+// Close does nothing for the dummy provider
 func (d *DummyProvider) Close() error {
 	return nil
 }
 
+// GetLocation will always return 0, 0 coordinates
 func (d *DummyProvider) GetLocation(_ net.IP) City {
 	return City{
 		Country:  Country{ISOCode: "XX"},

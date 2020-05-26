@@ -156,8 +156,8 @@ func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 
 type torrentDriver struct{}
 
-// NewTorrentStore initialize a TorrentStore implementation using the mysql backing store
-func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
+// New initialize a TorrentStore implementation using the mysql backing store
+func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig

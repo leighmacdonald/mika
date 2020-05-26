@@ -1,4 +1,3 @@
-// Package http is used to remotely control all aspects of the tracker.
 package tracker
 
 import (

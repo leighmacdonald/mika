@@ -125,8 +125,8 @@ func (u *UserStore) Close() error {
 
 type userDriver struct{}
 
-// NewUserStore creates a new mysql backed user store.
-func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
+// New creates a new mysql backed user store.
+func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig

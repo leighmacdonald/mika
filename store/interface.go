@@ -27,20 +27,20 @@ var (
 
 // TorrentDriver provides a interface to enable registration of TorrentStore drivers
 type TorrentDriver interface {
-	// NewUserStore instantiates a new TorrentStore
-	NewTorrentStore(config interface{}) (TorrentStore, error)
+	// New instantiates a new TorrentStore
+	New(config interface{}) (TorrentStore, error)
 }
 
 // PeerDriver provides a interface to enable registration of PeerStore drivers
 type PeerDriver interface {
-	// NewUserStore instantiates a new PeerStore
-	NewPeerStore(config interface{}) (PeerStore, error)
+	// New instantiates a new PeerStore
+	New(config interface{}) (PeerStore, error)
 }
 
 // UserDriver provides a interface to enable registration of UserStore drivers
 type UserDriver interface {
-	// NewUserStore instantiates a new UserStore
-	NewUserStore(config interface{}) (UserStore, error)
+	// New instantiates a new UserStore
+	New(config interface{}) (UserStore, error)
 }
 
 // AddPeerDriver will register a new driver able to instantiate a PeerStore
@@ -129,7 +129,7 @@ type PeerStore interface {
 	Sync(b map[model.PeerHash]model.PeerStats) error
 }
 
-// NewTorrentStore will attempt to initialize a TorrentStore using the driver name provided
+// New will attempt to initialize a TorrentStore using the driver name provided
 func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error) {
 	torrentDriversMutex.RLock()
 	defer torrentDriversMutex.RUnlock()
@@ -137,10 +137,10 @@ func NewTorrentStore(storeType string, config interface{}) (TorrentStore, error)
 	if !found {
 		return nil, consts.ErrInvalidDriver
 	}
-	return driver.NewTorrentStore(config)
+	return driver.New(config)
 }
 
-// NewPeerStore will attempt to initialize a PeerStore using the driver name provided
+// New will attempt to initialize a PeerStore using the driver name provided
 func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 	peerDriversMutex.RLock()
 	defer peerDriversMutex.RUnlock()
@@ -148,10 +148,10 @@ func NewPeerStore(storeType string, config interface{}) (PeerStore, error) {
 	if !found {
 		return nil, consts.ErrInvalidDriver
 	}
-	return driver.NewPeerStore(config)
+	return driver.New(config)
 }
 
-// NewUserStore will attempt to initialize a UserStore using the driver name provided
+// New will attempt to initialize a UserStore using the driver name provided
 func NewUserStore(storeType string, config interface{}) (UserStore, error) {
 	userDriverMutex.RLock()
 	defer userDriverMutex.RUnlock()
@@ -159,5 +159,5 @@ func NewUserStore(storeType string, config interface{}) (UserStore, error) {
 	if !found {
 		return nil, consts.ErrInvalidDriver
 	}
-	return driver.NewUserStore(config)
+	return driver.New(config)
 }

@@ -44,13 +44,12 @@ func GenerateTestPeer() model.Peer {
 	return p
 }
 
-func findPeer(peers model.Swarm, p1 model.Peer) (model.Peer, error) {
-	for _, p := range peers {
-		if p.PeerID == p1.PeerID {
-			return p, nil
-		}
+func findPeer(swarm model.Swarm, p1 model.Peer) (model.Peer, error) {
+	p, found := swarm.Peers[p1.PeerID]
+	if !found {
+		return model.Peer{}, errors.New("unknown peer")
 	}
-	return model.Peer{}, errors.New("unknown peer")
+	return p, nil
 }
 
 // TestPeerStore tests the interface implementation
@@ -58,20 +57,20 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 	torrentA := GenerateTestTorrent()
 	defer func() { _ = ts.Delete(torrentA.InfoHash, true) }()
 	require.NoError(t, ts.Add(torrentA))
-	var peers model.Swarm
+	swarm := model.NewSwarm()
 	for i := 0; i < 5; i++ {
 		p := GenerateTestPeer()
 		p.InfoHash = torrentA.InfoHash
-		peers = append(peers, p)
+		swarm.Peers[p.PeerID] = p
 	}
-	for _, peer := range peers {
+	for _, peer := range swarm.Peers {
 		require.NoError(t, ps.Add(torrentA.InfoHash, peer))
 	}
 	fetchedPeers, err := ps.GetN(torrentA.InfoHash, 5)
 	require.NoError(t, err)
-	require.Equal(t, len(peers), len(fetchedPeers))
-	for _, peer := range peers {
-		fp, err := findPeer(peers, peer)
+	require.Equal(t, len(swarm.Peers), len(fetchedPeers.Peers))
+	for _, peer := range swarm.Peers {
+		fp, err := findPeer(swarm, peer)
 		require.NoError(t, err)
 		require.NotNil(t, fp)
 		require.Equal(t, fp.PeerID, peer.PeerID)
@@ -79,10 +78,15 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 		require.Equal(t, fp.Port, peer.Port)
 		require.Equal(t, fp.Location, peer.Location)
 	}
-	if peers == nil || len(peers) < 5 {
+	if len(swarm.Peers) < 5 {
 		t.Fatalf("Invalid peer count")
 	}
-	p1 := peers[2]
+	var p1 model.Peer
+	for k := range swarm.Peers {
+		p1 = swarm.Peers[k]
+		break
+	}
+
 	ph := model.NewPeerHash(p1.InfoHash, p1.PeerID)
 	require.NoError(t, ps.Sync(map[model.PeerHash]model.PeerStats{
 		ph: {
@@ -99,7 +103,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 	require.Equal(t, p1.TotalTime, p1Updated.TotalTime)
 	require.Equal(t, uint64(20000), p1Updated.Downloaded)
 	require.Equal(t, uint64(10000), p1Updated.Uploaded)
-	for _, peer := range peers {
+	for _, peer := range swarm.Peers {
 		require.NoError(t, ps.Delete(torrentA.InfoHash, peer.PeerID))
 	}
 }
@@ -131,6 +135,7 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.Equal(t, len(wlClients)-1, len(clientsUpdated))
 }
 
+// TestUserStore tests the user store for conformance to our interface
 func TestUserStore(t *testing.T, s UserStore) {
 	var users []model.User
 	for i := 0; i < 5; i++ {

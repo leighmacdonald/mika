@@ -199,6 +199,7 @@ func NewAPIHandler(tkr *Tracker) *gin.Engine {
 	return r
 }
 
+// HTTPOpts is used to configure a http.Server instance
 type HTTPOpts struct {
 	ListenAddr     string
 	UseTLS         bool
@@ -209,6 +210,7 @@ type HTTPOpts struct {
 	TLSConfig      *tls.Config
 }
 
+// DefaultHTTPOpts returns a default set of options for http.Server instances
 func DefaultHTTPOpts() *HTTPOpts {
 	return &HTTPOpts{
 		ListenAddr:     ":34000",

@@ -389,17 +389,17 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		    peer_id::bytea, info_hash::bytea, user_id, addr_ip, addr_port, downloaded, uploaded, 
 			announces, speed_up, speed_dn, speed_up_max, speed_dn_max, ST_x(location), ST_y(location)
 		FROM
-		    peers 
+		    swarm 
 		WHERE
 		      info_hash = $1 
 		LIMIT 
 		    $2`
-	var peers model.Swarm
+	var swarm model.Swarm
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
 	rows, err := ps.db.Query(c, q, ih.Bytes(), limit)
 	if err != nil {
-		return nil, err
+		return swarm, err
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -407,14 +407,14 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		err = rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
 			&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location.Longitude, &p.Location.Latitude)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to fetch N peers from store")
+			return swarm, errors.Wrap(err, "failed to fetch N swarm from store")
 		}
-		peers = append(peers, p)
+		swarm.Peers[p.PeerID] = p
 	}
 	if rows.Err() != nil {
-		return nil, errors.Wrap(err, "error in peer query")
+		return swarm, errors.Wrap(err, "error in peer query")
 	}
-	return peers, nil
+	return swarm, nil
 }
 
 // Get will fetch the peer from the swarm if it exists
@@ -447,8 +447,8 @@ func (ps PeerStore) Close() error {
 
 type userDriver struct{}
 
-// NewUserStore creates a new postgres backed user store.
-func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
+// New creates a new postgres backed user store.
+func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -462,8 +462,8 @@ func (ud userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
 
 type peerDriver struct{}
 
-// NewPeerStore returns a postgres backed store.PeerStore driver
-func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
+// New returns a postgres backed store.PeerStore driver
+func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -474,21 +474,26 @@ func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
 	}
 	return NewPeerStore(db), nil
 }
+
+// NewUserStore instantiates a new postgres user store
 func NewUserStore(db *pgx.Conn) *UserStore {
 	return &UserStore{db: db, ctx: context.Background()}
 }
 
+// NewPeerStore instantiates a new postgres peer store
 func NewPeerStore(db *pgx.Conn) *PeerStore {
 	return &PeerStore{db: db, ctx: context.Background()}
 }
+
+// NewTorrentStore instantiates a new postgres torrent store
 func NewTorrentStore(db *pgx.Conn) *TorrentStore {
 	return &TorrentStore{db: db, ctx: context.Background()}
 }
 
 type torrentDriver struct{}
 
-// NewTorrentStore initialize a TorrentStore implementation using the postgres backing store
-func (td torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
+// New initialize a TorrentStore implementation using the postgres backing store
+func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig

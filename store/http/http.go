@@ -191,13 +191,17 @@ func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 
 // GetN will fetch peers for a torrents active swarm up to N users
 func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
-	var peers model.Swarm
+	swarm := model.NewSwarm()
+	var peers []model.Peer
 	_, err := ps.Exec(client.Opts{
 		Method: "GET",
 		Path:   fmt.Sprintf("/api/peers/swarm/%s/%d", ih.String(), limit),
 		Recv:   &peers,
 	})
-	return peers, err
+	for _, peer := range peers {
+		swarm.Peers[peer.PeerID] = peer
+	}
+	return swarm, err
 }
 
 // Close will close all the remaining http connections
@@ -206,12 +210,13 @@ func (ps PeerStore) Close() error {
 	return nil
 }
 
+// New instantiates a new http torrent store
 func NewTorrentStore(key string, baseUrl string) *TorrentStore {
 	return &TorrentStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
 }
 
-// NewTorrentStore initialize a TorrentStore implementation using the HTTP API backing store
-func (t torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, error) {
+// New initialize a TorrentStore implementation using the HTTP API backing store
+func (t torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -219,6 +224,7 @@ func (t torrentDriver) NewTorrentStore(cfg interface{}) (store.TorrentStore, err
 	return NewTorrentStore(c.Password, c.Host), nil
 }
 
+// New instantiates a new http peer store
 func NewPeerStore(key string, baseUrl string) *PeerStore {
 	return &PeerStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
 }
@@ -227,8 +233,8 @@ type peerDriver struct {
 	*client.AuthedClient
 }
 
-// NewPeerStore initialize a NewPeerStore implementation using the HTTP API backing store
-func (p peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
+// New initialize a New implementation using the HTTP API backing store
+func (p peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -319,6 +325,7 @@ func (u *UserStore) Close() error {
 	return nil
 }
 
+// New instantiated a new http user store
 func NewUserStore(key string, baseUrl string) *UserStore {
 	return &UserStore{client.NewAuthedClient(key, fullSchema(baseUrl))}
 }
@@ -333,12 +340,12 @@ func fullSchema(host string) string {
 
 type userDriver struct{}
 
-// NewUserStore creates a new http api backed user store.
+// New creates a new http api backed user store.
 // the config key store_users_host should be a full url prefix, including port.
 // This should be everything up to the /api/... path
 // eg: http://localhost:35000 will be translated into:
 // http://localhost:35000/api/user/pk/12345678901234567890
-func (p userDriver) NewUserStore(cfg interface{}) (store.UserStore, error) {
+func (p userDriver) New(cfg interface{}) (store.UserStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig

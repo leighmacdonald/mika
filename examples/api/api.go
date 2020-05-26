@@ -1,5 +1,5 @@
-// Package exampleapi implements a trivial reference server implementation
-// of the required API routes to communicate as a frontend server for the tracker.
+// Package api implements a trivial reference HTTP store server implementation
+// and the required API routes to communicate as a frontend server for the tracker.
 //
 package api
 
@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	// DefaultAuthKey is a predefined authentication key only used for testing purposes
 	DefaultAuthKey = "12345678901234567890"
 )
 
@@ -62,13 +63,13 @@ func getInfoHashParam(ih *model.InfoHash, c *gin.Context) bool {
 	return true
 }
 
-func getPeerIDParam(peerId *model.PeerID, c *gin.Context) bool {
-	peerIdStr := c.Param("peer_id")
-	if peerIdStr == "" {
+func getPeerIDParam(peerID *model.PeerID, c *gin.Context) bool {
+	peerIDStr := c.Param("peer_id")
+	if peerIDStr == "" {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return false
 	}
-	*peerId = model.PeerIDFromString(peerIdStr)
+	*peerID = model.PeerIDFromString(peerIDStr)
 	return true
 }
 
@@ -86,18 +87,18 @@ func (s *ServerExample) getTorrent(c *gin.Context) {
 }
 
 func (s *ServerExample) getUserByID(c *gin.Context) {
-	userIdStr := c.Param("user_id")
-	if userIdStr == "" {
+	userIDStr := c.Param("user_id")
+	if userIDStr == "" {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	userId := util.StringToUInt32(userIdStr, 0)
-	if userId == 0 {
+	userID := util.StringToUInt32(userIDStr, 0)
+	if userID == 0 {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 	var u model.User
-	if err := s.Users.GetByID(&u, userId); err != nil {
+	if err := s.Users.GetByID(&u, userID); err != nil {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
@@ -320,12 +321,19 @@ func (s *ServerExample) peersGetN(c *gin.Context) {
 	if limit > maxLimit {
 		limit = maxLimit
 	}
-	peers, err := s.Peers.GetN(infoHash, limit)
+	swarm, err := s.Peers.GetN(infoHash, limit)
 	if err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
+	swarm.RLock()
+	var peers []model.Peer
+	for _, p := range swarm.Peers {
+		peers = append(peers, p)
+	}
+	swarm.RUnlock()
 	c.JSON(http.StatusOK, peers)
+
 }
 
 func (s *ServerExample) peersGet(c *gin.Context) {

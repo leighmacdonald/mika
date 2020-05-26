@@ -8,6 +8,7 @@ import (
 	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -56,6 +57,7 @@ func (p PeerID) RawString() string {
 	return string(p.Bytes())
 }
 
+// URLEncode returns the peer id suitably  encoded for a URL
 func (p PeerID) URLEncode() string {
 	return fmt.Sprintf("%s", p.Bytes())
 }
@@ -117,28 +119,84 @@ func (peer *Peer) Valid() bool {
 }
 
 // Swarm is a set of users participating in a torrent
-type Swarm []Peer
+type Swarm struct {
+	Peers    map[PeerID]Peer
+	Seeders  int
+	Leechers int
+	*sync.RWMutex
+}
+
+func NewSwarm() Swarm {
+	return Swarm{
+		Peers:    make(map[PeerID]Peer),
+		Seeders:  0,
+		Leechers: 0,
+		RWMutex:  &sync.RWMutex{},
+	}
+}
 
 // Remove removes a peer from a slice
-func (peers Swarm) Remove(p PeerID) []Peer {
-	for i := len(peers) - 1; i >= 0; i-- {
-		if peers[i].PeerID == p {
-			return append(peers[:i], peers[i+1:]...)
+func (swarm Swarm) Remove(p PeerID) {
+	swarm.Lock()
+	delete(swarm.Peers, p)
+	swarm.Unlock()
+}
+
+// Remove removes a peer from a slice
+func (swarm Swarm) Add(p Peer) {
+	swarm.Lock()
+	swarm.Peers[p.PeerID] = p
+	swarm.Unlock()
+}
+func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) {
+	swarm.Lock()
+	peer, ok := swarm.Peers[peerID]
+	if !ok {
+		swarm.Unlock()
+		return
+	}
+	peer.Uploaded += stats.Uploaded
+	peer.Downloaded += stats.Downloaded
+	peer.Left = stats.Left
+	peer.Announces += stats.Announces
+	peer.AnnounceLast = stats.LastAnnounce
+	swarm.Peers[peerID] = peer
+	swarm.Unlock()
+}
+
+func (swarm Swarm) ReapExpired() {
+	swarm.Lock()
+	for k, peer := range swarm.Peers {
+		if peer.Expired() {
+			delete(swarm.Peers, k)
 		}
 	}
-	return peers
+	swarm.Unlock()
+}
+
+func (swarm Swarm) Get(peer *Peer, peerID PeerID) error {
+	swarm.RLock()
+	defer swarm.RUnlock()
+	p, found := swarm.Peers[peerID]
+	if !found {
+		return consts.ErrInvalidPeerID
+	}
+	*peer = p
+	return nil
 }
 
 // Counts returns the sums for seeders and leechers in the swarm
 // TODO cache this somewhere and only update on state change
-func (peers Swarm) Counts() (seeders uint, leechers uint) {
-	for _, p := range peers {
+func (swarm *Swarm) Counts() (seeders uint, leechers uint) {
+	swarm.RLock()
+	for _, p := range swarm.Peers {
 		if p.Left == 0 {
 			seeders++
 		} else {
 			leechers++
 		}
 	}
+	swarm.RUnlock()
 	return
 }
 

@@ -4,7 +4,6 @@ import (
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
-	"github.com/leighmacdonald/mika/util"
 	"sync"
 )
 
@@ -19,6 +18,7 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
+// NewTorrentStore instantiates a new in-memory torrent store
 func NewTorrentStore() *TorrentStore {
 	return &TorrentStore{
 		RWMutex:   sync.RWMutex{},
@@ -102,16 +102,17 @@ func (ts *TorrentStore) Get(torrent *model.Torrent, hash model.InfoHash) error {
 }
 
 // PeerStore is a memory backed store.PeerStore implementation
-// TODO shard peer storage?
+// TODO shard peer storage
 type PeerStore struct {
 	sync.RWMutex
-	peers map[model.InfoHash]model.Swarm
+	swarms map[model.InfoHash]model.Swarm
 }
 
+// NewPeerStore instantiates a new in-memory peer store
 func NewPeerStore() *PeerStore {
 	return &PeerStore{
 		RWMutex: sync.RWMutex{},
-		peers:   map[model.InfoHash]model.Swarm{},
+		swarms:  make(map[model.InfoHash]model.Swarm),
 	}
 }
 
@@ -121,54 +122,46 @@ func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
 	defer ps.Unlock()
 	// TODO reduce the cyclic complexity of this
 	for ph, stats := range b {
-		ih := ph.InfoHash()
-		pid := ph.PeerID()
-		for idx, peer := range ps.peers[ih] {
-			if pid == peer.PeerID {
-				peer.Uploaded += stats.Uploaded
-				peer.Downloaded += stats.Downloaded
-				peer.Announces += stats.Announces
-				peer.AnnounceLast = stats.LastAnnounce
-				peer.Left = stats.Left
-				ps.peers[ih][idx] = peer
-				break
-			}
+		swarm, ok := ps.swarms[ph.InfoHash()]
+		if ok {
+			swarm.UpdatePeer(ph.PeerID(), stats)
 		}
 	}
 	return nil
 }
 
-// Reap will loop through the peers removing any stale entries from active swarms
+// Reap will loop through the swarms removing any stale entries from active swarms
 func (ps *PeerStore) Reap() {
 	ps.Lock()
-	defer ps.Unlock()
-	for _, swarm := range ps.peers {
-		for _, peer := range swarm {
-			if peer.Expired() {
-				swarm.Remove(peer.PeerID)
-			}
+	for k := range ps.swarms {
+		swarm, ok := ps.swarms[k]
+		if !ok {
+			continue
 		}
+		swarm.ReapExpired()
 	}
+	ps.Unlock()
 }
 
 // Get will fetch the peer from the swarm if it exists
 func (ps *PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) error {
 	ps.RLock()
 	defer ps.RUnlock()
-	for _, peer := range ps.peers[ih] {
-		if peer.PeerID == peerID {
-			*p = peer
-			return nil
-		}
+	swarm, ok := ps.swarms[ih]
+	if !ok {
+		return consts.ErrInvalidPeerID
 	}
-	return consts.ErrInvalidPeerID
+	if err := swarm.Get(p, peerID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Close flushes allocated memory
 // TODO flush mem
 func (ps *PeerStore) Close() error {
 	ps.Lock()
-	ps.peers = make(map[model.InfoHash]model.Swarm)
+	ps.swarms = make(map[model.InfoHash]model.Swarm)
 	ps.Unlock()
 	return nil
 }
@@ -176,8 +169,12 @@ func (ps *PeerStore) Close() error {
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 	ps.Lock()
-	defer ps.Unlock()
-	ps.peers[ih] = append(ps.peers[ih], p)
+	_, ok := ps.swarms[ih]
+	if !ok {
+		ps.swarms[ih] = model.NewSwarm()
+	}
+	ps.swarms[ih].Peers[p.PeerID] = p
+	ps.Unlock()
 	return nil
 }
 
@@ -189,21 +186,21 @@ func (ps *PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
 
 // Delete will remove a user from a torrents swarm
 func (ps *PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
-	ps.Lock()
-	ps.peers[ih].Remove(p)
-	ps.Unlock()
+	ps.RLock()
+	ps.swarms[ih].Remove(p)
+	ps.RUnlock()
 	return nil
 }
 
-// GetN will fetch peers for a torrents active swarm up to N users
-func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
+// GetN will fetch swarms for a torrents active swarm up to N users
+func (ps *PeerStore) GetN(ih model.InfoHash, _ int) (model.Swarm, error) {
 	ps.RLock()
-	p, found := ps.peers[ih]
+	p, found := ps.swarms[ih]
 	ps.RUnlock()
 	if !found {
-		return nil, consts.ErrInvalidTorrentID
+		return model.Swarm{}, consts.ErrInvalidTorrentID
 	}
-	return p[0:util.MinInt(limit, len(p))], nil
+	return p, nil
 }
 
 // Add adds a new torrent to the memory store
@@ -231,15 +228,15 @@ func (ts *TorrentStore) Delete(ih model.InfoHash, _ bool) error {
 
 type torrentDriver struct{}
 
-// NewTorrentStore initialize a TorrentStore implementation using the memory backing store
-func (td torrentDriver) NewTorrentStore(_ interface{}) (store.TorrentStore, error) {
+// New initialize a TorrentStore implementation using the memory backing store
+func (td torrentDriver) New(_ interface{}) (store.TorrentStore, error) {
 	return NewTorrentStore(), nil
 }
 
 type peerDriver struct{}
 
-// NewPeerStore initialize a NewPeerStore implementation using the memory backing store
-func (pd peerDriver) NewPeerStore(_ interface{}) (store.PeerStore, error) {
+// New initialize a New implementation using the memory backing store
+func (pd peerDriver) New(_ interface{}) (store.PeerStore, error) {
 	return NewPeerStore(), nil
 }
 
@@ -249,6 +246,7 @@ type UserStore struct {
 	users map[string]model.User
 }
 
+// NewUserStore instantiates a new in-memory user store
 func NewUserStore() *UserStore {
 	return &UserStore{
 		RWMutex: sync.RWMutex{},
@@ -328,8 +326,8 @@ func (u *UserStore) Close() error {
 
 type userDriver struct{}
 
-// NewUserStore creates a new memory backed user store.
-func (pd userDriver) NewUserStore(_ interface{}) (store.UserStore, error) {
+// New creates a new memory backed user store.
+func (pd userDriver) New(_ interface{}) (store.UserStore, error) {
 	return NewUserStore(), nil
 }
 

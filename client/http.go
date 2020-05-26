@@ -31,12 +31,14 @@ func NewClient() *http.Client {
 	}
 }
 
+// AuthedClient represents a http client which supports basic authentication methods
 type AuthedClient struct {
 	*http.Client
 	authKey  string
 	basePath string
 }
 
+// NewAuthedClient create a new default AuthedClient instance
 func NewAuthedClient(authKey string, basePath string) *AuthedClient {
 	return &AuthedClient{
 		Client:   NewClient(),
@@ -59,7 +61,7 @@ type Opts struct {
 	Recv    interface{}
 }
 
-// Do handles http requests & response initialization and (un)marshalling of JSON payloads.
+// Exec handles http requests & response initialization and (un)marshalling of JSON payloads.
 // If JSON is not nil, it will be JSON encoded before sending to the host, otherwise Data will
 // be sent instead.
 // If Recv is not nil the response will be unmarshalled into its address

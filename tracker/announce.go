@@ -242,7 +242,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 // of a peers IP+Port appended to each other
 func makeCompactPeers(peers model.Swarm, skipID model.PeerID) []byte {
 	var buf bytes.Buffer
-	for _, peer := range peers {
+	peers.RLock()
+	for _, peer := range peers.Peers {
 		if peer.PeerID == skipID {
 			// Skip the peers own peer_id
 			continue
@@ -250,5 +251,6 @@ func makeCompactPeers(peers model.Swarm, skipID model.PeerID) []byte {
 		buf.Write(peer.IP.To4())
 		buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
 	}
+	peers.RUnlock()
 	return buf.Bytes()
 }

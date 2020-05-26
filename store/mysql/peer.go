@@ -136,15 +136,15 @@ func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		    ?`
 	var peers model.Swarm
 	if err := ps.db.Select(&peers, q, ih.Bytes(), limit); err != nil {
-		return nil, err
+		return model.Swarm{}, err
 	}
 	return peers, nil
 }
 
 type peerDriver struct{}
 
-// NewPeerStore returns a mysql backed store.PeerStore driver
-func (pd peerDriver) NewPeerStore(cfg interface{}) (store.PeerStore, error) {
+// New returns a mysql backed store.PeerStore driver
+func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig

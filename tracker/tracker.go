@@ -46,6 +46,7 @@ type Tracker struct {
 	Whitelist      map[string]model.WhiteListClient
 }
 
+// Opts is used to configure tracker instances
 type Opts struct {
 	Torrents store.TorrentStore
 	Peers    store.PeerStore
@@ -69,6 +70,8 @@ type Opts struct {
 	MaxPeers int
 }
 
+// NewDefaultOpts returns a new tracker configuration using in-memory
+// stores and default interval values
 func NewDefaultOpts() *Opts {
 	return &Opts{
 		Torrents:         memory.NewTorrentStore(),
@@ -109,55 +112,42 @@ func (t *Tracker) StatWorker() {
 	userBatch := make(map[string]model.UserStats)
 	peerBatch := make(map[model.PeerHash]model.PeerStats)
 	torrentBatch := make(map[model.InfoHash]model.TorrentStats)
-	userBatchMu := &sync.RWMutex{}
-	peerBatchMu := &sync.RWMutex{}
-	torrentBatchMu := &sync.RWMutex{}
 	for {
 		select {
 		case <-syncTicker.C:
 			// Copy the maps to pass into the go routine call. At the same time deleting
 			// the existing values
 			userBatchCopy := make(map[string]model.UserStats)
-			userBatchMu.Lock()
 			for k, v := range userBatch {
 				userBatchCopy[k] = v
 				delete(userBatch, k)
 			}
-			userBatchMu.Unlock()
+
 			peerBatchCopy := make(map[model.PeerHash]model.PeerStats)
-			peerBatchMu.Lock()
 			for k, v := range peerBatch {
 				peerBatchCopy[k] = v
 				delete(peerBatch, k)
 			}
-			peerBatchMu.Unlock()
+
 			torrentBatchCopy := make(map[model.InfoHash]model.TorrentStats)
-			torrentBatchMu.Lock()
 			for k, v := range torrentBatch {
 				torrentBatchCopy[k] = v
 				delete(torrentBatch, k)
 			}
-			torrentBatchMu.Unlock()
 			// TODO make sure we dont exec this more than once at a time
-			go func() {
-				// Send current copies of data to stores
-				userBatchMu.RLock()
-				if err := t.Users.Sync(userBatchCopy); err != nil {
-					log.Errorf(err.Error())
-				}
-				userBatchMu.RUnlock()
-				peerBatchMu.RLock()
-				if err := t.Peers.Sync(peerBatchCopy); err != nil {
-					log.Errorf(err.Error())
-				}
-				peerBatchMu.RUnlock()
 
-				torrentBatchMu.RLock()
-				if err := t.Torrents.Sync(torrentBatchCopy); err != nil {
-					log.Errorf(err.Error())
-				}
-				torrentBatchMu.RUnlock()
-			}()
+			// Send current copies of data to stores
+			if err := t.Users.Sync(userBatchCopy); err != nil {
+				log.Errorf(err.Error())
+			}
+
+			if err := t.Peers.Sync(peerBatchCopy); err != nil {
+				log.Errorf(err.Error())
+			}
+
+			if err := t.Torrents.Sync(torrentBatchCopy); err != nil {
+				log.Errorf(err.Error())
+			}
 		case u := <-t.StateUpdateChan:
 			ub, found := userBatch[u.Passkey]
 			if !found {
@@ -280,6 +270,8 @@ func NewTestTracker() (*Tracker, error) {
 	return tracker, nil
 }
 
+// LoadWhitelist will read the client white list from the tracker store and
+// load it into memory for quick lookups.
 func (t *Tracker) LoadWhitelist() error {
 	whitelist := make(map[string]model.WhiteListClient)
 	wl, err4 := t.Torrents.WhiteListGetAll()

@@ -63,7 +63,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		Leechers   uint
 		Completed  uint
 		Port       uint16
-		Ip         string
+		IP         string
 		Status     int
 	}
 	type testAnn struct {
@@ -75,7 +75,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: 4000, Uploaded: 5678, Downloaded: 1000, left: 5000, PK: user0.Passkey},
 			stateExpected{Uploaded: 5678, Downloaded: 1000, Left: 5000,
-				Seeders: 0, Leechers: 1, Completed: 0, Port: 4000, Ip: "12.34.56.78", Status: 200},
+				Seeders: 0, Leechers: 1, Completed: 0, Port: 4000, IP: "12.34.56.78", Status: 200},
 		},
 	}
 	for i, ann := range v {
@@ -85,11 +85,11 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		require.EqualValues(t, ann.state.Status, w.Code)
 		var peer model.Peer
 		require.NoError(t, tkr.Peers.Get(&peer, ann.req.Ih, ann.req.PID), "Failed to get peer (%d)", i)
-		require.Equal(t, peer.Uploaded, ann.state.Uploaded, "Invalid uploaded (%d)", i)
-		require.Equal(t, peer.Downloaded, ann.state.Downloaded, "Invalid downloaded (%d)", i)
-		require.Equal(t, peer.Left, ann.state.Left, "Invalid left (%d)", i)
-		require.Equal(t, peer.Port, ann.state.Port, "Invalid port (%d)", i)
-		require.Equal(t, peer.IP.String(), ann.state.Ip, "Invalid ip (%d)", i)
+		require.Equal(t, ann.state.Uploaded, peer.Uploaded, "Invalid uploaded (%d)", i)
+		require.Equal(t, ann.state.Downloaded, peer.Downloaded, "Invalid downloaded (%d)", i)
+		require.Equal(t, ann.state.Left, peer.Left, "Invalid left (%d)", i)
+		require.Equal(t, ann.state.Port, peer.Port, "Invalid port (%d)", i)
+		require.Equal(t, ann.state.IP, peer.IP.String(), "Invalid ip (%d)", i)
 		swarm, err := tkr.Peers.GetN(torrent0.InfoHash, 1000)
 		require.NoError(t, err, "Failed to fetch all peers (%d)", i)
 		seeds, leechers := swarm.Counts()

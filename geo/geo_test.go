@@ -12,6 +12,21 @@ import (
 	"time"
 )
 
+func TestLatLong(t *testing.T) {
+	ll := LatLong{-114, 58}
+	var ll2 LatLong
+	var ll3 LatLong
+	v, _ := ll.Value()
+	require.Equal(t, "POINT(-114.000000 58.000000)", v)
+	require.NoError(t, ll2.Scan([]byte("POINT(58.000000 -114.000000)")))
+	require.Equal(t, ll, ll2)
+	require.Error(t, ll3.Scan(1))
+	require.Error(t, ll3.Scan([]byte("POINT(58.000000 -114.000000 100)")))
+	require.Error(t, ll3.Scan([]byte("POINT(x -114.000000)")))
+	require.Error(t, ll3.Scan([]byte("POINT(58.000000 x)")))
+	require.Equal(t, LatLong{0, 0}, LatLongFromString("1 2 x"))
+}
+
 func TestGetLocation(t *testing.T) {
 	if config.GetString(config.GeodbAPIKey) == "" {
 		t.SkipNow()

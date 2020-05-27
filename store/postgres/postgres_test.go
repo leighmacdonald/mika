@@ -8,7 +8,6 @@ import (
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"os"
 	"testing"
 )
@@ -73,7 +72,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 		return
 	}
-	if viper.GetString(string(config.GeneralRunMode)) != "test" {
+	if config.GetString(config.GeneralRunMode) != "test" {
 		log.Info("Skipping database tests, not running in testing mode")
 		os.Exit(0)
 		return

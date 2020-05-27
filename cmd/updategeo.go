@@ -5,7 +5,6 @@ import (
 	"github.com/leighmacdonald/mika/geo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"time"
 )
 
@@ -16,8 +15,8 @@ var updategeoCmd = &cobra.Command{
 	Long:  `Downloaded the latest geo database from MaxMind.com`,
 	Run: func(cmd *cobra.Command, args []string) {
 		t0 := time.Now()
-		key := viper.GetString(string(config.GeodbAPIKey))
-		outPath := viper.GetString(string(config.GeodbPath))
+		key := config.GetString(config.GeodbAPIKey)
+		outPath := config.GetString(config.GeodbPath)
 		log.Infof("Starting download of MaxMind City database")
 		if err := geo.DownloadDB(outPath, key); err != nil {
 			log.Errorf("failed to download database: %s", err.Error())

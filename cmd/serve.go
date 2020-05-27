@@ -10,7 +10,6 @@ import (
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"log"
 	"net/http"
 )
@@ -24,28 +23,28 @@ var serveCmd = &cobra.Command{
 		ctx := context.Background()
 
 		opts := tracker.NewDefaultOpts()
-		opts.GeodbEnabled = viper.GetBool(string(config.GeodbEnabled))
-		opts.BatchInterval = viper.GetDuration(string(config.TrackerBatchUpdateInterval))
-		opts.ReaperInterval = viper.GetDuration(string(config.TrackerReaperInterval))
-		opts.AnnInterval = viper.GetDuration(string(config.TrackerAnnounceInterval))
-		opts.AnnIntervalMin = viper.GetDuration(string(config.TrackerAnnounceIntervalMin))
-		opts.AllowNonRoutable = viper.GetBool(string(config.TrackerAllowNonRoutable))
+		opts.GeodbEnabled = config.GetBool(config.GeodbEnabled)
+		opts.BatchInterval = config.GetDuration(config.TrackerBatchUpdateInterval)
+		opts.ReaperInterval = config.GetDuration(config.TrackerReaperInterval)
+		opts.AnnInterval = config.GetDuration(config.TrackerAnnounceInterval)
+		opts.AnnIntervalMin = config.GetDuration(config.TrackerAnnounceIntervalMin)
+		opts.AllowNonRoutable = config.GetBool(config.TrackerAllowNonRoutable)
 
-		runMode := viper.GetString(string(config.GeneralRunMode))
+		runMode := config.GetString(config.GeneralRunMode)
 		ts, err := store.NewTorrentStore(
-			viper.GetString(string(config.StoreTorrentType)),
+			config.GetString(config.StoreTorrentType),
 			config.GetStoreConfig(config.Torrent))
 		if err != nil {
 			log.Fatalf("Failed to setup torrent store: %s", err)
 		}
 		opts.Torrents = ts
-		p, err2 := store.NewPeerStore(viper.GetString(string(config.StorePeersType)),
+		p, err2 := store.NewPeerStore(config.GetString(config.StorePeersType),
 			config.GetStoreConfig(config.Peers))
 		if err2 != nil {
 			log.Fatalf("Failed to setup peer store: %s", err2)
 		}
 		opts.Peers = p
-		u, err3 := store.NewUserStore(viper.GetString(string(config.StoreUsersType)),
+		u, err3 := store.NewUserStore(config.GetString(config.StoreUsersType),
 			config.GetStoreConfig(config.Users))
 		if err3 != nil {
 			log.Fatalf("Failed to setup user store: %s", err3)
@@ -87,14 +86,14 @@ var serveCmd = &cobra.Command{
 		}
 
 		btOpts := tracker.DefaultHTTPOpts()
-		btOpts.ListenAddr = viper.GetString(string(config.TrackerListen))
-		btOpts.UseTLS = viper.GetBool(string(config.TrackerTLS))
+		btOpts.ListenAddr = config.GetString(config.TrackerListen)
+		btOpts.UseTLS = config.GetBool(config.TrackerTLS)
 		btOpts.Handler = tracker.NewBitTorrentHandler(tkr)
 		btServer := tracker.NewHTTPServer(btOpts)
 
 		apiOpts := tracker.DefaultHTTPOpts()
-		apiOpts.ListenAddr = viper.GetString(string(config.APIListen))
-		apiOpts.UseTLS = viper.GetBool(string(config.APITLS))
+		apiOpts.ListenAddr = config.GetString(config.APIListen)
+		apiOpts.UseTLS = config.GetBool(config.APITLS)
 		apiOpts.Handler = tracker.NewAPIHandler(tkr)
 		apiServer := tracker.NewHTTPServer(apiOpts)
 

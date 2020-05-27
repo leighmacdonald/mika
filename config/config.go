@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 // StoreType is a mapping to the backing store types used
@@ -202,36 +203,35 @@ func GetStoreConfig(storeType StoreType) *StoreConfig {
 	switch storeType {
 	case Users:
 		return &StoreConfig{
-			Type:       viper.GetString(string(StoreUsersType)),
-			Host:       viper.GetString(string(StoreUsersHost)),
-			Port:       viper.GetInt(string(StoreUsersPort)),
-			Username:   viper.GetString(string(StoreUsersUser)),
-			Password:   viper.GetString(string(StoreUsersPassword)),
-			Database:   viper.GetString(string(StoreUsersDatabase)),
-			Properties: viper.GetString(string(StoreUsersProperties)),
+			Type:       GetString(StoreUsersType),
+			Host:       GetString(StoreUsersHost),
+			Port:       GetInt(StoreUsersPort),
+			Username:   GetString(StoreUsersUser),
+			Password:   GetString(StoreUsersPassword),
+			Database:   GetString(StoreUsersDatabase),
+			Properties: GetString(StoreUsersProperties),
 		}
 	case Torrent:
 		return &StoreConfig{
-			Type:       viper.GetString(string(StoreTorrentType)),
-			Host:       viper.GetString(string(StoreTorrentHost)),
-			Port:       viper.GetInt(string(StoreTorrentPort)),
-			Username:   viper.GetString(string(StoreTorrentUser)),
-			Password:   viper.GetString(string(StoreTorrentPassword)),
-			Database:   viper.GetString(string(StoreTorrentDatabase)),
-			Properties: viper.GetString(string(StoreTorrentProperties)),
+			Type:       GetString(StoreTorrentType),
+			Host:       GetString(StoreTorrentHost),
+			Port:       GetInt(StoreTorrentPort),
+			Username:   GetString(StoreTorrentUser),
+			Password:   GetString(StoreTorrentPassword),
+			Database:   GetString(StoreTorrentDatabase),
+			Properties: GetString(StoreTorrentProperties),
 		}
-	case Peers:
+	default:
 		return &StoreConfig{
-			Type:       viper.GetString(string(StorePeersType)),
-			Host:       viper.GetString(string(StorePeersHost)),
-			Port:       viper.GetInt(string(StorePeersPort)),
-			Username:   viper.GetString(string(StorePeersUser)),
-			Password:   viper.GetString(string(StorePeersPassword)),
-			Database:   viper.GetString(string(StorePeersDatabase)),
-			Properties: viper.GetString(string(StorePeersProperties)),
+			Type:       GetString(StorePeersType),
+			Host:       GetString(StorePeersHost),
+			Port:       GetInt(StorePeersPort),
+			Username:   GetString(StorePeersUser),
+			Password:   GetString(StorePeersPassword),
+			Database:   GetString(StorePeersDatabase),
+			Properties: GetString(StorePeersProperties),
 		}
 	}
-	return nil
 }
 
 // GetString enforces use of our consts for config keys
@@ -244,24 +244,29 @@ func GetBool(key Key) bool {
 	return viper.GetBool(string(key))
 }
 
+// GetBool enforces use of our consts for config keys
+func GetInt(key Key) int {
+	return viper.GetInt(string(key))
+}
+
+// GetDuration enforces use of our consts for config keys
+func GetDuration(key Key) time.Duration {
+	return viper.GetDuration(string(key))
+}
+
 // Read reads in config file and ENV variables if set.
 func Read(cfgFile string) error {
 	// Find home directory.
-	home, err := homedir.Dir()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	home, _ := homedir.Dir()
 	viper.AddConfigPath(home)
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("../")
 	viper.AddConfigPath("../../")
+	viper.SetConfigName("mika")
 	if os.Getenv("MIKA_CONFIG") != "" {
 		viper.SetConfigFile(os.Getenv("MIKA_CONFIG"))
 	} else if cfgFile != "" {
 		viper.SetConfigName(cfgFile)
-	} else {
-		viper.SetConfigName("mika")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -269,10 +274,10 @@ func Read(cfgFile string) error {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		log.Debugf("Using config file: %s", viper.ConfigFileUsed())
-		level := viper.GetString(string(GeneralLogLevel))
-		colour := viper.GetBool(string(GeneralLogColour))
+		level := GetString(GeneralLogLevel)
+		colour := GetBool(GeneralLogColour)
 		setupLogger(level, colour)
-		gin.SetMode(viper.GetString(string(GeneralRunMode)))
+		gin.SetMode(GetString(GeneralRunMode))
 		return nil
 	}
 	return consts.ErrInvalidConfig

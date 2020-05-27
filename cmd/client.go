@@ -9,11 +9,9 @@ import (
 	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"github.com/spf13/cobra"
 	"path/filepath"
 	"strings"
-
-	"github.com/spf13/cobra"
 )
 
 // clientCmd represents the client command
@@ -25,8 +23,8 @@ var clientCmd = &cobra.Command{
 }
 
 func newClient() *client.Client {
-	host := viper.GetString(string(config.APIListen))
-	key := viper.GetString(string(config.APIKey))
+	host := config.GetString(config.APIListen)
+	key := config.GetString(config.APIKey)
 	if strings.HasPrefix(host, ":") {
 		host = "http://localhost" + host
 	}

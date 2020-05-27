@@ -2,9 +2,11 @@ package tracker
 
 import (
 	"fmt"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/stretchr/testify/require"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -93,67 +95,85 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		state stateExpected
 	}
 	announces := []testAnn{
-		// Bad InfoHash
+		// 0. Bad InfoHash
 		{testReq{IhStr: "", PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgInvalidInfoHash},
 		},
-		// Bad InfoHash length
+		// 1. Bad InfoHash length
 		{testReq{IhStr: "012345678901234567891", PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgInvalidInfoHash},
 		},
-		// Bad passkey
+		// 2. Bad passkey
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: "XXXXXXXXXXYYYYYYYYYY"},
 			stateExpected{Status: msgInvalidAuth},
 		},
-		// Bad port (too low)
+		// 3. Bad port (too low)
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: "1000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgInvalidPort},
 		},
-		// Bad port (too high)
+		// 4. Bad port (too high)
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: "100000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgInvalidPort},
 		},
-		// Non-routable ip
+		// 5. Non-routable ip
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "127.0.0.1",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgGenericError},
 		},
-		// Non-routable ip
+		// 6. Non-routable ip
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "10.0.0.10",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgGenericError},
 		},
-		// IPv6 non-routable
+		// 7. IPv6 non-routable
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "::1",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgMalformedRequest},
 		},
-		// IPv6 routable
+		// 8. IPv6 routable
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "2600::1",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgMalformedRequest},
 		},
-		// IPv6 routable
+		// 9. IPv6 routable
 		{testReq{Ih: unregisteredTorrent.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Status: msgInvalidInfoHash},
 		},
-		// 1 Leecher
+		// 10. 1 Leecher start event
+		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
+			Port: "4000", Uploaded: "0", Downloaded: "0", left: "10000", PK: user0.Passkey, event: string(consts.STARTED)},
+			stateExpected{Uploaded: 0, Downloaded: 0, Left: 10000,
+				Seeders: 0, Leechers: 1, Completed: 0, Port: 4000, IP: "12.34.56.78", Status: msgOk},
+		},
+		// 11. 1 Leecher announce event
 		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Uploaded: 0, Downloaded: 5000, Left: 5000,
 				Seeders: 0, Leechers: 1, Completed: 0, Port: 4000, IP: "12.34.56.78", Status: msgOk},
 		},
-		// 1 leecher / 1 seeder
+		// 12. 1 leecher / 1 seeder
 		{testReq{Ih: torrent0.InfoHash, PID: peer1.PeerID, IP: "12.34.56.99",
 			Port: "8001", Uploaded: "5000", Downloaded: "0", left: "0", PK: user1.Passkey},
 			stateExpected{Uploaded: 5000, Downloaded: 0, Left: 0,
 				Seeders: 1, Leechers: 1, Completed: 0, Port: 8001, IP: "12.34.56.99", Status: msgOk},
+		},
+		// 13. 2 Seeders, 1 completed leecher
+		{testReq{Ih: torrent0.InfoHash, PID: peer0.PeerID, IP: "12.34.56.78", event: string(consts.COMPLETED),
+			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "0", PK: user0.Passkey},
+			stateExpected{Uploaded: 0, Downloaded: 10000, Left: 0,
+				Seeders: 2, Leechers: 0, Completed: 1, Port: 4000, IP: "12.34.56.78", Status: msgOk},
+		},
+		// 14. 1 seeder left swarm
+		{testReq{Ih: torrent0.InfoHash, PID: peer1.PeerID, IP: "12.34.56.99", event: string(consts.STOPPED),
+			Port: "8001", Uploaded: "10000", Downloaded: "0", left: "0", PK: user1.Passkey},
+			stateExpected{Uploaded: 10000, Downloaded: 0, Left: 0,
+				Seeders: 1, Leechers: 0, Completed: 1, Port: 8001, IP: "12.34.56.99", Status: msgOk},
 		},
 	}
 	for i, a := range announces {
@@ -166,6 +186,9 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			var peer model.Peer
 			require.NoError(t, tkr.Peers.Get(&peer, a.req.Ih, a.req.PID), "Failed to get peer (%d)", i)
 			require.Equal(t, a.state.Uploaded, peer.Uploaded, "Invalid uploaded (%d)", i)
+			if i == 13 {
+				log.Println("x")
+			}
 			require.Equal(t, a.state.Downloaded, peer.Downloaded, "Invalid downloaded (%d)", i)
 			require.Equal(t, a.state.Left, peer.Left, "Invalid left (%d)", i)
 			require.Equal(t, a.state.Port, peer.Port, "Invalid port (%d)", i)

@@ -162,9 +162,14 @@ func (t *Tracker) StatWorker() {
 			if !found {
 				pb = model.PeerStats{}
 			}
+			var torrent model.Torrent
+			if err := t.Torrents.Get(&torrent, u.InfoHash); err != nil {
+				log.Errorf("No torrent found in batch update")
+				continue
+			}
 			// Global user stats
-			ub.Uploaded += u.Uploaded
-			ub.Downloaded += u.Downloaded
+			ub.Uploaded += uint64(float64(u.Uploaded) * torrent.MultiUp)
+			ub.Downloaded += uint64(float64(u.Downloaded) * torrent.MultiDn)
 			ub.Announces++
 
 			// Peer stats

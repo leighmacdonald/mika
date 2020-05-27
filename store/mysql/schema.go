@@ -20,8 +20,7 @@ create table torrent
 
 create table users
 (
-	user_id int unsigned auto_increment
-		primary key,
+	user_id int unsigned auto_increment	primary key,
 	passkey varchar(20) not null,
 	download_enabled tinyint(1) default 1 not null,
 	is_deleted tinyint(1) default 0 not null,

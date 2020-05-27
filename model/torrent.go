@@ -138,7 +138,7 @@ type Torrent struct {
 	// Download multiplier added to the users totals
 	// 0 denotes freeleech status
 	MultiDn   float64 `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
-	Announces uint32  `db:"announces"`
+	Announces uint64  `db:"announces"`
 }
 
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats

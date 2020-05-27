@@ -136,7 +136,7 @@ func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		    ?`
 	var peers model.Swarm
 	if err := ps.db.Select(&peers, q, ih.Bytes(), limit); err != nil {
-		return model.Swarm{}, err
+		return peers, err
 	}
 	return peers, nil
 }

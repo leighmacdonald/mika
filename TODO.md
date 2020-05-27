@@ -7,7 +7,7 @@
     - Verify batch recording stats
     - Add many more unit/integration tests for this. Currently mostly just a skeleton.
 - Fully working scrapes
-    - Verifies results
+    - Verified results
     - More unit/integration tests
 - Apply ratio multipliers
 - Implementations for all currently support store interfaces with tests
@@ -30,3 +30,4 @@ have limits attached to them.
 - Enforce announce intervals. Dont send peers for people announcing too fast.
 - Connectivity check. Test the connectivity (NAT-Traversal) for a user the first time their IP:Port is
 announced. If failed, dont send peers.
+- GZip support? (likely actually increases overall size of responses except for some edge cases)

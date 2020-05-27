@@ -50,6 +50,7 @@ const (
 	paramUploaded   announceParam = "uploaded"
 	paramCorrupt    announceParam = "corrupt"
 	paramNumWant    announceParam = "numwant"
+	paramEvent      announceParam = "event"
 	//paramCompact    announceParam = "compact"
 )
 

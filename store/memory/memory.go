@@ -40,6 +40,7 @@ func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 		t.TotalUploaded += stats.Uploaded
 		t.TotalDownloaded += stats.Downloaded
 		t.TotalCompleted += stats.Snatches
+		t.Announces += stats.Announces
 		ts.torrents[ih] = t
 
 	}
@@ -84,8 +85,8 @@ func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 // Close will delete/free all the underlying torrent data
 func (ts *TorrentStore) Close() error {
 	ts.Lock()
-	defer ts.Unlock()
 	ts.torrents = make(map[model.InfoHash]model.Torrent)
+	ts.Unlock()
 	return nil
 }
 

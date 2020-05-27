@@ -134,7 +134,7 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 	uploaded := getUint32Key(q, paramUploaded, 0)
 	corrupt := getUint32Key(q, paramCorrupt, 0)
 	event := consts.ParseAnnounceType(q.Params[paramEvent])
-	numWant := getUintKey(q, "numwant", 30)
+	numWant := getUintKey(q, paramNumWant, 30)
 	return &announceRequest{
 		Compact:    true, // Ignored and always set to true
 		Corrupt:    corrupt,

@@ -4,7 +4,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -18,5 +17,8 @@ func TestExists(t *testing.T) {
 
 func TestFindFile(t *testing.T) {
 	require.Equal(t, FindFile("1234567890.txt"), "1234567890.txt")
-	require.True(t, strings.HasPrefix(FindFile("README.md"), "/"))
+	path := FindFile("README.md")
+	fp, err := os.Open(path)
+	require.NoError(t, err, "Failed to open file: %s", path)
+	require.NoError(t, fp.Close())
 }

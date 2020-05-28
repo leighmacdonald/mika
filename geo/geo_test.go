@@ -63,7 +63,6 @@ func TestDistance(t *testing.T) {
 	if distance != 141.0 {
 		t.Errorf("Invalid distances: %f != %f", distance, 141.903347)
 	}
-
 }
 
 func BenchmarkDistance(t *testing.B) {

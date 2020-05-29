@@ -18,6 +18,7 @@ import (
 
 // Tracker is the main application struct used to tie all the discreet components together
 type Tracker struct {
+	*sync.RWMutex
 	// ctx is the master context used in the tracker, children contexts must use
 	// this for their parent
 	ctx      context.Context
@@ -42,8 +43,7 @@ type Tracker struct {
 	MaxPeers        int
 	StateUpdateChan chan model.UpdateState
 	// Whitelist and whitelist lock
-	WhitelistMutex *sync.RWMutex
-	Whitelist      map[string]model.WhiteListClient
+	Whitelist map[string]model.WhiteListClient
 }
 
 // Opts is used to configure tracker instances
@@ -93,11 +93,14 @@ func NewDefaultOpts() *Opts {
 // PeerReaper will call the store.PeerStore.Reap() function periodically. This is
 // used to clean peers that have not announced in a while from the swarm.
 func (t *Tracker) PeerReaper() {
-	peerTicker := time.NewTicker(t.ReaperInterval)
+	peerTimer := time.NewTimer(t.ReaperInterval)
 	for {
 		select {
-		case <-peerTicker.C:
+		case <-peerTimer.C:
 			t.Peers.Reap()
+			// We use a timer here so that config updates for the interval get applied
+			// on the next tick
+			peerTimer.Reset(t.ReaperInterval)
 		case <-t.ctx.Done():
 			return
 		}
@@ -108,13 +111,13 @@ func (t *Tracker) PeerReaper() {
 // backing stores for long term storage.
 // No locking required for these data sets
 func (t *Tracker) StatWorker() {
-	syncTicker := time.NewTicker(t.BatchInterval)
+	syncTimer := time.NewTimer(t.BatchInterval)
 	userBatch := make(map[string]model.UserStats)
 	peerBatch := make(map[model.PeerHash]model.PeerStats)
 	torrentBatch := make(map[model.InfoHash]model.TorrentStats)
 	for {
 		select {
-		case <-syncTicker.C:
+		case <-syncTimer.C:
 			// Copy the maps to pass into the go routine call. At the same time deleting
 			// the existing values
 			userBatchCopy := make(map[string]model.UserStats)
@@ -134,8 +137,6 @@ func (t *Tracker) StatWorker() {
 				torrentBatchCopy[k] = v
 				delete(torrentBatch, k)
 			}
-			// TODO make sure we dont exec this more than once at a time
-
 			// Send current copies of data to stores
 			if err := t.Users.Sync(userBatchCopy); err != nil {
 				log.Errorf(err.Error())
@@ -148,6 +149,7 @@ func (t *Tracker) StatWorker() {
 			if err := t.Torrents.Sync(torrentBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
+			syncTimer.Reset(t.BatchInterval)
 		case u := <-t.StateUpdateChan:
 			ub, found := userBatch[u.Passkey]
 			if !found {
@@ -201,9 +203,9 @@ func (t *Tracker) StatWorker() {
 				tb.Leechers--
 			case consts.STOPPED:
 				// Paused considered a seeder
-				if u.Paused || u.Left == 0{
+				if u.Paused || u.Left == 0 {
 					tb.Seeders--
-				} else  {
+				} else {
 					tb.Leechers--
 				}
 				if err := t.Peers.Delete(u.InfoHash, u.PeerID); err != nil {
@@ -223,21 +225,21 @@ func (t *Tracker) StatWorker() {
 // New creates a new Tracker instance with configured backend stores
 func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 	return &Tracker{
+		RWMutex:          &sync.RWMutex{},
 		ctx:              ctx,
-		StateUpdateChan:  make(chan model.UpdateState, 1000),
 		Torrents:         opts.Torrents,
 		Peers:            opts.Peers,
 		Users:            opts.Users,
 		Geodb:            opts.Geodb,
 		GeodbEnabled:     opts.GeodbEnabled,
-		Whitelist:        make(map[string]model.WhiteListClient),
-		WhitelistMutex:   &sync.RWMutex{},
-		MaxPeers:         opts.MaxPeers,
-		BatchInterval:    opts.BatchInterval,
+		AllowNonRoutable: opts.AllowNonRoutable,
 		ReaperInterval:   opts.ReaperInterval,
 		AnnInterval:      opts.AnnInterval,
 		AnnIntervalMin:   opts.AnnIntervalMin,
-		AllowNonRoutable: opts.AllowNonRoutable,
+		BatchInterval:    opts.BatchInterval,
+		MaxPeers:         opts.MaxPeers,
+		StateUpdateChan:  make(chan model.UpdateState, 1000),
+		Whitelist:        make(map[string]model.WhiteListClient),
 	}, nil
 }
 
@@ -288,9 +290,9 @@ func (t *Tracker) LoadWhitelist() error {
 			whitelist[cw.ClientPrefix] = cw
 		}
 	}
-	t.WhitelistMutex.Lock()
+	t.Lock()
 	t.Whitelist = whitelist
-	t.WhitelistMutex.Unlock()
+	t.Unlock()
 	return nil
 }
 

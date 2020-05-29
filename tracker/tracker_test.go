@@ -1,6 +1,8 @@
 package tracker
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/chihaya/bencode"
 	"github.com/leighmacdonald/mika/consts"
@@ -14,8 +16,17 @@ import (
 	"time"
 )
 
-func performRequest(r http.Handler, method, path string) *httptest.ResponseRecorder {
-	req, _ := http.NewRequest(method, path, nil)
+func performRequest(r http.Handler, method, path string, body interface{}) *httptest.ResponseRecorder {
+	var req *http.Request
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			panic("Failed to marshal test body")
+		}
+		req, _ = http.NewRequest(method, path, bytes.NewReader(b))
+	} else {
+		req, _ = http.NewRequest(method, path, nil)
+	}
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
@@ -122,7 +133,7 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 
 	for i, a := range scrapes {
 		u := fmt.Sprintf("/%s/scrape?%s", a.req.PK, a.req.ToValues().Encode())
-		w := performRequest(rh, "GET", u)
+		w := performRequest(rh, "GET", u, nil)
 		require.EqualValues(t, a.exp.status, errCode(w.Code),
 			fmt.Sprintf("%s (%d)", responseStringMap[errCode(w.Code)], i))
 
@@ -166,8 +177,8 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		IP         string
 		Status     errCode
 		HasPeer    bool
-		Snatches uint16
-		SwarmSize int
+		Snatches   uint16
+		SwarmSize  int
 	}
 	type testAnn struct {
 		req   testReq
@@ -255,7 +266,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			Port: "8001", Uploaded: "10000", Downloaded: "0", left: "0", PK: user1.Passkey},
 			stateExpected{Uploaded: 15000, Downloaded: 0, Left: 0,
 				Seeders: 1, Leechers: 0, Snatches: 1, Port: 8001, IP: "12.34.56.99", HasPeer: false, Status: msgOk,
-			SwarmSize: 1},
+				SwarmSize: 1},
 		},
 		// 15. 2 seeders, 1 paused
 		{testReq{Ih: torrent0.InfoHash, PID: seeder0.PeerID, IP: "12.34.56.99", event: string(consts.PAUSED),
@@ -270,7 +281,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		if i == 13 {
 			fmt.Println("x")
 		}
-		w := performRequest(rh, "GET", u)
+		w := performRequest(rh, "GET", u, nil)
 		time.Sleep(time.Millisecond * 200) // Wait for batch update call (100ms)
 		require.EqualValues(t, a.state.Status, errCode(w.Code),
 			fmt.Sprintf("%s (%d)", responseStringMap[errCode(w.Code)], i))

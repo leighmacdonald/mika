@@ -45,6 +45,8 @@ const (
 	// TrackerPublic enables/disables auto registration of torrents and users
 	// true|false
 	TrackerPublic Key = "tracker_public"
+	// TrackerAutoRegister will auto insert unknown info_hashes to be tracked
+	TrackerAutoRegister Key = "tracker_auto_register"
 	// TrackerListen sets the host and port to listen on
 	// hostname:port
 	TrackerListen Key = "tracker_listen"
@@ -75,6 +77,8 @@ const (
 	TrackerBatchUpdateInterval Key = "tracker_batch_update_interval"
 	// TrackerAllowNonRoutable defines whether we allow peers who are using non-public/routable addresses
 	TrackerAllowNonRoutable Key = "tracker_allow_non_routable"
+	// TrackerMaxPeers sets the max number of peers to return on an announce
+	TrackerMaxPeers Key = "tracker_max_peers"
 
 	// APIListen sets the host and port that the admin API should bind to
 	// localhost:34001

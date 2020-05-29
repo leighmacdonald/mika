@@ -43,16 +43,10 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}
-		peers, err := h.tracker.Peers.GetN(ih, 100)
-		if err != nil {
-			log.Debugf("Failed to get peers for scrape: %s", ih)
-			continue
-		}
-		seeders, leechers := peers.Counts()
 		resp[ih.String()] = bencode.Dict{
-			"complete":   seeders,
+			"complete":   torrent.Seeders,
 			"downloaded": torrent.TotalCompleted,
-			"incomplete": leechers,
+			"incomplete": torrent.Leechers,
 		}
 	}
 	var buf bytes.Buffer

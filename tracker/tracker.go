@@ -185,8 +185,10 @@ func (t *Tracker) StatWorker() {
 			tb.Downloaded += u.Downloaded
 
 			switch u.Event {
-			case consts.ANNOUNCE:
-
+			case consts.PAUSED:
+				if !pb.Paused {
+					tb.Seeders++
+				}
 			case consts.STARTED:
 				if u.Left == 0 {
 					tb.Seeders++
@@ -194,16 +196,15 @@ func (t *Tracker) StatWorker() {
 					tb.Leechers++
 				}
 			case consts.COMPLETED:
-				// TODO does a complete event get sent for a torrent when the user only downloads a specific file from the torrent
-				// Do we force left=0 for this? Or trust the client?
 				tb.Snatches++
 				tb.Seeders++
 				tb.Leechers--
 			case consts.STOPPED:
-				if u.Left > 0 {
-					tb.Leechers--
-				} else {
+				// Paused considered a seeder
+				if u.Paused || u.Left == 0{
 					tb.Seeders--
+				} else  {
+					tb.Leechers--
 				}
 				if err := t.Peers.Delete(u.InfoHash, u.PeerID); err != nil {
 					log.Errorf("Could not remove peer from swarm: %s", err.Error())

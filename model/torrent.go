@@ -139,6 +139,9 @@ type Torrent struct {
 	// 0 denotes freeleech status
 	MultiDn   float64 `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
 	Announces uint64  `db:"announces"`
+	Seeders int
+	Leechers int
+
 }
 
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats
@@ -166,6 +169,7 @@ type PeerStats struct {
 	Left         uint32
 	LastAnnounce time.Time
 	Announces    uint32
+	Paused       bool
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all

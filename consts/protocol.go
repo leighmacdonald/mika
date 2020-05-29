@@ -8,6 +8,8 @@ const (
 	STARTED   AnnounceType = "started"
 	STOPPED   AnnounceType = "stopped"
 	COMPLETED AnnounceType = "completed"
+	// Partial seeders send paused event BEP-21
+	PAUSED    AnnounceType = "paused"
 	ANNOUNCE  AnnounceType = ""
 )
 
@@ -20,6 +22,8 @@ func ParseAnnounceType(t string) AnnounceType {
 		return STOPPED
 	case "completed":
 		return COMPLETED
+	case "paused":
+		return PAUSED
 	default:
 		return ANNOUNCE
 	}

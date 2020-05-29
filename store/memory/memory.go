@@ -40,6 +40,8 @@ func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 		t.TotalUploaded += stats.Uploaded
 		t.TotalDownloaded += stats.Downloaded
 		t.TotalCompleted += stats.Snatches
+		t.Seeders += stats.Seeders
+		t.Leechers += stats.Leechers
 		t.Announces += stats.Announces
 		ts.torrents[ih] = t
 

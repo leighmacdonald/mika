@@ -217,23 +217,21 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		Left:       req.Left,
 		Event:      req.Event,
 		Timestamp:  time.Now(),
+		Paused: peer.Paused,
 	}
-
 	peers, err2 := h.tracker.Peers.GetN(tor.InfoHash, h.tracker.MaxPeers)
 	if err2 != nil {
 		log.Errorf("Could not read peers from swarm: %s", err2.Error())
 		oops(c, msgGenericError)
 		return
 	}
-	seeders, leechers := peers.Counts()
 	dict := bencode.Dict{
-		"complete":     seeders,
-		"incomplete":   leechers,
+		"complete":     tor.Seeders,
+		"incomplete":   tor.Leechers,
 		"interval":     int(h.tracker.AnnInterval.Seconds()),
 		"min interval": int(h.tracker.AnnIntervalMin.Seconds()),
 		"peers":        makeCompactPeers(peers, peer.PeerID),
 	}
-
 	var outBytes bytes.Buffer
 	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
 		oops(c, msgGenericError)

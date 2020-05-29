@@ -99,7 +99,8 @@ type Peer struct {
 	//CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
 	//UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
 
-	User *User
+	Paused bool
+	User   *User
 }
 
 // Expired checks if the peer last lost contact with us
@@ -190,21 +191,6 @@ func (swarm Swarm) Get(peer *Peer, peerID PeerID) error {
 	return nil
 }
 
-// Counts returns the sums for seeders and leechers in the swarm
-// TODO cache this somewhere and only update on state change
-func (swarm *Swarm) Counts() (seeders uint, leechers uint) {
-	swarm.RLock()
-	for _, p := range swarm.Peers {
-		if p.Left == 0 {
-			seeders++
-		} else {
-			leechers++
-		}
-	}
-	swarm.RUnlock()
-	return
-}
-
 // NewPeer create a new peer instance for inserting into a swarm
 func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
 	return Peer{
@@ -216,6 +202,7 @@ func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
 		Location:      geo.LatLong{Latitude: 0, Longitude: 0},
 		UserID:        userID,
 		User:          nil,
+		Paused:        false,
 	}
 }
 
@@ -233,4 +220,5 @@ type UpdateState struct {
 	// Timestamp is the time the new stats were announced
 	Timestamp time.Time
 	Event     consts.AnnounceType
+	Paused    bool
 }

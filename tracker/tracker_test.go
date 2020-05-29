@@ -102,6 +102,16 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 	}
 	require.NoError(t, tkr.Peers.Add(torrent0.InfoHash, leecher0))
 	require.NoError(t, tkr.Peers.Add(torrent0.InfoHash, seeder0))
+	require.NoError(t, tkr.Torrents.Sync(map[model.InfoHash]model.TorrentStats{
+		torrent0.InfoHash: {
+			Seeders:    1,
+			Leechers:   1,
+			Snatches:   2,
+			Uploaded:   0,
+			Downloaded: 0,
+			Announces:  2,
+		},
+	}))
 
 	scrapes := []sr{{
 		req: scrapeReq{
@@ -119,9 +129,9 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 		v, err := bencode.NewDecoder(w.Body).Decode()
 		require.NoError(t, err, "Failed to decode scrape: (%d)", i)
 		d := v.(bencode.Dict)
-		require.Equal(t, int64(2), d[torrent0.InfoHash.String()].(bencode.Dict)["complete"].(int64))
-		require.Equal(t, int64(0), d[torrent0.InfoHash.String()].(bencode.Dict)["incomplete"].(int64))
-		require.Equal(t, int64(0), d[torrent0.InfoHash.String()].(bencode.Dict)["downloaded"].(int64))
+		require.Equal(t, int64(1), d[torrent0.InfoHash.String()].(bencode.Dict)["complete"].(int64))
+		require.Equal(t, int64(1), d[torrent0.InfoHash.String()].(bencode.Dict)["incomplete"].(int64))
+		require.Equal(t, int64(2), d[torrent0.InfoHash.String()].(bencode.Dict)["downloaded"].(int64))
 	}
 }
 
@@ -150,13 +160,14 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		Uploaded   uint64
 		Downloaded uint64
 		Left       uint32
-		Seeders    uint
-		Leechers   uint
-		Completed  uint
+		Seeders    int
+		Leechers   int
 		Port       uint16
 		IP         string
 		Status     errCode
 		HasPeer    bool
+		Snatches uint16
+		SwarmSize int
 	}
 	type testAnn struct {
 		req   testReq
@@ -217,35 +228,48 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "12.34.56.78",
 			Port: "4000", Uploaded: "0", Downloaded: "0", left: "10000", PK: user0.Passkey, event: string(consts.STARTED)},
 			stateExpected{Uploaded: 0, Downloaded: 0, Left: 10000,
-				Seeders: 0, Leechers: 1, Completed: 0, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk},
+				Seeders: 0, Leechers: 1, Snatches: 0, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk, SwarmSize: 1},
 		},
 		// 11. 1 Leecher announce event
 		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "12.34.56.78",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Uploaded: 0, Downloaded: 5000, Left: 5000,
-				Seeders: 0, Leechers: 1, Completed: 0, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk},
+				Seeders: 0, Leechers: 1, Snatches: 0, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk, SwarmSize: 1},
 		},
 		// 12. 1 leecher / 1 seeder
 		{testReq{Ih: torrent0.InfoHash, PID: seeder0.PeerID, IP: "12.34.56.99",
-			Port: "8001", Uploaded: "5000", Downloaded: "0", left: "0", PK: user1.Passkey},
+			Port: "8001", Uploaded: "5000", Downloaded: "0", left: "0", PK: user1.Passkey, event: string(consts.STARTED)},
 			stateExpected{Uploaded: 5000, Downloaded: 0, Left: 0,
-				Seeders: 1, Leechers: 1, Completed: 0, Port: 8001, IP: "12.34.56.99", HasPeer: true, Status: msgOk},
+				Seeders: 1, Leechers: 1, Snatches: 0, Port: 8001, IP: "12.34.56.99", HasPeer: true, Status: msgOk,
+				SwarmSize: 2},
 		},
 		// 13. 2 Seeders, 1 completed leecher
 		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "12.34.56.78", event: string(consts.COMPLETED),
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "0", PK: user0.Passkey},
 			stateExpected{Uploaded: 0, Downloaded: 10000, Left: 0,
-				Seeders: 2, Leechers: 0, Completed: 1, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk},
+				Seeders: 2, Leechers: 0, Snatches: 1, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk,
+				SwarmSize: 2},
 		},
 		// 14. 1 seeder left swarm
 		{testReq{Ih: torrent0.InfoHash, PID: seeder0.PeerID, IP: "12.34.56.99", event: string(consts.STOPPED),
 			Port: "8001", Uploaded: "10000", Downloaded: "0", left: "0", PK: user1.Passkey},
 			stateExpected{Uploaded: 15000, Downloaded: 0, Left: 0,
-				Seeders: 1, Leechers: 0, Completed: 1, Port: 8001, IP: "12.34.56.99", HasPeer: false, Status: msgOk},
+				Seeders: 1, Leechers: 0, Snatches: 1, Port: 8001, IP: "12.34.56.99", HasPeer: false, Status: msgOk,
+			SwarmSize: 1},
+		},
+		// 15. 2 seeders, 1 paused
+		{testReq{Ih: torrent0.InfoHash, PID: seeder0.PeerID, IP: "12.34.56.99", event: string(consts.PAUSED),
+			Port: "8001", Uploaded: "0", Downloaded: "0", left: "5000", PK: user1.Passkey},
+			stateExpected{Uploaded: 0, Downloaded: 0, Left: 5000,
+				Seeders: 2, Leechers: 0, Snatches: 1, Port: 8001, IP: "12.34.56.99", HasPeer: true, Status: msgOk,
+				SwarmSize: 2},
 		},
 	}
 	for i, a := range announces {
 		u := fmt.Sprintf("/%s/announce?%s", a.req.PK, a.req.ToValues().Encode())
+		if i == 13 {
+			fmt.Println("x")
+		}
 		w := performRequest(rh, "GET", u)
 		time.Sleep(time.Millisecond * 200) // Wait for batch update call (100ms)
 		require.EqualValues(t, a.state.Status, errCode(w.Code),
@@ -266,9 +290,12 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			}
 			swarm, err := tkr.Peers.GetN(torrent0.InfoHash, 1000)
 			require.NoError(t, err, "Failed to fetch all peers (%d)", i)
-			seeds, leechers := swarm.Counts()
-			require.Equal(t, a.state.Seeders, seeds, "Invalid seeder count (%d)", i)
-			require.Equal(t, a.state.Leechers, leechers, "Invalid leecher count (%d)", i)
+			var torrent model.Torrent
+			require.NoError(t, tkr.Torrents.Get(&torrent, torrent0.InfoHash))
+			require.Equal(t, a.state.SwarmSize, len(swarm.Peers), "Invalid swarm size (%d)", i)
+			require.Equal(t, a.state.Seeders, torrent.Seeders, "Invalid seeder count (%d)", i)
+			require.Equal(t, a.state.Leechers, torrent.Leechers, "Invalid leecher count (%d)", i)
+			require.Equal(t, a.state.Snatches, torrent.TotalCompleted, "invalid snatch count (%d)", i)
 		}
 	}
 }

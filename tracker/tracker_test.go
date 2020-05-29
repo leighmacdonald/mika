@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"fmt"
+	"github.com/chihaya/bencode"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
@@ -114,6 +115,13 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 		w := performRequest(rh, "GET", u)
 		require.EqualValues(t, a.exp.status, errCode(w.Code),
 			fmt.Sprintf("%s (%d)", responseStringMap[errCode(w.Code)], i))
+
+		v, err := bencode.NewDecoder(w.Body).Decode()
+		require.NoError(t, err, "Failed to decode scrape: (%d)", i)
+		d := v.(bencode.Dict)
+		require.Equal(t, int64(2), d[torrent0.InfoHash.String()].(bencode.Dict)["complete"].(int64))
+		require.Equal(t, int64(0), d[torrent0.InfoHash.String()].(bencode.Dict)["incomplete"].(int64))
+		require.Equal(t, int64(0), d[torrent0.InfoHash.String()].(bencode.Dict)["downloaded"].(int64))
 	}
 }
 

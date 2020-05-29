@@ -15,7 +15,7 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 	if !preFlightChecks(&user, c.Param("passkey"), c, h.tracker) {
 		return
 	}
-	q, err := queryStringParser(c.Request.RequestURI)
+	q, err := queryStringParser(c.Request.URL.RawQuery)
 	if err != nil {
 		log.Errorf("Failed to parse request string")
 		oops(c, msgMalformedRequest)

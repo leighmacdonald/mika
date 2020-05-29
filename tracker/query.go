@@ -110,11 +110,11 @@ func queryStringParser(qStr string) (*query, error) {
 					if q.InfoHashes == nil {
 						q.InfoHashes = []string{firstInfoHash}
 					}
-
 					q.InfoHashes = append(q.InfoHashes, valStr)
 				} else {
 					firstInfoHash = valStr
 					hasInfoHash = true
+					q.InfoHashes = append(q.InfoHashes, valStr)
 				}
 			}
 			onKey = true

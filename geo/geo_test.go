@@ -35,7 +35,7 @@ func TestGetLocation(t *testing.T) {
 	if !util.Exists(fp) {
 		t.Skipf("No mmdb found")
 	}
-	db := New(fp, false)
+	db, _ := New(fp, false)
 	defer func() { _ = db.Close() }()
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
 	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -84.0 {
@@ -55,7 +55,7 @@ func TestDistance(t *testing.T) {
 	if !util.Exists(fp) {
 		t.Skipf("No mmdb found")
 	}
-	db := New(fp, false)
+	db, _ := New(fp, false)
 	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
@@ -66,7 +66,7 @@ func TestDistance(t *testing.T) {
 }
 
 func BenchmarkDistance(t *testing.B) {
-	db := New(util.FindFile(config.GetString(config.GeodbPath)), false)
+	db, _ := New(util.FindFile(config.GetString(config.GeodbPath)), false)
 	defer func() { _ = db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
@@ -97,7 +97,8 @@ func TestDownloadDB(t *testing.T) {
 
 	err2 := DownloadDB(p, key)
 	require.NoError(t, err2)
-	require.NoError(t, New(p, false).db.Verify(), "failed to verify downloaded mmdb")
+	_, err3 := New(p, true)
+	require.NoError(t, err3, "failed to verify downloaded mmdb")
 }
 
 func TestMain(m *testing.M) {

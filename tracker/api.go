@@ -107,7 +107,7 @@ func (a *AdminAPI) ping(c *gin.Context) {
 	c.JSON(http.StatusOK, PingResponse{Pong: r.Ping})
 }
 
-func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context) bool {
+func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context, hex bool) bool {
 	ihStr := c.Param("info_hash")
 	if ihStr == "" {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
@@ -115,9 +115,17 @@ func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context) bool {
 		})
 		return false
 	}
-	if err := model.InfoHashFromString(infoHash, ihStr); err != nil {
-		log.Warnf("failed to parse info hash from request context: %s", err.Error())
-		return false
+
+	if hex {
+		if err := model.InfoHashFromHex(infoHash, ihStr); err != nil {
+			log.Warnf("failed to parse info hash hex value from request context: %s", err.Error())
+			return false
+		}
+	} else {
+		if err := model.InfoHashFromString(infoHash, ihStr); err != nil {
+			log.Warnf("failed to parse info hash from request context: %s", err.Error())
+			return false
+		}
 	}
 	return true
 }
@@ -157,7 +165,7 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 
 func (a *AdminAPI) torrentDelete(c *gin.Context) {
 	var infoHash model.InfoHash
-	if !infoHashFromCtx(&infoHash, c) {
+	if !infoHashFromCtx(&infoHash, c, true) {
 		return
 	}
 	if err := a.t.Torrents.Delete(infoHash, true); err != nil {
@@ -177,7 +185,7 @@ type TorrentUpdatePrams struct {
 
 func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 	var ih model.InfoHash
-	if !infoHashFromCtx(&ih, c) {
+	if !infoHashFromCtx(&ih, c, true) {
 		return
 	}
 	var t model.Torrent
@@ -187,19 +195,19 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{})
+		c.JSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
-	var tup TorrentUpdatePrams
+	var tup model.TorrentUpdate
 	if err := c.BindJSON(&tup); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{})
+		c.JSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
 	}
-	// TODO use update channel
-	t.Reason = tup.Reason
-	t.IsDeleted = tup.IsDeleted
-	t.IsEnabled = tup.IsEnabled
-	c.JSON(http.StatusOK, tup)
+	if err := a.t.Torrents.Update(ih, tup); err != nil {
+		c.JSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
+	} else {
+		c.JSON(http.StatusOK, StatusResp{Message: "Updated successfully"})
+	}
 
 }
 
@@ -284,6 +292,7 @@ type ConfigUpdateRequest struct {
 func (a *AdminAPI) configUpdate(c *gin.Context) {
 	var configValues ConfigUpdateRequest
 	var err error
+	internalErr := false
 	if err = c.BindJSON(&configValues); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{})
 		return
@@ -336,10 +345,12 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 				if util.Exists(outPath) {
 					f, err := os.Open(outPath)
 					if err != nil {
+						internalErr = true
 						break
 					}
 					fi, err := f.Stat()
 					if err != nil {
+						internalErr = true
 						break
 					}
 					size = fi.Size()
@@ -347,12 +358,17 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 				if size == 0 || !util.Exists(outPath) {
 					err = geo.DownloadDB(outPath, key)
 					if err != nil {
+						internalErr = true
 						break
 					}
 					// Make sure a newly downloaded database is OK
 					verify = true
 				}
-				newDb := geo.New(outPath, verify)
+				newDb, err := geo.New(outPath, verify)
+				if err != nil {
+					internalErr = true
+					break
+				}
 				a.t.Geodb = newDb
 				a.t.GeodbEnabled = true
 			} else if !configValues.GeodbEnabled && a.t.GeodbEnabled {
@@ -360,12 +376,15 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 				a.t.GeodbEnabled = false
 			}
 		}
-
 	}
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		code := http.StatusBadRequest
+		if internalErr {
+			code = http.StatusInternalServerError
+		}
+		c.JSON(code, StatusResp{Err: err.Error()})
 	} else {
-		c.JSON(http.StatusOK, gin.H{})
+		c.JSON(http.StatusOK, StatusResp{Message: "Config values updated"})
 	}
 }
 

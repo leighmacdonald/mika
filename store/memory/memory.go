@@ -18,6 +18,34 @@ type TorrentStore struct {
 	whitelist []model.WhiteListClient
 }
 
+func (ts *TorrentStore) Update(infoHash model.InfoHash, update model.TorrentUpdate) error {
+	var orig model.Torrent
+	if err := ts.Get(&orig, infoHash); err != nil {
+		return err
+	}
+	for _, key := range update.Keys {
+		switch key {
+		case "reason":
+			orig.Reason = update.Reason
+		case "is_enabled":
+			orig.IsEnabled = update.IsEnabled
+		case "is_deleted":
+			orig.IsDeleted = update.IsDeleted
+		case "release_name":
+			orig.ReleaseName = update.ReleaseName
+		case "multi_up":
+			orig.MultiUp = update.MultiUp
+		case "multi_dn":
+			orig.MultiDn = update.MultiDn
+		}
+
+	}
+	ts.Lock()
+	ts.torrents[infoHash] = orig
+	ts.Unlock()
+	return nil
+}
+
 // NewTorrentStore instantiates a new in-memory torrent store
 func NewTorrentStore() *TorrentStore {
 	return &TorrentStore{

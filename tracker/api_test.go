@@ -2,7 +2,10 @@ package tracker
 
 import (
 	"context"
+	"fmt"
 	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"os"
@@ -18,6 +21,32 @@ func newTestAPI() (*Tracker, http.Handler) {
 		os.Exit(1)
 	}
 	return tkr, NewAPIHandler(tkr)
+}
+
+func TestTorrentUpdate(t *testing.T) {
+	tor0 := store.GenerateTestTorrent()
+	tkr, handler := newTestAPI()
+	require.NoError(t, tkr.Torrents.Add(tor0))
+	tup := model.TorrentUpdate{
+		Keys:        []string{"release_name", "is_deleted", "is_enabled", "reason", "multi_up", "multi_dn"},
+		ReleaseName: "new_name",
+		IsDeleted:   false,
+		IsEnabled:   false,
+		Reason:      "reason",
+		MultiUp:     2.0,
+		MultiDn:     0.5,
+	}
+	p := fmt.Sprintf("/torrent/%s", tor0.InfoHash.String())
+	w := performRequest(handler, "PATCH", p, tup)
+	require.Equal(t, 200, w.Code)
+	var tor1 model.Torrent
+	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash))
+	require.Equal(t, tup.ReleaseName, tor1.ReleaseName)
+	require.Equal(t, tup.IsDeleted, tor1.IsDeleted)
+	require.Equal(t, tup.IsEnabled, tor1.IsEnabled)
+	require.Equal(t, tup.Reason, tor1.Reason)
+	require.Equal(t, tup.MultiUp, tor1.MultiUp)
+	require.Equal(t, tup.MultiDn, tor1.MultiDn)
 }
 
 func TestConfigUpdate(t *testing.T) {

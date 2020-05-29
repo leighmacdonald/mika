@@ -147,6 +147,10 @@ type TorrentStore struct {
 	ctx context.Context
 }
 
+func (ts TorrentStore) Update(infoHash model.InfoHash, update model.TorrentUpdate) error {
+	panic("implement me")
+}
+
 // Sync batch updates the backing store with the new TorrentStats provided
 func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
 	panic("implement me")

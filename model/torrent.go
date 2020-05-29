@@ -139,9 +139,18 @@ type Torrent struct {
 	// 0 denotes freeleech status
 	MultiDn   float64 `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
 	Announces uint64  `db:"announces"`
-	Seeders int
-	Leechers int
+	Seeders   int
+	Leechers  int
+}
 
+type TorrentUpdate struct {
+	Keys        []string
+	ReleaseName string  `json:"release_name"`
+	IsDeleted   bool    `json:"is_deleted"`
+	IsEnabled   bool    `json:"is_enabled"`
+	Reason      string  `json:"reason"`
+	MultiUp     float64 `json:"multi_up"`
+	MultiDn     float64 `json:"multi_dn"`
 }
 
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats

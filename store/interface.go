@@ -95,6 +95,8 @@ type TorrentStore interface {
 	Delete(ih model.InfoHash, dropRow bool) error
 	// Get returns the Torrent matching the infohash
 	Get(torrent *model.Torrent, hash model.InfoHash) error
+	// Update will update certain parameters within the torrent
+	Update(infoHash model.InfoHash, update model.TorrentUpdate) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// WhiteListDelete removes a client from the global whitelist

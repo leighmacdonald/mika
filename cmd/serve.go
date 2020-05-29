@@ -52,7 +52,10 @@ var serveCmd = &cobra.Command{
 		opts.Users = u
 		var geodb geo.Provider
 		if config.GetBool(config.GeodbEnabled) {
-			geodb = geo.New(config.GetString(config.GeodbPath), runMode == "release")
+			geodb, err = geo.New(config.GetString(config.GeodbPath), runMode == "release")
+			if err != nil {
+				log.Fatalf("Could not validate geo database")
+			}
 		} else {
 			geodb = &geo.DummyProvider{}
 		}

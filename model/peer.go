@@ -191,6 +191,19 @@ func (swarm Swarm) Get(peer *Peer, peerID PeerID) error {
 	return nil
 }
 
+func (swarm Swarm) Update(p Peer) error {
+	swarm.RLock()
+	_, found := swarm.Peers[p.PeerID]
+	swarm.RUnlock()
+	if !found {
+		return consts.ErrInvalidPeerID
+	}
+	swarm.Lock()
+	swarm.Peers[p.PeerID] = p
+	swarm.Unlock()
+	return nil
+}
+
 // NewPeer create a new peer instance for inserting into a swarm
 func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
 	return Peer{

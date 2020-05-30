@@ -17,8 +17,13 @@ import (
 // GenerateTestUser creates a peer using fake data. Used for testing.
 func GenerateTestUser() model.User {
 	return model.User{
-		UserID:  uint32(rand.Intn(10000)),
-		Passkey: util.NewPasskey(),
+		UserID:          uint32(rand.Intn(10000)),
+		Passkey:         util.NewPasskey(),
+		IsDeleted:       false,
+		DownloadEnabled: true,
+		Downloaded:      1000,
+		Uploaded:        2000,
+		Announces:       500,
 	}
 }
 
@@ -113,13 +118,13 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	torrentA := GenerateTestTorrent()
 	require.NoError(t, ts.Add(torrentA))
 	var fetchedTorrent model.Torrent
-	require.NoError(t, ts.Get(&fetchedTorrent, torrentA.InfoHash))
+	require.NoError(t, ts.Get(&fetchedTorrent, torrentA.InfoHash, false))
 	require.Equal(t, torrentA.InfoHash, fetchedTorrent.InfoHash)
 	require.Equal(t, torrentA.IsDeleted, fetchedTorrent.IsDeleted)
 	require.Equal(t, torrentA.IsEnabled, fetchedTorrent.IsEnabled)
 	require.NoError(t, ts.Delete(torrentA.InfoHash, true))
 	var deletedTorrent model.Torrent
-	require.Equal(t, consts.ErrInvalidInfoHash, ts.Get(&deletedTorrent, torrentA.InfoHash))
+	require.Equal(t, consts.ErrInvalidInfoHash, ts.Get(&deletedTorrent, torrentA.InfoHash, false))
 	wlClients := []model.WhiteListClient{
 		{ClientPrefix: "UT", ClientName: "uTorrent"},
 		{ClientPrefix: "qT", ClientName: "QBittorrent"},
@@ -160,11 +165,12 @@ func TestUserStore(t *testing.T, s UserStore) {
 		},
 	}
 	require.NoError(t, s.Sync(batchUpdate))
+	time.Sleep(100 * time.Millisecond)
 	var updatedUser model.User
 	require.NoError(t, s.GetByPasskey(&updatedUser, users[0].Passkey))
-	require.Equal(t, uint64(1000), updatedUser.Uploaded)
-	require.Equal(t, uint64(2000), updatedUser.Downloaded)
-	require.Equal(t, uint32(10), updatedUser.Announces)
+	require.Equal(t, uint64(1000)+users[0].Uploaded, updatedUser.Uploaded)
+	require.Equal(t, uint64(2000)+users[0].Downloaded, updatedUser.Downloaded)
+	require.Equal(t, uint32(10)+users[0].Announces, updatedUser.Announces)
 }
 
 func init() {

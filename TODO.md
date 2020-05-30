@@ -22,6 +22,7 @@
 - Limit concurrent downloads for a user. This means having user classes/roles of some sort that can
 have limits attached to them.
 - Separate build env for docker img
+- Get client info from header
 
 ## Maybe
 - Clustering support

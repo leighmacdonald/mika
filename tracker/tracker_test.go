@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func performRequest(r http.Handler, method, path string, body interface{}) *httptest.ResponseRecorder {
+func performRequest(r http.Handler, method, path string, body interface{}, recv interface{}) *httptest.ResponseRecorder {
 	var req *http.Request
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -29,6 +29,11 @@ func performRequest(r http.Handler, method, path string, body interface{}) *http
 	}
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
+	if w.Code == http.StatusOK && recv != nil {
+		if err := json.Unmarshal(w.Body.Bytes(), recv); err != nil {
+			w.Code = 999
+		}
+	}
 	return w
 }
 
@@ -133,7 +138,7 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 
 	for i, a := range scrapes {
 		u := fmt.Sprintf("/%s/scrape?%s", a.req.PK, a.req.ToValues().Encode())
-		w := performRequest(rh, "GET", u, nil)
+		w := performRequest(rh, "GET", u, nil, nil)
 		require.EqualValues(t, a.exp.status, errCode(w.Code),
 			fmt.Sprintf("%s (%d)", responseStringMap[errCode(w.Code)], i))
 
@@ -281,7 +286,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		if i == 13 {
 			fmt.Println("x")
 		}
-		w := performRequest(rh, "GET", u, nil)
+		w := performRequest(rh, "GET", u, nil, nil)
 		time.Sleep(time.Millisecond * 200) // Wait for batch update call (100ms)
 		require.EqualValues(t, a.state.Status, errCode(w.Code),
 			fmt.Sprintf("%s (%d)", responseStringMap[errCode(w.Code)], i))
@@ -302,7 +307,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			swarm, err := tkr.Peers.GetN(torrent0.InfoHash, 1000)
 			require.NoError(t, err, "Failed to fetch all peers (%d)", i)
 			var torrent model.Torrent
-			require.NoError(t, tkr.Torrents.Get(&torrent, torrent0.InfoHash))
+			require.NoError(t, tkr.Torrents.Get(&torrent, torrent0.InfoHash, false))
 			require.Equal(t, a.state.SwarmSize, len(swarm.Peers), "Invalid swarm size (%d)", i)
 			require.Equal(t, a.state.Seeders, torrent.Seeders, "Invalid seeder count (%d)", i)
 			require.Equal(t, a.state.Leechers, torrent.Leechers, "Invalid leecher count (%d)", i)

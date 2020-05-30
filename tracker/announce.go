@@ -170,7 +170,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
 	var tor model.Torrent
-	if err := h.tracker.Torrents.Get(&tor, req.InfoHash); err != nil || tor.IsDeleted {
+	if err := h.tracker.Torrents.Get(&tor, req.InfoHash, false); err != nil || tor.IsDeleted {
 		log.Debugf("No torrent found matching: %x", req.InfoHash.Bytes())
 		oops(c, msgInvalidInfoHash)
 		return

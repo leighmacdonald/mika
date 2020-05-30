@@ -55,12 +55,15 @@ func (cache *TorrentCache) Delete(ih model.InfoHash, dropRow bool) {
 
 // Get returns the Torrent matching the infohash.
 // consts.ErrInvalidInfoHash is returned on failed lookup
-func (cache *TorrentCache) Get(torrent *model.Torrent, hash model.InfoHash) error {
+func (cache *TorrentCache) Get(torrent *model.Torrent, hash model.InfoHash, deletedOk bool) error {
 	if !cache.enabled {
 		return consts.ErrInvalidInfoHash
 	}
 	t, found := cache.torrents[hash]
 	if !found {
+		return consts.ErrInvalidInfoHash
+	}
+	if t.IsDeleted && !deletedOk {
 		return consts.ErrInvalidInfoHash
 	}
 	*torrent = t

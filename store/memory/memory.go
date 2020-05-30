@@ -20,7 +20,7 @@ type TorrentStore struct {
 
 func (ts *TorrentStore) Update(infoHash model.InfoHash, update model.TorrentUpdate) error {
 	var orig model.Torrent
-	if err := ts.Get(&orig, infoHash); err != nil {
+	if err := ts.Get(&orig, infoHash, true); err != nil {
 		return err
 	}
 	for _, key := range update.Keys {
@@ -144,11 +144,14 @@ func (ts *TorrentStore) Close() error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts *TorrentStore) Get(torrent *model.Torrent, hash model.InfoHash) error {
+func (ts *TorrentStore) Get(torrent *model.Torrent, hash model.InfoHash, deletedOk bool) error {
 	ts.RLock()
 	t, found := ts.torrents[hash]
 	ts.RUnlock()
-	if !found || t.IsDeleted {
+	if !found {
+		return consts.ErrInvalidInfoHash
+	}
+	if t.IsDeleted && !deletedOk {
 		return consts.ErrInvalidInfoHash
 	}
 	*torrent = t
@@ -230,8 +233,17 @@ func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 }
 
 // Update is a no-op for memory backed store
-func (ps *PeerStore) Update(_ model.InfoHash, _ model.Peer) error {
-	// no-op for in-memory store
+// TODO this is incomplete
+func (ps *PeerStore) Update(ih model.InfoHash, p model.Peer) error {
+	ps.RLock()
+	swarm, found := ps.swarms[ih]
+	ps.RUnlock()
+	if !found {
+		return consts.ErrInvalidInfoHash
+	}
+	ps.Lock()
+	_ = swarm.Update(p)
+	ps.Unlock()
 	return nil
 }
 
@@ -272,6 +284,22 @@ func (pd peerDriver) New(_ interface{}) (store.PeerStore, error) {
 type UserStore struct {
 	sync.RWMutex
 	users map[string]model.User
+}
+
+// Update is used to change a known user
+func (u *UserStore) Update(user model.User, oldPasskey string) error {
+	u.Lock()
+	defer u.Unlock()
+	key := user.Passkey
+	if oldPasskey != "" {
+		key = oldPasskey
+	}
+	_, found := u.users[key]
+	if !found {
+		return consts.ErrInvalidUser
+	}
+	u.users[user.Passkey] = user
+	return nil
 }
 
 // NewUserStore instantiates a new in-memory user store

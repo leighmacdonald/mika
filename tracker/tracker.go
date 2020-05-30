@@ -27,7 +27,6 @@ type Tracker struct {
 	Users    store.UserStore
 	Geodb    geo.Provider
 	// GeodbEnabled will enable the lookup of location data for peers
-	// TODO the dummy provider is probably sufficient
 	GeodbEnabled bool
 	// Public if true means we dont require a passkey / authorized user
 	Public bool
@@ -165,7 +164,9 @@ func (t *Tracker) StatWorker() {
 				pb = model.PeerStats{}
 			}
 			var torrent model.Torrent
-			if err := t.Torrents.Get(&torrent, u.InfoHash); err != nil {
+			// Keep deleted true so that we can record any buffered stat updates from
+			// the client even though we deleted/disabled the torrent itself.
+			if err := t.Torrents.Get(&torrent, u.InfoHash, true); err != nil {
 				log.Errorf("No torrent found in batch update")
 				continue
 			}

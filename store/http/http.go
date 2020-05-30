@@ -123,7 +123,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
+func (ts TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool) error {
 	resp, err := ts.Exec(client.Opts{
 		Method: "GET",
 		Path:   fmt.Sprintf("/api/torrent/%s", hash.String()),
@@ -316,6 +316,11 @@ func (u *UserStore) GetByID(user *model.User, userID uint32) error {
 		return consts.ErrUnauthorized
 	}
 	return nil
+}
+
+// Update updates a user from the backing store
+func (u *UserStore) Update(user model.User, oldPasskey string) error {
+	panic("implement me")
 }
 
 // Delete removes a user from the backing store

@@ -109,9 +109,9 @@ func (s *TorrentStore) Close() error {
 }
 
 // Get returns a torrent for the hash provided
-func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
+func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool) error {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
-	if err := s.cache.Get(t, hash); err == nil {
+	if err := s.cache.Get(t, hash, deletedOk); err == nil {
 		log.Debugf("Got cached torrent: %s", t.InfoHash.String())
 		return nil
 	}
@@ -124,6 +124,9 @@ func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	}
 	s.cache.Add(*t)
 	log.Debugf("Added torrent to cache (Get()): %s", t.InfoHash.String())
+	if t.IsDeleted && !deletedOk {
+		return consts.ErrInvalidInfoHash
+	}
 	return nil
 }
 

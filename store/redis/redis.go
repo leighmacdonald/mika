@@ -90,11 +90,8 @@ func (us UserStore) Sync(b map[string]model.UserStats) error {
 	return nil
 }
 
-// Add inserts a user into redis via at the string provided by the userKey function
-// This additionally sets the passkey->user_id mapping
-func (us UserStore) Add(u model.User) error {
-	pipe := us.client.TxPipeline()
-	pipe.HSet(userKey(u.Passkey), map[string]interface{}{
+func userMap(u model.User) map[string]interface{} {
+	return map[string]interface{}{
 		"user_id":          u.UserID,
 		"passkey":          u.Passkey,
 		"download_enabled": u.DownloadEnabled,
@@ -102,7 +99,14 @@ func (us UserStore) Add(u model.User) error {
 		"downloaded":       u.Downloaded,
 		"uploaded":         u.Uploaded,
 		"announces":        u.Announces,
-	})
+	}
+}
+
+// Add inserts a user into redis via at the string provided by the userKey function
+// This additionally sets the passkey->user_id mapping
+func (us UserStore) Add(u model.User) error {
+	pipe := us.client.TxPipeline()
+	pipe.HSet(userKey(u.Passkey), userMap(u))
 	pipe.Set(userIDKey(u.UserID), u.Passkey, 0)
 	if _, err := pipe.Exec(); err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
@@ -149,6 +153,28 @@ func (us UserStore) Delete(user model.User) error {
 	}
 	if err := us.client.Del(userIDKey(user.UserID)).Err(); err != nil {
 		return errors.Wrap(err, "Could not remove user pk index from store")
+	}
+	return nil
+}
+
+func (us UserStore) Update(user model.User, oldPasskey string) error {
+	passkey := user.Passkey
+	if oldPasskey != "" {
+		passkey = oldPasskey
+	}
+	exists, err := us.client.Exists(userKey(passkey)).Result()
+	if err != nil || exists == 0 {
+		return err
+	}
+	pipe := us.client.TxPipeline()
+	pipe.HSet(userKey(user.Passkey), userMap(user))
+	pipe.Set(userIDKey(user.UserID), user.Passkey, 0)
+	if oldPasskey != "" {
+		// remove old user object when switching to a new passkey as its the key
+		pipe.Del(userKey(passkey))
+	}
+	if _, err := pipe.Exec(); err != nil {
+		return errors.Wrap(err, "Failed to add user to store")
 	}
 	return nil
 }
@@ -258,7 +284,7 @@ func (ts *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
+func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool) error {
 	v, err := ts.client.HGetAll(torrentKey(hash)).Result()
 	if err != nil {
 		return err
@@ -271,12 +297,16 @@ func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash) error {
 	if err := model.InfoHashFromHex(&infoHash, ihStr); err != nil {
 		return errors.Wrap(err, "Failed to decode info_hash")
 	}
+	isDeleted := util.StringToBool(v["is_deleted"], false)
+	if isDeleted && !deletedOk {
+		return consts.ErrInvalidInfoHash
+	}
 	t.ReleaseName = v["release_name"]
 	t.InfoHash = infoHash
 	t.TotalCompleted = util.StringToUInt16(v["total_completed"], 0)
 	t.TotalUploaded = util.StringToUInt64(v["total_uploaded"], 0)
 	t.TotalDownloaded = util.StringToUInt64(v["total_downloaded"], 0)
-	t.IsDeleted = util.StringToBool(v["is_deleted"], false)
+	t.IsDeleted = isDeleted
 	t.IsEnabled = util.StringToBool(v["is_enabled"], false)
 	t.Reason = v["reason"]
 	t.MultiUp = util.StringToFloat64(v["multi_up"], 1.0)

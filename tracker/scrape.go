@@ -39,7 +39,7 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 			continue
 		}
 		var torrent model.Torrent
-		if err := h.tracker.Torrents.Get(&torrent, ih); err != nil {
+		if err := h.tracker.Torrents.Get(&torrent, ih, false); err != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}

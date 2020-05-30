@@ -24,6 +24,64 @@ func newTestAPI() (*Tracker, http.Handler) {
 	return tkr, NewAPIHandler(tkr)
 }
 
+func TestPing(t *testing.T) {
+	_, handler := newTestAPI()
+	req := PingRequest{Ping: "test"}
+	var resp PingResponse
+	w := performRequest(handler, "POST", "/ping", req, &resp)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, req.Ping, resp.Pong)
+	w2 := performRequest(handler, "POST", "/ping", "bad data", nil)
+	require.Equal(t, http.StatusBadRequest, w2.Code)
+}
+
+func equalUser(t *testing.T, a model.User, b model.User) {
+	require.Equal(t, a.UserID, b.UserID)
+	require.Equal(t, a.Passkey, b.Passkey)
+	require.Equal(t, a.IsDeleted, b.IsDeleted)
+	require.Equal(t, a.DownloadEnabled, b.DownloadEnabled)
+	require.Equal(t, a.Downloaded, b.Downloaded)
+	require.Equal(t, a.Uploaded, b.Uploaded)
+	require.Equal(t, a.Announces, b.Announces)
+}
+
+func TestUserAdd(t *testing.T) {
+	user0 := store.GenerateTestUser()
+	tkr, handler := newTestAPI()
+	w := performRequest(handler, "POST", "/user", user0, nil)
+	require.Equal(t, 200, w.Code)
+	var userByPK model.User
+	var userByID model.User
+	require.NoError(t, tkr.Users.GetByPasskey(&userByPK, user0.Passkey))
+	require.NoError(t, tkr.Users.GetByID(&userByID, user0.UserID))
+	for _, u := range []model.User{userByPK, userByID} {
+		equalUser(t, user0, u)
+	}
+}
+
+func TestUserDelete(t *testing.T) {
+	user0 := store.GenerateTestUser()
+	tkr, handler := newTestAPI()
+	require.NoError(t, tkr.Users.Add(user0))
+	u := fmt.Sprintf("/user/pk/%s", user0.Passkey)
+	w := performRequest(handler, "DELETE", u, nil, nil)
+	require.Equal(t, 200, w.Code)
+	require.Error(t, tkr.Users.GetByPasskey(&user0, user0.Passkey))
+}
+
+func TestUserUpdate(t *testing.T) {
+	user0 := store.GenerateTestUser()
+	user1 := store.GenerateTestUser()
+	var user2 model.User
+	tkr, handler := newTestAPI()
+	require.NoError(t, tkr.Users.Add(user0))
+	u := fmt.Sprintf("/user/pk/%s", user0.Passkey)
+	w := performRequest(handler, "PATCH", u, user1, nil)
+	require.Equal(t, 200, w.Code)
+	require.NoError(t, tkr.Users.GetByPasskey(&user2, user1.Passkey))
+	equalUser(t, user1, user2)
+}
+
 func TestTorrentAdd(t *testing.T) {
 	tor0 := store.GenerateTestTorrent()
 	tkr, handler := newTestAPI()
@@ -33,10 +91,10 @@ func TestTorrentAdd(t *testing.T) {
 		MultiUp:  1.0,
 		MultiDn:  -1,
 	}
-	w := performRequest(handler, "POST", "/torrent", tadd)
+	w := performRequest(handler, "POST", "/torrent", tadd, nil)
 	require.Equal(t, 200, w.Code)
 	var tor1 model.Torrent
-	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash))
+	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash, false))
 	require.Equal(t, tadd.Name, tor1.ReleaseName)
 	require.Equal(t, tadd.MultiUp, tor1.MultiUp)
 	require.Equal(t, float64(0), tor1.MultiDn)
@@ -47,10 +105,10 @@ func TestTorrentDelete(t *testing.T) {
 	tkr, handler := newTestAPI()
 	require.NoError(t, tkr.Torrents.Add(tor0))
 	u := fmt.Sprintf("/torrent/%s", tor0.InfoHash.String())
-	w := performRequest(handler, "DELETE", u, nil)
+	w := performRequest(handler, "DELETE", u, nil, nil)
 	require.Equal(t, 200, w.Code)
 	var tor1 model.Torrent
-	require.Error(t, tkr.Torrents.Get(&tor1, tor0.InfoHash))
+	require.Error(t, tkr.Torrents.Get(&tor1, tor0.InfoHash, false))
 
 }
 
@@ -68,10 +126,10 @@ func TestTorrentUpdate(t *testing.T) {
 		MultiDn:     0.5,
 	}
 	p := fmt.Sprintf("/torrent/%s", tor0.InfoHash.String())
-	w := performRequest(handler, "PATCH", p, tup)
+	w := performRequest(handler, "PATCH", p, tup, nil)
 	require.Equal(t, 200, w.Code)
 	var tor1 model.Torrent
-	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash))
+	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash, true))
 	require.Equal(t, tup.ReleaseName, tor1.ReleaseName)
 	require.Equal(t, tup.IsDeleted, tor1.IsDeleted)
 	require.Equal(t, tup.IsEnabled, tor1.IsEnabled)
@@ -83,10 +141,10 @@ func TestTorrentUpdate(t *testing.T) {
 	w2 := performRequest(handler, "PATCH", p, model.TorrentUpdate{
 		Keys:      []string{"is_deleted"},
 		IsDeleted: true,
-	})
+	}, nil)
 	require.Equal(t, 200, w2.Code)
 	var tor2 model.Torrent
-	require.Equal(t, consts.ErrInvalidInfoHash, tkr.Torrents.Get(&tor2, tor0.InfoHash))
+	require.Equal(t, consts.ErrInvalidInfoHash, tkr.Torrents.Get(&tor2, tor0.InfoHash, false))
 }
 
 func TestConfigUpdate(t *testing.T) {
@@ -118,7 +176,7 @@ func TestConfigUpdate(t *testing.T) {
 		TrackerAllowNonRoutable:    true,
 		GeodbEnabled:               true,
 	}
-	w := performRequest(handler, "PATCH", "/config", args)
+	w := performRequest(handler, "PATCH", "/config", args, nil)
 	require.Equal(t, 200, w.Code)
 	require.Equal(t, toDuration(args.TrackerAnnounceInterval), tkr.AnnInterval)
 	require.Equal(t, toDuration(args.TrackerAnnounceIntervalMin), tkr.AnnIntervalMin)

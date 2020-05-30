@@ -202,7 +202,7 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 		return
 	}
 	var t model.Torrent
-	err := a.t.Torrents.Get(&t, ih)
+	err := a.t.Torrents.Get(&t, ih, true)
 	if err == consts.ErrInvalidInfoHash {
 		c.JSON(http.StatusNotFound, gin.H{})
 		return
@@ -221,12 +221,34 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, StatusResp{Message: "Updated successfully"})
 	}
-
 }
 
-//func (a *AdminAPI) userUpdate(_ *gin.Context) {
-//
-//}
+func (a *AdminAPI) userUpdate(c *gin.Context) {
+	var user model.User
+	passkey := c.Param("passkey")
+	if len(passkey) != 20 {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	if err := a.t.Users.GetByPasskey(&user, passkey); err != nil {
+		if errors.Is(consts.ErrUnauthorized, err) {
+			c.AbortWithStatus(http.StatusNotFound)
+		} else {
+			c.AbortWithStatus(http.StatusInternalServerError)
+		}
+		return
+	}
+	var update model.User
+	if err := c.BindJSON(&update); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	if err := a.t.Users.Update(update, passkey); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.AbortWithStatus(http.StatusOK)
+}
 
 // UserDeleteRequest represents a JSON API requests to delete a user via passkey
 type UserDeleteRequest struct {
@@ -247,45 +269,27 @@ func (a *AdminAPI) userDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, StatusResp{Message: "Deleted user successfully"})
 }
 
-// UserAddRequest represents a JSON API requests to add a user
-type UserAddRequest struct {
-	UserID  uint32 `json:"user_id,omitempty"`
-	Passkey string `json:"passkey,omitempty"`
-}
-
-// UserAddResponse represents a JSON API response to adding a user
-type UserAddResponse struct {
-	Passkey string `json:"passkey"`
-}
-
 func (a *AdminAPI) userAdd(c *gin.Context) {
 	var user model.User
-	var req UserAddRequest
-	if err := c.BindJSON(&req); err != nil {
+	if err := c.BindJSON(&user); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Malformed request"})
 		return
 	}
-	user.DownloadEnabled = true
-	if req.Passkey == "" {
+	if user.Passkey == "" {
 		user.Passkey = util.NewPasskey()
-	} else {
-		user.Passkey = req.Passkey
-	}
-	if req.UserID > 0 {
-		user.UserID = req.UserID
 	}
 	if err := a.t.Users.Add(user); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Failed to add user"})
 		return
 	}
-	c.JSON(http.StatusOK, UserAddResponse{Passkey: user.Passkey})
+	c.AbortWithStatus(http.StatusOK)
 }
 
 // ConfigUpdateRequest holds new config values for the tracker
 //
 // Duration string format follows golang time.Duration string format i.e.:
-// 		A duration string is a possibly signed sequence of decimal numbers, each
-//		with optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
+// 		A duration string a sequence of decimal numbers, each
+//		with optional fraction and a unit suffix, such as "300ms", "1.5h" or "2h45m".
 //		Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 type ConfigUpdateRequest struct {
 	// The keys that we actually want to update from our struct

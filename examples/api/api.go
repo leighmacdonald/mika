@@ -79,7 +79,7 @@ func (s *ServerExample) getTorrent(c *gin.Context) {
 		return
 	}
 	var t model.Torrent
-	if err := s.Torrents.Get(&t, infoHash); err != nil || t.IsDeleted {
+	if err := s.Torrents.Get(&t, infoHash, true); err != nil || t.IsDeleted {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return
 	}
@@ -187,14 +187,10 @@ func (s *ServerExample) addTorrent(c *gin.Context) {
 }
 
 func (s *ServerExample) userAdd(c *gin.Context) {
-	var userReq tracker.UserAddRequest
-	if err := c.BindJSON(&userReq); err != nil {
+	var user model.User
+	if err := c.BindJSON(&user); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
-	}
-	user := model.User{
-		UserID:  userReq.UserID,
-		Passkey: userReq.Passkey,
 	}
 	if err := s.Users.Add(user); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
@@ -204,7 +200,7 @@ func (s *ServerExample) userAdd(c *gin.Context) {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, user)
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (s *ServerExample) userSync(c *gin.Context) {
@@ -217,7 +213,7 @@ func (s *ServerExample) userSync(c *gin.Context) {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	okResponse(c, "sync successful")
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (s *ServerExample) userDelete(c *gin.Context) {
@@ -235,7 +231,7 @@ func (s *ServerExample) userDelete(c *gin.Context) {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	okResponse(c, "Deleted user successfully")
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (s *ServerExample) torrentSync(c *gin.Context) {
@@ -248,7 +244,7 @@ func (s *ServerExample) torrentSync(c *gin.Context) {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	okResponse(c, "torrent sync successful")
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (s *ServerExample) peersSync(c *gin.Context) {
@@ -270,7 +266,7 @@ func (s *ServerExample) peersSync(c *gin.Context) {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	okResponse(c, "peer sync successful")
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (s *ServerExample) peersAdd(c *gin.Context) {
@@ -289,7 +285,7 @@ func (s *ServerExample) peersAdd(c *gin.Context) {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	okResponse(c, "Peer added to swarm successfully")
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (s *ServerExample) peersDelete(c *gin.Context) {
@@ -304,7 +300,7 @@ func (s *ServerExample) peersDelete(c *gin.Context) {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	okResponse(c, "Successfully deleted peer")
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (s *ServerExample) peersGetN(c *gin.Context) {

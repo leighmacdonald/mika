@@ -178,7 +178,9 @@ var userAddCmd = &cobra.Command{
 		if passkey == "" {
 			passkey = util.NewPasskey()
 		}
-		if err := c.UserAdd(passkey); err != nil {
+		var user model.User
+		user.Passkey = passkey
+		if err := c.UserAdd(user); err != nil {
 			log.Errorf("Error adding user: %s", err.Error())
 		}
 		log.Infof("Added user with passkey: %s", passkey)

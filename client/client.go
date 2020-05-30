@@ -58,15 +58,14 @@ func (c *Client) UserDelete(passkey string) error {
 }
 
 // UserAdd creates a new user with the passkey provided
-func (c *Client) UserAdd(passkey string) error {
-	var uar tracker.UserAddResponse
+func (c *Client) UserAdd(user model.User) error {
+	if !user.Valid() {
+		return errors.New("Invalid user model")
+	}
 	_, err := c.Exec(Opts{
 		Method: "POST",
 		Path:   "/user",
-		JSON: tracker.UserAddRequest{
-			Passkey: passkey,
-		},
-		Recv: &uar,
+		JSON:   user,
 	})
 	return err
 }

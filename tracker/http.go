@@ -189,6 +189,7 @@ func NewAPIHandler(tkr *Tracker) *gin.Engine {
 
 	r.POST("/user", h.userAdd)
 	r.DELETE("/user/pk/:passkey", h.userDelete)
+	r.PATCH("/user/pk/:passkey", h.userUpdate)
 
 	r.POST("/whitelist", h.whitelistAdd)
 	r.DELETE("/whitelist/:prefix", h.whitelistDelete)

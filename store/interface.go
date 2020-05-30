@@ -79,6 +79,8 @@ type UserStore interface {
 	GetByID(user *model.User, userID uint32) error
 	// Delete removes a user from the backing store
 	Delete(user model.User) error
+	// Update is used to change a known user
+	Update(user model.User, oldPasskey string) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// Sync batch updates the backing store with the new UserStats provided
@@ -94,7 +96,7 @@ type TorrentStore interface {
 	// If dropRow is true, it will permanently remove the torrent from the store
 	Delete(ih model.InfoHash, dropRow bool) error
 	// Get returns the Torrent matching the infohash
-	Get(torrent *model.Torrent, hash model.InfoHash) error
+	Get(torrent *model.Torrent, hash model.InfoHash, deletedOk bool) error
 	// Update will update certain parameters within the torrent
 	Update(infoHash model.InfoHash, update model.TorrentUpdate) error
 	// Close will cleanup and close the underlying storage driver if necessary

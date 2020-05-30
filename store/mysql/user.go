@@ -118,6 +118,10 @@ func (u *UserStore) Delete(user model.User) error {
 	return nil
 }
 
+func (u *UserStore) Update(user model.User, oldPasskey string) error {
+	panic("implement me")
+}
+
 // Close will close the underlying database connection and clear the local caches
 func (u *UserStore) Close() error {
 	return u.db.Close()

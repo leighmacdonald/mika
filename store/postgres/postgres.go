@@ -25,6 +25,10 @@ type UserStore struct {
 	ctx context.Context
 }
 
+func (us UserStore) Update(user model.User, oldPasskey string) error {
+	panic("implement me")
+}
+
 // Sync batch updates the backing store with the new UserStats provided
 func (us UserStore) Sync(batch map[string]model.UserStats) error {
 	const txName = "userSync"
@@ -201,7 +205,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns a torrent for the hash provided
-func (ts TorrentStore) Get(t *model.Torrent, ih model.InfoHash) error {
+func (ts TorrentStore) Get(t *model.Torrent, ih model.InfoHash, deletedOk bool) error {
 	const q = `
 		SELECT 
 			info_hash::bytea, release_name, total_uploaded, total_downloaded, total_completed, 
@@ -232,6 +236,9 @@ func (ts TorrentStore) Get(t *model.Torrent, ih model.InfoHash) error {
 			return consts.ErrInvalidInfoHash
 		}
 		return err
+	}
+	if t.IsDeleted && !deletedOk {
+		return consts.ErrInvalidInfoHash
 	}
 	return nil
 }

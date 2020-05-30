@@ -24,6 +24,36 @@ func newTestAPI() (*Tracker, http.Handler) {
 	return tkr, NewAPIHandler(tkr)
 }
 
+func TestTorrentAdd(t *testing.T) {
+	tor0 := store.GenerateTestTorrent()
+	tkr, handler := newTestAPI()
+	tadd := TorrentAddRequest{
+		Name:     tor0.ReleaseName,
+		InfoHash: tor0.InfoHash.String(),
+		MultiUp:  1.0,
+		MultiDn:  -1,
+	}
+	w := performRequest(handler, "POST", "/torrent", tadd)
+	require.Equal(t, 200, w.Code)
+	var tor1 model.Torrent
+	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash))
+	require.Equal(t, tadd.Name, tor1.ReleaseName)
+	require.Equal(t, tadd.MultiUp, tor1.MultiUp)
+	require.Equal(t, float64(0), tor1.MultiDn)
+}
+
+func TestTorrentDelete(t *testing.T) {
+	tor0 := store.GenerateTestTorrent()
+	tkr, handler := newTestAPI()
+	require.NoError(t, tkr.Torrents.Add(tor0))
+	u := fmt.Sprintf("/torrent/%s", tor0.InfoHash.String())
+	w := performRequest(handler, "DELETE", u, nil)
+	require.Equal(t, 200, w.Code)
+	var tor1 model.Torrent
+	require.Error(t, tkr.Torrents.Get(&tor1, tor0.InfoHash))
+
+}
+
 func TestTorrentUpdate(t *testing.T) {
 	tor0 := store.GenerateTestTorrent()
 	tkr, handler := newTestAPI()

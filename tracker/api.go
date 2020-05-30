@@ -132,8 +132,10 @@ func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context, hex bool) bool {
 
 // TorrentAddRequest represents a JSON request for adding a new torrent
 type TorrentAddRequest struct {
-	Name     string `json:"name"`
-	InfoHash string `json:"info_hash"`
+	Name     string  `json:"name"`
+	InfoHash string  `json:"info_hash"`
+	MultiUp  float64 `json:"multi_up"`
+	MultiDn  float64 `json:"multi_dn"`
 }
 
 func (a *AdminAPI) torrentAdd(c *gin.Context) {
@@ -144,12 +146,22 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 	}
 	var t model.Torrent
 	var ih model.InfoHash
-	if err := model.InfoHashFromString(&ih, req.InfoHash); err != nil {
+	if err := model.InfoHashFromHex(&ih, req.InfoHash); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
 	}
 	t.ReleaseName = req.Name
 	t.InfoHash = ih
+	if req.MultiUp < 0 {
+		t.MultiUp = 0
+	} else {
+		t.MultiUp = req.MultiUp
+	}
+	if req.MultiDn < 0 {
+		t.MultiDn = 0
+	} else {
+		t.MultiDn = req.MultiDn
+	}
 	if err := a.t.Torrents.Add(t); err != nil {
 		if errors.Is(err, consts.ErrDuplicate) {
 			c.AbortWithStatusJSON(http.StatusConflict, StatusResp{

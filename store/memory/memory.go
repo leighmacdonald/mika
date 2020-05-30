@@ -55,6 +55,29 @@ func NewTorrentStore() *TorrentStore {
 	}
 }
 
+// Add adds a new torrent to the memory store
+func (ts *TorrentStore) Add(t model.Torrent) error {
+	ts.RLock()
+	_, found := ts.torrents[t.InfoHash]
+	ts.RUnlock()
+	if found {
+		return consts.ErrDuplicate
+	}
+	ts.Lock()
+	ts.torrents[t.InfoHash] = t
+	ts.Unlock()
+	return nil
+}
+
+// Delete will mark a torrent as deleted in the backing store.
+// NOTE the memory store always permanently deletes the torrent
+func (ts *TorrentStore) Delete(ih model.InfoHash, _ bool) error {
+	ts.Lock()
+	delete(ts.torrents, ih)
+	ts.Unlock()
+	return nil
+}
+
 // Sync batch updates the backing store with the new TorrentStats provided
 func (ts *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
 	ts.Lock()
@@ -229,29 +252,6 @@ func (ps *PeerStore) GetN(ih model.InfoHash, _ int) (model.Swarm, error) {
 		return model.Swarm{}, consts.ErrInvalidTorrentID
 	}
 	return p, nil
-}
-
-// Add adds a new torrent to the memory store
-func (ts *TorrentStore) Add(t model.Torrent) error {
-	ts.RLock()
-	_, found := ts.torrents[t.InfoHash]
-	ts.RUnlock()
-	if found {
-		return consts.ErrDuplicate
-	}
-	ts.Lock()
-	ts.torrents[t.InfoHash] = t
-	ts.Unlock()
-	return nil
-}
-
-// Delete will mark a torrent as deleted in the backing store.
-// NOTE the memory store always permanently deletes the torrent
-func (ts *TorrentStore) Delete(ih model.InfoHash, _ bool) error {
-	ts.Lock()
-	delete(ts.torrents, ih)
-	ts.Unlock()
-	return nil
 }
 
 type torrentDriver struct{}

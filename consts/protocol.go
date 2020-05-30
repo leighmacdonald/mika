@@ -9,8 +9,8 @@ const (
 	STOPPED   AnnounceType = "stopped"
 	COMPLETED AnnounceType = "completed"
 	// Partial seeders send paused event BEP-21
-	PAUSED    AnnounceType = "paused"
-	ANNOUNCE  AnnounceType = ""
+	PAUSED   AnnounceType = "paused"
+	ANNOUNCE AnnounceType = ""
 )
 
 // ParseAnnounceType returns the AnnounceType from a string

@@ -183,6 +183,7 @@ type TorrentUpdatePrams struct {
 	Reason    string `json:"reason"`
 }
 
+// TODO ability to un-delete a torrent
 func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 	var ih model.InfoHash
 	if !infoHashFromCtx(&ih, c, true) {

@@ -217,7 +217,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		Left:       req.Left,
 		Event:      req.Event,
 		Timestamp:  time.Now(),
-		Paused: peer.Paused,
+		Paused:     peer.Paused,
 	}
 	peers, err2 := h.tracker.Peers.GetN(tor.InfoHash, h.tracker.MaxPeers)
 	if err2 != nil {

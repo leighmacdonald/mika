@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/leighmacdonald/mika/config"
+	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/stretchr/testify/require"
@@ -47,6 +48,15 @@ func TestTorrentUpdate(t *testing.T) {
 	require.Equal(t, tup.Reason, tor1.Reason)
 	require.Equal(t, tup.MultiUp, tor1.MultiUp)
 	require.Equal(t, tup.MultiDn, tor1.MultiDn)
+
+	// Deleted torrents should not be fetchable after update
+	w2 := performRequest(handler, "PATCH", p, model.TorrentUpdate{
+		Keys:      []string{"is_deleted"},
+		IsDeleted: true,
+	})
+	require.Equal(t, 200, w2.Code)
+	var tor2 model.Torrent
+	require.Equal(t, consts.ErrInvalidInfoHash, tkr.Torrents.Get(&tor2, tor0.InfoHash))
 }
 
 func TestConfigUpdate(t *testing.T) {

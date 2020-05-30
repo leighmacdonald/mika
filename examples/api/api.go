@@ -5,7 +5,6 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
 	"github.com/leighmacdonald/mika/tracker"
@@ -29,7 +28,7 @@ type (
 		Users       store.UserStore
 		Peers       store.PeerStore
 		Torrents    store.TorrentStore
-		WhiteList   map[string]model.WhiteListClient
+		WhiteList   map[string]store.WhiteListClient
 		WhiteListMx *sync.RWMutex
 	}
 
@@ -50,35 +49,35 @@ func okResponse(c *gin.Context, msg string) {
 	c.JSON(http.StatusOK, okMsg{msg})
 }
 
-func getInfoHashParam(ih *model.InfoHash, c *gin.Context) bool {
+func getInfoHashParam(ih *store.InfoHash, c *gin.Context) bool {
 	infoHashStr := c.Param("info_hash")
 	if infoHashStr == "" {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return false
 	}
-	if err := model.InfoHashFromHex(ih, infoHashStr); err != nil {
+	if err := store.InfoHashFromHex(ih, infoHashStr); err != nil {
 		errResponse(c, http.StatusBadRequest, "Malformed info_hash")
 		return false
 	}
 	return true
 }
 
-func getPeerIDParam(peerID *model.PeerID, c *gin.Context) bool {
+func getPeerIDParam(peerID *store.PeerID, c *gin.Context) bool {
 	peerIDStr := c.Param("peer_id")
 	if peerIDStr == "" {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return false
 	}
-	*peerID = model.PeerIDFromString(peerIDStr)
+	*peerID = store.PeerIDFromString(peerIDStr)
 	return true
 }
 
 func (s *ServerExample) getTorrent(c *gin.Context) {
-	var infoHash model.InfoHash
+	var infoHash store.InfoHash
 	if !getInfoHashParam(&infoHash, c) {
 		return
 	}
-	var t model.Torrent
+	var t store.Torrent
 	if err := s.Torrents.Get(&t, infoHash, true); err != nil || t.IsDeleted {
 		errResponse(c, http.StatusNotFound, "Unknown info_hash")
 		return
@@ -97,7 +96,7 @@ func (s *ServerExample) getUserByID(c *gin.Context) {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	var u model.User
+	var u store.User
 	if err := s.Users.GetByID(&u, userID); err != nil {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
@@ -106,7 +105,7 @@ func (s *ServerExample) getUserByID(c *gin.Context) {
 }
 
 func (s *ServerExample) getWhitelist(c *gin.Context) {
-	var cwl []model.WhiteListClient
+	var cwl []store.WhiteListClient
 	s.WhiteListMx.RLock()
 	defer s.WhiteListMx.RUnlock()
 	for _, wl := range s.WhiteList {
@@ -132,7 +131,7 @@ func (s *ServerExample) deleteWhitelist(c *gin.Context) {
 }
 
 func (s *ServerExample) addWhitelist(c *gin.Context) {
-	var wlc model.WhiteListClient
+	var wlc store.WhiteListClient
 	if err := c.BindJSON(&wlc); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -153,7 +152,7 @@ func (s *ServerExample) getUserByPasskey(c *gin.Context) {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	var u model.User
+	var u store.User
 	if err := s.Users.GetByPasskey(&u, passkey); err != nil {
 		errResponse(c, http.StatusUnauthorized, "Unauthorized")
 		return
@@ -162,7 +161,7 @@ func (s *ServerExample) getUserByPasskey(c *gin.Context) {
 }
 
 func (s *ServerExample) deleteTorrent(c *gin.Context) {
-	var infoHash model.InfoHash
+	var infoHash store.InfoHash
 	if !getInfoHashParam(&infoHash, c) {
 		return
 	}
@@ -174,7 +173,7 @@ func (s *ServerExample) deleteTorrent(c *gin.Context) {
 }
 
 func (s *ServerExample) addTorrent(c *gin.Context) {
-	var torrent model.Torrent
+	var torrent store.Torrent
 	if err := c.BindJSON(&torrent); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -187,7 +186,7 @@ func (s *ServerExample) addTorrent(c *gin.Context) {
 }
 
 func (s *ServerExample) userAdd(c *gin.Context) {
-	var user model.User
+	var user store.User
 	if err := c.BindJSON(&user); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -204,12 +203,12 @@ func (s *ServerExample) userAdd(c *gin.Context) {
 }
 
 func (s *ServerExample) userSync(c *gin.Context) {
-	var batch map[string]model.UserStats
+	var batch map[string]store.UserStats
 	if err := c.BindJSON(&batch); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := s.Users.Sync(batch); err != nil {
+	if err := s.Users.Sync(batch, nil); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -222,7 +221,7 @@ func (s *ServerExample) userDelete(c *gin.Context) {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	var user model.User
+	var user store.User
 	if err := s.Users.GetByPasskey(&user, us.Passkey); err != nil {
 		errResponse(c, http.StatusNotFound, "User does not exist")
 		return
@@ -235,12 +234,12 @@ func (s *ServerExample) userDelete(c *gin.Context) {
 }
 
 func (s *ServerExample) torrentSync(c *gin.Context) {
-	var batch map[model.InfoHash]model.TorrentStats
+	var batch map[store.InfoHash]store.TorrentStats
 	if err := c.BindJSON(batch); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := s.Torrents.Sync(batch); err != nil {
+	if err := s.Torrents.Sync(batch, nil); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -248,21 +247,21 @@ func (s *ServerExample) torrentSync(c *gin.Context) {
 }
 
 func (s *ServerExample) peersSync(c *gin.Context) {
-	var batch map[string]model.PeerStats
+	var batch map[string]store.PeerStats
 	if err := c.BindJSON(&batch); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	rb := make(map[model.PeerHash]model.PeerStats)
+	rb := make(map[store.PeerHash]store.PeerStats)
 	for k, v := range batch {
-		var ph model.PeerHash
-		if err := model.PeerHashFromHex(&ph, k); err != nil {
+		var ph store.PeerHash
+		if err := store.PeerHashFromHex(&ph, k); err != nil {
 			errResponse(c, http.StatusBadRequest, err.Error())
 			return
 		}
 		rb[ph] = v
 	}
-	if err := s.Peers.Sync(rb); err != nil {
+	if err := s.Peers.Sync(rb, nil); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -271,8 +270,8 @@ func (s *ServerExample) peersSync(c *gin.Context) {
 
 func (s *ServerExample) peersAdd(c *gin.Context) {
 	var (
-		peer     model.Peer
-		infoHash model.InfoHash
+		peer     store.Peer
+		infoHash store.InfoHash
 	)
 	if !getInfoHashParam(&infoHash, c) {
 		return
@@ -290,8 +289,8 @@ func (s *ServerExample) peersAdd(c *gin.Context) {
 
 func (s *ServerExample) peersDelete(c *gin.Context) {
 	var (
-		peerID   model.PeerID
-		infoHash model.InfoHash
+		peerID   store.PeerID
+		infoHash store.InfoHash
 	)
 	if !getPeerIDParam(&peerID, c) || !getInfoHashParam(&infoHash, c) {
 		return
@@ -304,7 +303,7 @@ func (s *ServerExample) peersDelete(c *gin.Context) {
 }
 
 func (s *ServerExample) peersGetN(c *gin.Context) {
-	var infoHash model.InfoHash
+	var infoHash store.InfoHash
 	if !getInfoHashParam(&infoHash, c) {
 		return
 	}
@@ -323,7 +322,7 @@ func (s *ServerExample) peersGetN(c *gin.Context) {
 		return
 	}
 	swarm.RLock()
-	var peers []model.Peer
+	var peers []store.Peer
 	for _, p := range swarm.Peers {
 		peers = append(peers, p)
 	}
@@ -334,9 +333,9 @@ func (s *ServerExample) peersGetN(c *gin.Context) {
 
 func (s *ServerExample) peersGet(c *gin.Context) {
 	var (
-		peer     model.Peer
-		peerID   model.PeerID
-		infoHash model.InfoHash
+		peer     store.Peer
+		peerID   store.PeerID
+		infoHash store.InfoHash
 	)
 	if !getPeerIDParam(&peerID, c) || !getInfoHashParam(&infoHash, c) {
 		return
@@ -349,7 +348,7 @@ func (s *ServerExample) peersGet(c *gin.Context) {
 }
 
 func (s *ServerExample) peersReap(c *gin.Context) {
-	s.Peers.Reap()
+	s.Peers.Reap(nil)
 	okResponse(c, "reaped")
 }
 
@@ -375,7 +374,7 @@ func New(listenAddr string, pathPrefix string, authKey string) *http.Server {
 		Torrents:    memory.NewTorrentStore(),
 		Peers:       memory.NewPeerStore(),
 		Users:       memory.NewUserStore(),
-		WhiteList:   map[string]model.WhiteListClient{},
+		WhiteList:   map[string]store.WhiteListClient{},
 		WhiteListMx: &sync.RWMutex{},
 	}
 	for i := 0; i < userCount; i++ {
@@ -388,7 +387,7 @@ func New(listenAddr string, pathPrefix string, authKey string) *http.Server {
 			log.Panicf("Failed to add user")
 		}
 	}
-	var torrents model.Torrents
+	var torrents store.Torrents
 	for i := 0; i < torrentCount; i++ {
 		t := store.GenerateTestTorrent()
 		if err := s.Torrents.Add(t); err != nil {

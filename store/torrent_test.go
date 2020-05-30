@@ -1,4 +1,4 @@
-package model
+package store
 
 import (
 	"github.com/stretchr/testify/require"

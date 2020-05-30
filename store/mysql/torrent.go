@@ -9,7 +9,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -21,16 +20,15 @@ const (
 
 // TorrentStore implements the store.TorrentStore interface for mysql
 type TorrentStore struct {
-	db    *sqlx.DB
-	cache *store.TorrentCache
+	db *sqlx.DB
 }
 
-func (s *TorrentStore) Update(infoHash model.InfoHash, update model.TorrentUpdate) error {
+func (s *TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
 	panic("implement me")
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (s *TorrentStore) Sync(b map[model.InfoHash]model.TorrentStats) error {
+func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
 	const q = `
 		UPDATE 
 		    torrent
@@ -76,7 +74,7 @@ func (s *TorrentStore) Conn() interface{} {
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (s *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
+func (s *TorrentStore) WhiteListDelete(client store.WhiteListClient) error {
 	const q = `DELETE FROM whitelist WHERE client_prefix = ?`
 	if _, err := s.db.Exec(q, client.ClientPrefix); err != nil {
 		return errors.Wrap(err, "Failed to delete client whitelist")
@@ -85,7 +83,7 @@ func (s *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (s *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
+func (s *TorrentStore) WhiteListAdd(client store.WhiteListClient) error {
 	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES (:client_prefix, :client_name)`
 	if _, err := s.db.NamedExec(q, client); err != nil {
 		return errors.Wrap(err, "Failed to insert new whitelist entry")
@@ -94,8 +92,8 @@ func (s *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (s *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
-	var wl []model.WhiteListClient
+func (s *TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
+	var wl []store.WhiteListClient
 	const q = `SELECT * FROM whitelist`
 	if err := s.db.Select(&wl, q); err != nil {
 		return nil, errors.Wrap(err, "Failed to select client whitelists")
@@ -109,12 +107,8 @@ func (s *TorrentStore) Close() error {
 }
 
 // Get returns a torrent for the hash provided
-func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool) error {
+func (s *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
 	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
-	if err := s.cache.Get(t, hash, deletedOk); err == nil {
-		log.Debugf("Got cached torrent: %s", t.InfoHash.String())
-		return nil
-	}
 	err := s.db.Get(t, q, hash.Bytes())
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
@@ -122,7 +116,6 @@ func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool
 		}
 		return err
 	}
-	s.cache.Add(*t)
 	log.Debugf("Added torrent to cache (Get()): %s", t.InfoHash.String())
 	if t.IsDeleted && !deletedOk {
 		return consts.ErrInvalidInfoHash
@@ -131,20 +124,19 @@ func (s *TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool
 }
 
 // Add inserts a new torrent into the backing store
-func (s *TorrentStore) Add(t model.Torrent) error {
+func (s *TorrentStore) Add(t store.Torrent) error {
 	const q = `INSERT INTO torrent (info_hash, release_name) VALUES(?, ?)`
 	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName)
 	if err != nil {
 		return err
 	}
-	s.cache.Add(t)
 	log.Debugf("Added torrent to cache (Add()): %s", t.InfoHash.String())
 	return nil
 }
 
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
+func (s *TorrentStore) Delete(ih store.InfoHash, dropRow bool) error {
 	var err error
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
@@ -157,7 +149,6 @@ func (s *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 	if err != nil {
 		return err
 	}
-	s.cache.Delete(ih, dropRow)
 	return nil
 }
 
@@ -171,8 +162,7 @@ func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	}
 	db := sqlx.MustConnect(driverName, c.DSN())
 	return &TorrentStore{
-		db:    db,
-		cache: store.NewTorrentCache(true),
+		db: db,
 	}, nil
 }
 

@@ -1,4 +1,4 @@
-package model
+package store
 
 // User defines a basic user known to the tracker
 // All users are considered enabled if they exist. You must remove them from the

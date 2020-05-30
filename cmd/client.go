@@ -5,12 +5,13 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/leighmacdonald/mika/client"
 	"github.com/leighmacdonald/mika/config"
-	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -72,9 +73,9 @@ var torrentDeleteCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		c := newClient()
-		var ih model.InfoHash
+		var ih store.InfoHash
 		for _, hashString := range args {
-			if err := model.InfoHashFromString(&ih, hashString); err != nil {
+			if err := store.InfoHashFromString(&ih, hashString); err != nil {
 				log.Fatalf("Error trying to parse infohash %s: %s", hashString, err.Error())
 			}
 			if err := c.TorrentDelete(ih); err != nil {
@@ -102,13 +103,13 @@ var torrentAddFileCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		c := newClient()
-		var infoHash model.InfoHash
+		var infoHash store.InfoHash
 		for _, fileName := range args {
 			mi, err := metainfo.LoadFromFile(fileName)
 			if err != nil {
 				return
 			}
-			if err := model.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
+			if err := store.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
 				log.Fatalf(err.Error())
 			}
 			basename := filepath.Base(fileName)
@@ -142,13 +143,13 @@ var torrentAddCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		c := newClient()
-		var infoHash model.InfoHash
+		var infoHash store.InfoHash
 		for _, hashString := range args {
 			p := strings.SplitN(hashString, ":", 2)
 			if len(p) != 2 {
 				log.Fatalf(`Invalid format. Expected: <info_hash>:"release name"`)
 			}
-			if err := model.InfoHashFromString(&infoHash, p[0]); err != nil {
+			if err := store.InfoHashFromString(&infoHash, p[0]); err != nil {
 				log.Fatalf(err.Error())
 			}
 			if err := c.TorrentAdd(infoHash, p[1]); err != nil {
@@ -170,20 +171,29 @@ var userAddCmd = &cobra.Command{
 	Use:     "add",
 	Aliases: []string{"a"},
 	Short:   "Add a user to the tracker & store",
-	Args:    cobra.MaximumNArgs(1),
+	Args:    cobra.MaximumNArgs(2),
 	Long:    "Add a user to the tracker & store",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := newClient()
+		userId := cmd.Flag("id").Value.String()
+		if userId == "" {
+			log.Fatalf("Must set user id to positive integer")
+		}
+		idVal, err := strconv.ParseUint(userId, 10, 64)
+		if err != nil {
+			log.Fatalf("Must set user id to positive integer")
+		}
 		passkey := cmd.Flag("passkey").Value.String()
 		if passkey == "" {
 			passkey = util.NewPasskey()
 		}
-		var user model.User
+		var user store.User
 		user.Passkey = passkey
+		user.UserID = uint32(idVal)
 		if err := c.UserAdd(user); err != nil {
-			log.Errorf("Error adding user: %s", err.Error())
+			log.Fatalf("Error adding user: %s", err.Error())
 		}
-		log.Infof("Added user with passkey: %s", passkey)
+		log.Infof("Added user (%d) with passkey: %s", idVal, passkey)
 	},
 }
 
@@ -206,6 +216,7 @@ var userDeleteCmd = &cobra.Command{
 
 func init() {
 	userAddCmd.PersistentFlags().StringP("passkey", "p", "", "User Passkey")
+	userAddCmd.PersistentFlags().StringP("id", "u", "", "Your internal user ID")
 	userDeleteCmd.PersistentFlags().StringP("passkey", "p", "", "User Passkey")
 
 	torrentCmd.AddCommand(torrentAddCmd)

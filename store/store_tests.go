@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/stretchr/testify/require"
 	"log"
@@ -15,8 +14,8 @@ import (
 )
 
 // GenerateTestUser creates a peer using fake data. Used for testing.
-func GenerateTestUser() model.User {
-	return model.User{
+func GenerateTestUser() User {
+	return User{
 		UserID:          uint32(rand.Intn(10000)),
 		Passkey:         util.NewPasskey(),
 		IsDeleted:       false,
@@ -28,20 +27,20 @@ func GenerateTestUser() model.User {
 }
 
 // GenerateTestTorrent creates a torrent using fake data. Used for testing.
-func GenerateTestTorrent() model.Torrent {
+func GenerateTestTorrent() Torrent {
 	token, _ := util.GenRandomBytes(20)
-	var ih model.InfoHash
-	if err := model.InfoHashFromBytes(&ih, token); err != nil {
+	var ih InfoHash
+	if err := InfoHashFromBytes(&ih, token); err != nil {
 		log.Panicf("Failed to generate info_hash: %s", err.Error())
 	}
-	return model.NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)))
+	return NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)))
 }
 
 // GenerateTestPeer creates a peer using fake data for the provided user. Used for testing.
-func GenerateTestPeer() model.Peer {
+func GenerateTestPeer() Peer {
 	token, _ := util.GenRandomBytes(20)
-	ih := model.PeerIDFromString(string(token))
-	p := model.NewPeer(
+	ih := PeerIDFromString(string(token))
+	p := NewPeer(
 		uint32(rand.Intn(1000000)),
 		ih,
 		net.ParseIP("1.2.3.4"),
@@ -49,10 +48,10 @@ func GenerateTestPeer() model.Peer {
 	return p
 }
 
-func findPeer(swarm model.Swarm, p1 model.Peer) (model.Peer, error) {
+func findPeer(swarm Swarm, p1 Peer) (Peer, error) {
 	p, found := swarm.Peers[p1.PeerID]
 	if !found {
-		return model.Peer{}, errors.New("unknown peer")
+		return Peer{}, errors.New("unknown peer")
 	}
 	return p, nil
 }
@@ -62,7 +61,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 	torrentA := GenerateTestTorrent()
 	defer func() { _ = ts.Delete(torrentA.InfoHash, true) }()
 	require.NoError(t, ts.Add(torrentA))
-	swarm := model.NewSwarm()
+	swarm := NewSwarm()
 	for i := 0; i < 5; i++ {
 		p := GenerateTestPeer()
 		p.InfoHash = torrentA.InfoHash
@@ -86,21 +85,21 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 	if len(swarm.Peers) < 5 {
 		t.Fatalf("Invalid peer count")
 	}
-	var p1 model.Peer
+	var p1 Peer
 	for k := range swarm.Peers {
 		p1 = swarm.Peers[k]
 		break
 	}
 
-	ph := model.NewPeerHash(p1.InfoHash, p1.PeerID)
-	require.NoError(t, ps.Sync(map[model.PeerHash]model.PeerStats{
+	ph := NewPeerHash(p1.InfoHash, p1.PeerID)
+	require.NoError(t, ps.Sync(map[PeerHash]PeerStats{
 		ph: {
 			Uploaded:     10000,
 			Downloaded:   20000,
 			LastAnnounce: time.Now(),
 			Announces:    5,
 		},
-	}))
+	}, nil))
 	updatedPeers, err2 := ps.GetN(torrentA.InfoHash, 5)
 	require.NoError(t, err2)
 	p1Updated, _ := findPeer(updatedPeers, p1)
@@ -117,15 +116,15 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	torrentA := GenerateTestTorrent()
 	require.NoError(t, ts.Add(torrentA))
-	var fetchedTorrent model.Torrent
+	var fetchedTorrent Torrent
 	require.NoError(t, ts.Get(&fetchedTorrent, torrentA.InfoHash, false))
 	require.Equal(t, torrentA.InfoHash, fetchedTorrent.InfoHash)
 	require.Equal(t, torrentA.IsDeleted, fetchedTorrent.IsDeleted)
 	require.Equal(t, torrentA.IsEnabled, fetchedTorrent.IsEnabled)
 	require.NoError(t, ts.Delete(torrentA.InfoHash, true))
-	var deletedTorrent model.Torrent
+	var deletedTorrent Torrent
 	require.Equal(t, consts.ErrInvalidInfoHash, ts.Get(&deletedTorrent, torrentA.InfoHash, false))
-	wlClients := []model.WhiteListClient{
+	wlClients := []WhiteListClient{
 		{ClientPrefix: "UT", ClientName: "uTorrent"},
 		{ClientPrefix: "qT", ClientName: "QBittorrent"},
 	}
@@ -142,7 +141,7 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 
 // TestUserStore tests the user store for conformance to our interface
 func TestUserStore(t *testing.T, s UserStore) {
-	var users []model.User
+	var users []User
 	for i := 0; i < 5; i++ {
 		users = append(users, GenerateTestUser())
 	}
@@ -150,23 +149,23 @@ func TestUserStore(t *testing.T, s UserStore) {
 		t.Fatalf("Failed to setup users")
 	}
 	require.NoError(t, s.Add(users[0]))
-	var fetchedUserID model.User
-	var fetchedUserPasskey model.User
+	var fetchedUserID User
+	var fetchedUserPasskey User
 	require.NoError(t, s.GetByID(&fetchedUserID, users[0].UserID))
 	require.Equal(t, users[0], fetchedUserID)
 	require.NoError(t, s.GetByPasskey(&fetchedUserPasskey, users[0].Passkey))
 	require.Equal(t, users[0], fetchedUserPasskey)
 
-	batchUpdate := map[string]model.UserStats{
+	batchUpdate := map[string]UserStats{
 		users[0].Passkey: {
 			Uploaded:   1000,
 			Downloaded: 2000,
 			Announces:  10,
 		},
 	}
-	require.NoError(t, s.Sync(batchUpdate))
+	require.NoError(t, s.Sync(batchUpdate, nil))
 	time.Sleep(100 * time.Millisecond)
-	var updatedUser model.User
+	var updatedUser User
 	require.NoError(t, s.GetByPasskey(&updatedUser, users[0].Passkey))
 	require.Equal(t, uint64(1000)+users[0].Uploaded, updatedUser.Uploaded)
 	require.Equal(t, uint64(2000)+users[0].Downloaded, updatedUser.Downloaded)

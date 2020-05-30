@@ -11,7 +11,6 @@ package store
 
 import (
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	log "github.com/sirupsen/logrus"
 	"sync"
 )
@@ -72,43 +71,43 @@ func AddUserDriver(name string, driver UserDriver) {
 // To disable a user they MUST be deleted from the active user cache
 type UserStore interface {
 	// Add will add a new user to the backing store
-	Add(u model.User) error
+	Add(u User) error
 	// GetByPasskey returns a user matching the passkey
-	GetByPasskey(user *model.User, passkey string) error
+	GetByPasskey(user *User, passkey string) error
 	// GetByID returns a user matching the userId
-	GetByID(user *model.User, userID uint32) error
+	GetByID(user *User, userID uint32) error
 	// Delete removes a user from the backing store
-	Delete(user model.User) error
+	Delete(user User) error
 	// Update is used to change a known user
-	Update(user model.User, oldPasskey string) error
+	Update(user User, oldPasskey string) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// Sync batch updates the backing store with the new UserStats provided
-	Sync(b map[string]model.UserStats) error
+	Sync(b map[string]UserStats, cache *UserCache) error
 }
 
 // TorrentStore defines where we can store permanent torrent data
 // The backing drivers should always persist the data to disk
 type TorrentStore interface {
 	// Add adds a new torrent to the backing store
-	Add(t model.Torrent) error
+	Add(t Torrent) error
 	// Delete will mark a torrent as deleted in the backing store.
 	// If dropRow is true, it will permanently remove the torrent from the store
-	Delete(ih model.InfoHash, dropRow bool) error
+	Delete(ih InfoHash, dropRow bool) error
 	// Get returns the Torrent matching the infohash
-	Get(torrent *model.Torrent, hash model.InfoHash, deletedOk bool) error
+	Get(torrent *Torrent, hash InfoHash, deletedOk bool) error
 	// Update will update certain parameters within the torrent
-	Update(infoHash model.InfoHash, update model.TorrentUpdate) error
+	Update(infoHash InfoHash, update TorrentUpdate) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// WhiteListDelete removes a client from the global whitelist
-	WhiteListDelete(client model.WhiteListClient) error
+	WhiteListDelete(client WhiteListClient) error
 	// WhiteListAdd will insert a new client prefix into the allowed clients list
-	WhiteListAdd(client model.WhiteListClient) error
+	WhiteListAdd(client WhiteListClient) error
 	// WhiteListGetAll fetches all known whitelisted clients
-	WhiteListGetAll() ([]model.WhiteListClient, error)
+	WhiteListGetAll() ([]WhiteListClient, error)
 	// Sync batch updates the backing store with the new TorrentStats provided
-	Sync(b map[model.InfoHash]model.TorrentStats) error
+	Sync(b map[InfoHash]TorrentStats, cache *TorrentCache) error
 	// Conn returns the underlying connection, if any
 	Conn() interface{}
 }
@@ -118,19 +117,19 @@ type TorrentStore interface {
 // if its backed by something that can restore its in memory state, such as redis
 type PeerStore interface {
 	// Add inserts a peer into the active swarm for the torrent provided
-	Add(ih model.InfoHash, p model.Peer) error
+	Add(ih InfoHash, p Peer) error
 	// Delete will remove a user from a torrents swarm
-	Delete(ih model.InfoHash, p model.PeerID) error
+	Delete(ih InfoHash, p PeerID) error
 	// GetN will fetch peers for a torrents active swarm up to N users
-	GetN(ih model.InfoHash, limit int) (model.Swarm, error)
+	GetN(ih InfoHash, limit int) (Swarm, error)
 	// Get will fetch the peer from the swarm if it exists
-	Get(peer *model.Peer, ih model.InfoHash, id model.PeerID) error
+	Get(peer *Peer, ih InfoHash, id PeerID) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// Reap will loop through the peers removing any stale entries from active swarms
-	Reap()
+	Reap(cache *PeerCache)
 	// Sync batch updates the backing store with the new PeerStats provided
-	Sync(b map[model.PeerHash]model.PeerStats) error
+	Sync(b map[PeerHash]PeerStats, cache *PeerCache) error
 }
 
 // NewTorrentStore will attempt to initialize a TorrentStore using the driver name provided

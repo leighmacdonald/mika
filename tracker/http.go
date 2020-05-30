@@ -6,7 +6,7 @@ import (
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/toorop/gin-logrus"
@@ -100,13 +100,13 @@ func oops(ctx *gin.Context, errCode errCode) {
 // preFlightChecks ensures our user meets the requirements to make an authorized request
 // THis is used within the request handler itself and not as a middleware because of the
 // slightly higher cost of passing data in through the request context
-func preFlightChecks(usr *model.User, pk string, c *gin.Context, t *Tracker) bool {
+func preFlightChecks(usr *store.User, pk string, c *gin.Context, t *Tracker) bool {
 	// Check that the user is valid before parsing anything
 	if pk == "" {
 		oops(c, msgInvalidAuth)
 		return false
 	}
-	if err := t.Users.GetByPasskey(usr, pk); err != nil {
+	if err := t.UserGet(usr, pk); err != nil {
 		log.Debugf("Got invalid passkey")
 		oops(c, msgInvalidAuth)
 		return false

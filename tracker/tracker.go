@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
 	log "github.com/sirupsen/logrus"
@@ -21,11 +20,18 @@ type Tracker struct {
 	*sync.RWMutex
 	// ctx is the master context used in the tracker, children contexts must use
 	// this for their parent
-	ctx      context.Context
-	Torrents store.TorrentStore
-	Peers    store.PeerStore
-	Users    store.UserStore
-	Geodb    geo.Provider
+	ctx context.Context
+
+	Torrents      store.TorrentStore
+	TorrentsCache *store.TorrentCache
+
+	Users      store.UserStore
+	UsersCache *store.UserCache
+
+	Peers     store.PeerStore
+	PeerCache *store.PeerCache
+
+	Geodb geo.Provider
 	// GeodbEnabled will enable the lookup of location data for peers
 	GeodbEnabled bool
 	// Public if true means we dont require a passkey / authorized user
@@ -40,17 +46,20 @@ type Tracker struct {
 	BatchInterval  time.Duration
 	// MaxPeers is the max number of peers we send in an announce
 	MaxPeers        int
-	StateUpdateChan chan model.UpdateState
+	StateUpdateChan chan store.UpdateState
 	// Whitelist and whitelist lock
-	Whitelist map[string]model.WhiteListClient
+	Whitelist map[string]store.WhiteListClient
 }
 
 // Opts is used to configure tracker instances
 type Opts struct {
-	Torrents store.TorrentStore
-	Peers    store.PeerStore
-	Users    store.UserStore
-	Geodb    geo.Provider
+	Torrents            store.TorrentStore
+	Peers               store.PeerStore
+	Users               store.UserStore
+	TorrentCacheEnabled bool
+	UserCacheEnabled    bool
+	PeerCacheEnabled    bool
+	Geodb               geo.Provider
 	// GeodbEnabled will enable the lookup of location data for peers
 	// TODO the dummy provider is probably sufficient
 	GeodbEnabled bool
@@ -73,19 +82,22 @@ type Opts struct {
 // stores and default interval values
 func NewDefaultOpts() *Opts {
 	return &Opts{
-		Torrents:         memory.NewTorrentStore(),
-		Peers:            memory.NewPeerStore(),
-		Users:            memory.NewUserStore(),
-		Geodb:            &geo.DummyProvider{},
-		GeodbEnabled:     false,
-		Public:           false,
-		AutoRegister:     false,
-		AllowNonRoutable: false,
-		ReaperInterval:   time.Second * 300,
-		AnnInterval:      time.Second * 60,
-		AnnIntervalMin:   time.Second * 30,
-		BatchInterval:    time.Second * 60,
-		MaxPeers:         100,
+		Torrents:            memory.NewTorrentStore(),
+		Peers:               memory.NewPeerStore(),
+		Users:               memory.NewUserStore(),
+		UserCacheEnabled:    false,
+		TorrentCacheEnabled: false,
+		PeerCacheEnabled:    false,
+		Geodb:               &geo.DummyProvider{},
+		GeodbEnabled:        false,
+		Public:              false,
+		AutoRegister:        false,
+		AllowNonRoutable:    false,
+		ReaperInterval:      time.Second * 300,
+		AnnInterval:         time.Second * 60,
+		AnnIntervalMin:      time.Second * 30,
+		BatchInterval:       time.Second * 60,
+		MaxPeers:            100,
 	}
 }
 
@@ -96,7 +108,7 @@ func (t *Tracker) PeerReaper() {
 	for {
 		select {
 		case <-peerTimer.C:
-			t.Peers.Reap()
+			t.Peers.Reap(t.PeerCache)
 			// We use a timer here so that config updates for the interval get applied
 			// on the next tick
 			peerTimer.Reset(t.ReaperInterval)
@@ -111,59 +123,59 @@ func (t *Tracker) PeerReaper() {
 // No locking required for these data sets
 func (t *Tracker) StatWorker() {
 	syncTimer := time.NewTimer(t.BatchInterval)
-	userBatch := make(map[string]model.UserStats)
-	peerBatch := make(map[model.PeerHash]model.PeerStats)
-	torrentBatch := make(map[model.InfoHash]model.TorrentStats)
+	userBatch := make(map[string]store.UserStats)
+	peerBatch := make(map[store.PeerHash]store.PeerStats)
+	torrentBatch := make(map[store.InfoHash]store.TorrentStats)
 	for {
 		select {
 		case <-syncTimer.C:
 			// Copy the maps to pass into the go routine call. At the same time deleting
 			// the existing values
-			userBatchCopy := make(map[string]model.UserStats)
+			userBatchCopy := make(map[string]store.UserStats)
 			for k, v := range userBatch {
 				userBatchCopy[k] = v
 				delete(userBatch, k)
 			}
 
-			peerBatchCopy := make(map[model.PeerHash]model.PeerStats)
+			peerBatchCopy := make(map[store.PeerHash]store.PeerStats)
 			for k, v := range peerBatch {
 				peerBatchCopy[k] = v
 				delete(peerBatch, k)
 			}
 
-			torrentBatchCopy := make(map[model.InfoHash]model.TorrentStats)
+			torrentBatchCopy := make(map[store.InfoHash]store.TorrentStats)
 			for k, v := range torrentBatch {
 				torrentBatchCopy[k] = v
 				delete(torrentBatch, k)
 			}
 			// Send current copies of data to stores
-			if err := t.Users.Sync(userBatchCopy); err != nil {
+			if err := t.Users.Sync(userBatchCopy, t.UsersCache); err != nil {
 				log.Errorf(err.Error())
 			}
 
-			if err := t.Peers.Sync(peerBatchCopy); err != nil {
+			if err := t.Peers.Sync(peerBatchCopy, t.PeerCache); err != nil {
 				log.Errorf(err.Error())
 			}
 
-			if err := t.Torrents.Sync(torrentBatchCopy); err != nil {
+			if err := t.Torrents.Sync(torrentBatchCopy, t.TorrentsCache); err != nil {
 				log.Errorf(err.Error())
 			}
 			syncTimer.Reset(t.BatchInterval)
 		case u := <-t.StateUpdateChan:
 			ub, found := userBatch[u.Passkey]
 			if !found {
-				ub = model.UserStats{}
+				ub = store.UserStats{}
 			}
 			tb, found := torrentBatch[u.InfoHash]
 			if !found {
-				tb = model.TorrentStats{}
+				tb = store.TorrentStats{}
 			}
-			pHash := model.NewPeerHash(u.InfoHash, u.PeerID)
+			pHash := store.NewPeerHash(u.InfoHash, u.PeerID)
 			pb, found := peerBatch[pHash]
 			if !found {
-				pb = model.PeerStats{}
+				pb = store.PeerStats{}
 			}
-			var torrent model.Torrent
+			var torrent store.Torrent
 			// Keep deleted true so that we can record any buffered stat updates from
 			// the client even though we deleted/disabled the torrent itself.
 			if err := t.Torrents.Get(&torrent, u.InfoHash, true); err != nil {
@@ -225,7 +237,7 @@ func (t *Tracker) StatWorker() {
 
 // New creates a new Tracker instance with configured backend stores
 func New(ctx context.Context, opts *Opts) (*Tracker, error) {
-	return &Tracker{
+	t := &Tracker{
 		RWMutex:          &sync.RWMutex{},
 		ctx:              ctx,
 		Torrents:         opts.Torrents,
@@ -239,9 +251,19 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		AnnIntervalMin:   opts.AnnIntervalMin,
 		BatchInterval:    opts.BatchInterval,
 		MaxPeers:         opts.MaxPeers,
-		StateUpdateChan:  make(chan model.UpdateState, 1000),
-		Whitelist:        make(map[string]model.WhiteListClient),
-	}, nil
+		StateUpdateChan:  make(chan store.UpdateState, 1000),
+		Whitelist:        make(map[string]store.WhiteListClient),
+	}
+	if opts.TorrentCacheEnabled {
+		t.TorrentsCache = store.NewTorrentCache()
+	}
+	if opts.UserCacheEnabled {
+		t.UsersCache = store.NewUserCache()
+	}
+	if opts.PeerCacheEnabled {
+		t.PeerCache = store.NewPeerCache()
+	}
+	return t, nil
 }
 
 // NewTestTracker sets up a tracker with fake data for testing
@@ -282,7 +304,7 @@ func NewTestTracker() (*Tracker, error) {
 // LoadWhitelist will read the client white list from the tracker store and
 // load it into memory for quick lookups.
 func (t *Tracker) LoadWhitelist() error {
-	whitelist := make(map[string]model.WhiteListClient)
+	whitelist := make(map[string]store.WhiteListClient)
 	wl, err4 := t.Torrents.WhiteListGetAll()
 	if err4 != nil {
 		log.Warnf("Whitelist empty, all clients are allowed")
@@ -294,6 +316,76 @@ func (t *Tracker) LoadWhitelist() error {
 	t.Lock()
 	t.Whitelist = whitelist
 	t.Unlock()
+	return nil
+}
+
+func (t *Tracker) TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+	cached := false
+	if t.TorrentsCache != nil {
+		cached = t.TorrentsCache.Get(torrent, hash)
+		if cached {
+			if torrent.IsDeleted && !deletedOk {
+				return consts.ErrInvalidInfoHash
+			}
+			return nil
+		}
+	}
+	if err := t.Torrents.Get(torrent, hash, deletedOk); err != nil {
+		return err
+	}
+	if t.TorrentsCache != nil && !cached {
+		t.TorrentsCache.Set(*torrent)
+	}
+	return nil
+}
+
+func (t *Tracker) UserGet(user *store.User, passkey string) error {
+	cached := false
+	if t.UsersCache != nil {
+		cached = t.UsersCache.Get(user, passkey)
+		if cached {
+			return nil
+		}
+	}
+	if err := t.Users.GetByPasskey(user, passkey); err != nil {
+		return err
+	}
+	if t.UsersCache != nil && !cached {
+		t.UsersCache.Set(*user)
+	}
+	return nil
+}
+
+func (t *Tracker) UserAdd(user store.User) error {
+	if err := t.Users.Add(user); err != nil {
+		return err
+	}
+	if t.UsersCache != nil {
+		t.UsersCache.Set(user)
+	}
+	return nil
+}
+
+func (t *Tracker) PeerGet(peer *store.Peer, infoHash store.InfoHash, peerID store.PeerID) error {
+	if t.PeerCache != nil && t.PeerCache.Get(peer, infoHash, peerID) {
+		return nil
+	}
+	if err := t.Peers.Get(peer, infoHash, peerID); err != nil {
+		return err
+	}
+	if t.PeerCache != nil {
+		t.PeerCache.Set(infoHash, *peer)
+	}
+	return nil
+}
+
+func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
+	if err := t.Peers.Add(infoHash, peer); err != nil {
+		return err
+	}
+	if t.PeerCache != nil {
+		t.PeerCache.Set(infoHash, peer)
+	}
 	return nil
 }
 

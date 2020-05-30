@@ -1,4 +1,4 @@
-package model
+package store
 
 import (
 	"database/sql/driver"
@@ -152,12 +152,12 @@ func (swarm Swarm) Add(p Peer) {
 }
 
 // UpdatePeer will update a swarm member with new stats
-func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) {
+func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (Peer, bool) {
 	swarm.Lock()
 	peer, ok := swarm.Peers[peerID]
 	if !ok {
 		swarm.Unlock()
-		return
+		return peer, false
 	}
 	peer.Uploaded += stats.Uploaded
 	peer.Downloaded += stats.Downloaded
@@ -166,14 +166,16 @@ func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) {
 	peer.AnnounceLast = stats.LastAnnounce
 	swarm.Peers[peerID] = peer
 	swarm.Unlock()
+	return peer, true
 }
 
 // ReapExpired will delete any peers from the swarm that are considered expired
-func (swarm Swarm) ReapExpired() {
+func (swarm Swarm) ReapExpired(infoHash InfoHash, cache *PeerCache) {
 	swarm.Lock()
 	for k, peer := range swarm.Peers {
 		if peer.Expired() {
 			delete(swarm.Peers, k)
+			cache.Delete(infoHash, peer.PeerID)
 		}
 	}
 	swarm.Unlock()

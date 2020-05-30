@@ -12,7 +12,6 @@ import (
 	"github.com/leighmacdonald/mika/client"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -40,12 +39,12 @@ type TorrentStore struct {
 	*client.AuthedClient
 }
 
-func (ts TorrentStore) Update(infoHash model.InfoHash, update model.TorrentUpdate) error {
+func (ts TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
 	panic("implement me")
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
+func (ts TorrentStore) Sync(_ map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
 	panic("implement me")
 }
 
@@ -55,7 +54,7 @@ func (ts TorrentStore) Conn() interface{} {
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (ts TorrentStore) WhiteListDelete(wlc model.WhiteListClient) error {
+func (ts TorrentStore) WhiteListDelete(wlc store.WhiteListClient) error {
 	_, err := ts.Exec(client.Opts{
 		Method: "DELETE",
 		Path:   fmt.Sprintf("/api/whitelist/%s", wlc.ClientPrefix),
@@ -67,7 +66,7 @@ func (ts TorrentStore) WhiteListDelete(wlc model.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (ts TorrentStore) WhiteListAdd(wlc model.WhiteListClient) error {
+func (ts TorrentStore) WhiteListAdd(wlc store.WhiteListClient) error {
 	_, err := ts.Exec(client.Opts{
 		Method: "POST",
 		Path:   "/api/whitelist",
@@ -80,8 +79,8 @@ func (ts TorrentStore) WhiteListAdd(wlc model.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
-	var wl []model.WhiteListClient
+func (ts TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
+	var wl []store.WhiteListClient
 	_, err := ts.Exec(client.Opts{
 		Method: "GET",
 		Path:   "/api/whitelist",
@@ -94,7 +93,7 @@ func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 }
 
 // Add adds a new torrent to the HTTP API backing store
-func (ts TorrentStore) Add(t model.Torrent) error {
+func (ts TorrentStore) Add(t store.Torrent) error {
 	_, err := ts.Exec(client.Opts{
 		Method: "POST",
 		Path:   "/api/torrent",
@@ -105,7 +104,7 @@ func (ts TorrentStore) Add(t model.Torrent) error {
 
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
+func (ts TorrentStore) Delete(ih store.InfoHash, dropRow bool) error {
 	if dropRow {
 		_, err := ts.Exec(client.Opts{
 			Method: "DELETE",
@@ -123,7 +122,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool) error {
+func (ts TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
 	resp, err := ts.Exec(client.Opts{
 		Method: "GET",
 		Path:   fmt.Sprintf("/api/torrent/%s", hash.String()),
@@ -151,8 +150,8 @@ type PeerStore struct {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
-	rb := make(map[string]model.PeerStats)
+func (ps PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
+	rb := make(map[string]store.PeerStats)
 	for k, v := range batch {
 		rb[k.String()] = v
 	}
@@ -165,12 +164,12 @@ func (ps PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps PeerStore) Reap() {
+func (ps PeerStore) Reap(cache *store.PeerCache) {
 	panic("implement me")
 }
 
 // Add inserts a peer into the active swarm for the torrent provided
-func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
+func (ps PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 	_, err := ps.Exec(client.Opts{
 		Method: "POST",
 		Path:   fmt.Sprintf("/api/peer/create/%s", ih.String()),
@@ -180,12 +179,12 @@ func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps PeerStore) Get(_ *model.Peer, _ model.InfoHash, _ model.PeerID) error {
+func (ps PeerStore) Get(_ *store.Peer, _ store.InfoHash, _ store.PeerID) error {
 	panic("implement me")
 }
 
 // Delete will remove a user from a torrents swarm
-func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
+func (ps PeerStore) Delete(ih store.InfoHash, p store.PeerID) error {
 	_, err := ps.Exec(client.Opts{
 		Method: "DELETE",
 		Path:   fmt.Sprintf("/api/peers/delete/%s/%s", ih.String(), p.String()),
@@ -194,9 +193,9 @@ func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 }
 
 // GetN will fetch peers for a torrents active swarm up to N users
-func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
-	swarm := model.NewSwarm()
-	var peers []model.Peer
+func (ps PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
+	swarm := store.NewSwarm()
+	var peers []store.Peer
 	_, err := ps.Exec(client.Opts{
 		Method: "GET",
 		Path:   fmt.Sprintf("/api/peers/swarm/%s/%d", ih.String(), limit),
@@ -252,7 +251,7 @@ type UserStore struct {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (u *UserStore) Sync(batch map[string]model.UserStats) error {
+func (u *UserStore) Sync(batch map[string]store.UserStats, cache *store.UserCache) error {
 	_, err := u.Exec(client.Opts{
 		Method: "POST",
 		Path:   "/api/user/sync",
@@ -262,7 +261,7 @@ func (u *UserStore) Sync(batch map[string]model.UserStats) error {
 }
 
 // Add will add a new user to the backing store
-func (u *UserStore) Add(user model.User) error {
+func (u *UserStore) Add(user store.User) error {
 	_, err := u.Exec(client.Opts{
 		Method: "POST",
 		Path:   "/api/user",
@@ -279,7 +278,7 @@ func (u *UserStore) Add(user model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
+func (u *UserStore) GetByPasskey(usr *store.User, passkey string) error {
 	if len(passkey) != 20 {
 		return consts.ErrUnauthorized
 	}
@@ -300,7 +299,7 @@ func (u *UserStore) GetByPasskey(usr *model.User, passkey string) error {
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(user *model.User, userID uint32) error {
+func (u *UserStore) GetByID(user *store.User, userID uint32) error {
 	if userID == 0 {
 		return consts.ErrUnauthorized
 	}
@@ -319,12 +318,12 @@ func (u *UserStore) GetByID(user *model.User, userID uint32) error {
 }
 
 // Update updates a user from the backing store
-func (u *UserStore) Update(user model.User, oldPasskey string) error {
+func (u *UserStore) Update(user store.User, oldPasskey string) error {
 	panic("implement me")
 }
 
 // Delete removes a user from the backing store
-func (u *UserStore) Delete(_ model.User) error {
+func (u *UserStore) Delete(_ store.User) error {
 	panic("implement me")
 }
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/chihaya/bencode"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -39,9 +38,9 @@ func performRequest(r http.Handler, method, path string, body interface{}, recv 
 
 type testReq struct {
 	PK         string
-	Ih         model.InfoHash
+	Ih         store.InfoHash
 	IhStr      string
-	PID        model.PeerID
+	PID        store.PeerID
 	PIDStr     string
 	IP         string
 	Port       string
@@ -78,7 +77,7 @@ func (t testReq) ToValues() url.Values {
 
 type scrapeReq struct {
 	PK         string
-	InfoHashes []model.InfoHash
+	InfoHashes []store.InfoHash
 }
 
 func (r scrapeReq) ToValues() url.Values {
@@ -113,12 +112,12 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 	rh := NewBitTorrentHandler(tkr)
 
 	require.NoError(t, tkr.Torrents.Add(torrent0), "Failed to add test torrent")
-	for _, u := range []model.User{user0, user1} {
+	for _, u := range []store.User{user0, user1} {
 		require.NoError(t, tkr.Users.Add(u), "Failed to add test user")
 	}
 	require.NoError(t, tkr.Peers.Add(torrent0.InfoHash, leecher0))
 	require.NoError(t, tkr.Peers.Add(torrent0.InfoHash, seeder0))
-	require.NoError(t, tkr.Torrents.Sync(map[model.InfoHash]model.TorrentStats{
+	require.NoError(t, tkr.Torrents.Sync(map[store.InfoHash]store.TorrentStats{
 		torrent0.InfoHash: {
 			Seeders:    1,
 			Leechers:   1,
@@ -127,12 +126,12 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 			Downloaded: 0,
 			Announces:  2,
 		},
-	}))
+	}, nil))
 
 	scrapes := []sr{{
 		req: scrapeReq{
 			PK:         user0.Passkey,
-			InfoHashes: []model.InfoHash{torrent0.InfoHash}},
+			InfoHashes: []store.InfoHash{torrent0.InfoHash}},
 		exp: scrapeExpect{status: msgOk}},
 	}
 
@@ -168,7 +167,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 	rh := NewBitTorrentHandler(tkr)
 
 	require.NoError(t, tkr.Torrents.Add(torrent0), "Failed to add test torrent")
-	for _, u := range []model.User{user0, user1} {
+	for _, u := range []store.User{user0, user1} {
 		require.NoError(t, tkr.Users.Add(u), "Failed to add test user")
 	}
 
@@ -292,7 +291,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			fmt.Sprintf("%s (%d)", responseStringMap[errCode(w.Code)], i))
 		if w.Code == 200 {
 			// Additional validations for ok announces
-			var peer model.Peer
+			var peer store.Peer
 			if a.state.HasPeer {
 				// If we expect a peer (!stopped event)
 				require.NoError(t, tkr.Peers.Get(&peer, a.req.Ih, a.req.PID), "Failed to get peer (%d)", i)
@@ -306,7 +305,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			}
 			swarm, err := tkr.Peers.GetN(torrent0.InfoHash, 1000)
 			require.NoError(t, err, "Failed to fetch all peers (%d)", i)
-			var torrent model.Torrent
+			var torrent store.Torrent
 			require.NoError(t, tkr.Torrents.Get(&torrent, torrent0.InfoHash, false))
 			require.Equal(t, a.state.SwarmSize, len(swarm.Peers), "Invalid swarm size (%d)", i)
 			require.Equal(t, a.state.Seeders, torrent.Seeders, "Invalid seeder count (%d)", i)

@@ -6,7 +6,6 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
@@ -33,15 +32,15 @@ func whiteListKey(prefix string) string {
 	return fmt.Sprintf("%s%s", prefixWhitelist, prefix)
 }
 
-func torrentKey(t model.InfoHash) string {
+func torrentKey(t store.InfoHash) string {
 	return fmt.Sprintf("%s:%s", prefixTorrent, t.String())
 }
 
-func torrentPeersKey(t model.InfoHash) string {
+func torrentPeersKey(t store.InfoHash) string {
 	return fmt.Sprintf("%s:%s:*", prefixPeer, t.String())
 }
 
-func peerKey(t model.InfoHash, p model.PeerID) string {
+func peerKey(t store.InfoHash, p store.PeerID) string {
 	return fmt.Sprintf("%s:%s:%s", prefixPeer, t.String(), p.String())
 }
 
@@ -60,7 +59,7 @@ type UserStore struct {
 
 // Sync batch updates the backing store with the new UserStats provided
 // TODO leverage cache layer so we can pipeline the updates w/o query first
-func (us UserStore) Sync(b map[string]model.UserStats) error {
+func (us UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
 	for passkey, stats := range b {
 		old, err := us.client.HGetAll(userKey(passkey)).Result()
 		if err != nil {
@@ -90,7 +89,7 @@ func (us UserStore) Sync(b map[string]model.UserStats) error {
 	return nil
 }
 
-func userMap(u model.User) map[string]interface{} {
+func userMap(u store.User) map[string]interface{} {
 	return map[string]interface{}{
 		"user_id":          u.UserID,
 		"passkey":          u.Passkey,
@@ -104,7 +103,7 @@ func userMap(u model.User) map[string]interface{} {
 
 // Add inserts a user into redis via at the string provided by the userKey function
 // This additionally sets the passkey->user_id mapping
-func (us UserStore) Add(u model.User) error {
+func (us UserStore) Add(u store.User) error {
 	pipe := us.client.TxPipeline()
 	pipe.HSet(userKey(u.Passkey), userMap(u))
 	pipe.Set(userIDKey(u.UserID), u.Passkey, 0)
@@ -115,7 +114,7 @@ func (us UserStore) Add(u model.User) error {
 }
 
 // GetByPasskey returns the hash values set of the passkey and maps it to a User struct
-func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
+func (us UserStore) GetByPasskey(user *store.User, passkey string) error {
 	v, err := us.client.HGetAll(userKey(passkey)).Result()
 	if err != nil {
 		return errors.Wrap(err, "Failed to retrieve user by passkey")
@@ -134,7 +133,7 @@ func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
 }
 
 // GetByID will query the passkey:user_id index for the passkey and return the matching user
-func (us UserStore) GetByID(user *model.User, userID uint32) error {
+func (us UserStore) GetByID(user *store.User, userID uint32) error {
 	passkey, err := us.client.Get(userIDKey(userID)).Result()
 	if err != nil {
 		log.Warnf("Failed to lookup user by ID, no passkey mapped: %d", userID)
@@ -147,7 +146,7 @@ func (us UserStore) GetByID(user *model.User, userID uint32) error {
 }
 
 // Delete drops a user from redis.
-func (us UserStore) Delete(user model.User) error {
+func (us UserStore) Delete(user store.User) error {
 	if err := us.client.Del(userKey(user.Passkey)).Err(); err != nil {
 		return errors.Wrap(err, "Could not remove user from store")
 	}
@@ -157,7 +156,7 @@ func (us UserStore) Delete(user model.User) error {
 	return nil
 }
 
-func (us UserStore) Update(user model.User, oldPasskey string) error {
+func (us UserStore) Update(user store.User, oldPasskey string) error {
 	passkey := user.Passkey
 	if oldPasskey != "" {
 		passkey = oldPasskey
@@ -189,12 +188,12 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
-func (ts *TorrentStore) Update(infoHash model.InfoHash, update model.TorrentUpdate) error {
+func (ts *TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
 	panic("implement me")
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts *TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
+func (ts *TorrentStore) Sync(_ map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
 	panic("implement me")
 }
 
@@ -204,7 +203,7 @@ func (ts *TorrentStore) Conn() interface{} {
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
+func (ts *TorrentStore) WhiteListDelete(client store.WhiteListClient) error {
 	res, err := ts.client.Del(whiteListKey(client.ClientPrefix)).Result()
 	if err != nil {
 		return errors.Wrap(err, "Failed to remove whitelisted client")
@@ -216,7 +215,7 @@ func (ts *TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
+func (ts *TorrentStore) WhiteListAdd(client store.WhiteListClient) error {
 	valueMap := map[string]interface{}{
 		"client_prefix": client.ClientPrefix,
 		"client_name":   client.ClientName,
@@ -229,18 +228,18 @@ func (ts *TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
+func (ts *TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
 	prefixes, err := ts.client.Keys(fmt.Sprintf("%s*", prefixWhitelist)).Result()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch whitelist keys")
 	}
-	var wl []model.WhiteListClient
+	var wl []store.WhiteListClient
 	for _, prefix := range prefixes {
 		valueMap, err := ts.client.HGetAll(whiteListKey(prefix)).Result()
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to fetch whitelist value for: %s", whiteListKey(prefix))
 		}
-		wl = append(wl, model.WhiteListClient{
+		wl = append(wl, store.WhiteListClient{
 			ClientPrefix: valueMap["client_prefix"],
 			ClientName:   valueMap["client_name"],
 		})
@@ -249,7 +248,7 @@ func (ts *TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 }
 
 // Add adds a new torrent to the redis backing store
-func (ts *TorrentStore) Add(t model.Torrent) error {
+func (ts *TorrentStore) Add(t store.Torrent) error {
 	err := ts.client.HSet(torrentKey(t.InfoHash), map[string]interface{}{
 		"release_name":     t.ReleaseName,
 		"total_completed":  t.TotalCompleted,
@@ -270,7 +269,7 @@ func (ts *TorrentStore) Add(t model.Torrent) error {
 
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (ts *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
+func (ts *TorrentStore) Delete(ih store.InfoHash, dropRow bool) error {
 	if dropRow {
 		if err := ts.client.Del(torrentKey(ih)).Err(); err != nil {
 			return errors.Wrap(err, "Could not remove torrent from store")
@@ -284,7 +283,7 @@ func (ts *TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk bool) error {
+func (ts *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
 	v, err := ts.client.HGetAll(torrentKey(hash)).Result()
 	if err != nil {
 		return err
@@ -293,8 +292,8 @@ func (ts *TorrentStore) Get(t *model.Torrent, hash model.InfoHash, deletedOk boo
 	if !found {
 		return consts.ErrInvalidInfoHash
 	}
-	var infoHash model.InfoHash
-	if err := model.InfoHashFromHex(&infoHash, ihStr); err != nil {
+	var infoHash store.InfoHash
+	if err := store.InfoHashFromHex(&infoHash, ihStr); err != nil {
 		return errors.Wrap(err, "Failed to decode info_hash")
 	}
 	isDeleted := util.StringToBool(v["is_deleted"], false)
@@ -328,7 +327,7 @@ type PeerStore struct {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps *PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
+func (ps *PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
 	pipe := ps.client.Pipeline()
 	for ph, stats := range batch {
 		k := peerKey(ph.InfoHash(), ph.PeerID())
@@ -345,12 +344,12 @@ func (ps *PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps *PeerStore) Reap() {
+func (ps *PeerStore) Reap(cache *store.PeerCache) {
 	log.Debugf("Implement reaping peers..")
 }
 
 // Add inserts a peer into the active swarm for the torrent provided
-func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
+func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
 		"speed_up":       p.SpeedUP,
 		"speed_dn":       p.SpeedDN,
@@ -385,7 +384,7 @@ func (ps *PeerStore) findKeys(prefix string) []string {
 
 // Update will sync any new peer data with the backing store
 // Note that this OVERWRITES the values, doesnt add
-func (ps *PeerStore) Update(ih model.InfoHash, p model.Peer) error {
+func (ps *PeerStore) Update(ih store.InfoHash, p store.Peer) error {
 	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
 		"speed_up":       p.SpeedUP,
 		"speed_dn":       p.SpeedDN,
@@ -406,12 +405,12 @@ func (ps *PeerStore) Update(ih model.InfoHash, p model.Peer) error {
 }
 
 // Delete will remove a user from a torrents swarm
-func (ps *PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
+func (ps *PeerStore) Delete(ih store.InfoHash, p store.PeerID) error {
 	return ps.client.Del(peerKey(ih, p)).Err()
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps *PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) error {
+func (ps *PeerStore) Get(p *store.Peer, ih store.InfoHash, peerID store.PeerID) error {
 	v, err := ps.client.HGetAll(peerKey(ih, peerID)).Result()
 	if err != nil {
 		return err
@@ -423,7 +422,7 @@ func (ps *PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) 
 	return nil
 }
 
-func mapPeerValues(p *model.Peer, v map[string]string) {
+func mapPeerValues(p *store.Peer, v map[string]string) {
 	p.SpeedUP = util.StringToUInt32(v["speed_up"], 0)
 	p.SpeedDN = util.StringToUInt32(v["speed_dn"], 0)
 	p.SpeedUPMax = util.StringToUInt32(v["speed_dn_max"], 0)
@@ -437,14 +436,14 @@ func mapPeerValues(p *model.Peer, v map[string]string) {
 	p.Port = util.StringToUInt16(v["addr_port"], 0)
 	p.AnnounceLast = util.StringToTime(v["last_announce"])
 	p.AnnounceFirst = util.StringToTime(v["first_announce"])
-	p.PeerID = model.PeerIDFromString(v["peer_id"])
+	p.PeerID = store.PeerIDFromString(v["peer_id"])
 	p.Location = geo.LatLongFromString(v["location"])
 	p.UserID = util.StringToUInt32(v["user_id"], 0)
 }
 
 // GetN will fetch peers for a torrents active swarm up to N users
-func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
-	swarm := model.NewSwarm()
+func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
+	swarm := store.NewSwarm()
 	for i, key := range ps.findKeys(torrentPeersKey(ih)) {
 		if i == limit {
 			break
@@ -453,7 +452,7 @@ func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		if err != nil {
 			return swarm, errors.Wrap(err, "Error trying to GetN")
 		}
-		var p model.Peer
+		var p store.Peer
 		mapPeerValues(&p, v)
 		swarm.Peers[p.PeerID] = p
 	}

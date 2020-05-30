@@ -3,7 +3,7 @@ package client
 import (
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -22,7 +22,7 @@ func New(host string, authKey string) *Client {
 }
 
 // TorrentDelete will delete the torrent matching the info_hash provided
-func (c *Client) TorrentDelete(ih model.InfoHash) error {
+func (c *Client) TorrentDelete(ih store.InfoHash) error {
 	_, err := c.Exec(Opts{
 		Method: "DELETE",
 		Path:   fmt.Sprintf("/torrent/%s", ih.String()),
@@ -31,7 +31,7 @@ func (c *Client) TorrentDelete(ih model.InfoHash) error {
 }
 
 // TorrentAdd add a new info_hash and associated name to be tracked
-func (c *Client) TorrentAdd(ih model.InfoHash, name string) error {
+func (c *Client) TorrentAdd(ih store.InfoHash, name string) error {
 	resp, err := c.Exec(Opts{
 		Method: "POST",
 		Path:   "/torrent",
@@ -58,7 +58,7 @@ func (c *Client) UserDelete(passkey string) error {
 }
 
 // UserAdd creates a new user with the passkey provided
-func (c *Client) UserAdd(user model.User) error {
+func (c *Client) UserAdd(user store.User) error {
 	if !user.Valid() {
 		return errors.New("Invalid user model")
 	}

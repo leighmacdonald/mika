@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -25,12 +24,12 @@ type UserStore struct {
 	ctx context.Context
 }
 
-func (us UserStore) Update(user model.User, oldPasskey string) error {
+func (us UserStore) Update(user store.User, oldPasskey string) error {
 	panic("implement me")
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (us UserStore) Sync(batch map[string]model.UserStats) error {
+func (us UserStore) Sync(batch map[string]store.UserStats, cache *store.UserCache) error {
 	const txName = "userSync"
 	const q = `
 		UPDATE 
@@ -66,7 +65,7 @@ func (us UserStore) Sync(batch map[string]model.UserStats) error {
 }
 
 // Add will add a new user to the backing store
-func (us UserStore) Add(user model.User) error {
+func (us UserStore) Add(user store.User) error {
 	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
 	const q = `
@@ -86,7 +85,7 @@ func (us UserStore) Add(user model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
+func (us UserStore) GetByPasskey(user *store.User, passkey string) error {
 	const q = `
 		SELECT 
 		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
@@ -105,7 +104,7 @@ func (us UserStore) GetByPasskey(user *model.User, passkey string) error {
 }
 
 // GetByID returns a user matching the userId
-func (us UserStore) GetByID(user *model.User, userID uint32) error {
+func (us UserStore) GetByID(user *store.User, userID uint32) error {
 	const q = `
 		SELECT 
 		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
@@ -124,7 +123,7 @@ func (us UserStore) GetByID(user *model.User, userID uint32) error {
 }
 
 // Delete removes a user from the backing store
-func (us UserStore) Delete(user model.User) error {
+func (us UserStore) Delete(user store.User) error {
 	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
@@ -151,12 +150,12 @@ type TorrentStore struct {
 	ctx context.Context
 }
 
-func (ts TorrentStore) Update(infoHash model.InfoHash, update model.TorrentUpdate) error {
+func (ts TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
 	panic("implement me")
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts TorrentStore) Sync(_ map[model.InfoHash]model.TorrentStats) error {
+func (ts TorrentStore) Sync(_ map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
 	panic("implement me")
 }
 
@@ -166,7 +165,7 @@ func (ts TorrentStore) Conn() interface{} {
 }
 
 // Add inserts a new torrent into the backing store
-func (ts TorrentStore) Add(t model.Torrent) error {
+func (ts TorrentStore) Add(t store.Torrent) error {
 	const q = `INSERT INTO torrent (info_hash, release_name) VALUES($1::bytea, $2)`
 	//log.Println(t.InfoHash.Bytes())
 	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
@@ -183,7 +182,7 @@ func (ts TorrentStore) Add(t model.Torrent) error {
 
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
+func (ts TorrentStore) Delete(ih store.InfoHash, dropRow bool) error {
 	const dropQ = `DELETE FROM torrent WHERE info_hash = $1`
 	const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = $1`
 	var query string
@@ -205,7 +204,7 @@ func (ts TorrentStore) Delete(ih model.InfoHash, dropRow bool) error {
 }
 
 // Get returns a torrent for the hash provided
-func (ts TorrentStore) Get(t *model.Torrent, ih model.InfoHash, deletedOk bool) error {
+func (ts TorrentStore) Get(t *store.Torrent, ih store.InfoHash, deletedOk bool) error {
 	const q = `
 		SELECT 
 			info_hash::bytea, release_name, total_uploaded, total_downloaded, total_completed, 
@@ -251,7 +250,7 @@ func (ts TorrentStore) Close() error {
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
+func (ts TorrentStore) WhiteListDelete(client store.WhiteListClient) error {
 	const q = `DELETE FROM whitelist WHERE client_prefix = $1`
 	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
@@ -266,7 +265,7 @@ func (ts TorrentStore) WhiteListDelete(client model.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
+func (ts TorrentStore) WhiteListAdd(client store.WhiteListClient) error {
 	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES ($1, $2)`
 	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
@@ -281,8 +280,8 @@ func (ts TorrentStore) WhiteListAdd(client model.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
-	var wl []model.WhiteListClient
+func (ts TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
+	var wl []store.WhiteListClient
 	const q = `SELECT client_prefix, client_name FROM whitelist`
 	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
@@ -292,7 +291,7 @@ func (ts TorrentStore) WhiteListGetAll() ([]model.WhiteListClient, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var client model.WhiteListClient
+		var client store.WhiteListClient
 		err = rows.Scan(&client.ClientPrefix, &client.ClientName)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to fetch client whitelist")
@@ -309,7 +308,7 @@ type PeerStore struct {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
+func (ps PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
 	const txName = "peerSync"
 	const q = `
 		UPDATE 
@@ -347,7 +346,7 @@ func (ps PeerStore) Sync(batch map[model.PeerHash]model.PeerStats) error {
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps PeerStore) Reap() {
+func (ps PeerStore) Reap(cache *store.PeerCache) {
 	// NOW() - INTERVAL '15 minutes'
 	const q = `DELETE FROM peers WHERE announce_last < $1`
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
@@ -363,7 +362,7 @@ func (ps PeerStore) Reap() {
 }
 
 // Add insets the peer into the swarm of the torrent provided
-func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
+func (ps PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 	const q = `
 	INSERT INTO peers 
 	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, announce_first, announce_last)
@@ -385,7 +384,7 @@ func (ps PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 }
 
 // Delete will remove a peer from the swarm of the torrent provided
-func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
+func (ps PeerStore) Delete(ih store.InfoHash, p store.PeerID) error {
 	const q = `DELETE FROM peers WHERE info_hash = $1 AND peer_id = $2`
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
@@ -394,7 +393,7 @@ func (ps PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
 }
 
 // GetN will fetch the torrents swarm member peers
-func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
+func (ps PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 	const q = `
 		SELECT 
 		    peer_id::bytea, info_hash::bytea, user_id, addr_ip, addr_port, downloaded, uploaded, 
@@ -405,7 +404,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		      info_hash = $1 
 		LIMIT 
 		    $2`
-	var swarm model.Swarm
+	var swarm store.Swarm
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
 	rows, err := ps.db.Query(c, q, ih.Bytes(), limit)
@@ -414,7 +413,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var p model.Peer
+		var p store.Peer
 		err = rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
 			&p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax, &p.Location.Longitude, &p.Location.Latitude)
 		if err != nil {
@@ -429,7 +428,7 @@ func (ps PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps PeerStore) Get(p *model.Peer, ih model.InfoHash, peerID model.PeerID) error {
+func (ps PeerStore) Get(p *store.Peer, ih store.InfoHash, peerID store.PeerID) error {
 	const q = `
 		SELECT 
 		       peer_id, info_hash, user_id, addr_ip, addr_port, downloaded, uploaded, announces,

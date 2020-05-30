@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
 	log "github.com/sirupsen/logrus"
@@ -17,7 +16,7 @@ func TestTorrentDriver(t *testing.T) {
 	// multiStatements=true is required to exec the full schema at once
 	db := sqlx.MustConnect(driverName, config.GetStoreConfig(config.Torrent).DSN())
 	setupDB(t, db)
-	store.TestTorrentStore(t, &TorrentStore{db: db, cache: store.NewTorrentCache(false)})
+	store.TestTorrentStore(t, &TorrentStore{db: db})
 }
 
 func TestUserDriver(t *testing.T) {
@@ -25,7 +24,7 @@ func TestUserDriver(t *testing.T) {
 	setupDB(t, db)
 	store.TestUserStore(t, &UserStore{
 		db:      db,
-		users:   map[string]model.User{},
+		users:   map[string]store.User{},
 		usersMx: sync.RWMutex{},
 	})
 }

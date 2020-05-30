@@ -5,7 +5,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -18,12 +17,12 @@ const ErrNoResults = "sql: no rows in result set"
 // UserStore is the MySQL backed store.UserStore implementation
 type UserStore struct {
 	db      *sqlx.DB
-	users   map[string]model.User
+	users   map[string]store.User
 	usersMx sync.RWMutex
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (u *UserStore) Sync(b map[string]model.UserStats) error {
+func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
 	const q = `
 		UPDATE 
 			users 
@@ -51,15 +50,25 @@ func (u *UserStore) Sync(b map[string]model.UserStats) error {
 			}
 			return errors.Wrap(err, "Failed to exec user Sync() tx")
 		}
+		if cache != nil {
+			var usr store.User
+			if cache.Get(&usr, passkey) {
+				usr.Downloaded += stats.Downloaded
+				usr.Uploaded += stats.Uploaded
+				usr.Announces += stats.Announces
+				cache.Set(usr)
+			}
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return errors.Wrap(err, "Failed to commit user Sync() tx")
 	}
+
 	return nil
 }
 
 // Add will add a new user to the backing store
-func (u *UserStore) Add(user model.User) error {
+func (u *UserStore) Add(user store.User) error {
 	const q = `
 		INSERT INTO users 
 		    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded) 
@@ -82,7 +91,7 @@ func (u *UserStore) Add(user model.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetByPasskey(user *model.User, passkey string) error {
+func (u *UserStore) GetByPasskey(user *store.User, passkey string) error {
 	const q = `SELECT * FROM users WHERE passkey = ?`
 	if err := u.db.Get(user, q, passkey); err != nil {
 		if err.Error() == ErrNoResults {
@@ -94,7 +103,7 @@ func (u *UserStore) GetByPasskey(user *model.User, passkey string) error {
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(user *model.User, userID uint32) error {
+func (u *UserStore) GetByID(user *store.User, userID uint32) error {
 	const q = `SELECT * FROM users WHERE user_id = ?`
 	if err := u.db.Get(user, q, userID); err != nil {
 		if err.Error() == ErrNoResults {
@@ -106,7 +115,7 @@ func (u *UserStore) GetByID(user *model.User, userID uint32) error {
 }
 
 // Delete removes a user from the backing store
-func (u *UserStore) Delete(user model.User) error {
+func (u *UserStore) Delete(user store.User) error {
 	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
@@ -118,7 +127,7 @@ func (u *UserStore) Delete(user model.User) error {
 	return nil
 }
 
-func (u *UserStore) Update(user model.User, oldPasskey string) error {
+func (u *UserStore) Update(user store.User, oldPasskey string) error {
 	panic("implement me")
 }
 
@@ -138,7 +147,7 @@ func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
 	db := sqlx.MustConnect(driverName, c.DSN())
 	return &UserStore{
 		db:      db,
-		users:   map[string]model.User{},
+		users:   map[string]store.User{},
 		usersMx: sync.RWMutex{},
 	}, nil
 }

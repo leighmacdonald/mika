@@ -5,7 +5,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -17,7 +16,7 @@ type PeerStore struct {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
+func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
 	const q = `
 		UPDATE 
 			peers
@@ -61,7 +60,7 @@ func (ps *PeerStore) Sync(b map[model.PeerHash]model.PeerStats) error {
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps *PeerStore) Reap() {
+func (ps *PeerStore) Reap(cache *store.PeerCache) {
 	const q = `DELETE FROM peers WHERE announce_last <= (NOW() - INTERVAL 15 MINUTE)`
 	rows, err := ps.db.Exec(q)
 	if err != nil {
@@ -81,7 +80,7 @@ func (ps *PeerStore) Close() error {
 }
 
 // Add insets the peer into the swarm of the torrent provided
-func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
+func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 	const q = `
 	INSERT INTO peers 
 	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, announce_first, announce_last)
@@ -98,14 +97,14 @@ func (ps *PeerStore) Add(ih model.InfoHash, p model.Peer) error {
 }
 
 // Delete will remove a peer from the swarm of the torrent provided
-func (ps *PeerStore) Delete(ih model.InfoHash, p model.PeerID) error {
+func (ps *PeerStore) Delete(ih store.InfoHash, p store.PeerID) error {
 	const q = `DELETE FROM peers WHERE info_hash = ? AND peer_id = ?`
 	_, err := ps.db.Exec(q, ih.Bytes(), p.Bytes())
 	return err
 }
 
 // Get will fetch the peer from the swarm if it exists
-func (ps *PeerStore) Get(peer *model.Peer, ih model.InfoHash, peerID model.PeerID) error {
+func (ps *PeerStore) Get(peer *store.Peer, ih store.InfoHash, peerID store.PeerID) error {
 	const q = `
 		SELECT 
 		    peer_id, info_hash, user_id, INET_NTOA(addr_ip) as addr_ip, addr_port, 
@@ -121,7 +120,7 @@ func (ps *PeerStore) Get(peer *model.Peer, ih model.InfoHash, peerID model.PeerI
 }
 
 // GetN will fetch the torrents swarm member peers
-func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
+func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 	const q = `
 		SELECT 
 			peer_id, info_hash, user_id, INET_NTOA(addr_ip) as addr_ip, addr_port, 
@@ -134,7 +133,7 @@ func (ps *PeerStore) GetN(ih model.InfoHash, limit int) (model.Swarm, error) {
 		    info_hash = ? 
 		LIMIT
 		    ?`
-	var peers model.Swarm
+	var peers store.Swarm
 	if err := ps.db.Select(&peers, q, ih.Bytes(), limit); err != nil {
 		return peers, err
 	}

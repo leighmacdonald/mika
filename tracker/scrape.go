@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
-	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 )
 
 // scrape handles the bittorrent scrape protocol for
 func (h *BitTorrentHandler) scrape(c *gin.Context) {
-	var user model.User
+	var user store.User
 	if !preFlightChecks(&user, c.Param("passkey"), c, h.tracker) {
 		return
 	}
@@ -32,13 +32,13 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 	}
 	// Todo limit scrape to N torrents
 	resp := make(bencode.Dict, len(q.InfoHashes))
-	var ih model.InfoHash
+	var ih store.InfoHash
 	for _, ihStr := range q.InfoHashes {
-		if err := model.InfoHashFromString(&ih, ihStr); err != nil {
+		if err := store.InfoHashFromString(&ih, ihStr); err != nil {
 			log.Errorf("Failed to decode info hash in scrape: %s", ihStr)
 			continue
 		}
-		var torrent model.Torrent
+		var torrent store.Torrent
 		if err := h.tracker.Torrents.Get(&torrent, ih, false); err != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue

@@ -6,7 +6,7 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
-	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -42,7 +42,7 @@ type PingResponse struct {
 }
 
 func (a *AdminAPI) whitelistAdd(c *gin.Context) {
-	var wcl model.WhiteListClient
+	var wcl store.WhiteListClient
 	if err := c.BindJSON(&wcl); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -73,7 +73,7 @@ func (a *AdminAPI) whitelistDelete(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	newWL := make(map[string]model.WhiteListClient)
+	newWL := make(map[string]store.WhiteListClient)
 	wl, err := a.t.Torrents.WhiteListGetAll()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -89,7 +89,7 @@ func (a *AdminAPI) whitelistDelete(c *gin.Context) {
 }
 
 func (a *AdminAPI) whitelistGet(c *gin.Context) {
-	var wl []model.WhiteListClient
+	var wl []store.WhiteListClient
 	a.t.RLock()
 	defer a.t.RUnlock()
 	for _, c := range a.t.Whitelist {
@@ -107,7 +107,7 @@ func (a *AdminAPI) ping(c *gin.Context) {
 	c.JSON(http.StatusOK, PingResponse{Pong: r.Ping})
 }
 
-func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context, hex bool) bool {
+func infoHashFromCtx(infoHash *store.InfoHash, c *gin.Context, hex bool) bool {
 	ihStr := c.Param("info_hash")
 	if ihStr == "" {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
@@ -117,12 +117,12 @@ func infoHashFromCtx(infoHash *model.InfoHash, c *gin.Context, hex bool) bool {
 	}
 
 	if hex {
-		if err := model.InfoHashFromHex(infoHash, ihStr); err != nil {
+		if err := store.InfoHashFromHex(infoHash, ihStr); err != nil {
 			log.Warnf("failed to parse info hash hex value from request context: %s", err.Error())
 			return false
 		}
 	} else {
-		if err := model.InfoHashFromString(infoHash, ihStr); err != nil {
+		if err := store.InfoHashFromString(infoHash, ihStr); err != nil {
 			log.Warnf("failed to parse info hash from request context: %s", err.Error())
 			return false
 		}
@@ -144,9 +144,9 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Malformed request"})
 		return
 	}
-	var t model.Torrent
-	var ih model.InfoHash
-	if err := model.InfoHashFromHex(&ih, req.InfoHash); err != nil {
+	var t store.Torrent
+	var ih store.InfoHash
+	if err := store.InfoHashFromHex(&ih, req.InfoHash); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
 	}
@@ -176,7 +176,7 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 }
 
 func (a *AdminAPI) torrentDelete(c *gin.Context) {
-	var infoHash model.InfoHash
+	var infoHash store.InfoHash
 	if !infoHashFromCtx(&infoHash, c, true) {
 		return
 	}
@@ -197,11 +197,11 @@ type TorrentUpdatePrams struct {
 
 // TODO ability to un-delete a torrent
 func (a *AdminAPI) torrentUpdate(c *gin.Context) {
-	var ih model.InfoHash
+	var ih store.InfoHash
 	if !infoHashFromCtx(&ih, c, true) {
 		return
 	}
-	var t model.Torrent
+	var t store.Torrent
 	err := a.t.Torrents.Get(&t, ih, true)
 	if err == consts.ErrInvalidInfoHash {
 		c.JSON(http.StatusNotFound, gin.H{})
@@ -211,7 +211,7 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
-	var tup model.TorrentUpdate
+	var tup store.TorrentUpdate
 	if err := c.BindJSON(&tup); err != nil {
 		c.JSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
@@ -224,7 +224,7 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 }
 
 func (a *AdminAPI) userUpdate(c *gin.Context) {
-	var user model.User
+	var user store.User
 	passkey := c.Param("passkey")
 	if len(passkey) != 20 {
 		c.AbortWithStatus(http.StatusNotFound)
@@ -238,7 +238,7 @@ func (a *AdminAPI) userUpdate(c *gin.Context) {
 		}
 		return
 	}
-	var update model.User
+	var update store.User
 	if err := c.BindJSON(&update); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -257,7 +257,7 @@ type UserDeleteRequest struct {
 
 func (a *AdminAPI) userDelete(c *gin.Context) {
 	pk := c.Param("passkey")
-	var user model.User
+	var user store.User
 	if err := a.t.Users.GetByPasskey(&user, pk); err != nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Err: "User not found"})
 		return
@@ -270,7 +270,7 @@ func (a *AdminAPI) userDelete(c *gin.Context) {
 }
 
 func (a *AdminAPI) userAdd(c *gin.Context) {
-	var user model.User
+	var user store.User
 	if err := c.BindJSON(&user); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Malformed request"})
 		return

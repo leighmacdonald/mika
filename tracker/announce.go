@@ -5,7 +5,7 @@ import (
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/consts"
-	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net"
@@ -68,7 +68,7 @@ type announceRequest struct {
 
 	// urlencoded 20-byte SHA1 hash of the value of the info key from the Metainfo file. Note that the
 	// value will be a bencoded dictionary, given the definition of the info key above.
-	InfoHash model.InfoHash
+	InfoHash store.InfoHash
 
 	// Optional. Number of peers that the client would like to receive from the tracker. This value is
 	// permitted to be zero. If omitted, typically defaults to 50 peers.
@@ -82,7 +82,7 @@ type announceRequest struct {
 	// generating this peer ID. However, one may rightly presume that it must at least be unique for
 	// your local machine, thus should probably incorporate things like process ID and perhaps a timestamp
 	// recorded at startup. See peer_id below for common client encodings of this field.
-	PeerID model.PeerID
+	PeerID store.PeerID
 
 	// The port number that the client is listening on. Ports reserved for BitTorrent are typically
 	// 6881-6889. Clients may choose to give up if it cannot establish a port within this range.
@@ -102,8 +102,8 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 	if !ihExists {
 		return nil, msgInvalidInfoHash
 	}
-	var infoHash model.InfoHash
-	if err := model.InfoHashFromString(&infoHash, infoHashStr); err != nil {
+	var infoHash store.InfoHash
+	if err := store.InfoHashFromString(&infoHash, infoHashStr); err != nil {
 		log.Warnf("Got malformed info_hash: %s", infoHashStr)
 		return nil, msgInvalidInfoHash
 	}
@@ -144,7 +144,7 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 		InfoHash:   infoHash,
 		Left:       left,
 		NumWant:    numWant,
-		PeerID:     model.PeerIDFromString(peerID),
+		PeerID:     store.PeerIDFromString(peerID),
 		Port:       port,
 		Uploaded:   uploaded,
 	}, msgOk
@@ -157,7 +157,7 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// Check that the user is valid before parsing anything
 	pk := c.Param("passkey")
-	var usr model.User
+	var usr store.User
 	if valid := preFlightChecks(&usr, pk, c, h.tracker); !valid {
 		oops(c, msgInvalidAuth)
 		return
@@ -169,8 +169,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		return
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
-	var tor model.Torrent
-	if err := h.tracker.Torrents.Get(&tor, req.InfoHash, false); err != nil || tor.IsDeleted {
+	var tor store.Torrent
+	if err := h.tracker.TorrentGet(&tor, req.InfoHash, false); err != nil || tor.IsDeleted {
 		log.Debugf("No torrent found matching: %x", req.InfoHash.Bytes())
 		oops(c, msgInvalidInfoHash)
 		return
@@ -185,13 +185,13 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		c.Data(int(msgInvalidInfoHash), gin.MIMEPlain, responseError(tor.Reason))
 		return
 	}
-	var peer model.Peer
-	err := h.tracker.Peers.Get(&peer, tor.InfoHash, req.PeerID)
+	var peer store.Peer
+	err := h.tracker.PeerGet(&peer, tor.InfoHash, req.PeerID)
 	if err != nil {
 		if err == consts.ErrInvalidPeerID {
 			// Create a new peer for the swarm
-			peer = model.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
-			if err := h.tracker.Peers.Add(tor.InfoHash, peer); err != nil {
+			peer = store.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
+			if err := h.tracker.PeerAdd(tor.InfoHash, peer); err != nil {
 				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
 				oops(c, msgGenericError)
 				return
@@ -208,7 +208,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	}
 	// Send state to another go channel for updating outside of the announce request
 	// so that we can respond asap
-	h.tracker.StateUpdateChan <- model.UpdateState{
+	h.tracker.StateUpdateChan <- store.UpdateState{
 		Passkey:    pk,
 		InfoHash:   tor.InfoHash,
 		PeerID:     peer.PeerID,
@@ -242,7 +242,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(peers model.Swarm, skipID model.PeerID) []byte {
+func makeCompactPeers(peers store.Swarm, skipID store.PeerID) []byte {
 	var buf bytes.Buffer
 	peers.RLock()
 	for _, peer := range peers.Peers {

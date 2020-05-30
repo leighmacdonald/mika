@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/leighmacdonald/mika/examples/api"
-	"github.com/leighmacdonald/mika/model"
+	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/stretchr/testify/require"
 	"log"
@@ -23,8 +23,8 @@ var (
 
 func TestClient_Torrent(t *testing.T) {
 	c := New(host, api.DefaultAuthKey)
-	var ih model.InfoHash
-	_ = model.InfoHashFromString(&ih, ihStr)
+	var ih store.InfoHash
+	_ = store.InfoHashFromString(&ih, ihStr)
 	require.NoError(t, c.TorrentAdd(ih, "test torrent"))
 	require.NoError(t, c.TorrentDelete(ih))
 

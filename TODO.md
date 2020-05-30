@@ -2,17 +2,9 @@
 
 ## Next Release (v.2.0.0)
 - Caching layer for backing stores
-- Fully working announces
-    - Verify peers and their states
-    - Verify batch recording stats
-    - Add many more unit/integration tests for this. Currently mostly just a skeleton.
-- Fully working scrapes
-    - Verified results
-    - More unit/integration tests
 - Implementations for all currently support store interfaces with tests
     - http is mostly all that remains
     - Add test for all fields that are transmitted
-    
     
 ## Future
 - Implement cheater detection mechanisms

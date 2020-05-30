@@ -5,7 +5,6 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/geo"
-	"github.com/leighmacdonald/mika/model"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
@@ -65,21 +64,21 @@ var serveCmd = &cobra.Command{
 			log.Fatalf("Failed to initialize tracker: %s", err)
 		}
 		_ = tkr.LoadWhitelist()
-		var infoHash model.InfoHash
+		var infoHash store.InfoHash
 		mi, err5 := metainfo.LoadFromFile("examples/data/demo_torrent_data.torrent")
 		if err5 != nil {
 			return
 		}
-		if err := model.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
+		if err := store.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
 			log.Fatalf(err.Error())
 		}
-		if err := tkr.Torrents.Add(model.Torrent{
+		if err := tkr.Torrents.Add(store.Torrent{
 			ReleaseName: "demo torrent",
 			InfoHash:    infoHash,
 		}); err != nil {
 			panic("bad torrent")
 		}
-		if err := tkr.Users.Add(model.User{
+		if err := tkr.Users.Add(store.User{
 			UserID:          1,
 			Passkey:         "01234567890123456789",
 			IsDeleted:       false,

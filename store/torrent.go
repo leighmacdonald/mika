@@ -120,27 +120,27 @@ func (ih *InfoHash) RawString() string {
 
 // Torrent is the core struct for our torrent being tracked
 type Torrent struct {
-	ReleaseName    string   `db:"release_name" redis:"release_name" json:"release_name"`
-	InfoHash       InfoHash `db:"info_hash" redis:"info_hash" json:"info_hash"`
-	TotalCompleted uint16   `db:"total_completed" redis:"total_completed" json:"total_completed"`
+	InfoHash    InfoHash `json:"info_hash"`
+	ReleaseName string   `json:"release_name"`
+	Snatches    uint16   `json:"total_completed"`
 	// This is stored as MB to reduce storage costs
-	TotalUploaded uint64 `db:"total_uploaded" redis:"total_uploaded" json:"total_uploaded"`
+	Uploaded uint64 `json:"total_uploaded"`
 	// This is stored as MB to reduce storage costs
-	TotalDownloaded uint64 `db:"total_downloaded" redis:"total_downloaded" json:"total_downloaded"`
-	IsDeleted       bool   `db:"is_deleted" redis:"is_deleted" json:"is_deleted"`
+	Downloaded uint64 `json:"total_downloaded"`
+	IsDeleted  bool   `json:"is_deleted"`
 	// When you have a message to pass to a client set enabled = false and set the reason message.
 	// If IsDeleted is true, then nothing will be returned to the client
-	IsEnabled bool `db:"is_enabled" redis:"is_enabled" json:"is_enabled"`
+	IsEnabled bool `json:"is_enabled"`
 	// Reason when set will return a message to the torrent client
-	Reason string `db:"reason" redis:"reason" json:"reason"`
+	Reason string `json:"reason"`
 	// Upload multiplier added to the users totals
-	MultiUp float64 `db:"multi_up" redis:"multi_up" json:"multi_up"`
+	MultiUp float64 `json:"multi_up"`
 	// Download multiplier added to the users totals
 	// 0 denotes freeleech status
-	MultiDn   float64 `db:"multi_dn"  redis:"multi_dn" json:"multi_dn"`
-	Announces uint64  `db:"announces"`
-	Seeders   int
-	Leechers  int
+	MultiDn   float64 `json:"multi_dn"`
+	Announces uint64  `json:"announces"`
+	Seeders   int     `json:"seeders"`
+	Leechers  int     `json:"leechers"`
 }
 
 type TorrentUpdate struct {
@@ -159,9 +159,9 @@ type TorrentStats struct {
 	Seeders    int    `json:"seeders"`
 	Leechers   int    `json:"leechers"`
 	Snatches   uint16 `json:"snatches"`
-	Uploaded   uint64
-	Downloaded uint64
-	Announces  uint64
+	Uploaded   uint64 `json:"uploaded"`
+	Downloaded uint64 `json:"downloaded"`
+	Announces  uint64 `json:"announces"`
 }
 
 // UserStats is any info we want to batch update for a user

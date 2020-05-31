@@ -17,30 +17,17 @@ type TorrentStore struct {
 	whitelist []store.WhiteListClient
 }
 
-func (ts *TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
+func (ts *TorrentStore) Name() string {
+	return driverName
+}
+
+func (ts *TorrentStore) Update(torrent store.Torrent) error {
 	var orig store.Torrent
-	if err := ts.Get(&orig, infoHash, true); err != nil {
+	if err := ts.Get(&orig, torrent.InfoHash, true); err != nil {
 		return err
 	}
-	for _, key := range update.Keys {
-		switch key {
-		case "reason":
-			orig.Reason = update.Reason
-		case "is_enabled":
-			orig.IsEnabled = update.IsEnabled
-		case "is_deleted":
-			orig.IsDeleted = update.IsDeleted
-		case "release_name":
-			orig.ReleaseName = update.ReleaseName
-		case "multi_up":
-			orig.MultiUp = update.MultiUp
-		case "multi_dn":
-			orig.MultiDn = update.MultiDn
-		}
-
-	}
 	ts.Lock()
-	ts.torrents[infoHash] = orig
+	ts.torrents[torrent.InfoHash] = torrent
 	ts.Unlock()
 	return nil
 }
@@ -87,9 +74,9 @@ func (ts *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *sto
 			// Deleted torrent before sync occurred
 			continue
 		}
-		t.TotalUploaded += stats.Uploaded
-		t.TotalDownloaded += stats.Downloaded
-		t.TotalCompleted += stats.Snatches
+		t.Uploaded += stats.Uploaded
+		t.Downloaded += stats.Downloaded
+		t.Snatches += stats.Snatches
 		t.Seeders += stats.Seeders
 		t.Leechers += stats.Leechers
 		t.Announces += stats.Announces
@@ -164,6 +151,10 @@ func (ts *TorrentStore) Get(torrent *store.Torrent, hash store.InfoHash, deleted
 type PeerStore struct {
 	sync.RWMutex
 	swarms map[store.InfoHash]store.Swarm
+}
+
+func (ps *PeerStore) Name() string {
+	return driverName
 }
 
 // NewPeerStore instantiates a new in-memory peer store
@@ -288,6 +279,10 @@ func (pd peerDriver) New(_ interface{}) (store.PeerStore, error) {
 type UserStore struct {
 	sync.RWMutex
 	users map[string]store.User
+}
+
+func (u *UserStore) Name() string {
+	return driverName
 }
 
 // Update is used to change a known user

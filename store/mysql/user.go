@@ -21,6 +21,10 @@ type UserStore struct {
 	usersMx sync.RWMutex
 }
 
+func (u *UserStore) Name() string {
+	return driverName
+}
+
 // Sync batch updates the backing store with the new UserStats provided
 func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
 	const q = `

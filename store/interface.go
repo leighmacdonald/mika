@@ -84,6 +84,8 @@ type UserStore interface {
 	Close() error
 	// Sync batch updates the backing store with the new UserStats provided
 	Sync(b map[string]UserStats, cache *UserCache) error
+	// Name returns the name of the data store type
+	Name() string
 }
 
 // TorrentStore defines where we can store permanent torrent data
@@ -97,7 +99,7 @@ type TorrentStore interface {
 	// Get returns the Torrent matching the infohash
 	Get(torrent *Torrent, hash InfoHash, deletedOk bool) error
 	// Update will update certain parameters within the torrent
-	Update(infoHash InfoHash, update TorrentUpdate) error
+	Update(torrent Torrent) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// WhiteListDelete removes a client from the global whitelist
@@ -110,6 +112,8 @@ type TorrentStore interface {
 	Sync(b map[InfoHash]TorrentStats, cache *TorrentCache) error
 	// Conn returns the underlying connection, if any
 	Conn() interface{}
+	// Name returns the name of the data store type
+	Name() string
 }
 
 // PeerStore defines our interface for storing peer data
@@ -130,6 +134,8 @@ type PeerStore interface {
 	Reap(cache *PeerCache)
 	// Sync batch updates the backing store with the new PeerStats provided
 	Sync(b map[PeerHash]PeerStats, cache *PeerCache) error
+	// Name returns the name of the data store type
+	Name() string
 }
 
 // NewTorrentStore will attempt to initialize a TorrentStore using the driver name provided

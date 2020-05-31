@@ -310,7 +310,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			require.Equal(t, a.state.SwarmSize, len(swarm.Peers), "Invalid swarm size (%d)", i)
 			require.Equal(t, a.state.Seeders, torrent.Seeders, "Invalid seeder count (%d)", i)
 			require.Equal(t, a.state.Leechers, torrent.Leechers, "Invalid leecher count (%d)", i)
-			require.Equal(t, a.state.Snatches, torrent.TotalCompleted, "invalid snatch count (%d)", i)
+			require.Equal(t, a.state.Snatches, torrent.Snatches, "invalid snatch count (%d)", i)
 		}
 	}
 }

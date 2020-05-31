@@ -121,6 +121,26 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.Equal(t, torrentA.InfoHash, fetchedTorrent.InfoHash)
 	require.Equal(t, torrentA.IsDeleted, fetchedTorrent.IsDeleted)
 	require.Equal(t, torrentA.IsEnabled, fetchedTorrent.IsEnabled)
+	batch := map[InfoHash]TorrentStats{
+		torrentA.InfoHash: {
+			Seeders:    rand.Intn(100000),
+			Leechers:   rand.Intn(100000),
+			Snatches:   uint16(rand.Intn(10000)),
+			Uploaded:   uint64(rand.Intn(100000)),
+			Downloaded: uint64(rand.Intn(100000)),
+			Announces:  uint64(rand.Intn(100000)),
+		},
+	}
+	require.NoError(t, ts.Sync(batch, nil), "[%s] Failed to sync torrent", ts.Name())
+	var updated Torrent
+	require.NoError(t, ts.Get(&updated, torrentA.InfoHash, false))
+	require.Equal(t, torrentA.Snatches+batch[torrentA.InfoHash].Snatches, updated.Snatches)
+	require.Equal(t, torrentA.Leechers+batch[torrentA.InfoHash].Leechers, updated.Leechers)
+	require.Equal(t, torrentA.Snatches+batch[torrentA.InfoHash].Snatches, updated.Snatches)
+	require.Equal(t, torrentA.Uploaded+batch[torrentA.InfoHash].Uploaded, updated.Uploaded)
+	require.Equal(t, torrentA.Downloaded+batch[torrentA.InfoHash].Downloaded, updated.Downloaded)
+	require.Equal(t, torrentA.Announces+batch[torrentA.InfoHash].Announces, updated.Announces)
+
 	require.NoError(t, ts.Delete(torrentA.InfoHash, true))
 	var deletedTorrent Torrent
 	require.Equal(t, consts.ErrInvalidInfoHash, ts.Get(&deletedTorrent, torrentA.InfoHash, false))
@@ -146,7 +166,7 @@ func TestUserStore(t *testing.T, s UserStore) {
 		users = append(users, GenerateTestUser())
 	}
 	if users == nil {
-		t.Fatalf("Failed to setup users")
+		t.Fatalf("[%s] Failed to setup users", s.Name())
 	}
 	require.NoError(t, s.Add(users[0]))
 	var fetchedUserID User

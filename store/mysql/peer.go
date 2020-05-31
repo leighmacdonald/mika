@@ -15,6 +15,10 @@ type PeerStore struct {
 	db *sqlx.DB
 }
 
+func (ps *PeerStore) Name() string {
+	return driverName
+}
+
 // Sync batch updates the backing store with the new PeerStats provided
 func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
 	const q = `
@@ -32,9 +36,9 @@ func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.Pee
 	if err != nil {
 		return errors.Wrap(err, "Failed to being user Sync() tx")
 	}
-	stmt, err := tx.Prepare(q)
-	if err != nil {
-		return errors.Wrap(err, "Failed to prepare user Sync() tx")
+	stmt, err2 := tx.Prepare(q)
+	if err2 != nil {
+		return errors.Wrap(err2, "Failed to prepare user Sync() tx")
 	}
 	for ph, stats := range b {
 		ih := ph.InfoHash()
@@ -67,9 +71,9 @@ func (ps *PeerStore) Reap(cache *store.PeerCache) {
 		log.Errorf("Failed to reap peers: %s", err.Error())
 		return
 	}
-	count, err := rows.RowsAffected()
-	if err != nil {
-		log.Errorf("Failed to get reap count: %s", err.Error())
+	count, err2 := rows.RowsAffected()
+	if err2 != nil {
+		log.Errorf("Failed to get reap count: %s", err2)
 	}
 	log.Debugf("Reaped %d peers", count)
 }

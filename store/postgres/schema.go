@@ -24,6 +24,8 @@ create table torrent
     multi_up decimal(5,2) default 1.00 not null,
     multi_dn decimal(5,2) default 1.00 not null,
 	announces int default 0 not null,
+	seeders int default 0 not null,
+	leechers int default 0 not null,
     constraint uq_release_name
         unique (release_name)
 );

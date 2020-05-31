@@ -57,6 +57,10 @@ type UserStore struct {
 	client *redis.Client
 }
 
+func (us UserStore) Name() string {
+	return driverName
+}
+
 // Sync batch updates the backing store with the new UserStats provided
 // TODO leverage cache layer so we can pipeline the updates w/o query first
 func (us UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
@@ -188,13 +192,54 @@ type TorrentStore struct {
 	client *redis.Client
 }
 
-func (ts *TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
-	panic("implement me")
+func (ts *TorrentStore) Name() string {
+	return driverName
+}
+
+// Update is just a Add call with a check for existing key first as the process
+// is the same for setting both
+func (ts *TorrentStore) Update(torrent store.Torrent) error {
+	val, err := ts.client.Exists(torrentKey(torrent.InfoHash)).Result()
+	if err != nil {
+		return err
+	}
+	if val == 0 {
+		return errors.Wrapf(consts.ErrInvalidInfoHash, "Won't update non-existent torrent")
+	}
+	return ts.Add(torrent)
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts *TorrentStore) Sync(_ map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
-	panic("implement me")
+func (ts *TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
+	pipe := ts.client.TxPipeline()
+	for ih, s := range batch {
+		pipe.HIncrBy(torrentKey(ih), "seeders", int64(s.Seeders))
+		pipe.HIncrBy(torrentKey(ih), "leechers", int64(s.Leechers))
+		pipe.HIncrBy(torrentKey(ih), "total_completed", int64(s.Snatches))
+		pipe.HIncrBy(torrentKey(ih), "total_uploaded", int64(s.Uploaded))
+		pipe.HIncrBy(torrentKey(ih), "total_downloaded", int64(s.Downloaded))
+		pipe.HIncrBy(torrentKey(ih), "announces", int64(s.Announces))
+	}
+	if _, err := pipe.Exec(); err != nil {
+		return err
+	}
+	if cache != nil {
+		for ih, s := range batch {
+			var t store.Torrent
+			if !cache.Get(&t, ih) {
+				continue
+			}
+			t.Seeders += s.Seeders
+			t.Leechers += s.Leechers
+			t.Announces += s.Announces
+			t.Downloaded += s.Downloaded
+			t.Uploaded += s.Uploaded
+			t.Snatches += s.Snatches
+			cache.Set(t)
+		}
+
+	}
+	return nil
 }
 
 // Conn returns the underlying connection
@@ -247,20 +292,27 @@ func (ts *TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
 	return wl, nil
 }
 
-// Add adds a new torrent to the redis backing store
-func (ts *TorrentStore) Add(t store.Torrent) error {
-	err := ts.client.HSet(torrentKey(t.InfoHash), map[string]interface{}{
+func torrentMap(t store.Torrent) map[string]interface{} {
+	return map[string]interface{}{
 		"release_name":     t.ReleaseName,
-		"total_completed":  t.TotalCompleted,
-		"total_downloaded": t.TotalDownloaded,
-		"total_uploaded":   t.TotalUploaded,
+		"total_completed":  t.Snatches,
+		"total_downloaded": t.Downloaded,
+		"total_uploaded":   t.Uploaded,
 		"reason":           t.Reason,
 		"multi_up":         t.MultiUp,
 		"multi_dn":         t.MultiDn,
 		"info_hash":        t.InfoHash.String(),
 		"is_deleted":       t.IsDeleted,
 		"is_enabled":       t.IsEnabled,
-	}).Err()
+		"announces":        t.Announces,
+		"seeders":          t.Seeders,
+		"leechers":         t.Leechers,
+	}
+}
+
+// Add adds a new torrent to the redis backing store
+func (ts *TorrentStore) Add(t store.Torrent) error {
+	err := ts.client.HSet(torrentKey(t.InfoHash), torrentMap(t)).Err()
 	if err != nil {
 		return err
 	}
@@ -302,15 +354,17 @@ func (ts *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk boo
 	}
 	t.ReleaseName = v["release_name"]
 	t.InfoHash = infoHash
-	t.TotalCompleted = util.StringToUInt16(v["total_completed"], 0)
-	t.TotalUploaded = util.StringToUInt64(v["total_uploaded"], 0)
-	t.TotalDownloaded = util.StringToUInt64(v["total_downloaded"], 0)
+	t.Snatches = util.StringToUInt16(v["total_completed"], 0)
+	t.Uploaded = util.StringToUInt64(v["total_uploaded"], 0)
+	t.Downloaded = util.StringToUInt64(v["total_downloaded"], 0)
 	t.IsDeleted = isDeleted
 	t.IsEnabled = util.StringToBool(v["is_enabled"], false)
 	t.Reason = v["reason"]
 	t.MultiUp = util.StringToFloat64(v["multi_up"], 1.0)
 	t.MultiDn = util.StringToFloat64(v["multi_dn"], 1.0)
-
+	t.Announces = util.StringToUInt64(v["announces"], 0)
+	t.Seeders = util.StringToUInt(v["seeders"], 0)
+	t.Leechers = util.StringToUInt(v["leechers"], 0)
 	return nil
 }
 
@@ -324,6 +378,10 @@ type PeerStore struct {
 	client  *redis.Client
 	pubSub  *redis.PubSub
 	peerTTL time.Duration
+}
+
+func (ps *PeerStore) Name() string {
+	return driverName
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
@@ -344,9 +402,7 @@ func (ps *PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps *PeerStore) Reap(cache *store.PeerCache) {
-	log.Debugf("Implement reaping peers..")
-}
+func (ps *PeerStore) Reap(cache *store.PeerCache) {}
 
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {

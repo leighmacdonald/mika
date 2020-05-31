@@ -24,8 +24,36 @@ type UserStore struct {
 	ctx context.Context
 }
 
+func (us UserStore) Name() string {
+	return driverName
+}
+
 func (us UserStore) Update(user store.User, oldPasskey string) error {
-	panic("implement me")
+	const q = `
+		UPDATE
+			users
+		SET
+			user_id = $1,
+		    passkey = $2,
+		    is_deleted = $3,
+		    download_enabled = $4,
+		    downloaded = $5,
+		    uploaded = $6,
+		    announces = $7
+		WHERE
+			passkey = $8
+	`
+	passkey := user.Passkey
+	if oldPasskey != "" {
+		passkey = oldPasskey
+	}
+	c, cancel := context.WithDeadline(us.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
+	_, err := us.db.Exec(c, q, user.UserID, user.Passkey, user.IsDeleted, user.DownloadEnabled, user.Downloaded, user.Uploaded, user.Announces, passkey)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to update user: %d", user.UserID)
+	}
+	return nil
 }
 
 // Sync batch updates the backing store with the new UserStats provided
@@ -60,6 +88,11 @@ func (us UserStore) Sync(batch map[string]store.UserStats, cache *store.UserCach
 	}
 	if err := tx.Commit(c); err != nil {
 		return errors.Wrapf(err, "postgres.UserStore.Sync failed to commit tx")
+	}
+	if cache != nil {
+		for passkey := range batch {
+			cache.Delete(passkey)
+		}
 	}
 	return nil
 }
@@ -150,13 +183,85 @@ type TorrentStore struct {
 	ctx context.Context
 }
 
-func (ts TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
-	panic("implement me")
+func (ts TorrentStore) Name() string {
+	return driverName
+}
+
+// Update
+func (ts TorrentStore) Update(torrent store.Torrent) error {
+	const q = `
+		UPDATE 
+		    torrent 
+		SET
+			release_name = $1,
+		    info_hash = $2,
+		    total_completed = $3,
+		    total_uploaded = $4, 
+		    total_downloaded = $5,
+		    is_deleted = $6,
+		    is_enabled = $7,
+		    reason = $8,
+		    multi_up = $9,
+		    multi_dn = $10,
+		    announces = $11
+		WHERE
+			info_hash = $12
+			`
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
+	defer cancel()
+	_, err := ts.db.Exec(c, q, torrent.ReleaseName, torrent.InfoHash.Bytes(), torrent.Snatches,
+		torrent.Uploaded, torrent.Downloaded, torrent.IsDeleted, torrent.IsEnabled,
+		torrent.Reason, torrent.MultiUp, torrent.MultiDn, torrent.Announces)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to update torrent: %s", torrent.InfoHash.String())
+	}
+	return nil
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts TorrentStore) Sync(_ map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
-	panic("implement me")
+// TODO test cases
+func (ts TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
+	const txName = "torrentSync"
+	const q = `
+		UPDATE 
+			torrent
+		SET
+			seeders = (seeders + $1),
+		    leechers = (leechers + $2),
+		    total_completed = (total_completed + $3),
+		    total_downloaded = (total_downloaded + $4),
+		    total_uploaded = (total_uploaded + $5),
+		    announces = (announces + $6)
+		WHERE
+			info_hash = $7
+`
+	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(time.Second*10))
+	defer cancel()
+	tx, err := ts.db.Begin(c)
+	if err != nil {
+		return errors.Wrap(err, "postgres.PeerStore.Sync Failed to being transaction")
+	}
+	defer func() { _ = tx.Rollback(c) }()
+	_, err = tx.Prepare(c, txName, q)
+	if err != nil {
+		return errors.Wrap(err, "postgres.PeerStore.Sync Failed to being transaction")
+	}
+
+	for ih, stats := range batch {
+		if _, err := tx.Exec(c, txName, stats.Seeders, stats.Leechers, stats.Snatches,
+			stats.Downloaded, stats.Uploaded, stats.Announces, ih.Bytes()); err != nil {
+			return errors.Wrapf(err, "postgres.PeerStore.Sync failed to Exec tx")
+		}
+	}
+	if err := tx.Commit(c); err != nil {
+		return errors.Wrapf(err, "postgres.PeerStore.Sync failed to commit tx")
+	}
+	if cache != nil {
+		for ih, stats := range batch {
+			cache.Update(ih, stats)
+		}
+	}
+	return nil
 }
 
 // Conn returns the underlying database driver
@@ -208,7 +313,7 @@ func (ts TorrentStore) Get(t *store.Torrent, ih store.InfoHash, deletedOk bool) 
 	const q = `
 		SELECT 
 			info_hash::bytea, release_name, total_uploaded, total_downloaded, total_completed, 
-			is_deleted, is_enabled, reason, multi_up, multi_dn, announces
+			is_deleted, is_enabled, reason, multi_up, multi_dn, announces, seeders, leechers
 		FROM 
 		    torrent 
 		WHERE 
@@ -219,15 +324,17 @@ func (ts TorrentStore) Get(t *store.Torrent, ih store.InfoHash, deletedOk bool) 
 	err := ts.db.QueryRow(c, q, ih.Bytes()).Scan(
 		&b, // TODO implement pgx custom types to map automatically
 		&t.ReleaseName,
-		&t.TotalUploaded,
-		&t.TotalDownloaded,
-		&t.TotalCompleted,
+		&t.Uploaded,
+		&t.Downloaded,
+		&t.Snatches,
 		&t.IsDeleted,
 		&t.IsEnabled,
 		&t.Reason,
 		&t.MultiUp,
 		&t.MultiDn,
 		&t.Announces,
+		&t.Seeders,
+		&t.Leechers,
 	)
 	copy(t.InfoHash[:], b)
 	if err != nil {
@@ -305,6 +412,10 @@ func (ts TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
 type PeerStore struct {
 	db  *pgx.Conn
 	ctx context.Context
+}
+
+func (ps PeerStore) Name() string {
+	return driverName
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
@@ -399,12 +510,12 @@ func (ps PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 		    peer_id::bytea, info_hash::bytea, user_id, addr_ip, addr_port, downloaded, uploaded, 
 			announces, speed_up, speed_dn, speed_up_max, speed_dn_max, ST_x(location), ST_y(location)
 		FROM
-		    swarm 
+		    peers 
 		WHERE
 		      info_hash = $1 
 		LIMIT 
 		    $2`
-	var swarm store.Swarm
+	swarm := store.NewSwarm()
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
 	rows, err := ps.db.Query(c, q, ih.Bytes(), limit)
@@ -419,7 +530,7 @@ func (ps PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 		if err != nil {
 			return swarm, errors.Wrap(err, "failed to fetch N swarm from store")
 		}
-		swarm.Peers[p.PeerID] = p
+		swarm.Add(p)
 	}
 	if rows.Err() != nil {
 		return swarm, errors.Wrap(err, "error in peer query")

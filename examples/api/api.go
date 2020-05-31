@@ -234,12 +234,21 @@ func (s *ServerExample) userDelete(c *gin.Context) {
 }
 
 func (s *ServerExample) torrentSync(c *gin.Context) {
-	var batch map[store.InfoHash]store.TorrentStats
-	if err := c.BindJSON(batch); err != nil {
+	var batch map[string]store.TorrentStats
+	if err := c.BindJSON(&batch); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := s.Torrents.Sync(batch, nil); err != nil {
+	req := make(map[store.InfoHash]store.TorrentStats)
+	var ih store.InfoHash
+	for k, v := range batch {
+		if err := store.InfoHashFromHex(&ih, k); err != nil {
+			errResponse(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		req[ih] = v
+	}
+	if err := s.Torrents.Sync(req, nil); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}

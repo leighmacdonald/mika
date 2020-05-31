@@ -49,6 +49,20 @@ func (cache *TorrentCache) Set(t Torrent) {
 	cache.Unlock()
 }
 
+func (cache *TorrentCache) Update(infoHash InfoHash, stats TorrentStats) {
+	var t Torrent
+	if !cache.Get(&t, infoHash) {
+		return
+	}
+	t.Announces += stats.Announces
+	t.Downloaded += stats.Downloaded
+	t.Uploaded += stats.Uploaded
+	t.Snatches += stats.Snatches
+	t.Leechers += stats.Leechers
+	t.Seeders += stats.Seeders
+	cache.Set(t)
+}
+
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
 func (cache *TorrentCache) Delete(ih InfoHash, dropRow bool) {

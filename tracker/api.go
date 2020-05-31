@@ -216,7 +216,27 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
 	}
-	if err := a.t.Torrents.Update(ih, tup); err != nil {
+	if len(tup.Keys) == 0 {
+		c.JSON(http.StatusBadRequest, StatusResp{Err: "no update keys specified"})
+		return
+	}
+	for _, k := range tup.Keys {
+		switch k {
+		case "release_name":
+			t.ReleaseName = tup.ReleaseName
+		case "is_deleted":
+			t.IsDeleted = tup.IsDeleted
+		case "is_enabled":
+			t.IsEnabled = tup.IsEnabled
+		case "reason":
+			t.Reason = tup.Reason
+		case "multi_up":
+			t.MultiUp = tup.MultiUp
+		case "multi_dn":
+			t.MultiDn = tup.MultiDn
+		}
+	}
+	if err := a.t.Torrents.Update(t); err != nil {
 		c.JSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 	} else {
 		c.JSON(http.StatusOK, StatusResp{Message: "Updated successfully"})

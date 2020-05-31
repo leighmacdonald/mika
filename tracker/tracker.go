@@ -254,14 +254,30 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		StateUpdateChan:  make(chan store.UpdateState, 1000),
 		Whitelist:        make(map[string]store.WhiteListClient),
 	}
+	// Don't enable caching if we are already configured for a memory store.
 	if opts.TorrentCacheEnabled {
-		t.TorrentsCache = store.NewTorrentCache()
+		switch t.Torrents.(type) {
+		case *memory.TorrentStore:
+			log.Warnf("Not enabling cache for in-memory torrent store, already in-memory")
+		default:
+			t.TorrentsCache = store.NewTorrentCache()
+		}
 	}
 	if opts.UserCacheEnabled {
-		t.UsersCache = store.NewUserCache()
+		switch t.Users.(type) {
+		case *memory.UserStore:
+			log.Warnf("Not enabling cache for in-memory user store, already in-memory.")
+		default:
+			t.UsersCache = store.NewUserCache()
+		}
 	}
 	if opts.PeerCacheEnabled {
-		t.PeerCache = store.NewPeerCache()
+		switch t.Peers.(type) {
+		case *memory.PeerStore:
+			log.Warnf("Not enabling cache for in-memory peer store, already in-memory.")
+		default:
+			t.PeerCache = store.NewPeerCache()
+		}
 	}
 	return t, nil
 }

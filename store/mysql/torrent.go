@@ -23,8 +23,46 @@ type TorrentStore struct {
 	db *sqlx.DB
 }
 
-func (s *TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
-	panic("implement me")
+func (s *TorrentStore) Name() string {
+	return driverName
+}
+
+func (s *TorrentStore) Update(torrent store.Torrent) error {
+	const q = `
+		UPDATE 
+		    torrent 
+		SET
+			release_name = ?,
+		    info_hash = ?,
+		    total_completed = ?,
+		    total_uploaded = ?,
+		    total_downloaded = ?,
+		    is_deleted = ?,
+		    is_enabled = ?,
+		    reason = ?,
+		    multi_up = ?,
+		    multi_dn = ?,
+		    announces = ?
+		WHERE
+			info_hash = ?
+			`
+	_, err := s.db.Exec(q,
+		torrent.ReleaseName,
+		torrent.InfoHash.Bytes(),
+		torrent.Snatches,
+		torrent.Uploaded,
+		torrent.Downloaded,
+		torrent.IsDeleted,
+		torrent.IsEnabled,
+		torrent.Reason,
+		torrent.MultiUp,
+		torrent.MultiDn,
+		torrent.Announces,
+		torrent.InfoHash.Bytes())
+	if err != nil {
+		return errors.Wrap(err, "Failed to update torrent")
+	}
+	return nil
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
@@ -44,18 +82,17 @@ func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *stor
 	if err != nil {
 		return errors.Wrap(err, "Failed to being torrent Sync() tx")
 	}
-	stmt, err := tx.Prepare(q)
-	if err != nil {
-		return errors.Wrap(err, "Failed to prepare torrent Sync() tx")
+	stmt, err2 := tx.Prepare(q)
+	if err2 != nil {
+		return errors.Wrap(err2, "Failed to prepare torrent Sync() tx")
 	}
 	for ih, stats := range b {
-		_, err := stmt.Exec(
+		if _, err := stmt.Exec(
 			stats.Downloaded,
 			stats.Uploaded,
 			stats.Announces,
 			stats.Snatches,
-			ih.Bytes())
-		if err != nil {
+			ih.Bytes()); err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back torrent Sync() tx")
 			}

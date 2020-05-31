@@ -39,13 +39,34 @@ type TorrentStore struct {
 	*client.AuthedClient
 }
 
-func (ts TorrentStore) Update(infoHash store.InfoHash, update store.TorrentUpdate) error {
+func (ts TorrentStore) Name() string {
+	return driverName
+}
+
+func (ts TorrentStore) Update(torrent store.Torrent) error {
 	panic("implement me")
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts TorrentStore) Sync(_ map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
-	panic("implement me")
+func (ts TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
+	req := make(map[string]store.TorrentStats)
+	for k, v := range batch {
+		req[k.String()] = v
+	}
+	_, err := ts.Exec(client.Opts{
+		Method: "POST",
+		Path:   fmt.Sprintf("/api/torrent/sync"),
+		JSON:   req,
+	})
+	if err != nil {
+		return err
+	}
+	if cache != nil {
+		for k, v := range batch {
+			cache.Update(k, v)
+		}
+	}
+	return nil
 }
 
 // Conn returns the underlying http client
@@ -149,6 +170,10 @@ type PeerStore struct {
 	*client.AuthedClient
 }
 
+func (ps PeerStore) Name() string {
+	return driverName
+}
+
 // Sync batch updates the backing store with the new PeerStats provided
 func (ps PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
 	rb := make(map[string]store.PeerStats)
@@ -248,6 +273,10 @@ func (p peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 // UserStore is the HTTP API backed store.UserStore implementation
 type UserStore struct {
 	*client.AuthedClient
+}
+
+func (u *UserStore) Name() string {
+	return driverName
 }
 
 // Sync batch updates the backing store with the new UserStats provided

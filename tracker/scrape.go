@@ -39,13 +39,13 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 			continue
 		}
 		var torrent store.Torrent
-		if err := h.tracker.Torrents.Get(&torrent, ih, false); err != nil {
+		if err := h.tracker.TorrentGet(&torrent, ih, false); err != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}
 		resp[ih.String()] = bencode.Dict{
 			"complete":   torrent.Seeders,
-			"downloaded": torrent.TotalCompleted,
+			"downloaded": torrent.Snatches,
 			"incomplete": torrent.Leechers,
 		}
 	}
@@ -54,7 +54,5 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 		log.Errorf("Failed to encode scrape response")
 		return
 	}
-	encoded := buf.String()
-	log.Debug(encoded)
-	c.String(http.StatusOK, encoded)
+	c.Data(http.StatusOK, gin.MIMEPlain, buf.Bytes())
 }

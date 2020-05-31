@@ -67,17 +67,7 @@ func (s *TorrentStore) Update(torrent store.Torrent) error {
 
 // Sync batch updates the backing store with the new TorrentStats provided
 func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
-	const q = `
-		UPDATE 
-		    torrent
-		SET 
-			total_downloaded = (total_downloaded + ?),
-		    total_uploaded = (total_uploaded + ?),
-		    announces = (announces + ?),
-		    total_completed = (total_completed + ?)
-		WHERE
-			info_hash = ?
-		`
+	const q = `CALL torrent_update_stats(?, ?, ?, ?, ?, ?, ?)`
 	tx, err := s.db.Begin()
 	if err != nil {
 		return errors.Wrap(err, "Failed to being torrent Sync() tx")
@@ -88,11 +78,14 @@ func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *stor
 	}
 	for ih, stats := range b {
 		if _, err := stmt.Exec(
+			ih.Bytes(),
 			stats.Downloaded,
 			stats.Uploaded,
 			stats.Announces,
 			stats.Snatches,
-			ih.Bytes()); err != nil {
+			stats.Seeders,
+			stats.Leechers,
+		); err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back torrent Sync() tx")
 			}
@@ -101,6 +94,11 @@ func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *stor
 	}
 	if err := tx.Commit(); err != nil {
 		return errors.Wrap(err, "Failed to commit torrent Sync() tx")
+	}
+	if cache != nil {
+		for ih, stats := range b {
+			cache.Update(ih, stats)
+		}
 	}
 	return nil
 }
@@ -112,7 +110,7 @@ func (s *TorrentStore) Conn() interface{} {
 
 // WhiteListDelete removes a client from the global whitelist
 func (s *TorrentStore) WhiteListDelete(client store.WhiteListClient) error {
-	const q = `DELETE FROM whitelist WHERE client_prefix = ?`
+	const q = `CALL whitelist_delete_by_prefix(?)`
 	if _, err := s.db.Exec(q, client.ClientPrefix); err != nil {
 		return errors.Wrap(err, "Failed to delete client whitelist")
 	}
@@ -121,8 +119,8 @@ func (s *TorrentStore) WhiteListDelete(client store.WhiteListClient) error {
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (s *TorrentStore) WhiteListAdd(client store.WhiteListClient) error {
-	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES (:client_prefix, :client_name)`
-	if _, err := s.db.NamedExec(q, client); err != nil {
+	const q = `CALL whitelist_add(?, ?)`
+	if _, err := s.db.Exec(q, client.ClientPrefix, client.ClientName); err != nil {
 		return errors.Wrap(err, "Failed to insert new whitelist entry")
 	}
 	return nil
@@ -131,7 +129,7 @@ func (s *TorrentStore) WhiteListAdd(client store.WhiteListClient) error {
 // WhiteListGetAll fetches all known whitelisted clients
 func (s *TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
 	var wl []store.WhiteListClient
-	const q = `SELECT * FROM whitelist`
+	const q = `CALL whitelist_all()`
 	if err := s.db.Select(&wl, q); err != nil {
 		return nil, errors.Wrap(err, "Failed to select client whitelists")
 	}
@@ -145,8 +143,8 @@ func (s *TorrentStore) Close() error {
 
 // Get returns a torrent for the hash provided
 func (s *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
-	const q = `SELECT * FROM torrent WHERE info_hash = ? AND is_deleted = false`
-	err := s.db.Get(t, q, hash.Bytes())
+	const q = `CALL torrent_by_infohash(?, ?)`
+	err := s.db.Get(t, q, hash.Bytes(), deletedOk)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return consts.ErrInvalidInfoHash
@@ -162,7 +160,7 @@ func (s *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool
 
 // Add inserts a new torrent into the backing store
 func (s *TorrentStore) Add(t store.Torrent) error {
-	const q = `INSERT INTO torrent (info_hash, release_name) VALUES(?, ?)`
+	const q = `CALL torrent_add(?, ?)`
 	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName)
 	if err != nil {
 		return err
@@ -176,10 +174,10 @@ func (s *TorrentStore) Add(t store.Torrent) error {
 func (s *TorrentStore) Delete(ih store.InfoHash, dropRow bool) error {
 	var err error
 	if dropRow {
-		const dropQ = `DELETE FROM torrent WHERE info_hash = ?`
+		const dropQ = `CALL torrent_delete(?)`
 		_, err = s.db.Exec(dropQ, ih.Bytes())
 	} else {
-		const updateQ = `UPDATE torrent SET is_deleted = 1 WHERE info_hash = ?`
+		const updateQ = `CALL torrent_disable(?)`
 		_, err = s.db.NamedExec(updateQ, ih.Bytes())
 
 	}

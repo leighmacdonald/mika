@@ -27,15 +27,7 @@ func (u *UserStore) Name() string {
 
 // Sync batch updates the backing store with the new UserStats provided
 func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
-	const q = `
-		UPDATE 
-			users 
-		SET 
-		    announces = (announces + ?), 
-		    uploaded = (uploaded + ?),
-		    downloaded = (downloaded + ?)
-		WHERE
-			passkey = ?`
+	const q = `CALL user_update_stats(?, ?, ?, ?)`
 	// TODO use ctx for timeout
 	ctx := context.Background()
 	tx, err := u.db.BeginTx(ctx, nil)
@@ -47,7 +39,7 @@ func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) e
 		return errors.Wrap(err, "Failed to prepare user Sync() tx")
 	}
 	for passkey, stats := range b {
-		_, err := stmt.Exec(stats.Announces, stats.Uploaded, stats.Downloaded, passkey)
+		_, err := stmt.Exec(passkey, stats.Announces, stats.Uploaded, stats.Downloaded)
 		if err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back user Sync() tx")
@@ -73,21 +65,12 @@ func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) e
 
 // Add will add a new user to the backing store
 func (u *UserStore) Add(user store.User) error {
-	const q = `
-		INSERT INTO users 
-		    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded) 
-		VALUES
-		    (?, ?, ?, ?, ?, ?)`
-	res, err := u.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
-		user.IsDeleted, user.Downloaded, user.Uploaded)
+	const q = `CALL user_add(?, ?, ?, ?, ?, ?, ?)`
+	_, err := u.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
+		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
 	}
-	lastID, err := res.LastInsertId()
-	if err != nil {
-		return errors.New("Failed to fetch insert ID")
-	}
-	user.UserID = uint32(lastID)
 	return nil
 }
 
@@ -96,7 +79,7 @@ func (u *UserStore) Add(user store.User) error {
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
 func (u *UserStore) GetByPasskey(user *store.User, passkey string) error {
-	const q = `SELECT * FROM users WHERE passkey = ?`
+	const q = `CALL user_by_passkey(?)`
 	if err := u.db.Get(user, q, passkey); err != nil {
 		if err.Error() == ErrNoResults {
 			return consts.ErrInvalidUser
@@ -108,7 +91,7 @@ func (u *UserStore) GetByPasskey(user *store.User, passkey string) error {
 
 // GetByID returns a user matching the userId
 func (u *UserStore) GetByID(user *store.User, userID uint32) error {
-	const q = `SELECT * FROM users WHERE user_id = ?`
+	const q = `CALL user_by_id(?)`
 	if err := u.db.Get(user, q, userID); err != nil {
 		if err.Error() == ErrNoResults {
 			return consts.ErrInvalidUser
@@ -123,7 +106,7 @@ func (u *UserStore) Delete(user store.User) error {
 	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
-	const q = `DELETE FROM users WHERE user_id = ?`
+	const q = `CALL user_delete(?)`
 	if _, err := u.db.Exec(q, user.UserID); err != nil {
 		return errors.Wrap(err, "Failed to delete user")
 	}
@@ -132,7 +115,13 @@ func (u *UserStore) Delete(user store.User) error {
 }
 
 func (u *UserStore) Update(user store.User, oldPasskey string) error {
-	panic("implement me")
+	const q = `CALL user_update(?, ?, ?, ?, ?, ?, ?, ?)`
+	if _, err := u.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
+		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces,
+		oldPasskey); err != nil {
+		return errors.Wrapf(err, "Failed to update user")
+	}
+	return nil
 }
 
 // Close will close the underlying database connection and clear the local caches

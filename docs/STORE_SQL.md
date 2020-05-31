@@ -15,7 +15,7 @@ Ellison is a not so cool dude).
 
 For proper time conversions this must be set in any configured mysql stores.
     
-    store_*_properties: parseTime=true
+    store_*_properties: parseTime=true&multiStatements=true
 
 ### PostgreSQL
 

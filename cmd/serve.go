@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/store"
@@ -64,28 +63,6 @@ var serveCmd = &cobra.Command{
 			log.Fatalf("Failed to initialize tracker: %s", err)
 		}
 		_ = tkr.LoadWhitelist()
-		var infoHash store.InfoHash
-		mi, err5 := metainfo.LoadFromFile("examples/data/demo_torrent_data.torrent")
-		if err5 != nil {
-			return
-		}
-		if err := store.InfoHashFromHex(&infoHash, mi.HashInfoBytes().HexString()); err != nil {
-			log.Fatalf(err.Error())
-		}
-		if err := tkr.Torrents.Add(store.Torrent{
-			ReleaseName: "demo torrent",
-			InfoHash:    infoHash,
-		}); err != nil {
-			panic("bad torrent")
-		}
-		if err := tkr.Users.Add(store.User{
-			UserID:          1,
-			Passkey:         "01234567890123456789",
-			IsDeleted:       false,
-			DownloadEnabled: true,
-		}); err != nil {
-			panic("bad user")
-		}
 
 		btOpts := tracker.DefaultHTTPOpts()
 		btOpts.ListenAddr = config.GetString(config.TrackerListen)

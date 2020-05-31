@@ -1,10 +1,6 @@
 # TODO
 
 ## Next Release (v.2.0.0)
-- Caching layer for backing stores
-- Implementations for all currently support store interfaces with tests
-    - http is mostly all that remains
-    - Add test for all fields that are transmitted
     
 ## Future
 - Implement cheater detection mechanisms
@@ -15,6 +11,7 @@
 have limits attached to them.
 - Separate build env for docker img
 - Get client info from header
+- Statistical event logging, prometheus/influx/etc?
 
 ## Maybe
 - Clustering support

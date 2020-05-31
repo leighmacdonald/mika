@@ -8,6 +8,7 @@ import (
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 // PeerStore is the mysql backed implementation of store.PeerStore
@@ -21,17 +22,7 @@ func (ps *PeerStore) Name() string {
 
 // Sync batch updates the backing store with the new PeerStats provided
 func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
-	const q = `
-		UPDATE 
-			peers
-		SET
-			total_announces = (total_announces + ?),
-		    total_downloaded = (total_downloaded + ?),
-		    total_uploaded = (total_uploaded + ?),
-		    announce_last = ?
-		WHERE
-			info_hash = ? AND peer_id = ?
-	`
+	const q = `CALL peer_update_stats(?, ?, ?, ?, ?, ?)`
 	tx, err := ps.db.Begin()
 	if err != nil {
 		return errors.Wrap(err, "Failed to being user Sync() tx")
@@ -43,14 +34,8 @@ func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.Pee
 	for ph, stats := range b {
 		ih := ph.InfoHash()
 		pid := ph.PeerID()
-		_, err := stmt.Exec(
-			stats.Announces,
-			stats.Downloaded,
-			stats.Uploaded,
-			stats.LastAnnounce,
-			ih.Bytes(),
-			pid.Bytes())
-		if err != nil {
+		if _, err := stmt.Exec(ih.Bytes(), pid.Bytes(), stats.Downloaded, stats.Uploaded,
+			stats.Announces, stats.LastAnnounce); err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back peer Sync() tx")
 			}
@@ -65,8 +50,8 @@ func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.Pee
 
 // Reap will loop through the peers removing any stale entries from active swarms
 func (ps *PeerStore) Reap(cache *store.PeerCache) {
-	const q = `DELETE FROM peers WHERE announce_last <= (NOW() - INTERVAL 15 MINUTE)`
-	rows, err := ps.db.Exec(q)
+	const q = `CALL peer_reap(?)`
+	rows, err := ps.db.Exec(q, time.Now().Add(-15*time.Minute))
 	if err != nil {
 		log.Errorf("Failed to reap peers: %s", err.Error())
 		return
@@ -85,14 +70,9 @@ func (ps *PeerStore) Close() error {
 
 // Add insets the peer into the swarm of the torrent provided
 func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
-	const q = `
-	INSERT INTO peers 
-	    (peer_id, info_hash, addr_ip, addr_port, location, user_id, announce_first, announce_last)
-	VALUES 
-	    (?, ?, INET_ATON(?), ?, ST_PointFromText(?), ?, ?, ?)
-	`
+	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?)`
 	point := fmt.Sprintf("POINT(%s)", p.Location.String())
-	_, err := ps.db.Exec(q, p.PeerID.Bytes(), ih.Bytes(), p.IP.String(), p.Port, point, p.UserID,
+	_, err := ps.db.Exec(q, ih.Bytes(), p.PeerID.Bytes(), p.UserID, p.IP.String(), p.Port, point,
 		p.AnnounceFirst, p.AnnounceLast)
 	if err != nil {
 		return err
@@ -102,20 +82,14 @@ func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 
 // Delete will remove a peer from the swarm of the torrent provided
 func (ps *PeerStore) Delete(ih store.InfoHash, p store.PeerID) error {
-	const q = `DELETE FROM peers WHERE info_hash = ? AND peer_id = ?`
+	const q = `CALL peer_delete(?, ?)`
 	_, err := ps.db.Exec(q, ih.Bytes(), p.Bytes())
 	return err
 }
 
 // Get will fetch the peer from the swarm if it exists
 func (ps *PeerStore) Get(peer *store.Peer, ih store.InfoHash, peerID store.PeerID) error {
-	const q = `
-		SELECT 
-		    peer_id, info_hash, user_id, INET_NTOA(addr_ip) as addr_ip, addr_port, 
-		    total_downloaded, total_uploaded, total_left, total_time, total_announces, 
-		    speed_up, speed_dn, speed_up_max, speed_dn_max, ST_AsText(location) as location, 
-		    announce_last, announce_first 
-		FROM peers WHERE info_hash = ? AND peer_id = ? LIMIT 1`
+	const q = `CALL peer_get(?, ?)`
 	if err := ps.db.Get(peer, q, ih.Bytes(), peerID.Bytes()); err != nil {
 		log.Errorf("Failed to query peer: %s", err.Error())
 		return errors.Wrap(err, "Unknown peer")
@@ -125,23 +99,22 @@ func (ps *PeerStore) Get(peer *store.Peer, ih store.InfoHash, peerID store.PeerI
 
 // GetN will fetch the torrents swarm member peers
 func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
-	const q = `
-		SELECT 
-			peer_id, info_hash, user_id, INET_NTOA(addr_ip) as addr_ip, addr_port, 
-		    total_downloaded, total_uploaded, total_left, total_time, total_announces, 
-		    speed_up, speed_dn, speed_up_max, speed_dn_max,  ST_AsText(location) as location, 
-		    announce_last, announce_first 
-		FROM 
-		    peers 
-		WHERE 
-		    info_hash = ? 
-		LIMIT
-		    ?`
-	var peers store.Swarm
-	if err := ps.db.Select(&peers, q, ih.Bytes(), limit); err != nil {
-		return peers, err
+	const q = `CALL peer_get_n(?, ?)`
+	swarm := store.NewSwarm()
+	rows, err := ps.db.Query(q, ih.Bytes(), limit)
+	if err != nil {
+		return swarm, err
 	}
-	return peers, nil
+	var p store.Peer
+	for rows.Next() {
+		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
+			&p.Left, &p.TotalTime, &p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax,
+			&p.Location, &p.AnnounceLast, &p.AnnounceFirst); err != nil {
+			return swarm, err
+		}
+		swarm.Add(p)
+	}
+	return swarm, nil
 }
 
 type peerDriver struct{}

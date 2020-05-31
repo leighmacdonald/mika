@@ -134,7 +134,7 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 	require.NoError(t, ts.Sync(batch, nil), "[%s] Failed to sync torrent", ts.Name())
 	var updated Torrent
 	require.NoError(t, ts.Get(&updated, torrentA.InfoHash, false))
-	require.Equal(t, torrentA.Snatches+batch[torrentA.InfoHash].Snatches, updated.Snatches)
+	require.Equal(t, torrentA.Seeders+batch[torrentA.InfoHash].Seeders, updated.Seeders)
 	require.Equal(t, torrentA.Leechers+batch[torrentA.InfoHash].Leechers, updated.Leechers)
 	require.Equal(t, torrentA.Snatches+batch[torrentA.InfoHash].Snatches, updated.Snatches)
 	require.Equal(t, torrentA.Uploaded+batch[torrentA.InfoHash].Uploaded, updated.Uploaded)
@@ -190,6 +190,18 @@ func TestUserStore(t *testing.T, s UserStore) {
 	require.Equal(t, uint64(1000)+users[0].Uploaded, updatedUser.Uploaded)
 	require.Equal(t, uint64(2000)+users[0].Downloaded, updatedUser.Downloaded)
 	require.Equal(t, uint32(10)+users[0].Announces, updatedUser.Announces)
+
+	newUser := GenerateTestUser()
+	require.NoError(t, s.Update(newUser, users[0].Passkey))
+	var fetchedNewUser User
+	require.NoError(t, s.GetByPasskey(&fetchedNewUser, newUser.Passkey))
+	require.Equal(t, newUser.UserID, fetchedNewUser.UserID)
+	require.Equal(t, newUser.Passkey, fetchedNewUser.Passkey)
+	require.Equal(t, newUser.IsDeleted, fetchedNewUser.IsDeleted)
+	require.Equal(t, newUser.DownloadEnabled, fetchedNewUser.DownloadEnabled)
+	require.Equal(t, newUser.Downloaded, fetchedNewUser.Downloaded)
+	require.Equal(t, newUser.Uploaded, fetchedNewUser.Uploaded)
+	require.Equal(t, newUser.Announces, fetchedNewUser.Announces)
 }
 
 func init() {

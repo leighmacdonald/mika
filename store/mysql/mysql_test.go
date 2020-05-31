@@ -6,35 +6,45 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
 )
 
+var schemaSets = []string{"store/mysql/schema.sql"}
+
 func TestTorrentDriver(t *testing.T) {
 	// multiStatements=true is required to exec the full schema at once
 	db := sqlx.MustConnect(driverName, config.GetStoreConfig(config.Torrent).DSN())
-	setupDB(t, db)
-	store.TestTorrentStore(t, &TorrentStore{db: db})
+	for _, p := range schemaSets {
+		setupDB(t, db, p)
+		store.TestTorrentStore(t, &TorrentStore{db: db})
+	}
 }
 
 func TestUserDriver(t *testing.T) {
 	db := sqlx.MustConnect(driverName, config.GetStoreConfig(config.Torrent).DSN())
-	setupDB(t, db)
-	store.TestUserStore(t, &UserStore{
-		db:      db,
-		users:   map[string]store.User{},
-		usersMx: sync.RWMutex{},
-	})
+	for _, p := range schemaSets {
+		setupDB(t, db, p)
+		store.TestUserStore(t, &UserStore{
+			db:      db,
+			users:   map[string]store.User{},
+			usersMx: sync.RWMutex{},
+		})
+	}
 }
 
 func TestPeerStore(t *testing.T) {
 	db := sqlx.MustConnect(driverName, config.GetStoreConfig(config.Peers).DSN())
-	setupDB(t, db)
-	ts := memory.NewTorrentStore()
-	us := memory.NewUserStore()
-	store.TestPeerStore(t, &PeerStore{db: db}, ts, us)
+	for _, p := range schemaSets {
+		setupDB(t, db, p)
+		ts := memory.NewTorrentStore()
+		us := memory.NewUserStore()
+		store.TestPeerStore(t, &PeerStore{db: db}, ts, us)
+	}
 }
 
 func clearDB(db *sqlx.DB) {
@@ -45,9 +55,14 @@ func clearDB(db *sqlx.DB) {
 	}
 }
 
-func setupDB(t *testing.T, db *sqlx.DB) {
+func setupDB(t *testing.T, db *sqlx.DB, schemaPath string) {
 	clearDB(db)
-	db.MustExec(schema)
+	schema := util.FindFile(schemaPath)
+	b, err := ioutil.ReadFile(schema)
+	if err != nil {
+		panic("Cannot read schema file")
+	}
+	db.MustExec(string(b))
 	t.Cleanup(func() {
 		clearDB(db)
 	})

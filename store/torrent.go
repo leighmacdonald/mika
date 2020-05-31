@@ -120,27 +120,27 @@ func (ih *InfoHash) RawString() string {
 
 // Torrent is the core struct for our torrent being tracked
 type Torrent struct {
-	InfoHash    InfoHash `json:"info_hash"`
-	ReleaseName string   `json:"release_name"`
-	Snatches    uint16   `json:"total_completed"`
+	InfoHash    InfoHash `db:"info_hash" json:"info_hash"`
+	ReleaseName string   `db:"release_name" json:"release_name"`
+	Snatches    uint16   `db:"total_completed" json:"total_completed"`
 	// This is stored as MB to reduce storage costs
-	Uploaded uint64 `json:"total_uploaded"`
+	Uploaded uint64 `db:"total_uploaded" json:"total_uploaded"`
 	// This is stored as MB to reduce storage costs
-	Downloaded uint64 `json:"total_downloaded"`
-	IsDeleted  bool   `json:"is_deleted"`
+	Downloaded uint64 `db:"total_downloaded" json:"total_downloaded"`
+	IsDeleted  bool   `db:"is_deleted" json:"is_deleted"`
 	// When you have a message to pass to a client set enabled = false and set the reason message.
 	// If IsDeleted is true, then nothing will be returned to the client
-	IsEnabled bool `json:"is_enabled"`
+	IsEnabled bool `db:"is_enabled" json:"is_enabled"`
 	// Reason when set will return a message to the torrent client
-	Reason string `json:"reason"`
+	Reason string `db:"reason" json:"reason"`
 	// Upload multiplier added to the users totals
-	MultiUp float64 `json:"multi_up"`
+	MultiUp float64 `db:"multi_up" json:"multi_up"`
 	// Download multiplier added to the users totals
 	// 0 denotes freeleech status
-	MultiDn   float64 `json:"multi_dn"`
-	Announces uint64  `json:"announces"`
-	Seeders   int     `json:"seeders"`
-	Leechers  int     `json:"leechers"`
+	MultiDn   float64 `db:"multi_dn" json:"multi_dn"`
+	Announces uint64  `db:"announces" json:"announces"`
+	Seeders   int     `db:"seeders" json:"seeders"`
+	Leechers  int     `db:"leechers" json:"leechers"`
 }
 
 type TorrentUpdate struct {

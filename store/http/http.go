@@ -1,3 +1,5 @@
+// +build store_http
+
 // Package http defines a storage backend over a HTTP API.
 // This is meant to make basic interoperability possible for users
 // who do not want to change their data model (or use views on compatible RDBMS systems)

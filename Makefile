@@ -1,5 +1,5 @@
 .PHONY: all test clean build install
-GO_FLAGS = -ldflags "-X 'github.com/leighmacdonald/mika/consts.BuildVersion=`git rev-parse --short HEAD`'"
+GO_FLAGS = -ldflags "-X 'github.com/leighmacdonald/mika/consts.BuildVersion=`git describe --long`'"
 
 all: build
 

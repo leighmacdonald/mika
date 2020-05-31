@@ -1,3 +1,5 @@
+// +build store_http
+
 package http
 
 import (

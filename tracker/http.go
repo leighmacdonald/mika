@@ -167,8 +167,8 @@ func NewBitTorrentHandler(tkr *Tracker) *gin.Engine {
 	h := BitTorrentHandler{
 		tracker: tkr,
 	}
-	r.GET("/:passkey/announce", h.announce)
-	r.GET("/:passkey/scrape", h.scrape)
+	r.GET("/announce/:passkey", h.announce)
+	r.GET("/scrape/:passkey", h.scrape)
 	r.NoRoute(noRoute)
 	return r
 }

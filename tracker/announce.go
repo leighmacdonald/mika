@@ -191,6 +191,11 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		if err == consts.ErrInvalidPeerID {
 			// Create a new peer for the swarm
 			peer = store.NewPeer(usr.UserID, req.PeerID, req.IP, req.Port)
+			// Dont add download/upload stats because they would be doubled if applied in the
+			// state update. Left is set because its always a static value being set and a (safe) data race
+			// can occur for counting seeder/leecher states
+			peer.Client = c.GetHeader("User-Agent")
+			peer.Left = req.Left
 			if err := h.tracker.PeerAdd(tor.InfoHash, peer); err != nil {
 				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
 				oops(c, msgGenericError)
@@ -219,7 +224,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		Timestamp:  time.Now(),
 		Paused:     peer.Paused,
 	}
-	peers, err2 := h.tracker.Peers.GetN(tor.InfoHash, h.tracker.MaxPeers)
+	peers, err2 := h.tracker.PeerGetN(tor.InfoHash, h.tracker.MaxPeers)
 	if err2 != nil {
 		log.Errorf("Could not read peers from swarm: %s", err2.Error())
 		oops(c, msgGenericError)

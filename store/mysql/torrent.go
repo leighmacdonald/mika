@@ -151,7 +151,6 @@ func (s *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool
 		}
 		return err
 	}
-	log.Debugf("Added torrent to cache (Get()): %s", t.InfoHash.String())
 	if t.IsDeleted && !deletedOk {
 		return consts.ErrInvalidInfoHash
 	}

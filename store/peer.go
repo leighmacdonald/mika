@@ -95,6 +95,8 @@ type Peer struct {
 	InfoHash InfoHash    `db:"info_hash" redis:"info_hash" json:"info_hash"`
 	Location geo.LatLong `db:"location" redis:"location" json:"location"`
 	UserID   uint32      `db:"user_id" redis:"user_id" json:"user_id"`
+	// Client is the user-agent header sent
+	Client string `db:"client" json:"client"`
 	// TODO Do we actually care about these times? Announce times likely enough
 	//CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
 	//UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`

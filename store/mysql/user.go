@@ -8,7 +8,6 @@ import (
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"sync"
 )
 
 // ErrNoResults is the string returned from the driver when no rows are returned
@@ -16,9 +15,7 @@ const ErrNoResults = "sql: no rows in result set"
 
 // UserStore is the MySQL backed store.UserStore implementation
 type UserStore struct {
-	db      *sqlx.DB
-	users   map[string]store.User
-	usersMx sync.RWMutex
+	db *sqlx.DB
 }
 
 func (u *UserStore) Name() string {
@@ -139,9 +136,7 @@ func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
 	}
 	db := sqlx.MustConnect(driverName, c.DSN())
 	return &UserStore{
-		db:      db,
-		users:   map[string]store.User{},
-		usersMx: sync.RWMutex{},
+		db: db,
 	}, nil
 }
 

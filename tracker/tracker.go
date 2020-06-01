@@ -395,6 +395,14 @@ func (t *Tracker) PeerGet(peer *store.Peer, infoHash store.InfoHash, peerID stor
 	return nil
 }
 
+func (t *Tracker) PeerGetN(infoHash store.InfoHash, max int) (store.Swarm, error) {
+	swarm, err := t.Peers.GetN(infoHash, max)
+	if err != nil {
+		return store.Swarm{}, err
+	}
+	return swarm, nil
+}
+
 func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
 	if err := t.Peers.Add(infoHash, peer); err != nil {
 		return err

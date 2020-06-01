@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
@@ -8,6 +9,7 @@ import (
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"net"
 	"time"
 )
 
@@ -70,10 +72,10 @@ func (ps *PeerStore) Close() error {
 
 // Add insets the peer into the swarm of the torrent provided
 func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
-	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?)`
+	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	point := fmt.Sprintf("POINT(%s)", p.Location.String())
 	_, err := ps.db.Exec(q, ih.Bytes(), p.PeerID.Bytes(), p.UserID, p.IP.String(), p.Port, point,
-		p.AnnounceFirst, p.AnnounceLast)
+		p.AnnounceFirst, p.AnnounceLast, p.Downloaded, p.Uploaded, p.Left, p.Client)
 	if err != nil {
 		return err
 	}
@@ -91,8 +93,10 @@ func (ps *PeerStore) Delete(ih store.InfoHash, p store.PeerID) error {
 func (ps *PeerStore) Get(peer *store.Peer, ih store.InfoHash, peerID store.PeerID) error {
 	const q = `CALL peer_get(?, ?)`
 	if err := ps.db.Get(peer, q, ih.Bytes(), peerID.Bytes()); err != nil {
-		log.Errorf("Failed to query peer: %s", err.Error())
-		return errors.Wrap(err, "Unknown peer")
+		if errors.Is(sql.ErrNoRows, err) {
+			return consts.ErrInvalidPeerID
+		}
+		return errors.Wrap(err, "Error looking up peer")
 	}
 	return nil
 }
@@ -106,12 +110,14 @@ func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 		return swarm, err
 	}
 	var p store.Peer
+	var ip string
 	for rows.Next() {
-		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IP, &p.Port, &p.Downloaded, &p.Uploaded,
+		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &ip, &p.Port, &p.Downloaded, &p.Uploaded,
 			&p.Left, &p.TotalTime, &p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax,
 			&p.Location, &p.AnnounceLast, &p.AnnounceFirst); err != nil {
 			return swarm, err
 		}
+		p.IP = net.ParseIP(ip)
 		swarm.Add(p)
 	}
 	return swarm, nil

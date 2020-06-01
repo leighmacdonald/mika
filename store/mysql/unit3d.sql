@@ -1,5 +1,5 @@
 -- USERS
-CREATE PROCEDURE user_by_passkey(
+CREATE OR REPLACE PROCEDURE user_by_passkey(
     IN in_passkey varchar(32)
 )
 BEGIN
@@ -11,10 +11,10 @@ BEGIN
            uploaded                       as uploaded,
            0                              as announces
     FROM users
-    WHERE passkey = in_passkey;
+    WHERE passkey = in_passkey collate utf8mb4_unicode_ci;
 end;
 
-CREATE PROCEDURE user_by_id(
+CREATE OR REPLACE PROCEDURE user_by_id(
     IN in_user_id int
 )
 BEGIN
@@ -65,7 +65,7 @@ BEGIN
         active       = NOT in_is_deleted,
         downloaded   = in_downloaded,
         uploaded     = in_uploaded
-    WHERE passkey = if(in_old_passkey = '', in_passkey, in_old_passkey);
+    WHERE passkey = if(in_old_passkey = '', in_passkey, in_old_passkey) collate utf8mb4_unicode_ci;
 end;
 
 CREATE OR REPLACE PROCEDURE user_update_stats(IN in_passkey varchar(40),
@@ -76,7 +76,7 @@ BEGIN
     UPDATE users
     SET uploaded   = (uploaded + in_uploaded),
         downloaded = (downloaded + in_downloaded)
-    WHERE passkey = in_passkey;
+    WHERE passkey = in_passkey collate utf8mb4_unicode_ci;
 END;
 
 -- END USERS
@@ -86,7 +86,7 @@ END;
 CREATE OR REPLACE PROCEDURE torrent_by_infohash(IN in_info_hash binary(20),
                                                 IN in_deleted bool)
 BEGIN
-    SELECT UNHEX(info_hash),
+    SELECT UNHEX(info_hash)          as info_hash,
            name                      as release_name,
            0                         as total_uploaded,
            0                         as total_downloaded,
@@ -163,22 +163,34 @@ end;
 CREATE OR REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
                                      IN in_peer_id binary(20),
                                      IN in_user_id int,
-                                     IN in_addr_ip int unsigned,
+                                     IN in_addr_ip varchar(255),
                                      IN in_addr_port int,
                                      IN in_location varchar(255),
                                      IN in_announce_first datetime,
-                                     IN in_announce_last datetime)
+                                     IN in_announce_last datetime,
+                                     IN in_downloaded int,
+                                     IN in_uploaded int,
+                                     IN in_left int,
+                                     IN in_client varchar(255))
 BEGIN
+    SELECT @int_torrent_id := `id` FROM torrents WHERE info_hash = HEX(in_info_hash);
     INSERT INTO peers
-    (peer_id, md5_peer_id, info_hash, user_id, ip, port, created_at, updated_at)
+    (peer_id, md5_peer_id, info_hash, user_id, ip, port, created_at, updated_at, torrent_id,
+     downloaded, uploaded, `left`, agent, seeder)
     VALUES (HEX(in_peer_id),
             md5(HEX(in_peer_id)),
             HEX(in_info_hash),
             in_user_id,
-            INET_NTOA(in_addr_ip),
+            in_addr_ip,
             in_addr_port,
             in_announce_first,
-            in_announce_last);
+            in_announce_last,
+            @int_torrent_id,
+            in_downloaded,
+            in_uploaded,
+            in_left,
+            in_client,
+            if(in_left = 0, 1, 0));
 end;
 
 CREATE OR REPLACE PROCEDURE peer_delete(IN in_info_hash binary(20),
@@ -187,26 +199,26 @@ BEGIN
     DELETE FROM peers WHERE info_hash = HEX(in_info_hash) AND peer_id = HEX(in_peer_id);
 end;
 
-CREATE PROCEDURE peer_get(IN in_info_hash BINARY(20),
-                          IN in_peer_id BINARY(20))
+CREATE OR REPLACE PROCEDURE peer_get(IN in_info_hash BINARY(20),
+                                     IN in_peer_id BINARY(20))
 BEGIN
-    SELECT UNHEX(peer_id)                 as peer_id,
-           UNHEX(info_hash)               as info_hash,
-           user_id                        as user_id,
-           INET_ATON(ip)                  as addr_ip,
-           port                           as addr_port,
-           downloaded                     as total_downloaded,
-           uploaded                       as total_uploaded,
-           `left`                         as total_left,
-           0                              as total_time,
-           0                              as total_announces,
-           0                              as speed_up,
-           0                              as speed_dn,
-           0                              as speed_up_max,
-           0                              as speed_dn_max,
-           ST_PointFromText('POINT(0 0)') as location,
-           updated_at                     as announce_last,
-           created_at                     as announce_first
+    SELECT UNHEX(peer_id)   as peer_id,
+           UNHEX(info_hash) as info_hash,
+           user_id          as user_id,
+           ip               as addr_ip,
+           port             as addr_port,
+           downloaded       as total_downloaded,
+           uploaded         as total_uploaded,
+           `left`           as total_left,
+           0                as total_time,
+           0                as total_announces,
+           0                as speed_up,
+           0                as speed_dn,
+           0                as speed_up_max,
+           0                as speed_dn_max,
+           'POINT(0 0)'     as location,
+           updated_at       as announce_last,
+           created_at       as announce_first
     FROM peers
     WHERE info_hash = HEX(in_info_hash)
       and peer_id = HEX(in_peer_id);
@@ -214,23 +226,23 @@ END;
 
 CREATE OR REPLACE PROCEDURE peer_get_n(IN in_info_hash binary(20), IN in_limit int)
 BEGIN
-    SELECT UNHEX(peer_id)                 as peer_id,
-           UNHEX(info_hash)               as info_hash,
-           user_id                        as user_id,
-           INET_ATON(ip)                  as addr_ip,
-           port                           as addr_port,
-           downloaded                     as total_downloaded,
-           uploaded                       as total_uploaded,
-           `left`                         as total_left,
-           0                              as total_time,
-           0                              as total_announces,
-           0                              as speed_up,
-           0                              as speed_dn,
-           0                              as speed_up_max,
-           0                              as speed_dn_max,
-           ST_PointFromText('POINT(0 0)') as location,
-           updated_at                     as announce_last,
-           created_at                     as announce_first
+    SELECT UNHEX(peer_id)   as peer_id,
+           UNHEX(info_hash) as info_hash,
+           user_id          as user_id,
+           ip               as addr_ip,
+           port             as addr_port,
+           downloaded       as total_downloaded,
+           uploaded         as total_uploaded,
+           `left`           as total_left,
+           0                as total_time,
+           0                as total_announces,
+           0                as speed_up,
+           0                as speed_dn,
+           0                as speed_up_max,
+           0                as speed_dn_max,
+           'POINT(0 0)'     as location,
+           updated_at       as announce_last,
+           created_at       as announce_first
     FROM peers
     WHERE info_hash = HEX(in_info_hash)
     LIMIT in_limit;

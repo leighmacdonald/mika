@@ -36,6 +36,7 @@ create table peers
     peer_id          binary(20)             not null,
     info_hash        binary(20)             not null,
     user_id          int unsigned           not null,
+    ipv6             boolean                not null,
     addr_ip          int unsigned           not null,
     addr_port        smallint unsigned      not null,
     total_downloaded int unsigned default 0 not null,
@@ -49,7 +50,12 @@ create table peers
     speed_dn_max     int unsigned default 0 not null,
     announce_first   datetime               not null,
     announce_last    datetime               not null,
+    announce_prev    datetime               not null,
     location         point                  not null,
+    country_code     char(2)                not null default '',
+    asn              int unsigned           not null default 0,
+    as_name          varchar(255)           not null default '',
+    agent            varchar(100)           not null,
     constraint peers_pk primary key (info_hash, peer_id)
 );
 
@@ -229,14 +235,23 @@ CREATE OR REPLACE PROCEDURE peer_update_stats(IN in_info_hash binary(20),
                                               IN in_total_downloaded bigint,
                                               IN in_total_uploaded bigint,
                                               IN in_total_announces bigint,
-                                              IN in_announce_last datetime)
+                                              IN in_announce_last datetime,
+                                              IN in_speed_dn bigint,
+                                              IN in_speed_up bigint,
+                                              IN in_speed_dn_max bigint,
+                                              IN in_speed_up_max bigint)
 BEGIN
     UPDATE
         peers
     SET total_announces  = (total_announces + in_total_announces),
         total_downloaded = (total_downloaded + in_total_downloaded),
         total_uploaded   = (total_uploaded + in_total_uploaded),
-        announce_last    = in_announce_last
+        announce_last    = in_announce_last,
+        speed_up         = in_speed_up,
+        speed_dn         = in_speed_dn,
+        speed_up_max     = GREATEST(speed_up_max, in_speed_up_max),
+        speed_dn_max     = GREATEST(speed_dn_max, in_speed_dn_max)
+
     WHERE info_hash = in_info_hash
       AND peer_id = in_peer_id;
 END;
@@ -249,17 +264,40 @@ end;
 CREATE OR REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
                                      IN in_peer_id binary(20),
                                      IN in_user_id int,
+                                     IN in_ipv6 boolean,
                                      IN in_addr_ip varchar(255),
                                      IN in_addr_port int,
                                      IN in_location varchar(255),
                                      IN in_announce_first datetime,
-                                     IN in_announce_last datetime)
+                                     IN in_announce_last datetime,
+                                     IN in_downloaded int,
+                                     IN in_uploaded int,
+                                     IN in_left int,
+                                     IN in_client varchar(255),
+                                     IN in_country_code char(2),
+                                     IN in_asn varchar(10),
+                                     IN in_as_name varchar(255))
 BEGIN
     INSERT INTO peers
-    (peer_id, info_hash, user_id, addr_ip, addr_port, location, announce_first, announce_last)
-    VALUES (in_peer_id, in_info_hash, in_user_id,
-            INET_ATON(in_addr_ip), in_addr_port, ST_PointFromText(in_location),
-            in_announce_first, in_announce_last);
+    (peer_id, info_hash, user_id, ipv6, addr_ip, addr_port, location, announce_first, announce_last, announce_prev,
+     total_downloaded, total_uploaded, total_left, agent, country_code, asn, as_name)
+    VALUES (in_peer_id,
+            in_info_hash,
+            in_user_id,
+            in_ipv6,
+            if(in_ipv6 = false, INET_ATON(in_addr_ip), INET6_ATON(in_addr_ip)),
+            in_addr_port,
+            ST_PointFromText(in_location),
+            in_announce_first,
+            in_announce_last,
+            in_announce_last,
+            in_downloaded,
+            in_uploaded,
+            in_left,
+            in_client,
+            in_country_code,
+            in_asn,
+            in_as_name);
 end;
 
 CREATE OR REPLACE PROCEDURE peer_delete(IN in_info_hash binary(20),
@@ -273,7 +311,8 @@ BEGIN
     SELECT peer_id,
            info_hash,
            user_id,
-           INET_NTOA(addr_ip)  as addr_ip,
+           ipv6,
+           if(ipv6 = false, INET_NTOA(addr_ip), INET6_NTOA(addr_ip)) as addr_ip,
            addr_port,
            total_downloaded,
            total_uploaded,
@@ -284,9 +323,12 @@ BEGIN
            speed_dn,
            speed_up_max,
            speed_dn_max,
-           ST_AsText(location) as location,
+           ST_AsText(location)                                       as location,
            announce_last,
-           announce_first
+           announce_first,
+           country_code,
+           asn,
+           as_name
     FROM peers
     WHERE info_hash = in_info_hash
       AND peer_id = in_peer_id;
@@ -297,7 +339,8 @@ BEGIN
     SELECT peer_id,
            info_hash,
            user_id,
-           INET_NTOA(addr_ip)  as addr_ip,
+           ipv6,
+           if(ipv6 = false, INET_NTOA(addr_ip), INET6_NTOA(addr_ip)) as addr_ip,
            addr_port,
            total_downloaded,
            total_uploaded,
@@ -308,9 +351,12 @@ BEGIN
            speed_dn,
            speed_up_max,
            speed_dn_max,
-           ST_AsText(location) as location,
+           ST_AsText(location)                                       as location,
            announce_last,
-           announce_first
+           announce_first,
+           country_code,
+           asn,
+           as_name
     FROM peers
     WHERE info_hash = in_info_hash
     LIMIT in_limit;

@@ -28,7 +28,6 @@ var serveCmd = &cobra.Command{
 		opts.AnnIntervalMin = config.GetDuration(config.TrackerAnnounceIntervalMin)
 		opts.AllowNonRoutable = config.GetBool(config.TrackerAllowNonRoutable)
 
-		runMode := config.GetString(config.GeneralRunMode)
 		ts, err := store.NewTorrentStore(
 			config.GetString(config.StoreTorrentType),
 			config.GetStoreConfig(config.Torrent))
@@ -50,7 +49,7 @@ var serveCmd = &cobra.Command{
 		opts.Users = u
 		var geodb geo.Provider
 		if config.GetBool(config.GeodbEnabled) {
-			geodb, err = geo.New(config.GetString(config.GeodbPath), runMode == "release")
+			geodb, err = geo.New(config.GetString(config.GeodbPath))
 			if err != nil {
 				log.Fatalf("Could not validate geo database")
 			}

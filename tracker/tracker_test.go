@@ -136,7 +136,7 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 	}
 
 	for i, a := range scrapes {
-		u := fmt.Sprintf("/%s/scrape?%s", a.req.PK, a.req.ToValues().Encode())
+		u := fmt.Sprintf("/scrape/%s?%s", a.req.PK, a.req.ToValues().Encode())
 		w := performRequest(rh, "GET", u, nil, nil)
 		require.EqualValues(t, a.exp.status, errCode(w.Code),
 			fmt.Sprintf("%s (%d)", responseStringMap[errCode(w.Code)], i))
@@ -281,10 +281,7 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		},
 	}
 	for i, a := range announces {
-		u := fmt.Sprintf("/%s/announce?%s", a.req.PK, a.req.ToValues().Encode())
-		if i == 13 {
-			fmt.Println("x")
-		}
+		u := fmt.Sprintf("/announce/%s?%s", a.req.PK, a.req.ToValues().Encode())
 		w := performRequest(rh, "GET", u, nil, nil)
 		time.Sleep(time.Millisecond * 200) // Wait for batch update call (100ms)
 		require.EqualValues(t, a.state.Status, errCode(w.Code),

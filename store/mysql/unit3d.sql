@@ -144,13 +144,21 @@ CREATE OR REPLACE PROCEDURE peer_update_stats(IN in_info_hash binary(20),
                                               IN in_total_downloaded bigint,
                                               IN in_total_uploaded bigint,
                                               IN in_total_announces bigint,
-                                              IN in_announce_last datetime)
+                                              IN in_announce_last datetime,
+                                              IN in_speed_dn bigint,
+                                              IN in_speed_up bigint,
+                                              IN in_speed_dn_max bigint,
+                                              IN in_speed_up_max bigint)
 BEGIN
     UPDATE
         peers
-    SET downloaded = (downloaded + in_total_downloaded),
-        uploaded   = (uploaded + in_total_uploaded),
-        updated_at = in_announce_last
+    SET downloaded   = (downloaded + in_total_downloaded),
+        uploaded     = (uploaded + in_total_uploaded),
+        updated_at   = in_announce_last,
+        speed_up     = in_speed_up,
+        speed_dn     = in_speed_dn,
+        speed_up_max = GREATEST(speed_up_max, in_speed_up_max),
+        speed_dn_max = GREATEST(speed_dn_max, in_speed_dn_max)
     WHERE info_hash = HEX(in_info_hash)
       AND peer_id = HEX(in_peer_id);
 END;

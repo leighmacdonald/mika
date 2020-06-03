@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
-	"sync"
 	"testing"
 )
 
@@ -30,9 +29,7 @@ func TestUserDriver(t *testing.T) {
 	for _, p := range schemaSets {
 		setupDB(t, db, p)
 		store.TestUserStore(t, &UserStore{
-			db:      db,
-			users:   map[string]store.User{},
-			usersMx: sync.RWMutex{},
+			db: db,
 		})
 	}
 }

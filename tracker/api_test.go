@@ -147,15 +147,15 @@ func TestTorrentUpdate(t *testing.T) {
 }
 
 func TestConfigUpdate(t *testing.T) {
-	toDuration := func(s string) time.Duration {
-		d, err := time.ParseDuration(s)
+	toDuration := func(seconds int) time.Duration {
+		d, err := time.ParseDuration(fmt.Sprintf("%ds", seconds))
 		if err != nil {
 			panic("Invalid duration specified")
 		}
 		return d
 	}
 	tkr, handler := newTestAPI()
-	args := ConfigUpdateRequest{
+	args := ConfigRequest{
 		UpdateKeys: []config.Key{
 			config.TrackerAnnounceInterval,
 			config.TrackerAnnounceIntervalMin,
@@ -166,10 +166,10 @@ func TestConfigUpdate(t *testing.T) {
 			config.TrackerAllowNonRoutable,
 			config.GeodbEnabled,
 		},
-		TrackerAnnounceInterval:    "60s",
-		TrackerAnnounceIntervalMin: "30s",
-		TrackerReaperInterval:      "30s",
-		TrackerBatchUpdateInterval: "10s",
+		TrackerAnnounceInterval:    60,
+		TrackerAnnounceIntervalMin: 30,
+		TrackerReaperInterval:      30,
+		TrackerBatchUpdateInterval: 10,
 		TrackerMaxPeers:            100,
 		TrackerAutoRegister:        true,
 		TrackerAllowNonRoutable:    true,

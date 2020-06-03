@@ -202,7 +202,11 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 				return
 			}
 			if h.tracker.GeodbEnabled {
-				peer.Location = h.tracker.Geodb.GetLocation(peer.IP).Location
+				l := h.tracker.Geodb.GetLocation(peer.IP)
+				peer.Location = l.LatLong
+				peer.ASN = l.ASN
+				peer.AS = l.AS
+				peer.CountryCode = l.ISOCode
 			}
 		} else {
 			oops(c, msgGenericError)

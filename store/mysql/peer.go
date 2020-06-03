@@ -7,9 +7,11 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -24,7 +26,7 @@ func (ps *PeerStore) Name() string {
 
 // Sync batch updates the backing store with the new PeerStats provided
 func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
-	const q = `CALL peer_update_stats(?, ?, ?, ?, ?, ?)`
+	const q = `CALL peer_update_stats(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	tx, err := ps.db.Begin()
 	if err != nil {
 		return errors.Wrap(err, "Failed to being user Sync() tx")
@@ -33,19 +35,39 @@ func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.Pee
 	if err2 != nil {
 		return errors.Wrap(err2, "Failed to prepare user Sync() tx")
 	}
+	peers := make(map[store.InfoHash]store.Peer)
 	for ph, stats := range b {
-		ih := ph.InfoHash()
-		pid := ph.PeerID()
-		if _, err := stmt.Exec(ih.Bytes(), pid.Bytes(), stats.Downloaded, stats.Uploaded,
-			stats.Announces, stats.LastAnnounce); err != nil {
+		sum := stats.Totals()
+		if _, err := stmt.Exec(ph.InfoHash().Bytes(), ph.PeerID().Bytes(),
+			sum.TotalDn, sum.TotalUp, len(stats.Hist), sum.LastAnn,
+			sum.SpeedDn, sum.SpeedUp, sum.SpeedDnMax, sum.SpeedUpMax); err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back peer Sync() tx")
 			}
 			return errors.Wrap(err, "Failed to exec peer Sync() tx")
 		}
+		var peer store.Peer
+		if cache != nil {
+			// Update set for cached peer data
+			// Its applied only after successful Commit() call
+			if cache.Get(&peer, ph.InfoHash(), ph.PeerID()) {
+				peer.Downloaded += sum.TotalDn
+				peer.Uploaded += sum.TotalUp
+				peer.SpeedDN = uint32(sum.SpeedDn)
+				peer.SpeedUP = uint32(sum.SpeedUp)
+				peer.SpeedDNMax = util.UMax32(peer.SpeedDNMax, uint32(sum.SpeedDn))
+				peer.SpeedUPMax = util.UMax32(peer.SpeedUPMax, uint32(sum.SpeedUp))
+				peers[ph.InfoHash()] = peer
+			}
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return errors.Wrap(err, "Failed to commit user Sync() tx")
+	}
+	if cache != nil {
+		for ih, peer := range peers {
+			cache.Set(ih, peer)
+		}
 	}
 	return nil
 }
@@ -72,10 +94,12 @@ func (ps *PeerStore) Close() error {
 
 // Add insets the peer into the swarm of the torrent provided
 func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
-	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	point := fmt.Sprintf("POINT(%s)", p.Location.String())
-	_, err := ps.db.Exec(q, ih.Bytes(), p.PeerID.Bytes(), p.UserID, p.IP.String(), p.Port, point,
-		p.AnnounceFirst, p.AnnounceLast, p.Downloaded, p.Uploaded, p.Left, p.Client)
+	ip6 := strings.Count(p.IP.String(), ":") > 1
+	_, err := ps.db.Exec(q, ih.Bytes(), p.PeerID.Bytes(), p.UserID, ip6, p.IP.String(), p.Port, point,
+		p.AnnounceFirst, p.AnnounceLast, p.Downloaded, p.Uploaded, p.Left, p.Client,
+		p.CountryCode, p.ASN, p.AS)
 	if err != nil {
 		return err
 	}
@@ -112,9 +136,9 @@ func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 	var p store.Peer
 	var ip string
 	for rows.Next() {
-		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &ip, &p.Port, &p.Downloaded, &p.Uploaded,
+		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IPv6, &ip, &p.Port, &p.Downloaded, &p.Uploaded,
 			&p.Left, &p.TotalTime, &p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax,
-			&p.Location, &p.AnnounceLast, &p.AnnounceFirst); err != nil {
+			&p.Location, &p.AnnounceLast, &p.AnnounceFirst, &p.CountryCode, &p.ASN, &p.AS); err != nil {
 			return swarm, err
 		}
 		p.IP = net.ParseIP(ip)
@@ -131,7 +155,10 @@ func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect(driverName, c.DSN())
+	db, err := sqlx.Connect(driverName, c.DSN())
+	if err != nil {
+		return nil, err
+	}
 	return &PeerStore{
 		db: db,
 	}, nil

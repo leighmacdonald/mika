@@ -149,14 +149,15 @@ func (t *Tracker) StatWorker() {
 				delete(torrentBatch, k)
 			}
 			// Send current copies of data to stores
+			log.Debugf("Calling Sync() on %d users", len(userBatchCopy))
 			if err := t.Users.Sync(userBatchCopy, t.UsersCache); err != nil {
 				log.Errorf(err.Error())
 			}
-
+			log.Debugf("Calling Sync() on %d peers", len(userBatchCopy))
 			if err := t.Peers.Sync(peerBatchCopy, t.PeerCache); err != nil {
 				log.Errorf(err.Error())
 			}
-
+			log.Debugf("Calling Sync() on %d torrents", len(userBatchCopy))
 			if err := t.Torrents.Sync(torrentBatchCopy, t.TorrentsCache); err != nil {
 				log.Errorf(err.Error())
 			}
@@ -171,8 +172,8 @@ func (t *Tracker) StatWorker() {
 				tb = store.TorrentStats{}
 			}
 			pHash := store.NewPeerHash(u.InfoHash, u.PeerID)
-			pb, found := peerBatch[pHash]
-			if !found {
+			pb, peerFound := peerBatch[pHash]
+			if !peerFound {
 				pb = store.PeerStats{}
 			}
 			var torrent store.Torrent
@@ -188,11 +189,12 @@ func (t *Tracker) StatWorker() {
 			ub.Announces++
 
 			// Peer stats
-			pb.Downloaded += u.Downloaded
-			pb.Uploaded += u.Uploaded
-			pb.LastAnnounce = u.Timestamp
+			pb.Hist = append(pb.Hist, store.AnnounceHist{
+				Downloaded: u.Downloaded,
+				Uploaded:   u.Uploaded,
+				Timestamp:  u.Timestamp,
+			})
 			pb.Left = u.Left
-			pb.Announces++
 
 			// Global torrent stats
 			tb.Announces++

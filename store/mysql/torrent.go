@@ -194,7 +194,10 @@ func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	db := sqlx.MustConnect(driverName, c.DSN())
+	db, err := sqlx.Connect(driverName, c.DSN())
+	if err != nil {
+		return nil, err
+	}
 	return &TorrentStore{
 		db: db,
 	}, nil

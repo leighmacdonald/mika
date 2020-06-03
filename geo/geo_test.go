@@ -43,7 +43,7 @@ func TestGetLocation(t *testing.T) {
 	}
 	ip6 := db.GetLocation(net.ParseIP("2001:4860:4860::6464")) // Sprint owned IP6
 	if math.Round(ip6.LatLong.Latitude) != 37 || math.Round(ip6.LatLong.Longitude) != -122 {
-		t.Errorf("Invalid coord value: %f", ip4.LatLong)
+		t.Errorf("Invalid coord value: %f", ip6.LatLong)
 	}
 	require.Equal(t, "US", ip6.ISOCode)
 

@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -388,11 +389,12 @@ func (ps *PeerStore) Name() string {
 func (ps *PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
 	pipe := ps.client.Pipeline()
 	for ph, stats := range batch {
+		sum := stats.Totals()
 		k := peerKey(ph.InfoHash(), ph.PeerID())
-		pipe.HIncrBy(k, "announces", int64(stats.Announces))
-		pipe.HIncrBy(k, "downloaded", int64(stats.Downloaded))
-		pipe.HIncrBy(k, "uploaded", int64(stats.Uploaded))
-		pipe.HSet(k, "last_announce", util.TimeToString(stats.LastAnnounce))
+		pipe.HIncrBy(k, "announces", int64(len(stats.Hist)))
+		pipe.HIncrBy(k, "downloaded", int64(sum.TotalDn))
+		pipe.HIncrBy(k, "uploaded", int64(sum.TotalUp))
+		pipe.HSet(k, "last_announce", util.TimeToString(sum.LastAnn))
 		pipe.Expire(k, ps.peerTTL)
 	}
 	if _, err := pipe.Exec(); err != nil {
@@ -406,6 +408,7 @@ func (ps *PeerStore) Reap(cache *store.PeerCache) {}
 
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
+	ipv6 := strings.Count(p.IP.String(), ":") > 1
 	err := ps.client.HSet(peerKey(ih, p.PeerID), map[string]interface{}{
 		"speed_up":       p.SpeedUP,
 		"speed_dn":       p.SpeedDN,
@@ -415,6 +418,7 @@ func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 		"downloaded":     p.Downloaded,
 		"total_left":     p.Left,
 		"total_time":     p.TotalTime,
+		"ipv6":           ipv6,
 		"addr_ip":        p.IP.String(),
 		"addr_port":      p.Port,
 		"last_announce":  util.TimeToString(p.AnnounceLast),
@@ -423,6 +427,9 @@ func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 		"location":       p.Location.String(),
 		"user_id":        p.UserID,
 		"announces":      p.Announces,
+		"country_code":   p.CountryCode,
+		"asn":            p.ASN,
+		"as_name":        p.AS,
 	}).Err()
 	if err != nil {
 		return errors.Wrap(err, "Failed to Add")
@@ -488,6 +495,7 @@ func mapPeerValues(p *store.Peer, v map[string]string) {
 	p.Left = util.StringToUInt32(v["total_left"], 0)
 	p.Announces = util.StringToUInt32(v["announces"], 0)
 	p.TotalTime = util.StringToUInt32(v["total_time"], 0)
+	p.IPv6 = util.StringToBool(v["ipv6"], false)
 	p.IP = net.ParseIP(v["addr_ip"])
 	p.Port = util.StringToUInt16(v["addr_port"], 0)
 	p.AnnounceLast = util.StringToTime(v["last_announce"])
@@ -495,6 +503,9 @@ func mapPeerValues(p *store.Peer, v map[string]string) {
 	p.PeerID = store.PeerIDFromString(v["peer_id"])
 	p.Location = geo.LatLongFromString(v["location"])
 	p.UserID = util.StringToUInt32(v["user_id"], 0)
+	p.ASN = util.StringToUInt32(v["asn"], 0)
+	p.AS = v["as_name"]
+	p.CountryCode = v["country_code"]
 }
 
 // GetN will fetch peers for a torrents active swarm up to N users
@@ -587,10 +598,7 @@ func (pd userDriver) New(cfg interface{}) (store.UserStore, error) {
 	if !ok {
 		return nil, consts.ErrInvalidConfig
 	}
-	client := redis.NewClient(newRedisConfig(c))
-	return &UserStore{
-		client: client,
-	}, nil
+	return &UserStore{client: redis.NewClient(newRedisConfig(c))}, nil
 }
 
 func init() {

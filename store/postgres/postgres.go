@@ -445,7 +445,8 @@ func (ps PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.
 	}
 
 	for peerHash, stats := range batch {
-		if _, err := tx.Exec(c, txName, stats.Downloaded, stats.Uploaded, stats.Announces, stats.LastAnnounce,
+		sum := stats.Totals()
+		if _, err := tx.Exec(c, txName, sum.TotalDn, sum.TotalUp, len(stats.Hist), sum.LastAnn,
 			peerHash.PeerID().Bytes(), peerHash.InfoHash().Bytes()); err != nil {
 			return errors.Wrapf(err, "postgres.PeerStore.Sync failed to Exec tx")
 		}

@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
@@ -305,29 +306,43 @@ func (a *AdminAPI) userAdd(c *gin.Context) {
 	c.AbortWithStatus(http.StatusOK)
 }
 
-// ConfigUpdateRequest holds new config values for the tracker
+// ConfigRequest holds new config values for the tracker
 //
 // Duration string format follows golang time.Duration string format i.e.:
 // 		A duration string a sequence of decimal numbers, each
 //		with optional fraction and a unit suffix, such as "300ms", "1.5h" or "2h45m".
 //		Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-type ConfigUpdateRequest struct {
+type ConfigRequest struct {
 	// The keys that we actually want to update from our struct
 	// Some default values could be valid values so we cannot rely on empty values alone
 	// Keys not listed are NOT updated even if a value is set in the struct
 	UpdateKeys                 []config.Key `json:"update_keys"`
-	TrackerAnnounceInterval    string       `json:"tracker_announce_interval,omitempty"`
-	TrackerAnnounceIntervalMin string       `json:"tracker_announce_interval_min,omitempty"`
-	TrackerReaperInterval      string       `json:"tracker_reaper_interval,omitempty"`
-	TrackerBatchUpdateInterval string       `json:"tracker_batch_update_interval,omitempty"`
+	TrackerAnnounceInterval    int          `json:"tracker_announce_interval,omitempty"`
+	TrackerAnnounceIntervalMin int          `json:"tracker_announce_interval_min,omitempty"`
+	TrackerReaperInterval      int          `json:"tracker_reaper_interval,omitempty"`
+	TrackerBatchUpdateInterval int          `json:"tracker_batch_update_interval,omitempty"`
 	TrackerMaxPeers            int          `json:"tracker_max_peers,omitempty"`
-	TrackerAutoRegister        bool         `json:"tracker_auto_register,omitempty"`
-	TrackerAllowNonRoutable    bool         `json:"tracker_allow_non_routable,omitempty"`
+	TrackerAutoRegister        bool         `json:"tracker_auto_register"`
+	TrackerAllowNonRoutable    bool         `json:"tracker_allow_non_routable"`
 	GeodbEnabled               bool         `json:"geodb_enabled"`
 }
 
+func (a *AdminAPI) configGet(c *gin.Context) {
+	cfg := ConfigRequest{
+		TrackerAnnounceInterval:    int(a.t.AnnInterval.Seconds()),
+		TrackerAnnounceIntervalMin: int(a.t.AnnIntervalMin.Seconds()),
+		TrackerReaperInterval:      int(a.t.ReaperInterval.Seconds()),
+		TrackerBatchUpdateInterval: int(a.t.BatchInterval.Seconds()),
+		TrackerMaxPeers:            a.t.MaxPeers,
+		TrackerAutoRegister:        a.t.AutoRegister,
+		TrackerAllowNonRoutable:    a.t.AllowNonRoutable,
+		GeodbEnabled:               a.t.GeodbEnabled,
+	}
+	c.JSON(200, cfg)
+}
+
 func (a *AdminAPI) configUpdate(c *gin.Context) {
-	var configValues ConfigUpdateRequest
+	var configValues ConfigRequest
 	var err error
 	internalErr := false
 	if err = c.BindJSON(&configValues); err != nil {
@@ -340,28 +355,28 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 	for _, k := range configValues.UpdateKeys {
 		switch k {
 		case config.TrackerAnnounceInterval:
-			d, err := time.ParseDuration(configValues.TrackerAnnounceInterval)
+			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerAnnounceInterval))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Announce interval invalid format"})
 				return
 			}
 			a.t.AnnInterval = d
 		case config.TrackerAnnounceIntervalMin:
-			d, err := time.ParseDuration(configValues.TrackerAnnounceIntervalMin)
+			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerAnnounceIntervalMin))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Announce interval min invalid format"})
 				return
 			}
 			a.t.AnnIntervalMin = d
 		case config.TrackerReaperInterval:
-			d, err := time.ParseDuration(configValues.TrackerReaperInterval)
+			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerReaperInterval))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Reaper interval invalid"})
 				return
 			}
 			a.t.ReaperInterval = d
 		case config.TrackerBatchUpdateInterval:
-			d, err := time.ParseDuration(configValues.TrackerBatchUpdateInterval)
+			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerBatchUpdateInterval))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Batch interval invalid"})
 				return
@@ -375,7 +390,6 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 			a.t.AllowNonRoutable = configValues.TrackerAllowNonRoutable
 		case config.GeodbEnabled:
 			if configValues.GeodbEnabled && !a.t.GeodbEnabled {
-				verify := false
 				size := int64(0)
 				key := config.GetString(config.GeodbAPIKey)
 				outPath := config.GetString(config.GeodbPath)
@@ -398,10 +412,8 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 						internalErr = true
 						break
 					}
-					// Make sure a newly downloaded database is OK
-					verify = true
 				}
-				newDb, err := geo.New(outPath, verify)
+				newDb, err := geo.New(outPath)
 				if err != nil {
 					internalErr = true
 					break
@@ -427,4 +439,30 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 
 func (a *AdminAPI) stats(_ *gin.Context) {
 
+}
+
+// NewAPIHandler configures a router to handle API requests
+func NewAPIHandler(tkr *Tracker) *gin.Engine {
+	r := newRouter()
+	h := AdminAPI{
+		t: tkr,
+	}
+	r.POST("/ping", h.ping)
+	r.GET("/tracker/stats", h.stats)
+	r.PATCH("/config", h.configUpdate)
+	r.GET("/config", h.configGet)
+
+	r.DELETE("/torrent/:info_hash", h.torrentDelete)
+	r.PATCH("/torrent/:info_hash", h.torrentUpdate)
+	r.POST("/torrent", h.torrentAdd)
+
+	r.POST("/user", h.userAdd)
+	r.DELETE("/user/pk/:passkey", h.userDelete)
+	r.PATCH("/user/pk/:passkey", h.userUpdate)
+
+	r.POST("/whitelist", h.whitelistAdd)
+	r.DELETE("/whitelist/:prefix", h.whitelistDelete)
+	r.GET("/whitelist", h.whitelistGet)
+	r.NoRoute(noRoute)
+	return r
 }

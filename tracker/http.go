@@ -173,31 +173,6 @@ func NewBitTorrentHandler(tkr *Tracker) *gin.Engine {
 	return r
 }
 
-// NewAPIHandler configures a router to handle API requests
-func NewAPIHandler(tkr *Tracker) *gin.Engine {
-	r := newRouter()
-	h := AdminAPI{
-		t: tkr,
-	}
-	r.POST("/ping", h.ping)
-	r.GET("/tracker/stats", h.stats)
-	r.PATCH("/config", h.configUpdate)
-
-	r.DELETE("/torrent/:info_hash", h.torrentDelete)
-	r.PATCH("/torrent/:info_hash", h.torrentUpdate)
-	r.POST("/torrent", h.torrentAdd)
-
-	r.POST("/user", h.userAdd)
-	r.DELETE("/user/pk/:passkey", h.userDelete)
-	r.PATCH("/user/pk/:passkey", h.userUpdate)
-
-	r.POST("/whitelist", h.whitelistAdd)
-	r.DELETE("/whitelist/:prefix", h.whitelistDelete)
-	r.GET("/whitelist", h.whitelistGet)
-	r.NoRoute(noRoute)
-	return r
-}
-
 // HTTPOpts is used to configure a http.Server instance
 type HTTPOpts struct {
 	ListenAddr     string

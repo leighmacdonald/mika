@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/util"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 )
@@ -171,14 +173,48 @@ type UserStats struct {
 	Announces  uint32
 }
 
+type AnnounceHist struct {
+	Downloaded uint64
+	Uploaded   uint64
+	Timestamp  time.Time
+}
+
 // PeerStats is any info to batch peer updates
 type PeerStats struct {
-	Uploaded     uint64
-	Downloaded   uint64
-	Left         uint32
-	LastAnnounce time.Time
-	Announces    uint32
-	Paused       bool
+	Left   uint32
+	Hist   []AnnounceHist
+	Paused bool
+}
+type PeerSummary struct {
+	TotalUp    uint64
+	TotalDn    uint64
+	SpeedUp    uint64
+	SpeedDn    uint64
+	SpeedUpMax uint64
+	SpeedDnMax uint64
+	LastAnn    time.Time
+}
+
+func (ps *PeerStats) Totals() PeerSummary {
+	sum := PeerSummary{}
+	for i, s := range ps.Hist {
+		sum.TotalUp += s.Uploaded
+		sum.TotalDn += s.Downloaded
+		if i > 0 {
+			sum.SpeedDn = util.EstSpeed(sum.LastAnn.Unix(), s.Timestamp.Unix(), s.Downloaded)
+			sum.SpeedUp = util.EstSpeed(sum.LastAnn.Unix(), s.Timestamp.Unix(), s.Uploaded)
+			if sum.SpeedDn > sum.SpeedDnMax {
+				sum.SpeedDnMax = sum.SpeedDn
+			}
+			if sum.SpeedUp > sum.SpeedUpMax {
+				sum.SpeedUpMax = sum.SpeedUp
+			}
+			log.Debugf("Dn: %s Up: %s",
+				util.HumanBytesString(sum.SpeedDn), util.HumanBytesString(sum.SpeedUp))
+		}
+		sum.LastAnn = s.Timestamp
+	}
+	return sum
 }
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all

@@ -69,7 +69,7 @@ const (
 	TrackerAnnounceInterval Key = "tracker_announce_interval"
 	// TrackerAnnounceIntervalMin is the minimum interval a client is allowed
 	// 60s|1m
-	TrackerAnnounceIntervalMin Key = "tracker_announce_interval_minimum"
+	TrackerAnnounceIntervalMin Key = "tracker_announce_interval_min"
 	// TrackerHNRThreshold is how much time must pass before we mark a peer as Hit-N-Run
 	// 1d|12h|60m
 	TrackerHNRThreshold Key = "tracker_hnr_threshold"

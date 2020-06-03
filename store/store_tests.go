@@ -90,23 +90,43 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 		p1 = swarm.Peers[k]
 		break
 	}
-
+	var hist []AnnounceHist
+	hist = append(hist, AnnounceHist{
+		Uploaded:   5000,
+		Downloaded: 10000,
+		Timestamp:  time.Now().Add(-time.Minute * 10),
+	})
+	hist = append(hist, AnnounceHist{
+		Uploaded:   5000,
+		Downloaded: 10000,
+		Timestamp:  time.Now().Add(-time.Minute * 5),
+	})
+	hist = append(hist, AnnounceHist{
+		Uploaded:   2500,
+		Downloaded: 5000,
+		Timestamp:  time.Now(),
+	})
 	ph := NewPeerHash(p1.InfoHash, p1.PeerID)
 	require.NoError(t, ps.Sync(map[PeerHash]PeerStats{
 		ph: {
-			Uploaded:     10000,
-			Downloaded:   20000,
-			LastAnnounce: time.Now(),
-			Announces:    5,
+			Left:   1000,
+			Hist:   hist,
+			Paused: false,
 		},
 	}, nil))
+	uploaded := uint64(0)
+	downloaded := uint64(0)
+	for _, h := range hist {
+		uploaded += h.Uploaded
+		downloaded += h.Downloaded
+	}
 	updatedPeers, err2 := ps.GetN(torrentA.InfoHash, 5)
 	require.NoError(t, err2)
 	p1Updated, _ := findPeer(updatedPeers, p1)
-	require.Equal(t, uint32(5), p1Updated.Announces)
+	require.Equal(t, uint32(len(hist)), p1Updated.Announces)
 	require.Equal(t, p1.TotalTime, p1Updated.TotalTime)
-	require.Equal(t, uint64(20000), p1Updated.Downloaded)
-	require.Equal(t, uint64(10000), p1Updated.Uploaded)
+	require.Equal(t, downloaded, p1Updated.Downloaded)
+	require.Equal(t, uploaded, p1Updated.Uploaded)
 	for _, peer := range swarm.Peers {
 		require.NoError(t, ps.Delete(torrentA.InfoHash, peer.PeerID))
 	}

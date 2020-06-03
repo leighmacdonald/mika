@@ -71,11 +71,11 @@ func UMin64(a, b uint64) uint64 {
 }
 
 // EstSpeed will estimate a peers speed using downloaded amount over time
-func EstSpeed(startTime int32, lastTime int32, bytesSent uint64) float64 {
+func EstSpeed(startTime int64, lastTime int64, bytesSent uint64) uint64 {
 	if startTime <= 0 || lastTime <= 0 || bytesSent == 0 || lastTime < startTime {
-		return 0.0
+		return 0
 	}
-	return round64Plus(float64(bytesSent)/(float64(lastTime)-float64(startTime)), 2)
+	return uint64(float64(bytesSent) / (float64(lastTime) - float64(startTime)))
 }
 
 func logN(n, b float64) float64 {

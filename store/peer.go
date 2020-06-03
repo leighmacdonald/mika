@@ -81,7 +81,8 @@ type Peer struct {
 	// Max recorded dn speed, bytes/sec
 	SpeedDNMax uint32 `db:"speed_dn_max" redis:"speed_dn_max" json:"speed_dn_max"`
 	// Clients IPv4 Address detected automatically, does not use client supplied value
-	IP net.IP `db:"addr_ip" redis:"addr_ip" json:"addr_ip"`
+	IP   net.IP `db:"addr_ip" redis:"addr_ip" json:"addr_ip"`
+	IPv6 bool   `db:"ipv6" json:"ipv6"`
 	// Clients reported port
 	Port uint16 `db:"addr_port" redis:"addr_port" json:"addr_port"`
 	// Total number of announces the peer has made
@@ -91,10 +92,13 @@ type Peer struct {
 	// First announce timestamp
 	AnnounceFirst time.Time `db:"announce_first" redis:"announce_first" json:"announce_first"`
 	// Peer id, reported by client. Must have white-listed prefix
-	PeerID   PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
-	InfoHash InfoHash    `db:"info_hash" redis:"info_hash" json:"info_hash"`
-	Location geo.LatLong `db:"location" redis:"location" json:"location"`
-	UserID   uint32      `db:"user_id" redis:"user_id" json:"user_id"`
+	PeerID      PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
+	InfoHash    InfoHash    `db:"info_hash" redis:"info_hash" json:"info_hash"`
+	Location    geo.LatLong `db:"location" redis:"location" json:"location"`
+	CountryCode string      `db:"country_code" json:"country_code"`
+	ASN         uint32      `db:"asn" json:"asn"`
+	AS          string      `db:"as" json:"as"`
+	UserID      uint32      `db:"user_id" redis:"user_id" json:"user_id"`
 	// Client is the user-agent header sent
 	Client string `db:"client" json:"client"`
 	// TODO Do we actually care about these times? Announce times likely enough
@@ -161,11 +165,13 @@ func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (Peer, bool) {
 		swarm.Unlock()
 		return peer, false
 	}
-	peer.Uploaded += stats.Uploaded
-	peer.Downloaded += stats.Downloaded
+	for _, s := range stats.Hist {
+		peer.Uploaded += s.Uploaded
+		peer.Downloaded += s.Downloaded
+		peer.AnnounceLast = s.Timestamp
+	}
+	peer.Announces += uint32(len(stats.Hist))
 	peer.Left = stats.Left
-	peer.Announces += stats.Announces
-	peer.AnnounceLast = stats.LastAnnounce
 	swarm.Peers[peerID] = peer
 	swarm.Unlock()
 	return peer, true

@@ -4,32 +4,43 @@ package geo
 
 import (
 	"database/sql/driver"
+	"encoding/csv"
 	"fmt"
+	"github.com/ip2location/ip2location-go"
 	"github.com/leighmacdonald/mika/util"
-	"github.com/oschwald/maxminddb-golang"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io"
+	"io/ioutil"
 	"math"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
-	pi             = math.Pi
-	twoPi          = math.Pi * 2.0
-	maxLoopCount   = 20
-	eps            = 1.0e-23
-	kilometer      = 2
-	geoDownloadURL = "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=%s&suffix=tar.gz"
+	pi                      = math.Pi
+	twoPi                   = math.Pi * 2.0
+	maxLoopCount            = 20
+	eps                     = 1.0e-23
+	kilometer               = 2
+	geoDownloadURL          = "https://www.ip2location.com/download/?token=%s&file=%s"
+	geoDatabaseASN4         = "DBASNLITE"
+	geoDatabaseASN6         = "DBASNLITEIPV6"
+	geoDatabaseLocation     = "DB5LITEBINIPV6"
+	geoDatabaseASNFile4     = "IP2LOCATION-LITE-ASN.IPV4.CSV"
+	geoDatabaseASNFile6     = "IP2LOCATION-LITE-ASN.IPV6.CSV"
+	geoDatabaseLocationFile = "IP2LOCATION-LITE-DB5.IPV6.BIN"
 )
 
 // Provider defines our interface for querying geo location data stores
 type Provider interface {
-	GetLocation(ip net.IP) City
-	Close() error
+	GetLocation(ip net.IP) Location
+	Close()
 }
 
 // DummyProvider is used when we dont want to use this feature. It will always return 0, 0
@@ -41,33 +52,37 @@ func (d *DummyProvider) DownloadDB(_ string, _ string) error {
 }
 
 // Close does nothing for the dummy provider
-func (d *DummyProvider) Close() error {
-	return nil
-}
+func (d *DummyProvider) Close() {}
 
 // GetLocation will always return 0, 0 coordinates
-func (d *DummyProvider) GetLocation(_ net.IP) City {
-	return City{
-		Country:  Country{ISOCode: "XX"},
-		Location: LatLong{Latitude: 0.0, Longitude: 0.0},
-	}
+func (d *DummyProvider) GetLocation(_ net.IP) Location {
+	return defaultLocation()
 }
 
-// City provides the country and lat/long
-type City struct {
-	Country  Country `maxminddb:"country"`
-	Location LatLong `maxminddb:"location"`
-}
-
-// Country is the ISO country code
-type Country struct {
-	ISOCode string `maxminddb:"iso_code"`
-}
-
-// LatLong provides a container and some helper functions for location data
 type LatLong struct {
-	Latitude  float64 `maxminddb:"latitude"`
-	Longitude float64 `maxminddb:"longitude"`
+	Latitude  float64
+	Longitude float64
+}
+
+// Location provides a container and some helper functions for location data
+type Location struct {
+	ISOCode string
+	Country string
+	LatLong LatLong
+	// Autonomous system number (ASN)
+	ASN string
+	// Autonomous system (AS) name
+	AS string
+}
+
+func defaultLocation() Location {
+	return Location{
+		ISOCode: "",
+		Country: "",
+		LatLong: LatLong{Latitude: 0.0, Longitude: 0.0},
+		ASN:     "",
+		AS:      "",
+	}
 }
 
 // Value implements the driver.Valuer interface for our custom type
@@ -138,24 +153,48 @@ func (db *DB) distance(llA LatLong, llB LatLong) float64 {
 // into the configured geodb_path config file path usually defined in the configuration
 // files.
 func DownloadDB(outputPath string, apiKey string) error {
-	if apiKey == "" {
-		return errors.New("invalid maxmind api key")
+	type dlParam struct {
+		dbName   string
+		fileName string
 	}
-	url := fmt.Sprintf(geoDownloadURL, apiKey)
-	resp, err := http.Get(url)
-	if err != nil {
-		return errors.Wrap(err, "Failed to downloaded geoip db")
-	}
-	defer func() {
+	dl := func(u dlParam) error {
+		resp, err := http.Get(fmt.Sprintf(geoDownloadURL, apiKey, u.dbName))
+		if err != nil {
+			return errors.Wrap(err, "Failed to downloaded geoip db")
+		}
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
 		if err := resp.Body.Close(); err != nil {
 			log.Error("Failed to close response body for geodb download")
 		}
-	}()
-	s, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return err
+
+		err2 := extractZip(b, outputPath, u.fileName)
+
+		return err2
 	}
-	return extractTarGz(resp.Body, s)
+	if apiKey == "" {
+		return errors.New("invalid maxmind api key")
+	}
+	var exitErr error
+	var wg sync.WaitGroup
+	for _, u := range []dlParam{
+		{dbName: geoDatabaseASN4, fileName: geoDatabaseASNFile4},
+		{dbName: geoDatabaseASN6, fileName: geoDatabaseASNFile6},
+		{dbName: geoDatabaseLocation, fileName: geoDatabaseLocationFile},
+	} {
+		wg.Add(1)
+		req := u
+		go func() {
+			if err := dl(req); err != nil {
+				log.Errorf("Failed to download geo database: %s", err.Error())
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	return exitErr
 }
 
 // deg2rad converts degrees to radians
@@ -273,43 +312,96 @@ func (ellipsoid ellipsoid) calculateBearing(lat1, lon1, lat2, lon2 float64) (dis
 
 // DB handles opening and querying from the maxmind Cities geo memory mapped database (.mmdb) file.
 type DB struct {
-	db        *maxminddb.Reader
+	sync.RWMutex
+	db        *ip2location.DB
 	ellipsoid ellipsoid
+	asn4      []ASNRecord
+	asn6      []ASNRecord
+}
+
+type ASNRecord struct {
+	net *net.IPNet
+	ASN string
+	AS  string
 }
 
 // New opens the .mmdb file for querying and sets up the ellipsoid configuration for more accurate
 // geo queries
-func New(path string, verify bool) (*DB, error) {
-	db, err := maxminddb.Open(path)
+func New(path string) (*DB, error) {
+	db, err := ip2location.OpenDB(filepath.Join(path, geoDatabaseLocationFile))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	if verify {
-		if err := db.Verify(); err != nil {
-			return nil, errors.Wrapf(err, "Failed to validate maxmind geodb file")
+	var (
+		records4 []ASNRecord
+		records6 []ASNRecord
+	)
+	for i, asnFileName := range []string{geoDatabaseASNFile4, geoDatabaseASNFile6} {
+		asnFile, err1 := os.Open(filepath.Join(path, asnFileName))
+		if err1 != nil {
+			return nil, err1
+		}
+		reader := csv.NewReader(asnFile)
+		for {
+			row, err2 := reader.Read()
+			if err2 == io.EOF {
+				break
+			}
+			if err2 != nil {
+				log.Fatalf("Failed to read csv row: %s", err.Error())
+			}
+			_, cidr, err2 := net.ParseCIDR(row[2])
+			if row[3] != "-" {
+				fmt.Println(net.ParseIP(row[0]), row[2], row[3])
+			}
+			if i == 0 {
+				records4 = append(records4, ASNRecord{net: cidr, ASN: row[3], AS: row[4]})
+			} else {
+				records6 = append(records6, ASNRecord{net: cidr, ASN: row[3], AS: row[4]})
+			}
 		}
 	}
 	return &DB{
-		db: db,
+		RWMutex: sync.RWMutex{},
+		db:      db,
 		ellipsoid: ellipsoid{
 			ellipse{6378137.0, 298.257223563}, // WGS84, because why not
 			kilometer,
 			1000.0,
 		},
+		asn4: records4,
+		asn6: records6,
 	}, nil
 }
 
 // Close close the underlying memory mapped file
-func (db *DB) Close() error {
-	return db.db.Close()
+func (db *DB) Close() {
+	db.db.Close()
 }
 
 // GetLocation returns the geo location of the input IP addr
-func (db *DB) GetLocation(ip net.IP) City {
-	var record City
-	err := db.db.Lookup(ip, &record)
+func (db *DB) GetLocation(ip net.IP) Location {
+	res, err := db.db.Get_all(ip.String())
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("Failed to get location for: %s", ip.String())
+		return defaultLocation()
 	}
-	return record
+	var asnRec ASNRecord
+	db.RLock()
+	for _, r := range db.asn4 {
+		if r.net.Contains(ip) {
+			asnRec = r
+			break
+		}
+	}
+	db.RUnlock()
+	return Location{
+		ISOCode: res.Country_short,
+		Country: res.Country_long,
+		LatLong: LatLong{
+			float64(res.Latitude), float64(res.Longitude),
+		},
+		ASN: asnRec.ASN,
+		AS:  asnRec.AS,
+	}
 }

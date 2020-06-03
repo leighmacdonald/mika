@@ -31,19 +31,16 @@ func TestGetLocation(t *testing.T) {
 	if config.GetString(config.GeodbAPIKey) == "" {
 		t.SkipNow()
 	}
-	fp := util.FindFile(config.GetString(config.GeodbPath))
-	if !util.Exists(fp) {
-		t.Skipf("No mmdb found")
-	}
-	db, _ := New(fp, false)
-	defer func() { _ = db.Close() }()
+	db, err := New(config.GetString(config.GeodbPath))
+	require.NoError(t, err, "Failed to open database")
+	defer func() { db.Close() }()
 	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
-	if math.Round(ip4.Location.Latitude) != 34.0 || math.Round(ip4.Location.Longitude) != -84.0 {
-		t.Errorf("Invalid coord value: %f", ip4.Location)
+	if math.Round(ip4.LatLong.Latitude) != 34 || math.Round(ip4.LatLong.Longitude) != -84 {
+		t.Errorf("Invalid coord value: %f", ip4.LatLong)
 	}
 	ip6 := db.GetLocation(net.ParseIP("2600::")) // Sprint owned IP6
-	if math.Round(ip6.Location.Latitude) != 38 || math.Round(ip6.Location.Longitude) != -98.0 {
-		t.Errorf("Invalid coord value: %f", ip4.Location)
+	if math.Round(ip6.LatLong.Latitude) != 39 || math.Round(ip6.LatLong.Longitude) != -77.0 {
+		t.Errorf("Invalid coord value: %f", ip4.LatLong)
 	}
 }
 
@@ -53,10 +50,10 @@ func TestDistance(t *testing.T) {
 	}
 	fp := util.FindFile(config.GetString(config.GeodbPath))
 	if !util.Exists(fp) {
-		t.Skipf("No mmdb found")
+		t.Skipf("Invalid geodb directory")
 	}
-	db, _ := New(fp, false)
-	defer func() { _ = db.Close() }()
+	db, _ := New(fp)
+	defer func() { db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
 	distance := db.distance(a, b)
@@ -66,8 +63,8 @@ func TestDistance(t *testing.T) {
 }
 
 func BenchmarkDistance(t *testing.B) {
-	db, _ := New(util.FindFile(config.GetString(config.GeodbPath)), false)
-	defer func() { _ = db.Close() }()
+	db, _ := New(config.GetString(config.GeodbPath))
+	defer func() { db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
 	for n := 0; n < t.N; n++ {
@@ -97,10 +94,13 @@ func TestDownloadDB(t *testing.T) {
 
 	err2 := DownloadDB(p, key)
 	require.NoError(t, err2)
-	_, err3 := New(p, true)
+	_, err3 := New(p)
 	require.NoError(t, err3, "failed to verify downloaded mmdb")
 }
 
 func TestMain(m *testing.M) {
+	if err := config.Read("mika_testing"); err != nil {
+		log.Panicf("Failed to load test config: %s", err.Error())
+	}
 	os.Exit(m.Run())
 }

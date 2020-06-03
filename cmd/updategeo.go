@@ -17,7 +17,7 @@ var updategeoCmd = &cobra.Command{
 		t0 := time.Now()
 		key := config.GetString(config.GeodbAPIKey)
 		outPath := config.GetString(config.GeodbPath)
-		log.Infof("Starting download of MaxMind City database")
+		log.Infof("Starting download of ip2location databases")
 		if err := geo.DownloadDB(outPath, key); err != nil {
 			log.Errorf("failed to download database: %s", err.Error())
 		} else {

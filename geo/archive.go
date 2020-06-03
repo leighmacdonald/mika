@@ -1,51 +1,62 @@
 package geo
 
 import (
-	"archive/tar"
-	"compress/gzip"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"archive/zip"
+	"bytes"
 	"io"
-	"strings"
+	"os"
+	"path/filepath"
 )
 
-func extractTarGz(gzipStream io.Reader, outStream io.Writer) error {
-	uncompressedStream, err := gzip.NewReader(gzipStream)
+func extractZip(data []byte, dest string, filename string) error {
+	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		log.Fatal("extractTarGz: NewReader failed")
+		return err
 	}
-	tarReader := tar.NewReader(uncompressedStream)
-	foundFile := false
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF || header == nil {
+	// Closure to address file descriptors issue with all the deferred .Close() methods
+	extractAndWriteFile := func(f *zip.File) error {
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := rc.Close(); err != nil {
+				panic(err)
+			}
+		}()
+
+		path := filepath.Join(dest, f.Name)
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(path, f.Mode())
+		} else {
+			os.MkdirAll(filepath.Dir(path), f.Mode())
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if err := f.Close(); err != nil {
+					panic(err)
+				}
+			}()
+
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	for _, f := range r.File {
+		if f.Name == filename {
+			err := extractAndWriteFile(f)
+			if err != nil {
+				return err
+			}
 			break
 		}
-		if err != nil {
-			log.Fatalf("extractTarGz: Next() failed: %s", err.Error())
-		}
-		switch header.Typeflag {
-		case tar.TypeDir:
-			//if err := os.Mkdir(header.Name, 0755); err != nil {
-			//	log.Fatalf("extractTarGz: Mkdir() failed: %s", err.Error())
-			//}
-		case tar.TypeReg:
-			if !strings.HasSuffix(header.Name, ".mmdb") {
-				continue
-			}
-			foundFile = true
-			if _, err := io.Copy(outStream, tarReader); err != nil {
-				log.Fatalf("extractTarGz: Copy() failed: %s", err.Error())
-			}
-		default:
-			log.Fatalf(
-				"extractTarGz: unknown type: %v in %s",
-				header.Typeflag,
-				header.Name)
-		}
-	}
-	if !foundFile {
-		return errors.New("Archive contained no mmdb file")
 	}
 	return nil
 }

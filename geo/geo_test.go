@@ -34,14 +34,19 @@ func TestGetLocation(t *testing.T) {
 	db, err := New(config.GetString(config.GeodbPath))
 	require.NoError(t, err, "Failed to open database")
 	defer func() { db.Close() }()
-	ip4 := db.GetLocation(net.ParseIP("12.34.56.78"))
-	if math.Round(ip4.LatLong.Latitude) != 34 || math.Round(ip4.LatLong.Longitude) != -84 {
+	ip4 := db.GetLocation(net.ParseIP("45.136.241.10"))
+	require.Equal(t, uint32(16509), ip4.ASN)
+	require.Equal(t, "AMAZON-02", ip4.AS)
+	require.Equal(t, "IL", ip4.ISOCode)
+	if math.Round(ip4.LatLong.Latitude) != 32 || math.Round(ip4.LatLong.Longitude) != 35 {
 		t.Errorf("Invalid coord value: %f", ip4.LatLong)
 	}
-	ip6 := db.GetLocation(net.ParseIP("2600::")) // Sprint owned IP6
-	if math.Round(ip6.LatLong.Latitude) != 39 || math.Round(ip6.LatLong.Longitude) != -77.0 {
+	ip6 := db.GetLocation(net.ParseIP("2001:4860:4860::6464")) // Sprint owned IP6
+	if math.Round(ip6.LatLong.Latitude) != 37 || math.Round(ip6.LatLong.Longitude) != -122 {
 		t.Errorf("Invalid coord value: %f", ip4.LatLong)
 	}
+	require.Equal(t, "US", ip6.ISOCode)
+
 }
 
 func TestDistance(t *testing.T) {

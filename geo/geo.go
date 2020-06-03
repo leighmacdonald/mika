@@ -32,7 +32,7 @@ const (
 	geoDatabaseASN4         = "DBASNLITE"
 	geoDatabaseASN6         = "DBASNLITEIPV6"
 	geoDatabaseLocation     = "DB5LITEBINIPV6"
-	geoDatabaseASNFile4     = "IP2LOCATION-LITE-ASN.IPV4.CSV"
+	geoDatabaseASNFile4     = "IP2LOCATION-LITE-ASN.CSV"
 	geoDatabaseASNFile6     = "IP2LOCATION-LITE-ASN.IPV6.CSV"
 	geoDatabaseLocationFile = "IP2LOCATION-LITE-DB5.IPV6.BIN"
 )
@@ -67,10 +67,9 @@ type LatLong struct {
 // Location provides a container and some helper functions for location data
 type Location struct {
 	ISOCode string
-	Country string
 	LatLong LatLong
 	// Autonomous system number (ASN)
-	ASN string
+	ASN uint32
 	// Autonomous system (AS) name
 	AS string
 }
@@ -78,9 +77,8 @@ type Location struct {
 func defaultLocation() Location {
 	return Location{
 		ISOCode: "",
-		Country: "",
 		LatLong: LatLong{Latitude: 0.0, Longitude: 0.0},
-		ASN:     "",
+		ASN:     0,
 		AS:      "",
 	}
 }
@@ -321,7 +319,7 @@ type DB struct {
 
 type ASNRecord struct {
 	net *net.IPNet
-	ASN string
+	ASN uint32
 	AS  string
 }
 
@@ -348,16 +346,17 @@ func New(path string) (*DB, error) {
 				break
 			}
 			if err2 != nil {
-				log.Fatalf("Failed to read csv row: %s", err.Error())
+				log.Fatalf("Failed to read csv row: %s", err2.Error())
 			}
 			_, cidr, err2 := net.ParseCIDR(row[2])
-			if row[3] != "-" {
-				fmt.Println(net.ParseIP(row[0]), row[2], row[3])
+			asNum, err := strconv.ParseUint(row[3], 10, 32)
+			if err != nil {
+				continue
 			}
 			if i == 0 {
-				records4 = append(records4, ASNRecord{net: cidr, ASN: row[3], AS: row[4]})
+				records4 = append(records4, ASNRecord{net: cidr, ASN: uint32(asNum), AS: row[4]})
 			} else {
-				records6 = append(records6, ASNRecord{net: cidr, ASN: row[3], AS: row[4]})
+				records6 = append(records6, ASNRecord{net: cidr, ASN: uint32(asNum), AS: row[4]})
 			}
 		}
 	}
@@ -381,8 +380,9 @@ func (db *DB) Close() {
 
 // GetLocation returns the geo location of the input IP addr
 func (db *DB) GetLocation(ip net.IP) Location {
+	const invalidErr = "Invalid IP address."
 	res, err := db.db.Get_all(ip.String())
-	if err != nil {
+	if err != nil || res.Country_short == invalidErr {
 		log.Errorf("Failed to get location for: %s", ip.String())
 		return defaultLocation()
 	}
@@ -397,7 +397,6 @@ func (db *DB) GetLocation(ip net.IP) Location {
 	db.RUnlock()
 	return Location{
 		ISOCode: res.Country_short,
-		Country: res.Country_long,
 		LatLong: LatLong{
 			float64(res.Latitude), float64(res.Longitude),
 		},

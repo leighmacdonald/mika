@@ -349,5 +349,5 @@ func init() {
 
 	viper.SetDefault(string(GeodbEnabled), false)
 	viper.SetDefault(string(GeodbAPIKey), "")
-	viper.SetDefault(string(GeodbPath), "geodb.mmdb")
+	viper.SetDefault(string(GeodbPath), "./")
 }

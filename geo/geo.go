@@ -313,11 +313,11 @@ type DB struct {
 	sync.RWMutex
 	db        *ip2location.DB
 	ellipsoid ellipsoid
-	asn4      []ASNRecord
-	asn6      []ASNRecord
+	asn4      []asnRecord
+	asn6      []asnRecord
 }
 
-type ASNRecord struct {
+type asnRecord struct {
 	net *net.IPNet
 	ASN uint32
 	AS  string
@@ -331,8 +331,8 @@ func New(path string) (*DB, error) {
 		return nil, err
 	}
 	var (
-		records4 []ASNRecord
-		records6 []ASNRecord
+		records4 []asnRecord
+		records6 []asnRecord
 	)
 	for i, asnFileName := range []string{geoDatabaseASNFile4, geoDatabaseASNFile6} {
 		asnFile, err1 := os.Open(filepath.Join(path, asnFileName))
@@ -357,9 +357,9 @@ func New(path string) (*DB, error) {
 				continue
 			}
 			if i == 0 {
-				records4 = append(records4, ASNRecord{net: cidr, ASN: uint32(asNum), AS: row[4]})
+				records4 = append(records4, asnRecord{net: cidr, ASN: uint32(asNum), AS: row[4]})
 			} else {
-				records6 = append(records6, ASNRecord{net: cidr, ASN: uint32(asNum), AS: row[4]})
+				records6 = append(records6, asnRecord{net: cidr, ASN: uint32(asNum), AS: row[4]})
 			}
 		}
 	}
@@ -389,7 +389,7 @@ func (db *DB) GetLocation(ip net.IP) Location {
 		log.Errorf("Failed to get location for: %s", ip.String())
 		return defaultLocation()
 	}
-	var asnRec ASNRecord
+	var asnRec asnRecord
 	db.RLock()
 	for _, r := range db.asn4 {
 		if r.net.Contains(ip) {

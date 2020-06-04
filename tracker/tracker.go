@@ -23,13 +23,13 @@ type Tracker struct {
 	// this for their parent
 	ctx context.Context
 
-	Torrents      store.TorrentStore
+	torrents      store.TorrentStore
 	TorrentsCache *store.TorrentCache
 
-	Users      store.UserStore
+	users      store.UserStore
 	UsersCache *store.UserCache
 
-	Peers     store.PeerStore
+	peers     store.PeerStore
 	PeerCache *store.PeerCache
 
 	Geodb geo.Provider
@@ -109,7 +109,7 @@ func (t *Tracker) PeerReaper() {
 	for {
 		select {
 		case <-peerTimer.C:
-			expired := t.Peers.Reap()
+			expired := t.peers.Reap()
 			if t.PeerCache != nil {
 				for _, ph := range expired {
 					t.PeerCache.Delete(ph.InfoHash(), ph.PeerID())
@@ -185,7 +185,7 @@ func (t *Tracker) StatWorker() {
 			var torrent store.Torrent
 			// Keep deleted true so that we can record any buffered stat updates from
 			// the client even though we deleted/disabled the torrent itself.
-			if err := t.Torrents.Get(&torrent, u.InfoHash, true); err != nil {
+			if err := t.torrents.Get(&torrent, u.InfoHash, true); err != nil {
 				log.Errorf("No torrent found in batch update")
 				continue
 			}
@@ -229,7 +229,7 @@ func (t *Tracker) StatWorker() {
 				} else {
 					tb.Leechers--
 				}
-				if err := t.Peers.Delete(u.InfoHash, u.PeerID); err != nil {
+				if err := t.peers.Delete(u.InfoHash, u.PeerID); err != nil {
 					log.Errorf("Could not remove peer from swarm: %s", err.Error())
 				}
 			}
@@ -248,9 +248,9 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 	t := &Tracker{
 		RWMutex:          &sync.RWMutex{},
 		ctx:              ctx,
-		Torrents:         opts.Torrents,
-		Peers:            opts.Peers,
-		Users:            opts.Users,
+		torrents:         opts.Torrents,
+		peers:            opts.Peers,
+		users:            opts.Users,
 		Geodb:            opts.Geodb,
 		GeodbEnabled:     opts.GeodbEnabled,
 		AllowNonRoutable: opts.AllowNonRoutable,
@@ -264,7 +264,7 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 	}
 	// Don't enable caching if we are already configured for a memory store.
 	if opts.TorrentCacheEnabled {
-		switch t.Torrents.(type) {
+		switch t.torrents.(type) {
 		case *memory.TorrentStore:
 			log.Warnf("Not enabling cache for in-memory torrent store, already in-memory")
 		default:
@@ -272,7 +272,7 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		}
 	}
 	if opts.UserCacheEnabled {
-		switch t.Users.(type) {
+		switch t.users.(type) {
 		case *memory.UserStore:
 			log.Warnf("Not enabling cache for in-memory user store, already in-memory.")
 		default:
@@ -280,7 +280,7 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		}
 	}
 	if opts.PeerCacheEnabled {
-		switch t.Peers.(type) {
+		switch t.peers.(type) {
 		case *memory.PeerStore:
 			log.Warnf("Not enabling cache for in-memory peer store, already in-memory.")
 		default:
@@ -313,12 +313,12 @@ func NewTestTracker() (*Tracker, error) {
 	for i := 0; i < userCount; i++ {
 		usr := store.GenerateTestUser()
 		usr.Passkey = fmt.Sprintf("1234567890123456789%d", i)
-		if err := tracker.Users.Add(usr); err != nil {
+		if err := tracker.users.Add(usr); err != nil {
 			return nil, err
 		}
 	}
 	for i := 0; i < torrentCount; i++ {
-		if err := tracker.Torrents.Add(store.GenerateTestTorrent()); err != nil {
+		if err := tracker.torrents.Add(store.GenerateTestTorrent()); err != nil {
 			log.Panicf("Error adding torrent: %s", err.Error())
 		}
 	}
@@ -329,7 +329,7 @@ func NewTestTracker() (*Tracker, error) {
 // load it into memory for quick lookups.
 func (t *Tracker) LoadWhitelist() error {
 	whitelist := make(map[string]store.WhiteListClient)
-	wl, err4 := t.Torrents.WhiteListGetAll()
+	wl, err4 := t.torrents.WhiteListGetAll()
 	if err4 != nil {
 		log.Warnf("Whitelist empty, all clients are allowed")
 	} else {
@@ -354,7 +354,7 @@ func (t *Tracker) TorrentGet(torrent *store.Torrent, hash store.InfoHash, delete
 			return nil
 		}
 	}
-	if err := t.Torrents.Get(torrent, hash, deletedOk); err != nil {
+	if err := t.torrents.Get(torrent, hash, deletedOk); err != nil {
 		return err
 	}
 	if t.TorrentsCache != nil && !cached {
@@ -371,7 +371,7 @@ func (t *Tracker) UserGet(user *store.User, passkey string) error {
 			return nil
 		}
 	}
-	if err := t.Users.GetByPasskey(user, passkey); err != nil {
+	if err := t.users.GetByPasskey(user, passkey); err != nil {
 		return err
 	}
 	if t.UsersCache != nil && !cached {
@@ -381,7 +381,7 @@ func (t *Tracker) UserGet(user *store.User, passkey string) error {
 }
 
 func (t *Tracker) UserAdd(user store.User) error {
-	if err := t.Users.Add(user); err != nil {
+	if err := t.users.Add(user); err != nil {
 		return err
 	}
 	if t.UsersCache != nil {
@@ -394,7 +394,7 @@ func (t *Tracker) PeerGet(peer *store.Peer, infoHash store.InfoHash, peerID stor
 	if t.PeerCache != nil && t.PeerCache.Get(peer, infoHash, peerID) {
 		return nil
 	}
-	if err := t.Peers.Get(peer, infoHash, peerID); err != nil {
+	if err := t.peers.Get(peer, infoHash, peerID); err != nil {
 		return err
 	}
 	if t.PeerCache != nil {
@@ -404,7 +404,7 @@ func (t *Tracker) PeerGet(peer *store.Peer, infoHash store.InfoHash, peerID stor
 }
 
 func (t *Tracker) PeerGetN(infoHash store.InfoHash, max int) (store.Swarm, error) {
-	swarm, err := t.Peers.GetN(infoHash, max)
+	swarm, err := t.peers.GetN(infoHash, max)
 	if err != nil {
 		return store.Swarm{}, err
 	}
@@ -412,7 +412,7 @@ func (t *Tracker) PeerGetN(infoHash store.InfoHash, max int) (store.Swarm, error
 }
 
 func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
-	if err := t.Peers.Add(infoHash, peer); err != nil {
+	if err := t.peers.Add(infoHash, peer); err != nil {
 		return err
 	}
 	if t.PeerCache != nil {
@@ -422,7 +422,7 @@ func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
 }
 
 func (t *Tracker) UserSync(batch map[string]store.UserStats) error {
-	if err := t.Users.Sync(batch); err != nil {
+	if err := t.users.Sync(batch); err != nil {
 		return err
 	}
 	if t.UsersCache != nil {
@@ -440,7 +440,7 @@ func (t *Tracker) UserSync(batch map[string]store.UserStats) error {
 }
 
 func (t *Tracker) PeerSync(batch map[store.PeerHash]store.PeerStats) error {
-	if err := t.Peers.Sync(batch); err != nil {
+	if err := t.peers.Sync(batch); err != nil {
 		return err
 	}
 	if t.PeerCache != nil {
@@ -462,7 +462,7 @@ func (t *Tracker) PeerSync(batch map[store.PeerHash]store.PeerStats) error {
 }
 
 func (t *Tracker) TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
-	if err := t.Torrents.Sync(batch); err != nil {
+	if err := t.torrents.Sync(batch); err != nil {
 		return err
 	}
 	if t.TorrentsCache != nil {

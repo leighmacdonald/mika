@@ -108,8 +108,6 @@ func TestDownloadDB(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	if err := config.Read("mika_testing"); err != nil {
-		log.Panicf("Failed to load test config: %s", err.Error())
-	}
+	_ = config.Read("mika_testing")
 	os.Exit(m.Run())
 }

@@ -52,7 +52,7 @@ func (a *AdminAPI) whitelistAdd(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	if err := a.t.Torrents.WhiteListAdd(wcl); err != nil {
+	if err := a.t.torrents.WhiteListAdd(wcl); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	}
 	a.t.Lock()
@@ -70,12 +70,12 @@ func (a *AdminAPI) whitelistDelete(c *gin.Context) {
 	a.t.RLock()
 	defer a.t.RUnlock()
 	wlc := a.t.Whitelist[prefix]
-	if err := a.t.Torrents.WhiteListDelete(wlc); err != nil {
+	if err := a.t.torrents.WhiteListDelete(wlc); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	newWL := make(map[string]store.WhiteListClient)
-	wl, err := a.t.Torrents.WhiteListGetAll()
+	wl, err := a.t.torrents.WhiteListGetAll()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -163,7 +163,7 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 	} else {
 		t.MultiDn = req.MultiDn
 	}
-	if err := a.t.Torrents.Add(t); err != nil {
+	if err := a.t.torrents.Add(t); err != nil {
 		if errors.Is(err, consts.ErrDuplicate) {
 			c.AbortWithStatusJSON(http.StatusConflict, StatusResp{
 				Err: err.Error(),
@@ -181,7 +181,7 @@ func (a *AdminAPI) torrentDelete(c *gin.Context) {
 	if !infoHashFromCtx(&infoHash, c, true) {
 		return
 	}
-	if err := a.t.Torrents.Delete(infoHash, true); err != nil {
+	if err := a.t.torrents.Delete(infoHash, true); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
@@ -203,7 +203,7 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 		return
 	}
 	var t store.Torrent
-	err := a.t.Torrents.Get(&t, ih, true)
+	err := a.t.torrents.Get(&t, ih, true)
 	if err == consts.ErrInvalidInfoHash {
 		c.JSON(http.StatusNotFound, gin.H{})
 		return
@@ -237,7 +237,7 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 			t.MultiDn = tup.MultiDn
 		}
 	}
-	if err := a.t.Torrents.Update(t); err != nil {
+	if err := a.t.torrents.Update(t); err != nil {
 		c.JSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 	} else {
 		c.JSON(http.StatusOK, StatusResp{Message: "Updated successfully"})
@@ -251,7 +251,7 @@ func (a *AdminAPI) userUpdate(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	if err := a.t.Users.GetByPasskey(&user, passkey); err != nil {
+	if err := a.t.users.GetByPasskey(&user, passkey); err != nil {
 		if errors.Is(consts.ErrUnauthorized, err) {
 			c.AbortWithStatus(http.StatusNotFound)
 		} else {
@@ -264,7 +264,7 @@ func (a *AdminAPI) userUpdate(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	if err := a.t.Users.Update(update, passkey); err != nil {
+	if err := a.t.users.Update(update, passkey); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -279,11 +279,11 @@ type UserDeleteRequest struct {
 func (a *AdminAPI) userDelete(c *gin.Context) {
 	pk := c.Param("passkey")
 	var user store.User
-	if err := a.t.Users.GetByPasskey(&user, pk); err != nil {
+	if err := a.t.users.GetByPasskey(&user, pk); err != nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Err: "User not found"})
 		return
 	}
-	if err := a.t.Users.Delete(user); err != nil {
+	if err := a.t.users.Delete(user); err != nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, StatusResp{Err: "Failed to delete user"})
 		return
 	}
@@ -299,7 +299,7 @@ func (a *AdminAPI) userAdd(c *gin.Context) {
 	if user.Passkey == "" {
 		user.Passkey = util.NewPasskey()
 	}
-	if err := a.t.Users.Add(user); err != nil {
+	if err := a.t.users.Add(user); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Failed to add user"})
 		return
 	}

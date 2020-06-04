@@ -51,8 +51,8 @@ func TestUserAdd(t *testing.T) {
 	require.Equal(t, 200, w.Code)
 	var userByPK store.User
 	var userByID store.User
-	require.NoError(t, tkr.Users.GetByPasskey(&userByPK, user0.Passkey))
-	require.NoError(t, tkr.Users.GetByID(&userByID, user0.UserID))
+	require.NoError(t, tkr.users.GetByPasskey(&userByPK, user0.Passkey))
+	require.NoError(t, tkr.users.GetByID(&userByID, user0.UserID))
 	for _, u := range []store.User{userByPK, userByID} {
 		equalUser(t, user0, u)
 	}
@@ -61,11 +61,11 @@ func TestUserAdd(t *testing.T) {
 func TestUserDelete(t *testing.T) {
 	user0 := store.GenerateTestUser()
 	tkr, handler := newTestAPI()
-	require.NoError(t, tkr.Users.Add(user0))
+	require.NoError(t, tkr.users.Add(user0))
 	u := fmt.Sprintf("/user/pk/%s", user0.Passkey)
 	w := performRequest(handler, "DELETE", u, nil, nil)
 	require.Equal(t, 200, w.Code)
-	require.Error(t, tkr.Users.GetByPasskey(&user0, user0.Passkey))
+	require.Error(t, tkr.users.GetByPasskey(&user0, user0.Passkey))
 }
 
 func TestUserUpdate(t *testing.T) {
@@ -73,11 +73,11 @@ func TestUserUpdate(t *testing.T) {
 	user1 := store.GenerateTestUser()
 	var user2 store.User
 	tkr, handler := newTestAPI()
-	require.NoError(t, tkr.Users.Add(user0))
+	require.NoError(t, tkr.users.Add(user0))
 	u := fmt.Sprintf("/user/pk/%s", user0.Passkey)
 	w := performRequest(handler, "PATCH", u, user1, nil)
 	require.Equal(t, 200, w.Code)
-	require.NoError(t, tkr.Users.GetByPasskey(&user2, user1.Passkey))
+	require.NoError(t, tkr.users.GetByPasskey(&user2, user1.Passkey))
 	equalUser(t, user1, user2)
 }
 
@@ -93,7 +93,7 @@ func TestTorrentAdd(t *testing.T) {
 	w := performRequest(handler, "POST", "/torrent", tadd, nil)
 	require.Equal(t, 200, w.Code)
 	var tor1 store.Torrent
-	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash, false))
+	require.NoError(t, tkr.torrents.Get(&tor1, tor0.InfoHash, false))
 	require.Equal(t, tadd.Name, tor1.ReleaseName)
 	require.Equal(t, tadd.MultiUp, tor1.MultiUp)
 	require.Equal(t, float64(0), tor1.MultiDn)
@@ -102,19 +102,19 @@ func TestTorrentAdd(t *testing.T) {
 func TestTorrentDelete(t *testing.T) {
 	tor0 := store.GenerateTestTorrent()
 	tkr, handler := newTestAPI()
-	require.NoError(t, tkr.Torrents.Add(tor0))
+	require.NoError(t, tkr.torrents.Add(tor0))
 	u := fmt.Sprintf("/torrent/%s", tor0.InfoHash.String())
 	w := performRequest(handler, "DELETE", u, nil, nil)
 	require.Equal(t, 200, w.Code)
 	var tor1 store.Torrent
-	require.Error(t, tkr.Torrents.Get(&tor1, tor0.InfoHash, false))
+	require.Error(t, tkr.torrents.Get(&tor1, tor0.InfoHash, false))
 
 }
 
 func TestTorrentUpdate(t *testing.T) {
 	tor0 := store.GenerateTestTorrent()
 	tkr, handler := newTestAPI()
-	require.NoError(t, tkr.Torrents.Add(tor0))
+	require.NoError(t, tkr.torrents.Add(tor0))
 	tup := store.TorrentUpdate{
 		Keys:        []string{"release_name", "is_deleted", "is_enabled", "reason", "multi_up", "multi_dn"},
 		ReleaseName: "new_name",
@@ -128,7 +128,7 @@ func TestTorrentUpdate(t *testing.T) {
 	w := performRequest(handler, "PATCH", p, tup, nil)
 	require.Equal(t, 200, w.Code)
 	var tor1 store.Torrent
-	require.NoError(t, tkr.Torrents.Get(&tor1, tor0.InfoHash, true))
+	require.NoError(t, tkr.torrents.Get(&tor1, tor0.InfoHash, true))
 	require.Equal(t, tup.ReleaseName, tor1.ReleaseName)
 	require.Equal(t, tup.IsDeleted, tor1.IsDeleted)
 	require.Equal(t, tup.IsEnabled, tor1.IsEnabled)
@@ -143,7 +143,7 @@ func TestTorrentUpdate(t *testing.T) {
 	}, nil)
 	require.Equal(t, 200, w2.Code)
 	var tor2 store.Torrent
-	require.Equal(t, consts.ErrInvalidInfoHash, tkr.Torrents.Get(&tor2, tor0.InfoHash, false))
+	require.Equal(t, consts.ErrInvalidInfoHash, tkr.torrents.Get(&tor2, tor0.InfoHash, false))
 }
 
 func TestConfigUpdate(t *testing.T) {

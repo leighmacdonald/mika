@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -83,17 +84,20 @@ func TestDownloadDB(t *testing.T) {
 		t.SkipNow()
 	}
 	p := util.FindFile(config.GetString(config.GeodbPath))
-	if util.Exists(p) {
-		file, err := os.Stat(p)
-		if err != nil {
-			log.Fatalf("failed to stat file: %s", err)
-		}
-		if time.Since(file.ModTime()).Hours() >= 6 {
-			if err := os.Remove(p); err != nil {
-				t.Fatalf("Could not remove mmdb file: %s", err)
+	for _, fp := range []string{geoDatabaseLocationFile, geoDatabaseASNFile4, geoDatabaseASNFile6} {
+		fullPath := filepath.Join(p, fp)
+		if util.Exists(fullPath) {
+			file, err := os.Stat(fullPath)
+			if err != nil {
+				log.Fatalf("failed to stat file: %s", err)
 			}
-		} else {
-			t.Skipf("Skipping download test, file age too new")
+			if time.Since(file.ModTime()).Hours() >= 6 {
+				if err := os.Remove(fullPath); err != nil {
+					t.Fatalf("Could not remove geo file %s: %s", fullPath, err)
+				}
+			} else {
+				t.Skipf("Skipping download test, file age too new")
+			}
 		}
 	}
 

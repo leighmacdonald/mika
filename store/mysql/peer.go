@@ -7,7 +7,6 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
-	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net"
@@ -25,7 +24,7 @@ func (ps *PeerStore) Name() string {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
+func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats) error {
 	const q = `CALL peer_update_stats(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	tx, err := ps.db.Begin()
 	if err != nil {
@@ -35,7 +34,7 @@ func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.Pee
 	if err2 != nil {
 		return errors.Wrap(err2, "Failed to prepare user Sync() tx")
 	}
-	peers := make(map[store.InfoHash]store.Peer)
+
 	for ph, stats := range b {
 		sum := stats.Totals()
 		if _, err := stmt.Exec(ph.InfoHash().Bytes(), ph.PeerID().Bytes(),
@@ -46,45 +45,29 @@ func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.Pee
 			}
 			return errors.Wrap(err, "Failed to exec peer Sync() tx")
 		}
-		var peer store.Peer
-		if cache != nil {
-			// Update set for cached peer data
-			// Its applied only after successful Commit() call
-			if cache.Get(&peer, ph.InfoHash(), ph.PeerID()) {
-				peer.Downloaded += sum.TotalDn
-				peer.Uploaded += sum.TotalUp
-				peer.SpeedDN = uint32(sum.SpeedDn)
-				peer.SpeedUP = uint32(sum.SpeedUp)
-				peer.SpeedDNMax = util.UMax32(peer.SpeedDNMax, uint32(sum.SpeedDn))
-				peer.SpeedUPMax = util.UMax32(peer.SpeedUPMax, uint32(sum.SpeedUp))
-				peers[ph.InfoHash()] = peer
-			}
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		return errors.Wrap(err, "Failed to commit user Sync() tx")
-	}
-	if cache != nil {
-		for ih, peer := range peers {
-			cache.Set(ih, peer)
-		}
 	}
 	return nil
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps *PeerStore) Reap(cache *store.PeerCache) {
+// TODO fetch peer hashes for expired peers to flush local caches
+func (ps *PeerStore) Reap() []store.PeerHash {
+	var peerHashes []store.PeerHash
 	const q = `CALL peer_reap(?)`
 	rows, err := ps.db.Exec(q, time.Now().Add(-15*time.Minute))
 	if err != nil {
 		log.Errorf("Failed to reap peers: %s", err.Error())
-		return
+		return nil
 	}
 	count, err2 := rows.RowsAffected()
 	if err2 != nil {
 		log.Errorf("Failed to get reap count: %s", err2)
 	}
 	log.Debugf("Reaped %d peers", count)
+	return peerHashes
 }
 
 // Close will close the underlying database connection

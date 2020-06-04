@@ -57,7 +57,7 @@ func (us UserStore) Update(user store.User, oldPasskey string) error {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (us UserStore) Sync(batch map[string]store.UserStats, cache *store.UserCache) error {
+func (us UserStore) Sync(batch map[string]store.UserStats) error {
 	const txName = "userSync"
 	const q = `
 		UPDATE 
@@ -88,11 +88,6 @@ func (us UserStore) Sync(batch map[string]store.UserStats, cache *store.UserCach
 	}
 	if err := tx.Commit(c); err != nil {
 		return errors.Wrapf(err, "postgres.UserStore.Sync failed to commit tx")
-	}
-	if cache != nil {
-		for passkey := range batch {
-			cache.Delete(passkey)
-		}
 	}
 	return nil
 }
@@ -220,7 +215,7 @@ func (ts TorrentStore) Update(torrent store.Torrent) error {
 
 // Sync batch updates the backing store with the new TorrentStats provided
 // TODO test cases
-func (ts TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
+func (ts TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats) error {
 	const txName = "torrentSync"
 	const q = `
 		UPDATE 
@@ -255,11 +250,6 @@ func (ts TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats, cache *
 	}
 	if err := tx.Commit(c); err != nil {
 		return errors.Wrapf(err, "postgres.PeerStore.Sync failed to commit tx")
-	}
-	if cache != nil {
-		for ih, stats := range batch {
-			cache.Update(ih, stats)
-		}
 	}
 	return nil
 }
@@ -419,7 +409,7 @@ func (ps PeerStore) Name() string {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
+func (ps PeerStore) Sync(batch map[store.PeerHash]store.PeerStats) error {
 	const txName = "peerSync"
 	const q = `
 		UPDATE 
@@ -458,19 +448,22 @@ func (ps PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps PeerStore) Reap(cache *store.PeerCache) {
+// TODO fetch peer hashes for expired peers to flush local caches
+func (ps PeerStore) Reap() []store.PeerHash {
 	// NOW() - INTERVAL '15 minutes'
+	var peerHashes []store.PeerHash
 	const q = `DELETE FROM peers WHERE announce_last < $1`
 	c, cancel := context.WithDeadline(ps.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
 	rows, err := ps.db.Exec(c, q, time.Now().Add(-(15 * time.Minute)))
 	if err != nil {
 		log.Errorf("failed to reap peers: %s", err.Error())
-		return
+		return nil
 	}
 	if rows.RowsAffected() > 0 {
 		log.Debugf("Reaped %d peers", rows.RowsAffected())
 	}
+	return peerHashes
 }
 
 // Add insets the peer into the swarm of the torrent provided

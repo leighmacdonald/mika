@@ -66,7 +66,7 @@ func (s *TorrentStore) Update(torrent store.Torrent) error {
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
+func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats) error {
 	const q = `CALL torrent_update_stats(?, ?, ?, ?, ?, ?, ?)`
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -94,11 +94,6 @@ func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *stor
 	}
 	if err := tx.Commit(); err != nil {
 		return errors.Wrap(err, "Failed to commit torrent Sync() tx")
-	}
-	if cache != nil {
-		for ih, stats := range b {
-			cache.Update(ih, stats)
-		}
 	}
 	return nil
 }
@@ -164,7 +159,6 @@ func (s *TorrentStore) Add(t store.Torrent) error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("Added torrent to cache (Add()): %s", t.InfoHash.String())
 	return nil
 }
 

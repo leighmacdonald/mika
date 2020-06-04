@@ -7,6 +7,7 @@ import (
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"time"
 
@@ -108,7 +109,12 @@ func (t *Tracker) PeerReaper() {
 	for {
 		select {
 		case <-peerTimer.C:
-			t.Peers.Reap(t.PeerCache)
+			expired := t.Peers.Reap()
+			if t.PeerCache != nil {
+				for _, ph := range expired {
+					t.PeerCache.Delete(ph.InfoHash(), ph.PeerID())
+				}
+			}
 			// We use a timer here so that config updates for the interval get applied
 			// on the next tick
 			peerTimer.Reset(t.ReaperInterval)
@@ -150,15 +156,15 @@ func (t *Tracker) StatWorker() {
 			}
 			// Send current copies of data to stores
 			log.Debugf("Calling Sync() on %d users", len(userBatchCopy))
-			if err := t.Users.Sync(userBatchCopy, t.UsersCache); err != nil {
+			if err := t.UserSync(userBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
 			log.Debugf("Calling Sync() on %d peers", len(userBatchCopy))
-			if err := t.Peers.Sync(peerBatchCopy, t.PeerCache); err != nil {
+			if err := t.PeerSync(peerBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
 			log.Debugf("Calling Sync() on %d torrents", len(userBatchCopy))
-			if err := t.Torrents.Sync(torrentBatchCopy, t.TorrentsCache); err != nil {
+			if err := t.TorrentSync(torrentBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
 			syncTimer.Reset(t.BatchInterval)
@@ -411,6 +417,58 @@ func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
 	}
 	if t.PeerCache != nil {
 		t.PeerCache.Set(infoHash, peer)
+	}
+	return nil
+}
+
+func (t *Tracker) UserSync(batch map[string]store.UserStats) error {
+	if err := t.Users.Sync(batch); err != nil {
+		return err
+	}
+	if t.UsersCache != nil {
+		var usr store.User
+		for passkey, stats := range batch {
+			if t.UsersCache.Get(&usr, passkey) {
+				usr.Downloaded += stats.Downloaded
+				usr.Uploaded += stats.Uploaded
+				usr.Announces += stats.Announces
+				t.UsersCache.Set(usr)
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Tracker) PeerSync(batch map[store.PeerHash]store.PeerStats) error {
+	if err := t.Peers.Sync(batch); err != nil {
+		return err
+	}
+	if t.PeerCache != nil {
+		var peer store.Peer
+		for ph, stats := range batch {
+			sum := stats.Totals()
+			if t.PeerCache.Get(&peer, ph.InfoHash(), ph.PeerID()) {
+				peer.Downloaded += sum.TotalDn
+				peer.Uploaded += sum.TotalUp
+				peer.SpeedDN = uint32(sum.SpeedDn)
+				peer.SpeedUP = uint32(sum.SpeedUp)
+				peer.SpeedDNMax = util.UMax32(peer.SpeedDNMax, uint32(sum.SpeedDn))
+				peer.SpeedUPMax = util.UMax32(peer.SpeedUPMax, uint32(sum.SpeedUp))
+				t.PeerCache.Set(ph.InfoHash(), peer)
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Tracker) TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
+	if err := t.Torrents.Sync(batch); err != nil {
+		return err
+	}
+	if t.TorrentsCache != nil {
+		for ih, stats := range batch {
+			t.TorrentsCache.Update(ih, stats)
+		}
 	}
 	return nil
 }

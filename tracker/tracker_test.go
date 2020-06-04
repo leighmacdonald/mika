@@ -126,7 +126,7 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 			Downloaded: 0,
 			Announces:  2,
 		},
-	}, nil))
+	}))
 
 	scrapes := []sr{{
 		req: scrapeReq{

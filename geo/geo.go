@@ -349,6 +349,9 @@ func New(path string) (*DB, error) {
 				log.Fatalf("Failed to read csv row: %s", err2.Error())
 			}
 			_, cidr, err2 := net.ParseCIDR(row[2])
+			if err2 != nil {
+				continue
+			}
 			asNum, err := strconv.ParseUint(row[3], 10, 32)
 			if err != nil {
 				continue

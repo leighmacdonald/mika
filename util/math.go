@@ -114,12 +114,3 @@ func HumanIBytesString(s uint64) string {
 	sizes := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
 	return humanizeBytes(s, 1024, sizes)
 }
-
-func roundF64(f float64) float64 {
-	return math.Floor(f + .5)
-}
-
-func round64Plus(f float64, places int) float64 {
-	shift := math.Pow(10, float64(places))
-	return roundF64(f*shift) / shift
-}

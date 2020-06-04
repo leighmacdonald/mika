@@ -113,7 +113,7 @@ func TestPeerStore(t *testing.T, ps PeerStore, ts TorrentStore, _ UserStore) {
 			Hist:   hist,
 			Paused: false,
 		},
-	}, nil))
+	}))
 	uploaded := uint64(0)
 	downloaded := uint64(0)
 	for _, h := range hist {
@@ -151,7 +151,7 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 			Announces:  uint64(rand.Intn(100000)),
 		},
 	}
-	require.NoError(t, ts.Sync(batch, nil), "[%s] Failed to sync torrent", ts.Name())
+	require.NoError(t, ts.Sync(batch), "[%s] Failed to sync torrent", ts.Name())
 	var updated Torrent
 	require.NoError(t, ts.Get(&updated, torrentA.InfoHash, false))
 	require.Equal(t, torrentA.Seeders+batch[torrentA.InfoHash].Seeders, updated.Seeders)
@@ -203,7 +203,7 @@ func TestUserStore(t *testing.T, s UserStore) {
 			Announces:  10,
 		},
 	}
-	require.NoError(t, s.Sync(batchUpdate, nil))
+	require.NoError(t, s.Sync(batchUpdate))
 	time.Sleep(100 * time.Millisecond)
 	var updatedUser User
 	require.NoError(t, s.GetByPasskey(&updatedUser, users[0].Passkey))

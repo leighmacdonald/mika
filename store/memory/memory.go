@@ -65,7 +65,7 @@ func (ts *TorrentStore) Delete(ih store.InfoHash, _ bool) error {
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
+func (ts *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats) error {
 	ts.Lock()
 	defer ts.Unlock()
 	for ih, stats := range b {
@@ -81,9 +81,6 @@ func (ts *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats, cache *sto
 		t.Leechers += stats.Leechers
 		t.Announces += stats.Announces
 		ts.torrents[ih] = t
-		if cache != nil {
-			cache.Set(t)
-		}
 	}
 	return nil
 }
@@ -166,33 +163,31 @@ func NewPeerStore() *PeerStore {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
+func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats) error {
 	ps.Lock()
 	defer ps.Unlock()
-	// TODO reduce the cyclic complexity of this
 	for ph, stats := range b {
 		swarm, ok := ps.swarms[ph.InfoHash()]
 		if ok {
-			newPeer, ok := swarm.UpdatePeer(ph.PeerID(), stats)
-			if ok && cache != nil {
-				cache.Set(ph.InfoHash(), newPeer)
-			}
+			_, _ = swarm.UpdatePeer(ph.PeerID(), stats)
 		}
 	}
 	return nil
 }
 
 // Reap will loop through the swarms removing any stale entries from active swarms
-func (ps *PeerStore) Reap(cache *store.PeerCache) {
+func (ps *PeerStore) Reap() []store.PeerHash {
+	var peerHashes []store.PeerHash
 	ps.Lock()
 	for k := range ps.swarms {
 		swarm, ok := ps.swarms[k]
 		if !ok {
 			continue
 		}
-		swarm.ReapExpired(k, cache)
+		peerHashes = append(peerHashes, swarm.ReapExpired(k)...)
 	}
 	ps.Unlock()
+	return peerHashes
 }
 
 // Get will fetch the peer from the swarm if it exists
@@ -310,7 +305,7 @@ func NewUserStore() *UserStore {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
+func (u *UserStore) Sync(b map[string]store.UserStats) error {
 	u.Lock()
 	defer u.Unlock()
 	for passkey, stats := range b {
@@ -323,9 +318,6 @@ func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) e
 		user.Downloaded += stats.Downloaded
 		user.Uploaded += stats.Uploaded
 		u.users[passkey] = user
-		if cache != nil {
-			cache.Set(user)
-		}
 	}
 	return nil
 }

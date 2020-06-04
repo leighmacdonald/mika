@@ -23,7 +23,7 @@ func (u *UserStore) Name() string {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
+func (u *UserStore) Sync(b map[string]store.UserStats) error {
 	const q = `CALL user_update_stats(?, ?, ?, ?)`
 	// TODO use ctx for timeout
 	ctx := context.Background()
@@ -42,15 +42,6 @@ func (u *UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) e
 				log.Errorf("Failed to roll back user Sync() tx")
 			}
 			return errors.Wrap(err, "Failed to exec user Sync() tx")
-		}
-		if cache != nil {
-			var usr store.User
-			if cache.Get(&usr, passkey) {
-				usr.Downloaded += stats.Downloaded
-				usr.Uploaded += stats.Uploaded
-				usr.Announces += stats.Announces
-				cache.Set(usr)
-			}
 		}
 	}
 	if err := tx.Commit(); err != nil {

@@ -64,7 +64,7 @@ func (us UserStore) Name() string {
 
 // Sync batch updates the backing store with the new UserStats provided
 // TODO leverage cache layer so we can pipeline the updates w/o query first
-func (us UserStore) Sync(b map[string]store.UserStats, cache *store.UserCache) error {
+func (us UserStore) Sync(b map[string]store.UserStats) error {
 	for passkey, stats := range b {
 		old, err := us.client.HGetAll(userKey(passkey)).Result()
 		if err != nil {
@@ -211,7 +211,7 @@ func (ts *TorrentStore) Update(torrent store.Torrent) error {
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (ts *TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats, cache *store.TorrentCache) error {
+func (ts *TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats) error {
 	pipe := ts.client.TxPipeline()
 	for ih, s := range batch {
 		pipe.HIncrBy(torrentKey(ih), "seeders", int64(s.Seeders))
@@ -223,22 +223,6 @@ func (ts *TorrentStore) Sync(batch map[store.InfoHash]store.TorrentStats, cache 
 	}
 	if _, err := pipe.Exec(); err != nil {
 		return err
-	}
-	if cache != nil {
-		for ih, s := range batch {
-			var t store.Torrent
-			if !cache.Get(&t, ih) {
-				continue
-			}
-			t.Seeders += s.Seeders
-			t.Leechers += s.Leechers
-			t.Announces += s.Announces
-			t.Downloaded += s.Downloaded
-			t.Uploaded += s.Uploaded
-			t.Snatches += s.Snatches
-			cache.Set(t)
-		}
-
 	}
 	return nil
 }
@@ -386,7 +370,7 @@ func (ps *PeerStore) Name() string {
 }
 
 // Sync batch updates the backing store with the new PeerStats provided
-func (ps *PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store.PeerCache) error {
+func (ps *PeerStore) Sync(batch map[store.PeerHash]store.PeerStats) error {
 	pipe := ps.client.Pipeline()
 	for ph, stats := range batch {
 		sum := stats.Totals()
@@ -404,7 +388,9 @@ func (ps *PeerStore) Sync(batch map[store.PeerHash]store.PeerStats, cache *store
 }
 
 // Reap will loop through the peers removing any stale entries from active swarms
-func (ps *PeerStore) Reap(cache *store.PeerCache) {}
+func (ps *PeerStore) Reap() []store.PeerHash {
+	return nil
+}
 
 // Add inserts a peer into the active swarm for the torrent provided
 func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {

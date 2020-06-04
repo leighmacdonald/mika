@@ -208,7 +208,7 @@ func (s *ServerExample) userSync(c *gin.Context) {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := s.Users.Sync(batch, nil); err != nil {
+	if err := s.Users.Sync(batch); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -248,7 +248,7 @@ func (s *ServerExample) torrentSync(c *gin.Context) {
 		}
 		req[ih] = v
 	}
-	if err := s.Torrents.Sync(req, nil); err != nil {
+	if err := s.Torrents.Sync(req); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -270,7 +270,7 @@ func (s *ServerExample) peersSync(c *gin.Context) {
 		}
 		rb[ph] = v
 	}
-	if err := s.Peers.Sync(rb, nil); err != nil {
+	if err := s.Peers.Sync(rb); err != nil {
 		errResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -357,7 +357,7 @@ func (s *ServerExample) peersGet(c *gin.Context) {
 }
 
 func (s *ServerExample) peersReap(c *gin.Context) {
-	s.Peers.Reap(nil)
+	s.Peers.Reap()
 	okResponse(c, "reaped")
 }
 

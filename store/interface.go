@@ -83,7 +83,7 @@ type UserStore interface {
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// Sync batch updates the backing store with the new UserStats provided
-	Sync(b map[string]UserStats, cache *UserCache) error
+	Sync(b map[string]UserStats) error
 	// Name returns the name of the data store type
 	Name() string
 }
@@ -109,7 +109,7 @@ type TorrentStore interface {
 	// WhiteListGetAll fetches all known whitelisted clients
 	WhiteListGetAll() ([]WhiteListClient, error)
 	// Sync batch updates the backing store with the new TorrentStats provided
-	Sync(b map[InfoHash]TorrentStats, cache *TorrentCache) error
+	Sync(b map[InfoHash]TorrentStats) error
 	// Conn returns the underlying connection, if any
 	Conn() interface{}
 	// Name returns the name of the data store type
@@ -131,9 +131,9 @@ type PeerStore interface {
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// Reap will loop through the peers removing any stale entries from active swarms
-	Reap(cache *PeerCache)
+	Reap() []PeerHash
 	// Sync batch updates the backing store with the new PeerStats provided
-	Sync(b map[PeerHash]PeerStats, cache *PeerCache) error
+	Sync(b map[PeerHash]PeerStats) error
 	// Name returns the name of the data store type
 	Name() string
 }

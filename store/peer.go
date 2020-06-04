@@ -178,15 +178,17 @@ func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (Peer, bool) {
 }
 
 // ReapExpired will delete any peers from the swarm that are considered expired
-func (swarm Swarm) ReapExpired(infoHash InfoHash, cache *PeerCache) {
+func (swarm Swarm) ReapExpired(infoHash InfoHash) []PeerHash {
 	swarm.Lock()
+	var peerHashes []PeerHash
 	for k, peer := range swarm.Peers {
 		if peer.Expired() {
 			delete(swarm.Peers, k)
-			cache.Delete(infoHash, peer.PeerID)
+			peerHashes = append(peerHashes, NewPeerHash(infoHash, peer.PeerID))
 		}
 	}
 	swarm.Unlock()
+	return peerHashes
 }
 
 // Get will copy a peer into the peer pointer passed in if it exists.

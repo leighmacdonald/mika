@@ -45,6 +45,7 @@ type Tracker struct {
 	AnnInterval    time.Duration
 	AnnIntervalMin time.Duration
 	BatchInterval  time.Duration
+	IPv6Only       bool
 	// MaxPeers is the max number of peers we send in an announce
 	MaxPeers        int
 	StateUpdateChan chan store.UpdateState
@@ -69,6 +70,8 @@ type Opts struct {
 	// If Public is true, this will allow unknown info_hashes to be automatically tracked
 	AutoRegister     bool
 	AllowNonRoutable bool
+	// Dont enable dual-stack replies in ipv6 mode
+	IPv6Only bool
 	// ReaperInterval is how often we can for dead peers in swarms
 	ReaperInterval time.Duration
 	AnnInterval    time.Duration
@@ -94,6 +97,7 @@ func NewDefaultOpts() *Opts {
 		Public:              false,
 		AutoRegister:        false,
 		AllowNonRoutable:    false,
+		IPv6Only:            false,
 		ReaperInterval:      time.Second * 300,
 		AnnInterval:         time.Second * 60,
 		AnnIntervalMin:      time.Second * 30,
@@ -254,6 +258,7 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		Geodb:            opts.Geodb,
 		GeodbEnabled:     opts.GeodbEnabled,
 		AllowNonRoutable: opts.AllowNonRoutable,
+		IPv6Only:         opts.IPv6Only,
 		ReaperInterval:   opts.ReaperInterval,
 		AnnInterval:      opts.AnnInterval,
 		AnnIntervalMin:   opts.AnnIntervalMin,

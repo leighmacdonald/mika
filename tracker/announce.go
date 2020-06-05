@@ -194,7 +194,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 			// Dont add download/upload stats because they would be doubled if applied in the
 			// state update. Left is set because its always a static value being set and a (safe) data race
 			// can occur for counting seeder/leecher states
-			peer.Client = c.GetHeader("User-Agent")
+			peer.Client = store.ClientString(req.PeerID).String()
 			peer.Left = req.Left
 			if err := h.tracker.PeerAdd(tor.InfoHash, peer); err != nil {
 				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
@@ -215,6 +215,32 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	} else {
 		peer.AnnounceLast = time.Now()
 	}
+	peers, err2 := h.tracker.PeerGetN(tor.InfoHash, h.tracker.MaxPeers)
+	if err2 != nil {
+		log.Errorf("Could not read peers from swarm: %s", err2.Error())
+		oops(c, msgGenericError)
+		return
+	}
+	dict := bencode.Dict{
+		"complete":     tor.Seeders,
+		"incomplete":   tor.Leechers,
+		"interval":     int(h.tracker.AnnInterval.Seconds()),
+		"min interval": int(h.tracker.AnnIntervalMin.Seconds()),
+	}
+	// TODO IP.To16() != nil validation for v4 in v6 addresses
+	ip6 := strings.Count(peer.IP.String(), ":") > 1
+	if !ip6 || (ip6 && !h.tracker.IPv6Only) {
+		dict["peers"] = makeCompactPeers(peers, peer.PeerID)
+	}
+	if ip6 {
+		dict["peers6"] = makeCompactPeers6(peers, peer.PeerID)
+	}
+	var outBytes bytes.Buffer
+	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
+		oops(c, msgGenericError)
+		return
+	}
+	c.Data(int(msgOk), gin.MIMEPlain, outBytes.Bytes())
 	// Send state to another go channel for updating outside of the announce request
 	// so that we can respond asap
 	h.tracker.StateUpdateChan <- store.UpdateState{
@@ -228,33 +254,14 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		Timestamp:  time.Now(),
 		Paused:     peer.Paused,
 	}
-	peers, err2 := h.tracker.PeerGetN(tor.InfoHash, h.tracker.MaxPeers)
-	if err2 != nil {
-		log.Errorf("Could not read peers from swarm: %s", err2.Error())
-		oops(c, msgGenericError)
-		return
-	}
-	dict := bencode.Dict{
-		"complete":     tor.Seeders,
-		"incomplete":   tor.Leechers,
-		"interval":     int(h.tracker.AnnInterval.Seconds()),
-		"min interval": int(h.tracker.AnnIntervalMin.Seconds()),
-		"peers":        makeCompactPeers(peers, peer.PeerID),
-	}
-	var outBytes bytes.Buffer
-	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
-		oops(c, msgGenericError)
-		return
-	}
-	c.Data(int(msgOk), gin.MIMEPlain, outBytes.Bytes())
 }
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(peers store.Swarm, skipID store.PeerID) []byte {
+func makeCompactPeers(swarm store.Swarm, skipID store.PeerID) []byte {
 	var buf bytes.Buffer
-	peers.RLock()
-	for _, peer := range peers.Peers {
+	swarm.RLock()
+	for _, peer := range swarm.Peers {
 		if peer.PeerID == skipID {
 			// Skip the peers own peer_id
 			continue
@@ -262,6 +269,20 @@ func makeCompactPeers(peers store.Swarm, skipID store.PeerID) []byte {
 		buf.Write(peer.IP.To4())
 		buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
 	}
-	peers.RUnlock()
+	swarm.RUnlock()
+	return buf.Bytes()
+}
+
+// makeCompactPeers6 returns a binary encoded peer set for compact responses
+func makeCompactPeers6(swarm store.Swarm, skipID store.PeerID) []byte {
+	var buf bytes.Buffer
+	for _, peer := range swarm.Peers {
+		if peer.PeerID == skipID {
+			// Skip the peers own peer_id
+			continue
+		}
+		buf.Write(peer.IP.To16())
+		buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+	}
 	return buf.Bytes()
 }

@@ -64,6 +64,22 @@ whitelisted clients support it.
 - DHT bootstrapping node
 - Migrations from existing tracker systems
 
+## BEP Support
+
+These are currently fully implemented BEPs:
+
+- [BEP0003](http://www.bittorrent.org/beps/bep_0003.html) The BitTorrent Protocol Specification
+- [BEP0007](http://www.bittorrent.org/beps/bep_0007.html) IPv6 Tracker Extension
+- [BEP0020](http://www.bittorrent.org/beps/bep_0020.html) Peer ID Conventions
+- [BEP0021](http://www.bittorrent.org/beps/bep_0021.html) Extension for partial seeds
+- [BEP0023](http://www.bittorrent.org/beps/bep_0023.html) Tracker Returns Compact Peer Lists
+- [BEP0048](http://www.bittorrent.org/beps/bep_0048.html) Tracker Protocol Extension: Scrape
+
+Not currently planned, but maybe in the future:
+- [BEP0008](http://www.bittorrent.org/beps/bep_0008.html) Tracker Peer Obfuscation
+- [BEP0024](http://www.bittorrent.org/beps/bep_0024.html) Tracker Returns External IP
+- [BEP0015](http://www.bittorrent.org/beps/bep_0015.html) UDP Tracker Protocol for BitTorrent
+- [BEP0041](http://www.bittorrent.org/beps/bep_0041.html) UDP Tracker Protocol Extensions
 
 ## Build Notes
 

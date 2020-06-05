@@ -8,6 +8,8 @@ import (
 	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -246,4 +248,218 @@ type UpdateState struct {
 	Timestamp time.Time
 	Event     consts.AnnounceType
 	Paused    bool
+}
+
+type BTClient struct {
+	Name     string
+	Major    int
+	Minor    int
+	Patch    int
+	SubPatch int
+}
+
+func (b BTClient) String() string {
+	return fmt.Sprintf("%s %d.%d.%d.%d", b.Name, b.Major, b.Minor, b.Patch, b.SubPatch)
+}
+
+const shadowCharSet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.-"
+
+// ClientString transforms the peer id into a client and version description
+//
+// Shadow Style:
+// Each character in the version string represents a number from 0 to 63.
+// '0'=0, ..., '9'=9, 'A'=10, ..., 'Z'=35, 'a'=36, ..., 'z'=61, '.'=62, '-'=63.
+func ClientString(peerID PeerID) BTClient {
+	var (
+		azStyle bool
+		prefix  string
+		val     uint64
+		err     error
+		cl      BTClient
+	)
+	done := false
+	for i, v := range peerID {
+		if i == 0 {
+			azStyle = v == '-' && peerID[7] == '-'
+		}
+		if azStyle {
+			switch i {
+			case 1:
+				prefix += string(v)
+				continue
+			case 2:
+				prefix += string(v)
+				n, found := clientNames[prefix]
+				if !found {
+					err = consts.ErrInvalidPeerID
+					break
+				}
+				cl.Name = n
+			case 3:
+				val, err = strconv.ParseUint(string(v), 10, 8)
+				if err != nil {
+					break
+				}
+				cl.Major = int(val)
+			case 4:
+				val, err = strconv.ParseUint(string(v), 10, 8)
+				if err != nil {
+					break
+				}
+				cl.Minor = int(val)
+			case 5:
+				val, err = strconv.ParseUint(string(v), 10, 8)
+				if err != nil {
+					break
+				}
+				cl.Patch = int(val)
+			case 6:
+				val, err = strconv.ParseUint(string(v), 10, 8)
+				if err != nil {
+					break
+				}
+				cl.SubPatch = int(val)
+				done = true
+				break
+			}
+		} else {
+			switch i {
+			case 0:
+				n, found := clientNames[string(v)]
+				if !found {
+					err = consts.ErrInvalidPeerID
+					break
+				}
+				cl.Name = n
+			case 1:
+				cl.Major = strings.Index(shadowCharSet, string(v))
+			case 2:
+				cl.Minor = strings.Index(shadowCharSet, string(v))
+			case 3:
+				cl.Patch = strings.Index(shadowCharSet, string(v))
+			case 4:
+				done = true
+				sp := strings.Index(shadowCharSet, string(v))
+				if sp >= 63 {
+					done = true
+					break
+				}
+				cl.SubPatch = sp
+				break
+			}
+		}
+		if done || err != nil {
+			if err != nil {
+				cl.Name = "Unknown"
+			}
+			break
+		}
+	}
+	return cl
+}
+
+var clientNames = map[string]string{
+	"7T": "aTorrent", // Android
+	"AB": "AnyEvent::BitTorrent",
+	"AG": "Ares",
+	"A~": "Ares",
+	"AR": "Arctic",
+	"AV": "Avicora",
+	"AT": "Artemis",
+	"AX": "BitPump",
+	"AZ": "Azureus",
+	"BB": "BitBuddy",
+	"BC": "BitComet",
+	"BE": "Baretorrent",
+	"BF": "Bitflu",
+	"BG": "BTG",            // uses Rasterbar libtorrent)
+	"BL": "BitCometLite",   // uses 6 digit version number OR BitBlinder
+	"BP": "BitTorrent Pro", // Azureus + spyware
+	"BR": "BitRocket",
+	"BS": "BTSlave",
+	"BT": "mainline BitTorrent", //  (versions >= 7.9) OR BBtor
+	"Bt": "Bt",
+	"BW": "BitWombat",
+	"BX": "~Bittorrent X",
+	"CD": "Enhanced CTorrent",
+	"CT": "CTorrent",
+	"DE": "DelugeTorrent",
+	"DP": "Propagate Data Client",
+	"EB": "EBit",
+	"ES": "electric sheep",
+	"FC": "FileCroc",
+	"FD": "Free Download Manager", // versions >= 5.1.12
+	"FT": "FoxTorrent",
+	"FX": "Freebox BitTorrent",
+	"GS": "GSTorrent",
+	"HK": "Hekate",
+	"HL": "Halite",
+	"HM": "hMule", // uses Rasterbar libtorrent
+	"HN": "Hydranode",
+	"IL": "iLivid",
+	"JS": "Justseed.it",
+	"JT": "JavaTorrent",
+	"KG": "KGet",
+	"KT": "KTorrent",
+	"LC": "LeechCraft",
+	"LH": "LH-ABC",
+	"LP": "Lphant",
+	"LT": "libtorrent",
+	"lt": "libTorrent",
+	"LW": "LimeWire",
+	"MK": "Meerkat",
+	"MO": "MonoTorrent",
+	"MP": "MooPolice",
+	"MR": "Miro",
+	"MT": "MoonlightTorrent",
+	"NB": "Net::BitTorrent",
+	"NX": "Net Transport",
+	"OS": "OneSwarm",
+	"OT": "OmegaTorrent",
+	"PB": "Protocol::BitTorrent",
+	"PD": "Pando",
+	"PI": "PicoTorrent",
+	"PT": "PHPTracker",
+	"qB": "qBittorrent",
+	"QD": "QQDownload",
+	"QT": "Qt 4 Torrent example",
+	"RT": "Retriever",
+	"RZ": "RezTorrent",
+	"S~": "Shareaza", // alpha/beta
+	"SB": "~Swiftbit",
+	"SD": "Thunder", // (aka XùnLéi)
+	"SM": "SoMud",
+	"SP": "BitSpirit",
+	"SS": "SwarmScope",
+	"ST": "SymTorrent",
+	"st": "sharktorrent",
+	"SZ": "Shareaza",
+	"TB": "Torch",
+	"TE": "terasaur Seed Bank",
+	"TL": "Tribler", // (versions >= 6.1.0)
+	"TN": "TorrentDotNET",
+	"TR": "Transmission",
+	"TS": "Torrentstorm",
+	"TT": "TuoTu",
+	"UL": "uLeecher!",
+	"UM": "µTorrent for Mac",
+	"UT": "µTorrent",
+	"VG": "Vagaa",
+	"WD": "WebTorrent Desktop",
+	"WT": "BitLet",
+	"WW": "WebTorrent",
+	"WY": "FireTorrent",
+	"XF": "Xfplay",
+	"XL": "Xunlei",
+	"XS": "XSwifter",
+	"XT": "XanTorrent",
+	"XX": "Xtorrent",
+	"ZT": "ZipTorrent",
+	"A":  "ABC",
+	"O":  "Osprey Permaseed",
+	"Q":  "BTQueue",
+	"R":  "Tribler", // (versions < 6.1.0)
+	"S":  "Shadow's client",
+	"T":  "BitTornado",
+	"U":  "UPnP NAT Bit Torrent",
 }

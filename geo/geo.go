@@ -96,7 +96,11 @@ func (ll *LatLong) Scan(v interface{}) error {
 		return errors.New("failed to convert value to string")
 	}
 	llStr := string(llStrB)
-	pcs := strings.Split(strings.Split(strings.Replace(llStr, ")", "", 1), "(")[1], " ")
+	ss := strings.Split(strings.Replace(llStr, ")", "", 1), "(")
+	if len(ss) != 2 {
+		return errors.New("Failed to parse location")
+	}
+	pcs := strings.Split(ss[1], " ")
 	if len(pcs) != 2 {
 		return errors.New("Failed to parse location")
 	}

@@ -171,6 +171,7 @@ end;
 CREATE OR REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
                                      IN in_peer_id binary(20),
                                      IN in_user_id int,
+                                     IN in_ipv6 boolean,
                                      IN in_addr_ip varchar(255),
                                      IN in_addr_port int,
                                      IN in_location varchar(255),
@@ -179,18 +180,23 @@ CREATE OR REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
                                      IN in_downloaded int,
                                      IN in_uploaded int,
                                      IN in_left int,
-                                     IN in_client varchar(255))
+                                     IN in_client varchar(255),
+                                     IN in_country_code char(2),
+                                     IN in_asn varchar(10),
+                                     IN in_as_name varchar(255))
 BEGIN
     SELECT @int_torrent_id := `id` FROM torrents WHERE info_hash = HEX(in_info_hash);
     INSERT INTO peers
-    (peer_id, md5_peer_id, info_hash, user_id, ip, port, created_at, updated_at, torrent_id,
-     downloaded, uploaded, `left`, agent, seeder)
+    (peer_id, md5_peer_id, info_hash, user_id, ipv6, ip, port, location, created_at, updated_at, torrent_id,
+     downloaded, uploaded, `left`, agent, seeder, country_code, asn, as_name)
     VALUES (HEX(in_peer_id),
             md5(HEX(in_peer_id)),
             HEX(in_info_hash),
             in_user_id,
+            in_ipv6,
             in_addr_ip,
             in_addr_port,
+            ST_PointFromText(in_location),
             in_announce_first,
             in_announce_last,
             @int_torrent_id,
@@ -198,7 +204,10 @@ BEGIN
             in_uploaded,
             in_left,
             in_client,
-            if(in_left = 0, 1, 0));
+            if(in_left = 0, 1, 0),
+            in_country_code,
+            in_asn,
+            in_as_name);
 end;
 
 CREATE OR REPLACE PROCEDURE peer_delete(IN in_info_hash binary(20),
@@ -210,23 +219,27 @@ end;
 CREATE OR REPLACE PROCEDURE peer_get(IN in_info_hash BINARY(20),
                                      IN in_peer_id BINARY(20))
 BEGIN
-    SELECT UNHEX(peer_id)   as peer_id,
-           UNHEX(info_hash) as info_hash,
-           user_id          as user_id,
-           ip               as addr_ip,
-           port             as addr_port,
-           downloaded       as total_downloaded,
-           uploaded         as total_uploaded,
-           `left`           as total_left,
-           0                as total_time,
-           0                as total_announces,
-           0                as speed_up,
-           0                as speed_dn,
-           0                as speed_up_max,
-           0                as speed_dn_max,
-           'POINT(0 0)'     as location,
-           updated_at       as announce_last,
-           created_at       as announce_first
+    SELECT UNHEX(peer_id)      as peer_id,
+           UNHEX(info_hash)    as info_hash,
+           user_id             as user_id,
+           ipv6                as ipv6,
+           ip                  as addr_ip,
+           port                as addr_port,
+           downloaded          as total_downloaded,
+           uploaded            as total_uploaded,
+           `left`              as total_left,
+           0                   as total_time,
+           total_announces     as total_announces,
+           speed_up            as speed_up,
+           speed_dn            as speed_dn,
+           speed_up_max        as speed_up_max,
+           speed_dn_max        as speed_dn_max,
+           ST_AsText(location) as location,
+           updated_at          as announce_last,
+           created_at          as announce_first,
+           country_code        as country_code,
+           asn                 as asn,
+           as_name             as as_name
     FROM peers
     WHERE info_hash = HEX(in_info_hash)
       and peer_id = HEX(in_peer_id);
@@ -234,23 +247,27 @@ END;
 
 CREATE OR REPLACE PROCEDURE peer_get_n(IN in_info_hash binary(20), IN in_limit int)
 BEGIN
-    SELECT UNHEX(peer_id)   as peer_id,
-           UNHEX(info_hash) as info_hash,
-           user_id          as user_id,
-           ip               as addr_ip,
-           port             as addr_port,
-           downloaded       as total_downloaded,
-           uploaded         as total_uploaded,
-           `left`           as total_left,
-           0                as total_time,
-           0                as total_announces,
-           0                as speed_up,
-           0                as speed_dn,
-           0                as speed_up_max,
-           0                as speed_dn_max,
-           'POINT(0 0)'     as location,
-           updated_at       as announce_last,
-           created_at       as announce_first
+    SELECT UNHEX(peer_id)      as peer_id,
+           UNHEX(info_hash)    as info_hash,
+           user_id             as user_id,
+           ipv6                as ipv6,
+           ip                  as addr_ip,
+           port                as addr_port,
+           downloaded          as total_downloaded,
+           uploaded            as total_uploaded,
+           `left`              as total_left,
+           0                   as total_time,
+           total_announces     as total_announces,
+           speed_up            as speed_up,
+           speed_dn            as speed_dn,
+           speed_up_max        as speed_up_max,
+           speed_dn_max        as speed_dn_max,
+           ST_AsText(location) as location,
+           updated_at          as announce_last,
+           created_at          as announce_first,
+           country_code        as country_code,
+           asn                 as asn,
+           as_name             as as_name
     FROM peers
     WHERE info_hash = HEX(in_info_hash)
     LIMIT in_limit;

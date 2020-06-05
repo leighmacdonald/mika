@@ -99,7 +99,7 @@ type Peer struct {
 	Location    geo.LatLong `db:"location" redis:"location" json:"location"`
 	CountryCode string      `db:"country_code" json:"country_code"`
 	ASN         uint32      `db:"asn" json:"asn"`
-	AS          string      `db:"as" json:"as"`
+	AS          string      `db:"as_name" json:"as_name"`
 	UserID      uint32      `db:"user_id" redis:"user_id" json:"user_id"`
 	// Client is the user-agent header sent
 	Client string `db:"client" json:"client"`

@@ -230,10 +230,10 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// TODO IP.To16() != nil validation for v4 in v6 addresses
 	ip6 := strings.Count(peer.IP.String(), ":") > 1
 	if !ip6 || (ip6 && !h.tracker.IPv6Only) {
-		dict["peers"] = makeCompactPeers(peers, peer.PeerID)
+		dict["peers"] = makeCompactPeers(peers, peer.PeerID, false)
 	}
 	if ip6 {
-		dict["peers6"] = makeCompactPeers6(peers, peer.PeerID)
+		dict["peers6"] = makeCompactPeers(peers, peer.PeerID, true)
 	}
 	var outBytes bytes.Buffer
 	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
@@ -258,7 +258,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(swarm store.Swarm, skipID store.PeerID) []byte {
+func makeCompactPeers(swarm store.Swarm, skipID store.PeerID, v6 bool) []byte {
 	var buf bytes.Buffer
 	swarm.RLock()
 	for _, peer := range swarm.Peers {
@@ -266,23 +266,15 @@ func makeCompactPeers(swarm store.Swarm, skipID store.PeerID) []byte {
 			// Skip the peers own peer_id
 			continue
 		}
-		buf.Write(peer.IP.To4())
-		buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+		if v6 && peer.IPv6 {
+			buf.Write(peer.IP.To16())
+			buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+		} else if !v6 && !peer.IPv6 {
+			buf.Write(peer.IP.To4())
+			buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
+		}
+
 	}
 	swarm.RUnlock()
-	return buf.Bytes()
-}
-
-// makeCompactPeers6 returns a binary encoded peer set for compact responses
-func makeCompactPeers6(swarm store.Swarm, skipID store.PeerID) []byte {
-	var buf bytes.Buffer
-	for _, peer := range swarm.Peers {
-		if peer.PeerID == skipID {
-			// Skip the peers own peer_id
-			continue
-		}
-		buf.Write(peer.IP.To16())
-		buf.Write([]byte{byte(peer.Port >> 8), byte(peer.Port & 0xff)})
-	}
 	return buf.Bytes()
 }

@@ -23,9 +23,15 @@ var clientCmd = &cobra.Command{
 	Aliases: []string{"c"},
 }
 
-func newClient() *client.Client {
-	host := config.GetString(config.APIListen)
-	key := config.GetString(config.APIKey)
+func newClient(cmd *cobra.Command) *client.Client {
+	host, err := cmd.Flags().GetString("host")
+	if err != nil {
+		host = config.GetString(config.APIListen)
+	}
+	key, err2 := cmd.Flags().GetString("key")
+	if err2 != nil {
+		key = config.GetString(config.APIKey)
+	}
 	if strings.HasPrefix(host, ":") {
 		host = "http://localhost" + host
 	}
@@ -41,7 +47,7 @@ var pingCmd = &cobra.Command{
 	Short: "Tests connecting to the backend tracker",
 	Long:  "Tests connecting to the backend tracker",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := newClient().Ping(); err != nil {
+		if err := newClient(cmd).Ping(); err != nil {
 			log.Fatalf("Could not connect to tracker")
 		}
 	},
@@ -72,7 +78,7 @@ var torrentDeleteCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		c := newClient()
+		c := newClient(cmd)
 		var ih store.InfoHash
 		for _, hashString := range args {
 			if err := store.InfoHashFromString(&ih, hashString); err != nil {
@@ -102,7 +108,7 @@ var torrentAddFileCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		c := newClient()
+		c := newClient(cmd)
 		var infoHash store.InfoHash
 		for _, fileName := range args {
 			mi, err := metainfo.LoadFromFile(fileName)
@@ -142,7 +148,7 @@ var torrentAddCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		c := newClient()
+		c := newClient(cmd)
 		var infoHash store.InfoHash
 		for _, hashString := range args {
 			p := strings.SplitN(hashString, ":", 2)
@@ -174,7 +180,7 @@ var userAddCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(2),
 	Long:    "Add a user to the tracker & store",
 	Run: func(cmd *cobra.Command, args []string) {
-		c := newClient()
+		c := newClient(cmd)
 		userId := cmd.Flag("id").Value.String()
 		if userId == "" {
 			log.Fatalf("Must set user id to positive integer")
@@ -208,16 +214,18 @@ var userDeleteCmd = &cobra.Command{
 		if passkey == "" {
 			log.Fatalf("Invalid passkey")
 		}
-		if err := newClient().UserDelete(passkey); err != nil {
+		if err := newClient(cmd).UserDelete(passkey); err != nil {
 			log.Errorf("Failed to remove user: %s", err.Error())
 		}
 	},
 }
 
 func init() {
-	userAddCmd.PersistentFlags().StringP("passkey", "p", "", "User Passkey")
+	clientCmd.PersistentFlags().StringP("host", "H", "localhost:34001", "Tracker host")
+	clientCmd.PersistentFlags().StringP("key", "k", "", "Tracker key")
+	userAddCmd.PersistentFlags().StringP("passkey", "P", "", "User Passkey")
 	userAddCmd.PersistentFlags().StringP("id", "u", "", "Your internal user ID")
-	userDeleteCmd.PersistentFlags().StringP("passkey", "p", "", "User Passkey")
+	userDeleteCmd.PersistentFlags().StringP("passkey", "P", "", "User Passkey")
 
 	torrentCmd.AddCommand(torrentAddCmd)
 	torrentCmd.AddCommand(torrentAddFileCmd)

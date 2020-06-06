@@ -300,6 +300,7 @@ func (a *AdminAPI) userAdd(c *gin.Context) {
 		user.Passkey = util.NewPasskey()
 	}
 	if err := a.t.users.Add(user); err != nil {
+		log.Error(err)
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Failed to add user"})
 		return
 	}

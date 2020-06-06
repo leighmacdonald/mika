@@ -34,7 +34,6 @@ func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats) error {
 	if err2 != nil {
 		return errors.Wrap(err2, "Failed to prepare user Sync() tx")
 	}
-
 	for ph, stats := range b {
 		sum := stats.Totals()
 		if _, err := stmt.Exec(ph.InfoHash().Bytes(), ph.PeerID().Bytes(),

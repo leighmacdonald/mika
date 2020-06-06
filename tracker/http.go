@@ -64,26 +64,34 @@ func Err(code errCode) error {
 // getIP Parses and returns a IP from a query
 // If a IP header exists, it will be used instead of the client provided query parameter
 // If no query IP is provided, the
-func getIP(q *query, c *gin.Context) (net.IP, error) {
+func getIP(q *query, c *gin.Context) (net.IP, bool, error) {
+	ipv6 := false
+
 	// Look for forwarded ip in headers
 	for _, header := range []string{"X-Real-IP", "X-Forwarded-For"} {
 		headerIP := c.Request.Header.Get(header)
 		if headerIP != "" {
 			ip := net.ParseIP(headerIP)
 			if ip != nil {
-				return ip.To4(), nil
+				return ip.To4(), false, nil
 			}
 		}
 	}
-	// Use client provided IP
-	ipStr, found := q.Params[paramIP]
-	if found {
-		ip := net.ParseIP(ipStr)
-		if ip != nil {
-			return ip, nil
+
+	for i, k := range []announceParam{paramIP, paramIPv6} {
+		// Use client provided IP
+		ipStr, found := q.Params[k]
+		if found {
+			ip := net.ParseIP(ipStr)
+			if ip != nil {
+				if i == 1 {
+					ipv6 = true
+				}
+				return ip, ipv6, nil
+			}
 		}
 	}
-	return nil, consts.ErrMalformedRequest
+	return nil, ipv6, consts.ErrMalformedRequest
 }
 
 // oops will output a bencoded error code to the torrent client using

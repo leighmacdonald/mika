@@ -64,8 +64,8 @@ type announceRequest struct {
 	// it only if the IP address that the request came in on is in RFC1918 space. Others honor it
 	// unconditionally, while others ignore it completely. In case of IPv6 address (e.g.: 2001:db8:1:2::100)
 	// it indicates only that client can communicate via IPv6.
-	IP net.IP
-
+	IP   net.IP
+	IPv6 bool
 	// urlencoded 20-byte SHA1 hash of the value of the info key from the Metainfo file. Note that the
 	// value will be a bencoded dictionary, given the definition of the info key above.
 	InfoHash store.InfoHash
@@ -111,7 +111,7 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 	if !exists {
 		return nil, msgInvalidPeerID
 	}
-	ipAddr, err2 := getIP(q, c)
+	ipAddr, ipv6, err2 := getIP(q, c)
 	if err2 != nil {
 		log.Warn("Could not get user IP from request")
 		return nil, msgMalformedRequest
@@ -140,6 +140,7 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 		Corrupt:    corrupt,
 		Downloaded: downloaded,
 		Event:      event,
+		IPv6:       ipv6,
 		IP:         ipAddr,
 		InfoHash:   infoHash,
 		Left:       left,
@@ -228,11 +229,10 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		"min interval": int(h.tracker.AnnIntervalMin.Seconds()),
 	}
 	// TODO IP.To16() != nil validation for v4 in v6 addresses
-	ip6 := strings.Count(peer.IP.String(), ":") > 1
-	if !ip6 || (ip6 && !h.tracker.IPv6Only) {
+	if !req.IPv6 || (req.IPv6 && !h.tracker.IPv6Only) {
 		dict["peers"] = makeCompactPeers(peers, peer.PeerID, false)
 	}
-	if ip6 {
+	if req.IPv6 {
 		dict["peers6"] = makeCompactPeers(peers, peer.PeerID, true)
 	}
 	var outBytes bytes.Buffer

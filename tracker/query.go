@@ -44,6 +44,7 @@ const (
 	paramInfoHash   announceParam = "info_hash"
 	paramPeerID     announceParam = "peer_id"
 	paramIP         announceParam = "ip"
+	paramIPv6       announceParam = "ipv6"
 	paramPort       announceParam = "port"
 	paramLeft       announceParam = "left"
 	paramDownloaded announceParam = "downloaded"

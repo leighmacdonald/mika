@@ -151,7 +151,6 @@ func (a *AdminAPI) torrentAdd(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: err.Error()})
 		return
 	}
-	t.ReleaseName = req.Name
 	t.InfoHash = ih
 	if req.MultiUp < 0 {
 		t.MultiUp = 0
@@ -223,8 +222,6 @@ func (a *AdminAPI) torrentUpdate(c *gin.Context) {
 	}
 	for _, k := range tup.Keys {
 		switch k {
-		case "release_name":
-			t.ReleaseName = tup.ReleaseName
 		case "is_deleted":
 			t.IsDeleted = tup.IsDeleted
 		case "is_enabled":

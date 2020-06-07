@@ -85,7 +85,6 @@ func TestTorrentAdd(t *testing.T) {
 	tor0 := store.GenerateTestTorrent()
 	tkr, handler := newTestAPI()
 	tadd := TorrentAddRequest{
-		Name:     tor0.ReleaseName,
 		InfoHash: tor0.InfoHash.String(),
 		MultiUp:  1.0,
 		MultiDn:  -1,
@@ -94,7 +93,6 @@ func TestTorrentAdd(t *testing.T) {
 	require.Equal(t, 200, w.Code)
 	var tor1 store.Torrent
 	require.NoError(t, tkr.torrents.Get(&tor1, tor0.InfoHash, false))
-	require.Equal(t, tadd.Name, tor1.ReleaseName)
 	require.Equal(t, tadd.MultiUp, tor1.MultiUp)
 	require.Equal(t, float64(0), tor1.MultiDn)
 }
@@ -129,7 +127,6 @@ func TestTorrentUpdate(t *testing.T) {
 	require.Equal(t, 200, w.Code)
 	var tor1 store.Torrent
 	require.NoError(t, tkr.torrents.Get(&tor1, tor0.InfoHash, true))
-	require.Equal(t, tup.ReleaseName, tor1.ReleaseName)
 	require.Equal(t, tup.IsDeleted, tor1.IsDeleted)
 	require.Equal(t, tup.IsEnabled, tor1.IsEnabled)
 	require.Equal(t, tup.Reason, tor1.Reason)

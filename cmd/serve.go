@@ -27,7 +27,7 @@ var serveCmd = &cobra.Command{
 		opts.AnnInterval = config.GetDuration(config.TrackerAnnounceInterval)
 		opts.AnnIntervalMin = config.GetDuration(config.TrackerAnnounceIntervalMin)
 		opts.AllowNonRoutable = config.GetBool(config.TrackerAllowNonRoutable)
-
+		opts.AutoRegister = config.GetBool(config.TrackerAutoRegister)
 		ts, err := store.NewTorrentStore(
 			config.GetString(config.StoreTorrentType),
 			config.GetStoreConfig(config.Torrent))

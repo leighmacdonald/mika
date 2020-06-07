@@ -12,6 +12,7 @@ import (
 	"github.com/toorop/gin-logrus"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -64,34 +65,41 @@ func Err(code errCode) error {
 // getIP Parses and returns a IP from a query
 // If a IP header exists, it will be used instead of the client provided query parameter
 // If no query IP is provided, the
-func getIP(q *query, c *gin.Context) (net.IP, bool, error) {
-	ipv6 := false
+func getIP(q *query, allowClientIP bool, c *gin.Context) (net.IP, bool, error) {
+	if allowClientIP {
+		for i, k := range [3]announceParam{paramIP, paramIPv4, paramIPv6} {
+			// Use client provided IP
+			ipStr, found := q.Params[k]
+			if found {
+				switch i {
+				case 0:
+					return net.ParseIP(ipStr), false, nil
+				case 1:
+					return net.ParseIP(ipStr), false, nil
+				case 2:
+					return net.ParseIP(ipStr), true, nil
+				}
 
+			}
+		}
+	}
 	// Look for forwarded ip in headers
 	for _, header := range []string{"X-Real-IP", "X-Forwarded-For"} {
-		headerIP := c.Request.Header.Get(header)
-		if headerIP != "" {
-			ip := net.ParseIP(headerIP)
-			if ip != nil {
-				return ip.To4(), false, nil
-			}
+		if headerIP := c.Request.Header.Get(header); headerIP != "" {
+			addr := net.ParseIP(headerIP)
+			return addr, strings.Count(headerIP, ":") > 1, nil
 		}
 	}
-
-	for i, k := range []announceParam{paramIP, paramIPv6} {
-		// Use client provided IP
-		ipStr, found := q.Params[k]
-		if found {
-			ip := net.ParseIP(ipStr)
-			if ip != nil {
-				if i == 1 {
-					ipv6 = true
-				}
-				return ip, ipv6, nil
-			}
+	httpAddr, _, _ := net.SplitHostPort(c.Request.RemoteAddr)
+	for i := 0; i < len(httpAddr); i++ {
+		switch httpAddr[i] {
+		case '.':
+			return net.ParseIP(httpAddr), false, nil
+		case ':':
+			return net.ParseIP(httpAddr), true, nil
 		}
 	}
-	return nil, ipv6, consts.ErrMalformedRequest
+	return net.IP{}, false, consts.ErrInvalidClient
 }
 
 // oops will output a bencoded error code to the torrent client using

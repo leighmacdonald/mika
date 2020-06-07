@@ -26,6 +26,7 @@ func performRequest(r http.Handler, method, path string, body interface{}, recv 
 	} else {
 		req, _ = http.NewRequest(method, path, nil)
 	}
+	req.RemoteAddr = "172.16.1.22:9000"
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code == http.StatusOK && recv != nil {
@@ -217,12 +218,12 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		// 5. Non-routable ip
 		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "127.0.0.1",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
-			stateExpected{Status: msgGenericError},
+			stateExpected{Status: msgMalformedRequest},
 		},
 		// 6. Non-routable ip
 		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "10.0.0.10",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
-			stateExpected{Status: msgGenericError},
+			stateExpected{Status: msgMalformedRequest},
 		},
 		// 7. IPv6 non-routable
 		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "::1",
@@ -231,8 +232,8 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		},
 		// 8. IPv6 routable
 		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "2600::1",
-			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
-			stateExpected{Status: msgMalformedRequest},
+			Port: "4000", Uploaded: "0", Downloaded: "0", left: "5000", PK: user0.Passkey},
+			stateExpected{Status: msgOk, HasPeer: true, Left: 5000, Port: 4000, IP: "2600::1", SwarmSize: 1},
 		},
 		// 9. IPv6 routable
 		{testReq{Ih: unregisteredTorrent.InfoHash, PID: leecher0.PeerID, IP: "12.34.56.78",
@@ -240,16 +241,16 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			stateExpected{Status: msgInvalidInfoHash},
 		},
 		// 10. 1 Leecher start event
-		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "12.34.56.78",
+		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "2600::1",
 			Port: "4000", Uploaded: "0", Downloaded: "0", left: "10000", PK: user0.Passkey, event: string(consts.STARTED)},
 			stateExpected{Uploaded: 0, Downloaded: 0, Left: 10000,
-				Seeders: 0, Leechers: 1, Snatches: 0, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk, SwarmSize: 1},
+				Seeders: 0, Leechers: 1, Snatches: 0, Port: 4000, IP: "2600::1", HasPeer: true, Status: msgOk, SwarmSize: 1},
 		},
 		// 11. 1 Leecher announce event
-		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "12.34.56.78",
+		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "2600::1",
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "5000", PK: user0.Passkey},
 			stateExpected{Uploaded: 0, Downloaded: 5000, Left: 5000,
-				Seeders: 0, Leechers: 1, Snatches: 0, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk, SwarmSize: 1},
+				Seeders: 0, Leechers: 1, Snatches: 0, Port: 4000, IP: "2600::1", HasPeer: true, Status: msgOk, SwarmSize: 1},
 		},
 		// 12. 1 leecher / 1 seeder
 		{testReq{Ih: torrent0.InfoHash, PID: seeder0.PeerID, IP: "12.34.56.99",
@@ -259,10 +260,10 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 				SwarmSize: 2},
 		},
 		// 13. 2 Seeders, 1 completed leecher
-		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "12.34.56.78", event: string(consts.COMPLETED),
+		{testReq{Ih: torrent0.InfoHash, PID: leecher0.PeerID, IP: "2600::1", event: string(consts.COMPLETED),
 			Port: "4000", Uploaded: "0", Downloaded: "5000", left: "0", PK: user0.Passkey},
 			stateExpected{Uploaded: 0, Downloaded: 10000, Left: 0,
-				Seeders: 2, Leechers: 0, Snatches: 1, Port: 4000, IP: "12.34.56.78", HasPeer: true, Status: msgOk,
+				Seeders: 2, Leechers: 0, Snatches: 1, Port: 4000, IP: "2600::1", HasPeer: true, Status: msgOk,
 				SwarmSize: 2},
 		},
 		// 14. 1 seeder left swarm

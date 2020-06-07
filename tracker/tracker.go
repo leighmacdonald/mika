@@ -40,6 +40,7 @@ type Tracker struct {
 	// If Public is true, this will allow unknown info_hashes to be automatically tracked
 	AutoRegister     bool
 	AllowNonRoutable bool
+	AllowClientIP    bool
 	// ReaperInterval is how often we can for dead peers in swarms
 	ReaperInterval time.Duration
 	AnnInterval    time.Duration
@@ -70,6 +71,7 @@ type Opts struct {
 	// If Public is true, this will allow unknown info_hashes to be automatically tracked
 	AutoRegister     bool
 	AllowNonRoutable bool
+	AllowClientIP    bool
 	// Dont enable dual-stack replies in ipv6 mode
 	IPv6Only bool
 	// ReaperInterval is how often we can for dead peers in swarms
@@ -97,6 +99,7 @@ func NewDefaultOpts() *Opts {
 		Public:              false,
 		AutoRegister:        false,
 		AllowNonRoutable:    false,
+		AllowClientIP:       false,
 		IPv6Only:            false,
 		ReaperInterval:      time.Second * 300,
 		AnnInterval:         time.Second * 60,
@@ -189,7 +192,7 @@ func (t *Tracker) StatWorker() {
 			var torrent store.Torrent
 			// Keep deleted true so that we can record any buffered stat updates from
 			// the client even though we deleted/disabled the torrent itself.
-			if err := t.torrents.Get(&torrent, u.InfoHash, true); err != nil {
+			if err := t.torrents.Get(&torrent, u.InfoHash, false); err != nil {
 				log.Errorf("No torrent found in batch update")
 				continue
 			}
@@ -258,7 +261,9 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		Geodb:            opts.Geodb,
 		GeodbEnabled:     opts.GeodbEnabled,
 		AllowNonRoutable: opts.AllowNonRoutable,
+		AllowClientIP:    opts.AllowClientIP,
 		IPv6Only:         opts.IPv6Only,
+		AutoRegister:     opts.AutoRegister,
 		ReaperInterval:   opts.ReaperInterval,
 		AnnInterval:      opts.AnnInterval,
 		AnnIntervalMin:   opts.AnnIntervalMin,
@@ -306,8 +311,10 @@ func NewTestTracker() (*Tracker, error) {
 	opts.ReaperInterval = time.Second * 10
 	opts.AnnInterval = time.Second * 10
 	opts.AnnIntervalMin = time.Second * 5
+	opts.AutoRegister = false
 	opts.MaxPeers = 50
 	opts.AllowNonRoutable = false
+	opts.AllowClientIP = true
 	tracker, err := New(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -346,6 +353,9 @@ func (t *Tracker) LoadWhitelist() error {
 	t.Whitelist = whitelist
 	t.Unlock()
 	return nil
+}
+func (t *Tracker) TorrentAdd(torrent store.Torrent) error {
+	return t.torrents.Add(torrent)
 }
 
 func (t *Tracker) TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {

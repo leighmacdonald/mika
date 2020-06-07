@@ -9,7 +9,6 @@ import (
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -108,46 +107,36 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 		return nil, msgInvalidInfoHash
 	}
 	peerID, exists := q.Params[paramPeerID]
-	if !exists {
+	if !exists || len(peerID) != 20 {
 		return nil, msgInvalidPeerID
 	}
-	ipAddr, ipv6, err2 := getIP(q, c)
+	ipAddr, ipv6, err2 := getIP(q, h.tracker.AllowClientIP, c)
 	if err2 != nil {
-		log.Warn("Could not get user IP from request")
-		return nil, msgMalformedRequest
-	}
-	if strings.Contains(ipAddr.String(), ":") {
-		log.Warn("Got ipv6 peer request")
+		log.Errorf("Failed to parse client ip: %s", c.Request.RemoteAddr)
 		return nil, msgMalformedRequest
 	}
 	if !h.tracker.AllowNonRoutable && util.IsPrivateIP(ipAddr) {
 		log.Warnf("Attempt to use non-routable IP value: %s", ipAddr.String())
-		return nil, msgGenericError
+		return nil, msgMalformedRequest
 	}
 	port := getUint16Key(q, paramPort, 0)
 	if port < 1024 {
 		// Don't allow privileged ports which require root to bind to on unix
 		return nil, msgInvalidPort
 	}
-	left := getUint32Key(q, paramLeft, 0)
-	downloaded := getUint32Key(q, paramDownloaded, 0)
-	uploaded := getUint32Key(q, paramUploaded, 0)
-	corrupt := getUint32Key(q, paramCorrupt, 0)
-	event := consts.ParseAnnounceType(q.Params[paramEvent])
-	numWant := getUintKey(q, paramNumWant, 30)
 	return &announceRequest{
 		Compact:    true, // Ignored and always set to true
-		Corrupt:    corrupt,
-		Downloaded: downloaded,
-		Event:      event,
+		Corrupt:    getUint32Key(q, paramCorrupt, 0),
+		Downloaded: getUint32Key(q, paramDownloaded, 0),
+		Event:      consts.ParseAnnounceType(q.Params[paramEvent]),
 		IPv6:       ipv6,
 		IP:         ipAddr,
 		InfoHash:   infoHash,
-		Left:       left,
-		NumWant:    numWant,
+		Left:       getUint32Key(q, paramLeft, 0),
+		NumWant:    getUintKey(q, paramNumWant, 30),
 		PeerID:     store.PeerIDFromString(peerID),
 		Port:       port,
-		Uploaded:   uploaded,
+		Uploaded:   getUint32Key(q, paramUploaded, 0),
 	}, msgOk
 }
 
@@ -172,9 +161,19 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// Get & Validate the torrent associated with the info_hash supplies
 	var tor store.Torrent
 	if err := h.tracker.TorrentGet(&tor, req.InfoHash, false); err != nil || tor.IsDeleted {
-		log.Debugf("No torrent found matching: %x", req.InfoHash.Bytes())
-		oops(c, msgInvalidInfoHash)
-		return
+		if h.tracker.AutoRegister {
+			tor.InfoHash = req.InfoHash
+			tor.IsEnabled = true
+			if err := h.tracker.TorrentAdd(tor); err != nil {
+				log.Errorf("Failed to auto register torrent: %s", err.Error())
+				oops(c, msgGenericError)
+				return
+			}
+		} else {
+			log.Debugf("No torrent found matching: %x", req.InfoHash.Bytes())
+			oops(c, msgInvalidInfoHash)
+			return
+		}
 	}
 	// If disabled and reason is set, the reason is returned to the client
 	// This is mostly useful for when a torrent has been "trumped" by another torrent so it

@@ -77,6 +77,9 @@ const (
 	TrackerBatchUpdateInterval Key = "tracker_batch_update_interval"
 	// TrackerAllowNonRoutable defines whether we allow peers who are using non-public/routable addresses
 	TrackerAllowNonRoutable Key = "tracker_allow_non_routable"
+
+	TrackerAllowClientIP Key = "tracker_allow_client_ip"
+
 	// TrackerMaxPeers sets the max number of peers to return on an announce
 	TrackerMaxPeers Key = "tracker_max_peers"
 

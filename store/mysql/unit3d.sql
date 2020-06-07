@@ -41,8 +41,8 @@ CREATE OR REPLACE PROCEDURE user_add(IN in_user_id int,
                                      IN in_passkey varchar(40),
                                      IN in_download_enabled bool,
                                      IN in_is_deleted bool,
-                                     IN in_downloaded bigint,
-                                     IN in_uploaded bigint,
+                                     IN in_downloaded bigint unsigned,
+                                     IN in_uploaded bigint unsigned,
                                      IN in_announces bigint)
 BEGIN
     SIGNAL SQLSTATE '45000'
@@ -53,8 +53,8 @@ CREATE OR REPLACE PROCEDURE user_update(IN in_user_id int,
                                         IN in_passkey varchar(40),
                                         IN in_download_enabled bool,
                                         IN in_is_deleted bool,
-                                        IN in_downloaded bigint,
-                                        IN in_uploaded bigint,
+                                        IN in_downloaded bigint unsigned,
+                                        IN in_uploaded bigint unsigned,
                                         IN in_announces bigint,
                                         IN in_old_passkey varchar(40))
 BEGIN
@@ -70,8 +70,8 @@ end;
 
 CREATE OR REPLACE PROCEDURE user_update_stats(IN in_passkey varchar(40),
                                               IN in_announces bigint,
-                                              IN in_uploaded bigint,
-                                              IN in_downloaded bigint)
+                                              IN in_uploaded bigint unsigned,
+                                              IN in_downloaded bigint unsigned)
 BEGIN
     UPDATE users
     SET uploaded   = (uploaded + in_uploaded),
@@ -87,7 +87,6 @@ CREATE OR REPLACE PROCEDURE torrent_by_infohash(IN in_info_hash binary(20),
                                                 IN in_deleted bool)
 BEGIN
     SELECT UNHEX(info_hash)          as info_hash,
-           name                      as release_name,
            0                         as total_uploaded,
            0                         as total_downloaded,
            times_completed           as total_completed,
@@ -113,16 +112,15 @@ BEGIN
     DELETE FROM torrents WHERE info_hash = HEX(in_info_hash);
 end;
 
-CREATE OR REPLACE PROCEDURE torrent_add(IN in_info_hash binary(20),
-                                        IN in_release_name varchar(255))
+CREATE OR REPLACE PROCEDURE torrent_add(IN in_info_hash binary(20))
 BEGIN
     SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'not compatible';
 end;
 
 CREATE OR REPLACE PROCEDURE torrent_update_stats(IN in_info_hash binary(20),
-                                                 IN in_total_downloaded bigint,
-                                                 IN in_total_uploaded bigint,
+                                                 IN in_total_downloaded bigint unsigned,
+                                                 IN in_total_uploaded bigint unsigned,
                                                  IN in_announces bigint,
                                                  IN in_total_completed int,
                                                  IN in_seeders int,
@@ -141,8 +139,8 @@ END;
 -- PEERS
 CREATE OR REPLACE PROCEDURE peer_update_stats(IN in_info_hash binary(20),
                                               IN in_peer_id binary(20),
-                                              IN in_total_downloaded bigint,
-                                              IN in_total_uploaded bigint,
+                                              IN in_total_downloaded bigint unsigned,
+                                              IN in_total_uploaded bigint unsigned,
                                               IN in_total_announces bigint,
                                               IN in_announce_last datetime,
                                               IN in_speed_dn bigint,
@@ -177,9 +175,9 @@ CREATE OR REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
                                      IN in_location varchar(255),
                                      IN in_announce_first datetime,
                                      IN in_announce_last datetime,
-                                     IN in_downloaded int,
-                                     IN in_uploaded int,
-                                     IN in_left int,
+                                     IN in_downloaded bigint unsigned,
+                                     IN in_uploaded bigint unsigned,
+                                     IN in_left bigint unsigned,
                                      IN in_client varchar(255),
                                      IN in_country_code char(2),
                                      IN in_asn varchar(10),

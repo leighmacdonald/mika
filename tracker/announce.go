@@ -89,6 +89,10 @@ type announceRequest struct {
 
 	// Optional. If a previous announce contained a tracker id, it should be set here.
 	TrackerID string
+
+	Key string
+
+	CryptoLevel consts.CryptoLevel
 }
 
 // Parse the query string into an announceRequest struct
@@ -124,19 +128,27 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 		// Don't allow privileged ports which require root to bind to on unix
 		return nil, msgInvalidPort
 	}
+	cryptoLevel := consts.Unencrypted
+	if getBoolKey(q, paramRequireCrypto, false) {
+		cryptoLevel = consts.Required
+	} else if getBoolKey(q, paramSupportCrypto, false) {
+		cryptoLevel = consts.Supported
+	}
 	return &announceRequest{
-		Compact:    true, // Ignored and always set to true
-		Corrupt:    getUint32Key(q, paramCorrupt, 0),
-		Downloaded: getUint32Key(q, paramDownloaded, 0),
-		Event:      consts.ParseAnnounceType(q.Params[paramEvent]),
-		IPv6:       ipv6,
-		IP:         ipAddr,
-		InfoHash:   infoHash,
-		Left:       getUint32Key(q, paramLeft, 0),
-		NumWant:    getUintKey(q, paramNumWant, 30),
-		PeerID:     store.PeerIDFromString(peerID),
-		Port:       port,
-		Uploaded:   getUint32Key(q, paramUploaded, 0),
+		Compact:     true, // Ignored and always set to true
+		Corrupt:     getUint32Key(q, paramCorrupt, 0),
+		Downloaded:  getUint32Key(q, paramDownloaded, 0),
+		Event:       consts.ParseAnnounceType(q.Params[paramEvent]),
+		IPv6:        ipv6,
+		IP:          ipAddr,
+		InfoHash:    infoHash,
+		Left:        getUint32Key(q, paramLeft, 0),
+		NumWant:     getUintKey(q, paramNumWant, 30),
+		PeerID:      store.PeerIDFromString(peerID),
+		Port:        port,
+		Key:         q.Params[paramKey],
+		Uploaded:    getUint32Key(q, paramUploaded, 0),
+		CryptoLevel: cryptoLevel,
 	}, msgOk
 }
 
@@ -157,6 +169,10 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	if code != msgOk {
 		oops(c, code)
 		return
+	}
+	if pk == "" && h.tracker.Public {
+		// Use client key to track user stats for public mode
+		pk = req.Key
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
 	var tor store.Torrent
@@ -196,6 +212,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 			// can occur for counting seeder/leecher states
 			peer.Client = store.ClientString(req.PeerID).String()
 			peer.Left = req.Left
+			// TODO allow this to be updated in the perm storage when a client changes settings
+			peer.CryptoLevel = req.CryptoLevel
 			if err := h.tracker.PeerAdd(tor.InfoHash, peer); err != nil {
 				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
 				oops(c, msgGenericError)
@@ -229,10 +247,10 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	}
 	// TODO IP.To16() != nil validation for v4 in v6 addresses
 	if !req.IPv6 || (req.IPv6 && !h.tracker.IPv6Only) {
-		dict["peers"] = makeCompactPeers(peers, peer.PeerID, false)
+		dict["peers"] = makeCompactPeers(peers, peer.PeerID, false, req.CryptoLevel)
 	}
 	if req.IPv6 {
-		dict["peers6"] = makeCompactPeers(peers, peer.PeerID, true)
+		dict["peers6"] = makeCompactPeers(peers, peer.PeerID, true, req.CryptoLevel)
 	}
 	var outBytes bytes.Buffer
 	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
@@ -257,10 +275,15 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(swarm store.Swarm, skipID store.PeerID, v6 bool) []byte {
+func makeCompactPeers(swarm store.Swarm, skipID store.PeerID, v6 bool, cl consts.CryptoLevel) []byte {
 	var buf bytes.Buffer
 	swarm.RLock()
 	for _, peer := range swarm.Peers {
+		if cl == consts.Required {
+			if !(peer.CryptoLevel == consts.Required || peer.CryptoLevel == consts.Supported) {
+				continue
+			}
+		}
 		if peer.PeerID == skipID {
 			// Skip the peers own peer_id
 			continue

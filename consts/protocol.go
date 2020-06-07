@@ -28,3 +28,11 @@ func ParseAnnounceType(t string) AnnounceType {
 		return ANNOUNCE
 	}
 }
+
+type CryptoLevel uint
+
+const (
+	Unencrypted CryptoLevel = 0
+	Supported   CryptoLevel = 1
+	Required    CryptoLevel = 2
+)

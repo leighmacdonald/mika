@@ -321,6 +321,8 @@ func init() {
 	viper.SetDefault(string(TrackerHNRThreshold), "6h")
 	viper.SetDefault(string(TrackerBatchUpdateInterval), "30s")
 	viper.SetDefault(string(TrackerAllowNonRoutable), false)
+	viper.SetDefault(string(TrackerAllowClientIP), false)
+
 	viper.SetDefault(string(APIListen), "0.0.0.0:34001")
 	viper.SetDefault(string(APITLS), false)
 	viper.SetDefault(string(APIIPv6), false)

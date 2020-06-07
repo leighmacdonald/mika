@@ -41,19 +41,23 @@ type announceParam string
 
 //noinspection GoUnusedConst
 const (
-	paramInfoHash   announceParam = "info_hash"
-	paramPeerID     announceParam = "peer_id"
-	paramIP         announceParam = "ip"
-	paramIPv4       announceParam = "ipv4"
-	paramIPv6       announceParam = "ipv6"
-	paramPort       announceParam = "port"
-	paramLeft       announceParam = "left"
-	paramDownloaded announceParam = "downloaded"
-	paramUploaded   announceParam = "uploaded"
-	paramCorrupt    announceParam = "corrupt"
-	paramNumWant    announceParam = "numwant"
-	paramEvent      announceParam = "event"
-	//paramCompact    announceParam = "compact"
+	paramInfoHash      announceParam = "info_hash"
+	paramPeerID        announceParam = "peer_id"
+	paramIP            announceParam = "ip"
+	paramIPv4          announceParam = "ipv4"
+	paramIPv6          announceParam = "ipv6"
+	paramPort          announceParam = "port"
+	paramLeft          announceParam = "left"
+	paramDownloaded    announceParam = "downloaded"
+	paramUploaded      announceParam = "uploaded"
+	paramCorrupt       announceParam = "corrupt"
+	paramNumWant       announceParam = "numwant"
+	paramEvent         announceParam = "event"
+	paramKey           announceParam = "key"
+	paramSupportCrypto announceParam = "supportcrypto"
+	// libtorrent based clients (qbt/deluge) will only send supportcrypto=1 even when
+	// requirecrypto is set in the client interfaces.
+	paramRequireCrypto announceParam = "requirecrypto"
 )
 
 type query struct {
@@ -140,6 +144,14 @@ func getUint32Key(q *query, key announceParam, def uint32) uint32 {
 		return def
 	}
 	return util.UMax32(0, left)
+}
+
+func getBoolKey(q *query, key announceParam, def bool) bool {
+	v, err := q.Uint(key)
+	if err != nil {
+		return def
+	}
+	return v == 1
 }
 
 func getUint16Key(q *query, key announceParam, def uint16) uint16 {

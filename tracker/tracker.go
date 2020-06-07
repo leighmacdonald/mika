@@ -260,6 +260,7 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		users:            opts.Users,
 		Geodb:            opts.Geodb,
 		GeodbEnabled:     opts.GeodbEnabled,
+		Public:           opts.Public,
 		AllowNonRoutable: opts.AllowNonRoutable,
 		AllowClientIP:    opts.AllowClientIP,
 		IPv6Only:         opts.IPv6Only,

@@ -54,6 +54,7 @@ create table peers
     asn              int unsigned           not null default 0,
     as_name          varchar(255)           not null default '',
     agent            varchar(100)           not null,
+    crypto_level     int unsigned default 0 not null,
     constraint peers_pk primary key (info_hash, peer_id)
 );
 
@@ -285,25 +286,26 @@ end;
 -- TODO Add left field
 CREATE OR
 REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
-    IN in_peer_id binary (20),
-    IN in_user_id int,
-    IN in_ipv6 boolean,
-    IN in_addr_ip varchar (255),
-    IN in_addr_port int,
-    IN in_location varchar (255),
-    IN in_announce_first datetime,
-    IN in_announce_last datetime,
-    IN in_downloaded int,
-    IN in_uploaded int,
-    IN in_left int,
-    IN in_client varchar (255),
-    IN in_country_code char (2),
-    IN in_asn varchar (10),
-    IN in_as_name varchar (255))
+                           IN in_peer_id binary (20),
+                           IN in_user_id int,
+                           IN in_ipv6 boolean,
+                           IN in_addr_ip varchar (255),
+                           IN in_addr_port int,
+                           IN in_location varchar(255),
+                           IN in_announce_first datetime,
+                           IN in_announce_last datetime,
+                           IN in_downloaded int,
+                           IN in_uploaded int,
+                           IN in_left int,
+                           IN in_client varchar(255),
+                           IN in_country_code char(2),
+                           IN in_asn varchar(10),
+                           IN in_as_name varchar(255),
+                           IN in_crypto_level int)
 BEGIN
 INSERT INTO peers
 (peer_id, info_hash, user_id, ipv6, addr_ip, addr_port, location, announce_first, announce_last, announce_prev,
- total_downloaded, total_uploaded, total_left, agent, country_code, asn, as_name)
+ total_downloaded, total_uploaded, total_left, agent, country_code, asn, as_name, crypto_level)
 VALUES (in_peer_id,
         in_info_hash,
         in_user_id,
@@ -320,7 +322,8 @@ VALUES (in_peer_id,
         in_client,
         in_country_code,
         in_asn,
-        in_as_name);
+        in_as_name,
+        in_crypto_level);
 end;
 
 CREATE OR
@@ -356,7 +359,8 @@ SELECT peer_id,
        announce_first,
        country_code,
        asn,
-       as_name
+       as_name,
+       crypto_level                                              as crypto_level
 FROM peers
 WHERE info_hash = in_info_hash
   AND peer_id = in_peer_id;
@@ -385,7 +389,8 @@ SELECT peer_id,
        announce_first,
        country_code,
        asn,
-       as_name
+       as_name,
+       crypto_level                                              as crypto_level
 FROM peers
 WHERE info_hash = in_info_hash
 LIMIT in_limit;

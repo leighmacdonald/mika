@@ -76,12 +76,12 @@ func (ps *PeerStore) Close() error {
 
 // Add insets the peer into the swarm of the torrent provided
 func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
-	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	point := fmt.Sprintf("POINT(%s)", p.Location.String())
 	ip6 := strings.Count(p.IP.String(), ":") > 1
 	_, err := ps.db.Exec(q, ih.Bytes(), p.PeerID.Bytes(), p.UserID, ip6, p.IP.String(), p.Port, point,
 		p.AnnounceFirst, p.AnnounceLast, p.Downloaded, p.Uploaded, p.Left, p.Client,
-		p.CountryCode, p.ASN, p.AS)
+		p.CountryCode, p.ASN, p.AS, int(p.CryptoLevel))
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 	for rows.Next() {
 		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IPv6, &ip, &p.Port, &p.Downloaded, &p.Uploaded,
 			&p.Left, &p.TotalTime, &p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax,
-			&p.Location, &p.AnnounceLast, &p.AnnounceFirst, &p.CountryCode, &p.ASN, &p.AS); err != nil {
+			&p.Location, &p.AnnounceLast, &p.AnnounceFirst, &p.CountryCode, &p.ASN, &p.AS, &p.CryptoLevel); err != nil {
 			return swarm, err
 		}
 		p.IP = net.ParseIP(ip)

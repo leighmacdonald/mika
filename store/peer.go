@@ -106,9 +106,9 @@ type Peer struct {
 	// TODO Do we actually care about these times? Announce times likely enough
 	//CreatedOn time.Time `db:"created_on" redis:"created_on" json:"created_on"`
 	//UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
-
-	Paused bool
-	User   *User
+	CryptoLevel consts.CryptoLevel `db:"crypto_level" json:"crypto_level"`
+	Paused      bool
+	User        *User
 }
 
 // Expired checks if the peer last lost contact with us

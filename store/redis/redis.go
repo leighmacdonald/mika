@@ -414,6 +414,7 @@ func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
 		"country_code":   p.CountryCode,
 		"asn":            p.ASN,
 		"as_name":        p.AS,
+		"crypto_level":   int(p.CryptoLevel),
 	}).Err()
 	if err != nil {
 		return errors.Wrap(err, "Failed to Add")
@@ -490,6 +491,7 @@ func mapPeerValues(p *store.Peer, v map[string]string) {
 	p.ASN = util.StringToUInt32(v["asn"], 0)
 	p.AS = v["as_name"]
 	p.CountryCode = v["country_code"]
+	p.CryptoLevel = consts.CryptoLevel(util.StringToUInt(v["crypto_level"], 0))
 }
 
 // GetN will fetch peers for a torrents active swarm up to N users

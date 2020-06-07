@@ -181,7 +181,6 @@ func TestConfigUpdate(t *testing.T) {
 	require.Equal(t, args.TrackerMaxPeers, tkr.MaxPeers)
 	require.Equal(t, args.TrackerAutoRegister, tkr.AutoRegister)
 	require.Equal(t, args.TrackerAllowNonRoutable, tkr.AllowNonRoutable)
-	require.Equal(t, args.GeodbEnabled, tkr.GeodbEnabled)
 }
 
 func TestMain(m *testing.M) {

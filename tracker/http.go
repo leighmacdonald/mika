@@ -118,16 +118,21 @@ func oops(ctx *gin.Context, errCode errCode) {
 // slightly higher cost of passing data in through the request context
 func preFlightChecks(usr *store.User, pk string, c *gin.Context, t *Tracker) bool {
 	// Check that the user is valid before parsing anything
-	if pk == "" {
-		oops(c, msgInvalidAuth)
-		return false
+	if t.Public {
+		usr.UserID = 1
+		return true
+	} else {
+		if pk == "" {
+			oops(c, msgInvalidAuth)
+			return false
+		}
+		if err := t.UserGet(usr, pk); err != nil {
+			log.Debugf("Got invalid passkey")
+			oops(c, msgInvalidAuth)
+			return false
+		}
+		return usr.Valid()
 	}
-	if err := t.UserGet(usr, pk); err != nil {
-		log.Debugf("Got invalid passkey")
-		oops(c, msgInvalidAuth)
-		return false
-	}
-	return usr.Valid()
 }
 
 // handleTrackerErrors is used as the default error handler for tracker requests
@@ -183,6 +188,8 @@ func NewBitTorrentHandler(tkr *Tracker) *gin.Engine {
 	h := BitTorrentHandler{
 		tracker: tkr,
 	}
+	r.GET("/announce", h.announce)
+	r.GET("/scrape", h.scrape)
 	r.GET("/announce/:passkey", h.announce)
 	r.GET("/scrape/:passkey", h.scrape)
 	r.NoRoute(noRoute)

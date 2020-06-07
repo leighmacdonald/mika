@@ -32,6 +32,9 @@ func TestGetLocation(t *testing.T) {
 	if config.GetString(config.GeodbAPIKey) == "" {
 		t.SkipNow()
 	}
+	if !util.Exists(filepath.Join(config.GetString(config.GeodbPath), geoDatabaseLocationFile)) {
+		t.SkipNow()
+	}
 	db, err := New(config.GetString(config.GeodbPath))
 	require.NoError(t, err, "Failed to open database")
 	defer func() { db.Close() }()

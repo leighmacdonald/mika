@@ -47,6 +47,9 @@ type InfoHash [20]byte
 
 // InfoHashFromString returns a binary infohash from the info string
 func InfoHashFromString(infoHash *InfoHash, s string) error {
+	if len(s) != 20 {
+		return consts.ErrInvalidInfoHash
+	}
 	copy(infoHash[:], s)
 	return nil
 }
@@ -122,9 +125,8 @@ func (ih *InfoHash) RawString() string {
 
 // Torrent is the core struct for our torrent being tracked
 type Torrent struct {
-	InfoHash    InfoHash `db:"info_hash" json:"info_hash"`
-	ReleaseName string   `db:"release_name" json:"release_name"`
-	Snatches    uint16   `db:"total_completed" json:"total_completed"`
+	InfoHash InfoHash `db:"info_hash" json:"info_hash"`
+	Snatches uint16   `db:"total_completed" json:"total_completed"`
 	// This is stored as MB to reduce storage costs
 	Uploaded uint64 `db:"total_uploaded" json:"total_uploaded"`
 	// This is stored as MB to reduce storage costs
@@ -219,14 +221,13 @@ func (ps *PeerStats) Totals() PeerSummary {
 
 // NewTorrent allocates and returns a new Torrent instance pointer with all
 // the minimum value required to operated in place
-func NewTorrent(ih InfoHash, name string) Torrent {
+func NewTorrent(ih InfoHash) Torrent {
 	torrent := Torrent{
-		ReleaseName: name,
-		InfoHash:    ih,
-		IsDeleted:   false,
-		IsEnabled:   true,
-		MultiUp:     1.0,
-		MultiDn:     1.0,
+		InfoHash:  ih,
+		IsDeleted: false,
+		IsEnabled: true,
+		MultiUp:   1.0,
+		MultiDn:   1.0,
 	}
 	return torrent
 }

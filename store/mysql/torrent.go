@@ -32,7 +32,6 @@ func (s *TorrentStore) Update(torrent store.Torrent) error {
 		UPDATE 
 		    torrent 
 		SET
-			release_name = ?,
 		    info_hash = ?,
 		    total_completed = ?,
 		    total_uploaded = ?,
@@ -47,7 +46,6 @@ func (s *TorrentStore) Update(torrent store.Torrent) error {
 			info_hash = ?
 			`
 	_, err := s.db.Exec(q,
-		torrent.ReleaseName,
 		torrent.InfoHash.Bytes(),
 		torrent.Snatches,
 		torrent.Uploaded,
@@ -154,8 +152,8 @@ func (s *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool
 
 // Add inserts a new torrent into the backing store
 func (s *TorrentStore) Add(t store.Torrent) error {
-	const q = `CALL torrent_add(?, ?)`
-	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.ReleaseName)
+	const q = `CALL torrent_add(?)`
+	_, err := s.db.Exec(q, t.InfoHash.Bytes())
 	if err != nil {
 		return err
 	}

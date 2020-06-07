@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"fmt"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/stretchr/testify/require"
@@ -33,7 +32,7 @@ func GenerateTestTorrent() Torrent {
 	if err := InfoHashFromBytes(&ih, token); err != nil {
 		log.Panicf("Failed to generate info_hash: %s", err.Error())
 	}
-	return NewTorrent(ih, fmt.Sprintf("Show.Title.%d.S03E07.720p.WEB.h264-GRP", rand.Intn(1000000)))
+	return NewTorrent(ih)
 }
 
 // GenerateTestPeer creates a peer using fake data for the provided user. Used for testing.

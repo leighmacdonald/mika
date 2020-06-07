@@ -320,7 +320,6 @@ func ClientString(peerID PeerID) BTClient {
 				}
 				cl.SubPatch = int(val)
 				done = true
-				break
 			}
 		} else {
 			switch i {
@@ -345,7 +344,6 @@ func ClientString(peerID PeerID) BTClient {
 					break
 				}
 				cl.SubPatch = sp
-				break
 			}
 		}
 		if done || err != nil {

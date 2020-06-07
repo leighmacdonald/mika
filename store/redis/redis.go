@@ -279,7 +279,6 @@ func (ts *TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
 
 func torrentMap(t store.Torrent) map[string]interface{} {
 	return map[string]interface{}{
-		"release_name":     t.ReleaseName,
 		"total_completed":  t.Snatches,
 		"total_downloaded": t.Downloaded,
 		"total_uploaded":   t.Uploaded,
@@ -337,7 +336,6 @@ func (ts *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk boo
 	if isDeleted && !deletedOk {
 		return consts.ErrInvalidInfoHash
 	}
-	t.ReleaseName = v["release_name"]
 	t.InfoHash = infoHash
 	t.Snatches = util.StringToUInt16(v["total_completed"], 0)
 	t.Uploaded = util.StringToUInt64(v["total_uploaded"], 0)

@@ -14,7 +14,6 @@ END $$;
 create table torrent
 (
     info_hash bytea check (octet_length(info_hash) = 20) not null primary key,
-    release_name varchar(255) not null,
     total_uploaded int default 0 not null,
     total_downloaded int default 0 not null,
     total_completed smallint default 0 not null,
@@ -25,9 +24,7 @@ create table torrent
     multi_dn decimal(5,2) default 1.00 not null,
 	announces int default 0 not null,
 	seeders int default 0 not null,
-	leechers int default 0 not null,
-    constraint uq_release_name
-        unique (release_name)
+	leechers int default 0 not null
 );
 
 create table users

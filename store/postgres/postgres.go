@@ -188,23 +188,22 @@ func (ts TorrentStore) Update(torrent store.Torrent) error {
 		UPDATE 
 		    torrent 
 		SET
-			release_name = $1,
-		    info_hash = $2,
-		    total_completed = $3,
-		    total_uploaded = $4, 
-		    total_downloaded = $5,
-		    is_deleted = $6,
-		    is_enabled = $7,
-		    reason = $8,
-		    multi_up = $9,
-		    multi_dn = $10,
-		    announces = $11
+		    info_hash = $1,
+		    total_completed = $2,
+		    total_uploaded = $3, 
+		    total_downloaded = $4,
+		    is_deleted = $5,
+		    is_enabled = $6,
+		    reason = $7,
+		    multi_up = $8,
+		    multi_dn = $9,
+		    announces = $10
 		WHERE
-			info_hash = $12
+			info_hash = $11
 			`
 	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
-	_, err := ts.db.Exec(c, q, torrent.ReleaseName, torrent.InfoHash.Bytes(), torrent.Snatches,
+	_, err := ts.db.Exec(c, q, torrent.InfoHash.Bytes(), torrent.Snatches,
 		torrent.Uploaded, torrent.Downloaded, torrent.IsDeleted, torrent.IsEnabled,
 		torrent.Reason, torrent.MultiUp, torrent.MultiDn, torrent.Announces)
 	if err != nil {
@@ -261,11 +260,11 @@ func (ts TorrentStore) Conn() interface{} {
 
 // Add inserts a new torrent into the backing store
 func (ts TorrentStore) Add(t store.Torrent) error {
-	const q = `INSERT INTO torrent (info_hash, release_name) VALUES($1::bytea, $2)`
+	const q = `INSERT INTO torrent (info_hash) VALUES($1::bytea)`
 	//log.Println(t.InfoHash.Bytes())
 	c, cancel := context.WithDeadline(ts.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
-	commandTag, err := ts.db.Exec(c, q, t.InfoHash.Bytes(), t.ReleaseName)
+	commandTag, err := ts.db.Exec(c, q, t.InfoHash.Bytes())
 	if err != nil {
 		return err
 	}
@@ -302,7 +301,7 @@ func (ts TorrentStore) Delete(ih store.InfoHash, dropRow bool) error {
 func (ts TorrentStore) Get(t *store.Torrent, ih store.InfoHash, deletedOk bool) error {
 	const q = `
 		SELECT 
-			info_hash::bytea, release_name, total_uploaded, total_downloaded, total_completed, 
+			info_hash::bytea, total_uploaded, total_downloaded, total_completed, 
 			is_deleted, is_enabled, reason, multi_up, multi_dn, announces, seeders, leechers
 		FROM 
 		    torrent 
@@ -313,7 +312,6 @@ func (ts TorrentStore) Get(t *store.Torrent, ih store.InfoHash, deletedOk bool) 
 	var b []byte
 	err := ts.db.QueryRow(c, q, ih.Bytes()).Scan(
 		&b, // TODO implement pgx custom types to map automatically
-		&t.ReleaseName,
 		&t.Uploaded,
 		&t.Downloaded,
 		&t.Snatches,

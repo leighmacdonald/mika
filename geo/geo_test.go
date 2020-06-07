@@ -28,11 +28,11 @@ func TestLatLong(t *testing.T) {
 	require.Equal(t, LatLong{0, 0}, LatLongFromString("1 2 x"))
 }
 
+func isSkipped() bool {
+	return config.GetString(config.GeodbAPIKey) == "" || !util.Exists(filepath.Join(config.GetString(config.GeodbPath), geoDatabaseLocationFile))
+}
 func TestGetLocation(t *testing.T) {
-	if config.GetString(config.GeodbAPIKey) == "" {
-		t.SkipNow()
-	}
-	if !util.Exists(filepath.Join(config.GetString(config.GeodbPath), geoDatabaseLocationFile)) {
+	if isSkipped() {
 		t.SkipNow()
 	}
 	db, err := New(config.GetString(config.GeodbPath))
@@ -54,7 +54,7 @@ func TestGetLocation(t *testing.T) {
 }
 
 func TestDistance(t *testing.T) {
-	if config.GetString(config.GeodbAPIKey) == "" {
+	if isSkipped() {
 		t.SkipNow()
 	}
 	fp := util.FindFile(config.GetString(config.GeodbPath))

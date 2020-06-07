@@ -115,8 +115,14 @@ func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
 	if err != nil {
 		return swarm, err
 	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Errorf("failed to close query rows: %s", err)
+		}
+	}()
 	var p store.Peer
 	var ip string
+
 	for rows.Next() {
 		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IPv6, &ip, &p.Port, &p.Downloaded, &p.Uploaded,
 			&p.Left, &p.TotalTime, &p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax,

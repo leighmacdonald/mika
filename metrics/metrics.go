@@ -160,9 +160,9 @@ func Get() RuntimeMetrics {
 	debug.ReadGCStats(&gc)
 	var m RuntimeMetrics
 
-	m.TorrentsTotalCached = atomic.SwapInt64(&TorrentsTotalCached, 0)
-	m.UsersTotalCached = atomic.SwapInt64(&UsersTotalCached, 0)
-	m.PeersTotalCached = atomic.SwapInt64(&PeersTotalCached, 0)
+	m.TorrentsTotalCached = atomic.LoadInt64(&TorrentsTotalCached)
+	m.UsersTotalCached = atomic.LoadInt64(&UsersTotalCached)
+	m.PeersTotalCached = atomic.LoadInt64(&PeersTotalCached)
 	m.AnnounceTotal = atomic.SwapInt64(&AnnounceTotal, 0)
 	m.AnnounceStatusOK = atomic.SwapInt64(&AnnounceStatusOK, 0)
 	m.AnnounceStatusUnauthorized = atomic.SwapInt64(&AnnounceStatusUnauthorized, 0)

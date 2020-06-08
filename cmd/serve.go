@@ -52,7 +52,7 @@ var serveCmd = &cobra.Command{
 		if config.GetBool(config.GeodbEnabled) {
 			geodb, err = geo.New(config.GetString(config.GeodbPath))
 			if err != nil {
-				log.Fatalf("Could not validate geo database")
+				log.Fatalf("Could not validate geo database. You may need to run ./mika updategeo")
 			}
 		} else {
 			geodb = &geo.DummyProvider{}

@@ -7,7 +7,9 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
+	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -58,7 +60,12 @@ func clearDB(db *pgx.Conn) {
 
 func setupDB(t *testing.T, db *pgx.Conn) {
 	clearDB(db)
-	if _, err := db.Exec(context.Background(), schema); err != nil {
+	schema := util.FindFile("store/postgres/schema.sql")
+	b, err := ioutil.ReadFile(schema)
+	if err != nil {
+		panic("Cannot read schema file")
+	}
+	if _, err := db.Exec(context.Background(), string(b)); err != nil {
 		log.Panicf("Failed to setupDB: %s", err)
 	}
 	t.Cleanup(func() {

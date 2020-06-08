@@ -1,11 +1,8 @@
-package postgres
-
-const schema = `
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 DO $$ BEGIN
-   CREATE DOMAIN uint2 AS int4 
-   CHECK(VALUE >= 0 AND VALUE < 65536);
+    CREATE DOMAIN uint2 AS int4
+        CHECK(VALUE >= 0 AND VALUE < 65536);
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -22,9 +19,9 @@ create table torrent
     reason varchar(255) default '' not null,
     multi_up decimal(5,2) default 1.00 not null,
     multi_dn decimal(5,2) default 1.00 not null,
-	announces int default 0 not null,
-	seeders int default 0 not null,
-	leechers int default 0 not null
+    announces int default 0 not null,
+    seeders int default 0 not null,
+    leechers int default 0 not null
 );
 
 create table users
@@ -69,4 +66,3 @@ create table whitelist
         primary key,
     client_name varchar(20) not null
 );
-`

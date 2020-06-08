@@ -435,18 +435,19 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 	}
 }
 
-func (a *AdminAPI) stats(_ *gin.Context) {
-
+func (a *AdminAPI) metrics(c *gin.Context) {
+	stats := getMetrics()
+	c.String(200, stats.String())
 }
 
 // NewAPIHandler configures a router to handle API requests
 func NewAPIHandler(tkr *Tracker) *gin.Engine {
 	r := newRouter()
-	h := AdminAPI{
-		t: tkr,
-	}
+	h := AdminAPI{t: tkr}
+
+	r.GET("/metrics", h.metrics)
+
 	r.POST("/ping", h.ping)
-	r.GET("/tracker/stats", h.stats)
 	r.PATCH("/config", h.configUpdate)
 	r.GET("/config", h.configGet)
 

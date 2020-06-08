@@ -419,7 +419,7 @@ var (
 	connectionsMu *sync.RWMutex
 )
 
-func getOrCreateConn(cfg *config.StoreConfig) (*sqlx.DB, error){
+func getOrCreateConn(cfg *config.StoreConfig) (*sqlx.DB, error) {
 	connectionsMu.Lock()
 	defer connectionsMu.Unlock()
 	existing, found := connections[cfg.Host]
@@ -452,7 +452,6 @@ func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
 	return &UserStore{db: db}, nil
 }
 
-
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the mysql backing store
@@ -467,7 +466,6 @@ func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 	}
 	return &TorrentStore{db: db}, nil
 }
-
 
 type peerDriver struct{}
 
@@ -484,8 +482,8 @@ func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 	return &PeerStore{db: db}, nil
 }
 
-
 func init() {
+	connections = make(map[string]*sqlx.DB)
 	connectionsMu = &sync.RWMutex{}
 	store.AddUserDriver(driverName, userDriver{})
 	store.AddTorrentDriver(driverName, torrentDriver{})

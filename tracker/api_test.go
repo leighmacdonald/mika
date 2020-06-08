@@ -8,6 +8,7 @@ import (
 	"github.com/leighmacdonald/mika/store"
 	"github.com/stretchr/testify/require"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -21,6 +22,14 @@ func newTestAPI() (*Tracker, http.Handler) {
 		os.Exit(1)
 	}
 	return tkr, NewAPIHandler(tkr)
+}
+
+func TestMetrics(t *testing.T) {
+	_, handler := newTestAPI()
+	req, _ := http.NewRequest("GET", "/metrics", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestPing(t *testing.T) {

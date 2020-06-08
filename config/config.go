@@ -118,6 +118,8 @@ const (
 	StoreTorrentPassword Key = "store_torrent_password"
 	// StoreTorrentProperties sets additional properties passed to the backing store configuration
 	StoreTorrentProperties Key = "store_torrent_properties"
+	// StoreTorrentCache enabled the in-memory cache
+	StoreTorrentCache Key = "store_torrent_cache"
 
 	// StoreUsersType sets the backing store type to be used for users
 	// memory|redis|postgres|mysql|http
@@ -140,6 +142,8 @@ const (
 	StoreUsersPassword Key = "store_users_password"
 	// StoreUsersProperties sets additional properties passed to the backing store configuration
 	StoreUsersProperties Key = "store_users_properties"
+	// StoreUsersCache enabled the in-memory cache
+	StoreUsersCache Key = "store_users_cache"
 
 	// StorePeersType sets the backing store type to be used for peers
 	// memory|redis|postgres|mysql|http
@@ -162,7 +166,8 @@ const (
 	StorePeersPassword Key = "store_peers_password"
 	// StorePeersProperties sets additional store specific properties passed to the backing store configuration
 	StorePeersProperties Key = "store_peers_properties"
-
+	// StorePeersCache enabled the in-memory cache
+	StorePeersCache Key = "store_peers_cache"
 	// GeodbPath sets the path to use for downloading and loading the geo database. Relative to the binary's path.
 	// ./path/to/file.mmdb
 	GeodbPath Key = "geodb_path"

@@ -5,35 +5,69 @@ general_log_colour: true
 
 # Allow anyone to participate in swarms. This disables passkey support.
 tracker_public: false
-tracker_listen: "0.0.0.0:34000"
+# Port and optionally ip to listen on
+tracker_listen: ":34000"
+# Enable TLS for the tracker port
 tracker_tls: false
+# Enable IPv6 for the tracker
 tracker_ipv6: false
+# Do not allow ipv4 addresses to connect
 tracker_ipv6_only: false
+# How often to prune old peers that did not send a stopped event
 tracker_reaper_interval: 90s
+# Base announce interval
 tracker_announce_interval: 30s
+# Minimum announce interval that a client can request
 tracker_announce_interval_minimum: 10s
 tracker_hnr_threshold: 1d
+# How often to update stat counters for peers/torrents/users
 tracker_batch_update_interval: 30s
+# Allow any torrent/info_hash to be tracked
+tracker_auto_register: false
+# Allow non-routable (LAN/localhost) IP addresses
+tracker_allow_non_routable: false
+# Allow the use of client supplied IP addresses. Beware this can open up the
+# possibility of a form of DDOS attack against the client supplied IP
+tracker_allow_client_ip: false
 
+# API configuration
+#
+# Port and optionally host to listen on
 api_listen: ":34001"
+# Use TLS for the port
 api_tls: false
+# Listen on IPv6
 api_ipv6: false
+# Enforce IPv6 listener only
 api_ipv6_only: false
+# Key to control the system over the API
 api_key:
 
-# memory, mysql, postgres, redis
-# postgres and mysql support requires that mika is built with the matching build tags
-# go build -tags postgres
+# Torrent driver
+#
+# Backend storage driver. One of: memory, mysql, postgres, redis
 store_torrent_type: mysql
+# Store host, if any
 store_torrent_host: 127.0.0.1
+# Store port, if any
 store_torrent_port: 3306
-# For redis, the dbname should be the numeric db value and should differ from the redis cache db value
+# Storage driver username, if any
 store_torrent_user: mika
+# Password for the storage driver
 store_torrent_password: mika
+# Database to use, if any
+# For redis, the dbname should be the numeric database value
 store_torrent_database: mika
+# Additional properties to pass to the storage driver, if any
+# For mysql this should be: parseTime=true
 store_torrent_properties: parseTime=true
+# Enable the caching layer for the storage driver
+# This is automatically ignored for memory storage drivers
+store_torrent_cache: true
 
-# Live peer cache backend storage config
+# Peer driver
+#
+# All valid options are the same as the torrent store above
 store_peers_type: memory
 store_peers_host:
 store_peers_port:
@@ -42,8 +76,11 @@ store_peers_password:
 store_peers_database:
 store_peers_properties:
 store_peers_max_idle: 500
+store_peers_cache: true
 
-# User backend storage config
+# User driver
+#
+# All valid options are the same as the torrent store above
 store_users_type: mysql
 store_users_host: 127.0.0.1
 store_users_port: 3306
@@ -52,8 +89,13 @@ store_users_password: mika
 store_users_database: mika
 store_users_properties: parseTime=true
 store_users_max_idle: 500
+store_users_cache: true
 
-# Visit https://www.maxmind.com and sign up to get a license key
-geodb_path: "geodb.mmdb"
+# Geo location lookups for peers
+#
+# Path to store the downloaded database files
+geodb_path: "./"
+# IP2Location.com API Key
 geodb_api_key:
+# Enable the feature.
 geodb_enabled: false

@@ -29,6 +29,9 @@ var serveCmd = &cobra.Command{
 		opts.AllowNonRoutable = config.GetBool(config.TrackerAllowNonRoutable)
 		opts.AutoRegister = config.GetBool(config.TrackerAutoRegister)
 		opts.Public = config.GetBool(config.TrackerPublic)
+		opts.TorrentCacheEnabled = config.GetBool(config.StoreTorrentCache)
+		opts.PeerCacheEnabled = config.GetBool(config.StorePeersCache)
+		opts.UserCacheEnabled = config.GetBool(config.StoreUsersCache)
 		ts, err := store.NewTorrentStore(
 			config.GetString(config.StoreTorrentType),
 			config.GetStoreConfig(config.Torrent))

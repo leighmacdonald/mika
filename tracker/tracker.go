@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
+	"github.com/leighmacdonald/mika/metrics"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
+	"sync/atomic"
 	"time"
 
 	// Imported for side-effects for NewTestTracker
@@ -400,9 +402,6 @@ func (t *Tracker) UserAdd(user store.User) error {
 	if err := t.users.Add(user); err != nil {
 		return err
 	}
-	if t.UsersCache != nil {
-		t.UsersCache.Set(user)
-	}
 	return nil
 }
 
@@ -433,6 +432,7 @@ func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
 	}
 	if t.PeerCache != nil {
 		t.PeerCache.Set(infoHash, peer)
+		atomic.AddInt64(&metrics.PeersTotalCached, 1)
 	}
 	return nil
 }

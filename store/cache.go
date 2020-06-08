@@ -1,7 +1,9 @@
 package store
 
 import (
+	"github.com/leighmacdonald/mika/metrics"
 	"sync"
+	"sync/atomic"
 )
 
 type UserCache struct {
@@ -47,6 +49,7 @@ func (cache *TorrentCache) Set(t Torrent) {
 	cache.Lock()
 	cache.torrents[t.InfoHash] = t
 	cache.Unlock()
+	atomic.AddInt64(&metrics.TorrentsTotalCached, 1)
 }
 
 func (cache *TorrentCache) Update(infoHash InfoHash, stats TorrentStats) {
@@ -70,6 +73,7 @@ func (cache *TorrentCache) Delete(ih InfoHash, dropRow bool) {
 	defer cache.Unlock()
 	if dropRow {
 		delete(cache.torrents, ih)
+		atomic.AddInt64(&metrics.TorrentsTotalCached, -1)
 	} else {
 		t, found := cache.torrents[ih]
 		if !found {
@@ -95,6 +99,7 @@ func (cache *UserCache) Set(user User) {
 	cache.Lock()
 	cache.users[user.Passkey] = user
 	cache.Unlock()
+	atomic.AddInt64(&metrics.UsersTotalCached, 1)
 }
 
 func (cache *UserCache) Get(user *User, passkey string) bool {
@@ -112,6 +117,7 @@ func (cache *UserCache) Delete(passkey string) {
 	cache.Lock()
 	delete(cache.users, passkey)
 	cache.Unlock()
+	atomic.AddInt64(&metrics.UsersTotalCached, -1)
 }
 
 func (cache *PeerCache) Set(infoHash InfoHash, peer Peer) {
@@ -124,6 +130,7 @@ func (cache *PeerCache) Set(infoHash InfoHash, peer Peer) {
 	cache.Lock()
 	cache.swarms[infoHash].Add(peer)
 	cache.Unlock()
+	atomic.AddInt64(&metrics.PeersTotalCached, 1)
 }
 
 func (cache *PeerCache) Get(peer *Peer, infoHash InfoHash, peerID PeerID) bool {
@@ -152,4 +159,5 @@ func (cache *PeerCache) Delete(infoHash InfoHash, peerID PeerID) {
 	cache.RLock()
 	cache.swarms[infoHash].Remove(peerID)
 	cache.RUnlock()
+	atomic.AddInt64(&metrics.PeersTotalCached, -1)
 }

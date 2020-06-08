@@ -5,10 +5,12 @@ import (
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/metrics"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"sync/atomic"
 	"time"
 )
 
@@ -30,7 +32,7 @@ type announceRequest struct {
 	Downloaded uint32
 
 	// The number of bytes this peer still has to download, encoded in base ten ascii.
-	// Note that this can'tracker be computed from downloaded and the file length since it
+	// Note that this can't be computed from downloaded and the file length since it
 	// might be a resume, and there's a chance that some of the downloaded data failed an
 	// integrity check and had to be re-downloaded.
 	Left uint32
@@ -158,16 +160,20 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 // There is no reason to support the older less efficient model for private needs
 func (h *BitTorrentHandler) announce(c *gin.Context) {
 	// Check that the user is valid before parsing anything
+	start := time.Now()
+	atomic.AddInt64(&metrics.AnnounceTotal, 1)
 	pk := c.Param("passkey")
 	var usr store.User
 	if valid := preFlightChecks(&usr, pk, c, h.tracker); !valid {
 		oops(c, msgInvalidAuth)
+		atomic.AddInt64(&metrics.AnnounceStatusUnauthorized, 1)
 		return
 	}
 	// Parse the announce into an announceRequest
 	req, code := h.newAnnounce(c)
 	if code != msgOk {
 		oops(c, code)
+		atomic.AddInt64(&metrics.AnnounceStatusMalformed, 1)
 		return
 	}
 	if pk == "" && h.tracker.Public {
@@ -188,6 +194,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		} else {
 			log.Debugf("No torrent found matching: %x", req.InfoHash.Bytes())
 			oops(c, msgInvalidInfoHash)
+			atomic.AddInt64(&metrics.AnnounceStatusInvalidInfoHash, 1)
 			return
 		}
 	}
@@ -271,6 +278,8 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		Timestamp:  time.Now(),
 		Paused:     peer.Paused,
 	}
+	atomic.AddInt64(&metrics.AnnounceStatusOK, 1)
+	metrics.AddAnnounceTime(time.Since(start).Nanoseconds())
 }
 
 // Generate a compact peer field array containing the byte representations

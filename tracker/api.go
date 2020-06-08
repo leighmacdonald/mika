@@ -7,6 +7,7 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
+	"github.com/leighmacdonald/mika/metrics"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
@@ -436,7 +437,7 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 }
 
 func (a *AdminAPI) metrics(c *gin.Context) {
-	stats := getMetrics()
+	stats := metrics.Get()
 	c.String(200, stats.String())
 }
 

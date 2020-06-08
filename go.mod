@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/anacrolix/torrent v1.15.2
+	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/chihaya/bencode v0.0.0-20160403015629-641906563e26
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gin-gonic/gin v1.6.3

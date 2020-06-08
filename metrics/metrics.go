@@ -1,4 +1,4 @@
-package tracker
+package metrics
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 var promHelp = map[string]string{
@@ -40,12 +42,67 @@ var promHelp = map[string]string{
 		"forced by the application calling the GC function.",
 	"gc_cpu_fraction": "gc_cpu_fraction is the fraction of this program's available " +
 		"CPU time used by the GC since the program started.",
+	"t_cache_torrents":              "t_cache_torrents is the total count of cached torrents",
+	"t_cache_users":                 "t_cache_users is the total count of cached users",
+	"t_cache_peers":                 "t_cache_peers is the total count of cached peers",
+	"t_ann_total":                   "t_ann_total is the total count of announces",
+	"t_ann_status_ok":               "t_ann_status_ok is the total count of successful announces",
+	"t_ann_status_unauthorized":     "t_ann_status_unauthorized is the total count of unauthorized users requests",
+	"t_ann_status_invalid_infohash": "t_ann_status_invalid_infohash is the total count of invalid info hash requests",
+	"t_ann_status_malformed":        "t_ann_status_malformed is the total count of malformed queries",
+	"t_ann_time_ns":                 "t_ann_time_ns is the average time it takes to fulfill a successful announce in nanoseconds",
 }
 
-type metrics struct {
+var (
+	TorrentsTotalCached int64
+	PeersTotalCached    int64
+	UsersTotalCached    int64
+
+	AnnounceTotal                 int64
+	AnnounceStatusOK              int64
+	AnnounceStatusUnauthorized    int64
+	AnnounceStatusInvalidInfoHash int64
+	AnnounceStatusMalformed       int64
+	execLock                      *sync.Mutex
+	AnnounceExecTimesNs           []int64
+)
+
+func AddAnnounceTime(t int64) {
+	execLock.Lock()
+	AnnounceExecTimesNs = append(AnnounceExecTimesNs, t)
+	execLock.Unlock()
+}
+
+func avgExecTime() int64 {
+	execLock.Lock()
+	var t int64
+	var avg int64
+	for _, v := range AnnounceExecTimesNs {
+		t += v
+	}
+	s := int64(len(AnnounceExecTimesNs))
+	if s > 0 {
+		avg = t / s
+		AnnounceExecTimesNs = nil
+	}
+	execLock.Unlock()
+	return avg
+}
+
+type RuntimeMetrics struct {
+	TorrentsTotalCached           int64 `prom:"t_cache_torrents" prom_type:"counter"`
+	UsersTotalCached              int64 `prom:"t_cache_users" prom_type:"counter"`
+	PeersTotalCached              int64 `prom:"t_cache_peers" prom_type:"counter"`
+	AnnounceTotal                 int64 `prom:"t_ann_total" prom_type:"gauge"`
+	AnnounceStatusOK              int64 `prom:"t_ann_status_ok" prom_type:"gauge"`
+	AnnounceStatusUnauthorized    int64 `prom:"t_ann_status_unauthorized" prom_type:"gauge"`
+	AnnounceStatusInvalidInfoHash int64 `prom:"t_ann_status_invalid_infohash" prom_type:"gauge"`
+	AnnounceStatusMalformed       int64 `prom:"t_ann_status_malformed" prom_type:"gauge"`
+	AnnounceExecTimesNsAvg        int64 `prom:"t_ann_time_ns" prom_type:"gauge"`
+
 	// GC stats
-	NumGC      int64 `prom:"num_gc" prom_type:""`
-	PauseTotal int64 `prom:"pause_total" prom_type:""`
+	NumGC      int64 `prom:"num_gc" prom_type:"gauge"`
+	PauseTotal int64 `prom:"pause_total" prom_type:"gauge"`
 
 	// Goro stats
 	GoRoutines int `prom:"go_routines" prom_type:"gauge"`
@@ -80,7 +137,7 @@ type metrics struct {
 	GCCPUFraction  float64 `prom:"gc_cpu_fraction" prom_type:"gauge"`
 }
 
-func (m metrics) String() string {
+func (m RuntimeMetrics) String() string {
 	var out strings.Builder
 	v := reflect.ValueOf(m)
 	t := v.Type()
@@ -94,14 +151,24 @@ func (m metrics) String() string {
 	return out.String()
 }
 
-func getMetrics() metrics {
+func Get() RuntimeMetrics {
 	var (
 		mem runtime.MemStats
 		gc  debug.GCStats
 	)
 	runtime.ReadMemStats(&mem)
 	debug.ReadGCStats(&gc)
-	var m metrics
+	var m RuntimeMetrics
+
+	m.TorrentsTotalCached = atomic.SwapInt64(&TorrentsTotalCached, 0)
+	m.UsersTotalCached = atomic.SwapInt64(&UsersTotalCached, 0)
+	m.PeersTotalCached = atomic.SwapInt64(&PeersTotalCached, 0)
+	m.AnnounceTotal = atomic.SwapInt64(&AnnounceTotal, 0)
+	m.AnnounceStatusOK = atomic.SwapInt64(&AnnounceStatusOK, 0)
+	m.AnnounceStatusUnauthorized = atomic.SwapInt64(&AnnounceStatusUnauthorized, 0)
+	m.AnnounceStatusInvalidInfoHash = atomic.SwapInt64(&AnnounceStatusInvalidInfoHash, 0)
+	m.AnnounceStatusMalformed = atomic.SwapInt64(&AnnounceStatusMalformed, 0)
+	m.AnnounceExecTimesNsAvg = avgExecTime()
 	m.NumGC = gc.NumGC
 	m.PauseTotal = gc.PauseTotal.Milliseconds()
 
@@ -135,4 +202,8 @@ func getMetrics() metrics {
 	m.GoRoutines = runtime.NumGoroutine()
 
 	return m
+}
+
+func init() {
+	execLock = &sync.Mutex{}
 }

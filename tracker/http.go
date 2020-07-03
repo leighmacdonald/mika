@@ -27,6 +27,7 @@ const (
 	msgInvalidInfoHash      errCode = 150
 	msgInvalidPeerID        errCode = 151
 	msgInvalidNumWant       errCode = 152
+	msgBadClient            errCode = 153
 	msgOk                   errCode = 200
 	msgInfoHashNotFound     errCode = 480
 	msgInvalidAuth          errCode = 490
@@ -48,6 +49,7 @@ var (
 		msgInvalidInfoHash:      errors.New("Invalid info hash"),
 		msgInvalidPeerID:        errors.New("Peer ID invalid"),
 		msgInvalidNumWant:       errors.New("num_want invalid"),
+		msgBadClient:            errors.New("Client not whitelisted"),
 		msgInfoHashNotFound:     errors.New("Unknown infohash"),
 		msgClientRequestTooFast: errors.New("Slow down there jimmy"),
 		msgMalformedRequest:     errors.New("Malformed request"),
@@ -116,7 +118,8 @@ func oops(ctx *gin.Context, errCode errCode) {
 // preFlightChecks ensures our user meets the requirements to make an authorized request
 // THis is used within the request handler itself and not as a middleware because of the
 // slightly higher cost of passing data in through the request context
-func preFlightChecks(usr *store.User, pk string, c *gin.Context, t *Tracker) bool {
+func (t *Tracker) preFlightChecks(usr *store.User, pk string, c *gin.Context) bool {
+
 	// Check that the user is valid before parsing anything
 	if t.Public {
 		usr.UserID = 1

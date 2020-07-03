@@ -64,7 +64,7 @@ create table peers
 DROP TABLE IF EXISTS whitelist;
 create table whitelist
 (
-    client_prefix varchar(10) not null primary key,
+    client_prefix char(8)     not null primary key,
     client_name   varchar(20) not null
 );
 
@@ -231,7 +231,7 @@ BEGIN
 end;
 
 DROP PROCEDURE IF EXISTS whitelist_add;
-CREATE PROCEDURE whitelist_add(IN in_client_prefix varchar(255),
+CREATE PROCEDURE whitelist_add(IN in_client_prefix char(5),
                                IN in_client_name varchar(255))
 BEGIN
     INSERT INTO whitelist (client_prefix, client_name)

@@ -164,7 +164,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	atomic.AddInt64(&metrics.AnnounceTotal, 1)
 	pk := c.Param("passkey")
 	var usr store.User
-	if valid := preFlightChecks(&usr, pk, c, h.tracker); !valid {
+	if valid := h.tracker.preFlightChecks(&usr, pk, c); !valid {
 		oops(c, msgInvalidAuth)
 		atomic.AddInt64(&metrics.AnnounceStatusUnauthorized, 1)
 		return
@@ -174,6 +174,10 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	if code != msgOk {
 		oops(c, code)
 		atomic.AddInt64(&metrics.AnnounceStatusMalformed, 1)
+		return
+	}
+	if !h.tracker.ClientWhitelisted(req.PeerID) {
+		oops(c, msgBadClient)
 		return
 	}
 	if pk == "" && h.tracker.Public {
@@ -221,17 +225,15 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 			peer.Left = req.Left
 			// TODO allow this to be updated in the perm storage when a client changes settings
 			peer.CryptoLevel = req.CryptoLevel
+			l := h.tracker.Geodb.GetLocation(peer.IP)
+			peer.Location = l.LatLong
+			peer.ASN = l.ASN
+			peer.AS = l.AS
+			peer.CountryCode = l.ISOCode
 			if err := h.tracker.PeerAdd(tor.InfoHash, peer); err != nil {
 				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
 				oops(c, msgGenericError)
 				return
-			}
-			if h.tracker.GeodbEnabled {
-				l := h.tracker.Geodb.GetLocation(peer.IP)
-				peer.Location = l.LatLong
-				peer.ASN = l.ASN
-				peer.AS = l.AS
-				peer.CountryCode = l.ISOCode
 			}
 		} else {
 			oops(c, msgGenericError)

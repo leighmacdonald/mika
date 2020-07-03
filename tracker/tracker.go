@@ -53,7 +53,8 @@ type Tracker struct {
 	MaxPeers        int
 	StateUpdateChan chan store.UpdateState
 	// Whitelist and whitelist lock
-	Whitelist map[string]store.WhiteListClient
+	Whitelist   map[string]store.WhiteListClient
+	WhitelistMu *sync.RWMutex
 }
 
 // Opts is used to configure tracker instances
@@ -194,7 +195,7 @@ func (t *Tracker) StatWorker() {
 			var torrent store.Torrent
 			// Keep deleted true so that we can record any buffered stat updates from
 			// the client even though we deleted/disabled the torrent itself.
-			if err := t.torrents.Get(&torrent, u.InfoHash, false); err != nil {
+			if err := t.TorrentGet(&torrent, u.InfoHash, false); err != nil {
 				log.Errorf("No torrent found in batch update")
 				continue
 			}
@@ -238,7 +239,7 @@ func (t *Tracker) StatWorker() {
 				} else {
 					tb.Leechers--
 				}
-				if err := t.peers.Delete(u.InfoHash, u.PeerID); err != nil {
+				if err := t.peerDelete(u.InfoHash, u.PeerID); err != nil {
 					log.Errorf("Could not remove peer from swarm: %s", err.Error())
 				}
 			}
@@ -274,6 +275,7 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		MaxPeers:         opts.MaxPeers,
 		StateUpdateChan:  make(chan store.UpdateState, 1000),
 		Whitelist:        make(map[string]store.WhiteListClient),
+		WhitelistMu:      &sync.RWMutex{},
 	}
 	// Don't enable caching if we are already configured for a memory store.
 	if opts.TorrentCacheEnabled {
@@ -338,6 +340,13 @@ func NewTestTracker() (*Tracker, error) {
 		}
 	}
 	return tracker, nil
+}
+
+func (t *Tracker) ClientWhitelisted(peerID store.PeerID) bool {
+	t.WhitelistMu.RLock()
+	_, found := t.Whitelist[string(peerID[0:8])]
+	t.WhitelistMu.RUnlock()
+	return found
 }
 
 // LoadWhitelist will read the client white list from the tracker store and
@@ -435,6 +444,10 @@ func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
 		atomic.AddInt64(&metrics.PeersTotalCached, 1)
 	}
 	return nil
+}
+func (t *Tracker) peerDelete(infoHash store.InfoHash, peerID store.PeerID) error {
+	t.PeerCache.Delete(infoHash, peerID)
+	return t.peers.Delete(infoHash, peerID)
 }
 
 func (t *Tracker) UserSync(batch map[string]store.UserStats) error {

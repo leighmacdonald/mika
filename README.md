@@ -8,7 +8,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/leighmacdonald/mika)](https://goreportcard.com/report/github.com/leighmacdonald/mika)
 [![GoDoc](https://godoc.org/github.com/leighmacdonald/mika?status.svg)](https://pkg.go.dev/github.com/leighmacdonald/mika)
 ![Lines of Code](https://tokei.rs/b1/github/leighmacdonald/mika)
-[![Discord chat](https://img.shields.io/badge/discord-Chat%20Now-a29bfe.svg?style=flat-square)](https://discord.gg/jWXFcHW)
+[![Discord chat](https://img.shields.io/discord/704508824320475218)](https://discord.gg/jWXFcHW)
 
 Mika is a torrent tracker written in the Go programming language.
 

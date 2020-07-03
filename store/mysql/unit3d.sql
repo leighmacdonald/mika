@@ -1,3 +1,19 @@
+--
+
+DROP TABLE IF EXISTS whitelist;
+create table whitelist
+(
+    client_prefix char(8)     not null primary key,
+    client_name   varchar(20) not null
+);
+
+DROP PROCEDURE IF EXISTS whitelist_all;
+CREATE PROCEDURE whitelist_all()
+BEGIN
+    SELECT *
+    FROM whitelist;
+end;
+
 -- USERS
 CREATE OR REPLACE PROCEDURE user_by_passkey(
     IN in_passkey varchar(32)
@@ -166,6 +182,7 @@ BEGIN
     DELETE FROM peers WHERE updated_at <= in_expiry_time;
 end;
 
+--  TODO what is actual uploaded/downloaded for
 CREATE OR REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
                                      IN in_peer_id binary(20),
                                      IN in_user_id int,
@@ -181,12 +198,13 @@ CREATE OR REPLACE PROCEDURE peer_add(IN in_info_hash binary(20),
                                      IN in_client varchar(255),
                                      IN in_country_code char(2),
                                      IN in_asn varchar(10),
-                                     IN in_as_name varchar(255))
+                                     IN in_as_name varchar(255),
+                                     IN in_crypto_level int)
 BEGIN
     SELECT @int_torrent_id := `id` FROM torrents WHERE info_hash = HEX(in_info_hash);
     INSERT INTO peers
     (peer_id, md5_peer_id, info_hash, user_id, ipv6, ip, port, location, created_at, updated_at, torrent_id,
-     downloaded, uploaded, `left`, agent, seeder, country_code, asn, as_name)
+     downloaded, uploaded, `left`, agent, seeder, country_code, asn, as_name, crypto_level)
     VALUES (HEX(in_peer_id),
             md5(HEX(in_peer_id)),
             HEX(in_info_hash),
@@ -205,14 +223,36 @@ BEGIN
             if(in_left = 0, 1, 0),
             in_country_code,
             in_asn,
-            in_as_name);
-end;
+            in_as_name,
+            in_crypto_level);
+    INSERT INTO history
+    (user_id, agent, info_hash, uploaded, actual_uploaded, client_uploaded, downloaded, actual_downloaded,
+     client_downloaded, seeder, active, seedtime, immune, hitrun, prewarn, created_at, updated_at)
+    VALUES (in_user_id,
+            in_client,
+            HEX(in_info_hash),
+            in_uploaded,
+            in_uploaded,
+            in_uploaded,
+            in_downloaded,
+            in_downloaded,
+            in_downloaded,
+            if(in_left = 0, 1, 0),
+            true,
+            0,
+            false,
+            false,
+            false,
+            NOW(),
+            NOW());
+
+END;
 
 CREATE OR REPLACE PROCEDURE peer_delete(IN in_info_hash binary(20),
                                         IN in_peer_id binary(20))
 BEGIN
     DELETE FROM peers WHERE info_hash = HEX(in_info_hash) AND peer_id = HEX(in_peer_id);
-end;
+END;
 
 CREATE OR REPLACE PROCEDURE peer_get(IN in_info_hash BINARY(20),
                                      IN in_peer_id BINARY(20))
@@ -227,7 +267,7 @@ BEGIN
            uploaded            as total_uploaded,
            `left`              as total_left,
            0                   as total_time,
-           total_announces     as total_announces,
+           0                   as total_announces,
            speed_up            as speed_up,
            speed_dn            as speed_dn,
            speed_up_max        as speed_up_max,
@@ -237,7 +277,8 @@ BEGIN
            created_at          as announce_first,
            country_code        as country_code,
            asn                 as asn,
-           as_name             as as_name
+           as_name             as as_name,
+           crypto_level        as crypto_level
     FROM peers
     WHERE info_hash = HEX(in_info_hash)
       and peer_id = HEX(in_peer_id);
@@ -255,7 +296,7 @@ BEGIN
            uploaded            as total_uploaded,
            `left`              as total_left,
            0                   as total_time,
-           total_announces     as total_announces,
+           0                   as total_announces,
            speed_up            as speed_up,
            speed_dn            as speed_dn,
            speed_up_max        as speed_up_max,
@@ -265,10 +306,11 @@ BEGIN
            created_at          as announce_first,
            country_code        as country_code,
            asn                 as asn,
-           as_name             as as_name
+           as_name             as as_name,
+           crypto_level        as crypto_level
     FROM peers
     WHERE info_hash = HEX(in_info_hash)
     LIMIT in_limit;
-end;
+END;
 
 -- END PEERS

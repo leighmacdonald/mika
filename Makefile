@@ -1,10 +1,7 @@
 .PHONY: all test clean build install
-GO_FLAGS = -ldflags "-X 'github.com/leighmacdonald/mika/consts.BuildVersion=`git describe --long`'"
+GO_FLAGS = -ldflags "-X 'github.com/leighmacdonald/mika/consts.BuildVersion=`git describe --abbrev=0`'"
 
 all: build
-
-deps:
-	@./update.sh
 
 vet:
 	@go vet . ./...
@@ -35,5 +32,8 @@ bench:
 
 clean:
 	@go clean $(GO_FLAGS) -i
+
+docker_run: build_latest
+	@docker-compose run --rm mika
 
 ## EOF

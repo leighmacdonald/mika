@@ -1,0 +1,52 @@
+version: '3.5'
+
+services:
+  postgres:
+    image: mdillon/postgis
+    restart: always
+    environment:
+      POSTGRES_USER: mika
+      POSTGRES_PASSWORD: mika
+    volumes:
+      - ./store/postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - mika_testing
+
+  mariadb:
+    image: mariadb:10.3
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: mika
+      MYSQL_DATABASE: mika
+    volumes:
+      - ./docker/mysql_init.sql:/docker-entrypoint-initdb.d/00_mysql_init.sql
+      - ./store/mysql/schema.sql:/docker-entrypoint-initdb.d/10_schema.sql
+    networks:
+      - mika_testing
+
+  redis:
+    image: redis:6-alpine
+    restart: always
+    networks:
+      - mika_testing
+
+  mika:
+    build:
+      dockerfile: docker/Dockerfile
+      context: "."
+    restart: always
+    depends_on:
+      - mariadb
+      - postgres
+    volumes:
+      - geo_data:/app/geo_data
+      - ./docker/mika.yaml:/app/mika.yaml
+    networks:
+      - mika_testing
+
+volumes:
+  geo_data:
+
+networks:
+  mika_testing:
+    driver: bridge

@@ -43,6 +43,7 @@ src
 *coverage*
 /cc-test-reporter
 /examples/data/.torrent.bolt.db
-/*.CSV
-/*.BIN
-/*.ZIP
+*.CSV
+*.BIN
+*.ZIP
+geo_data

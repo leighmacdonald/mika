@@ -84,7 +84,7 @@ BEGIN
     WHERE passkey = in_passkey;
 end;
 
-DROP PROCEDURE IF EXISTS user_by_id;
+DROP PROCEDURE IF EXISTS `user_by_id`;
 CREATE PROCEDURE user_by_id(IN in_user_id int)
 BEGIN
     SELECT user_id,

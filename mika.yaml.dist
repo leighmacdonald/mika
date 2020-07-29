@@ -92,9 +92,9 @@ store_users_max_idle: 500
 store_users_cache: true
 
 # Geo location lookups for peers
-#
+# Visit https://www.ip2location.com/ and sign up to get a license key
 # Path to store the downloaded database files
-geodb_path: "./"
+geodb_path: "geo_data"
 # IP2Location.com API Key
 geodb_api_key:
 # Enable the feature.

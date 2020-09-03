@@ -47,3 +47,4 @@ src
 *.BIN
 *.ZIP
 geo_data
+/install.sh

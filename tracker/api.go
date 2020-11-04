@@ -315,15 +315,15 @@ type ConfigRequest struct {
 	// The keys that we actually want to update from our struct
 	// Some default values could be valid values so we cannot rely on empty values alone
 	// Keys not listed are NOT updated even if a value is set in the struct
-	UpdateKeys                 []config.Key `json:"update_keys"`
-	TrackerAnnounceInterval    int          `json:"tracker_announce_interval,omitempty"`
-	TrackerAnnounceIntervalMin int          `json:"tracker_announce_interval_min,omitempty"`
-	TrackerReaperInterval      int          `json:"tracker_reaper_interval,omitempty"`
-	TrackerBatchUpdateInterval int          `json:"tracker_batch_update_interval,omitempty"`
-	TrackerMaxPeers            int          `json:"tracker_max_peers,omitempty"`
-	TrackerAutoRegister        bool         `json:"tracker_auto_register"`
-	TrackerAllowNonRoutable    bool         `json:"tracker_allow_non_routable"`
-	GeodbEnabled               bool         `json:"geodb_enabled"`
+	UpdateKeys                 []string `json:"update_keys"`
+	TrackerAnnounceInterval    int      `json:"tracker_announce_interval,omitempty"`
+	TrackerAnnounceIntervalMin int      `json:"tracker_announce_interval_min,omitempty"`
+	TrackerReaperInterval      int      `json:"tracker_reaper_interval,omitempty"`
+	TrackerBatchUpdateInterval int      `json:"tracker_batch_update_interval,omitempty"`
+	TrackerMaxPeers            int      `json:"tracker_max_peers,omitempty"`
+	TrackerAutoRegister        bool     `json:"tracker_auto_register"`
+	TrackerAllowNonRoutable    bool     `json:"tracker_allow_non_routable"`
+	GeodbEnabled               bool     `json:"geodb_enabled"`
 }
 
 func (a *AdminAPI) configGet(c *gin.Context) {
@@ -353,47 +353,45 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 
 	for _, k := range configValues.UpdateKeys {
 		switch k {
-		case config.TrackerAnnounceInterval:
+		case "tracker_announce_interval":
 			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerAnnounceInterval))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Announce interval invalid format"})
 				return
 			}
 			a.t.AnnInterval = d
-		case config.TrackerAnnounceIntervalMin:
+		case "tracker_announce_interval_minimum":
 			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerAnnounceIntervalMin))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Announce interval min invalid format"})
 				return
 			}
 			a.t.AnnIntervalMin = d
-		case config.TrackerReaperInterval:
+		case "tracker_reaper_interval":
 			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerReaperInterval))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Reaper interval invalid"})
 				return
 			}
 			a.t.ReaperInterval = d
-		case config.TrackerBatchUpdateInterval:
+		case "tracker_batch_update_interval":
 			d, err := time.ParseDuration(fmt.Sprintf("%ds", configValues.TrackerBatchUpdateInterval))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, StatusResp{Err: "Batch interval invalid"})
 				return
 			}
 			a.t.BatchInterval = d
-		case config.TrackerMaxPeers:
+		case "tracker_max_peers":
 			a.t.MaxPeers = configValues.TrackerMaxPeers
-		case config.TrackerAutoRegister:
+		case "tracker_auto_register":
 			a.t.AutoRegister = configValues.TrackerAutoRegister
-		case config.TrackerAllowNonRoutable:
+		case "tracker_allow_non_routable":
 			a.t.AllowNonRoutable = configValues.TrackerAllowNonRoutable
-		case config.GeodbEnabled:
+		case "geodb_enabled":
 			if configValues.GeodbEnabled && !a.t.GeodbEnabled {
 				size := int64(0)
-				key := config.GetString(config.GeodbAPIKey)
-				outPath := config.GetString(config.GeodbPath)
-				if util.Exists(outPath) {
-					f, err := os.Open(outPath)
+				if util.Exists(config.GeoDB.Path) {
+					f, err := os.Open(config.GeoDB.Path)
 					if err != nil {
 						internalErr = true
 						break
@@ -405,14 +403,14 @@ func (a *AdminAPI) configUpdate(c *gin.Context) {
 					}
 					size = fi.Size()
 				}
-				if size == 0 || !util.Exists(outPath) {
-					err = geo.DownloadDB(outPath, key)
+				if size == 0 || !util.Exists(config.GeoDB.Path) {
+					err = geo.DownloadDB(config.GeoDB.Path, config.GeoDB.APIKey)
 					if err != nil {
 						internalErr = true
 						break
 					}
 				}
-				newDb, err := geo.New(outPath)
+				newDb, err := geo.New(config.GeoDB.Path)
 				if err != nil {
 					internalErr = true
 					break

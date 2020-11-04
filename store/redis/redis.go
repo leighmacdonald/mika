@@ -517,7 +517,7 @@ func (ps *PeerStore) Close() error {
 	return ps.client.Close()
 }
 
-func newRedisConfig(c *config.StoreConfig) *redis.Options {
+func newRedisConfig(c config.StoreConfig) *redis.Options {
 	database, err := strconv.ParseInt(c.Database, 10, 32)
 	if err != nil {
 		log.Panicf("Failed to parse redis database integer: %s", c.Database)
@@ -538,12 +538,8 @@ func newRedisConfig(c *config.StoreConfig) *redis.Options {
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the redis backing store
-func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	client := redis.NewClient(newRedisConfig(c))
+func (td torrentDriver) New(cfg config.StoreConfig) (store.TorrentStore, error) {
+	client := redis.NewClient(newRedisConfig(cfg))
 	return &TorrentStore{
 		client: client,
 	}, nil
@@ -561,12 +557,8 @@ func (ps *PeerStore) peerExpireHandler() {
 type peerDriver struct{}
 
 // New initialize a New implementation using the redis backing store
-func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	client := redis.NewClient(newRedisConfig(c))
+func (pd peerDriver) New(cfg config.StoreConfig) (store.PeerStore, error) {
+	client := redis.NewClient(newRedisConfig(cfg))
 	ps := &PeerStore{
 		client:  client,
 		pubSub:  client.Subscribe("peer_expired"),
@@ -579,12 +571,8 @@ func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 type userDriver struct{}
 
 // New initialize a New implementation using the redis backing store
-func (pd userDriver) New(cfg interface{}) (store.UserStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	return &UserStore{client: redis.NewClient(newRedisConfig(c))}, nil
+func (pd userDriver) New(cfg config.StoreConfig) (store.UserStore, error) {
+	return &UserStore{client: redis.NewClient(newRedisConfig(cfg))}, nil
 }
 
 func init() {

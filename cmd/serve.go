@@ -21,39 +21,35 @@ var serveCmd = &cobra.Command{
 		ctx := context.Background()
 
 		opts := tracker.NewDefaultOpts()
-		opts.GeodbEnabled = config.GetBool(config.GeodbEnabled)
-		opts.BatchInterval = config.GetDuration(config.TrackerBatchUpdateInterval)
-		opts.ReaperInterval = config.GetDuration(config.TrackerReaperInterval)
-		opts.AnnInterval = config.GetDuration(config.TrackerAnnounceInterval)
-		opts.AnnIntervalMin = config.GetDuration(config.TrackerAnnounceIntervalMin)
-		opts.AllowNonRoutable = config.GetBool(config.TrackerAllowNonRoutable)
-		opts.AutoRegister = config.GetBool(config.TrackerAutoRegister)
-		opts.Public = config.GetBool(config.TrackerPublic)
-		opts.TorrentCacheEnabled = config.GetBool(config.StoreTorrentCache)
-		opts.PeerCacheEnabled = config.GetBool(config.StorePeersCache)
-		opts.UserCacheEnabled = config.GetBool(config.StoreUsersCache)
-		ts, err := store.NewTorrentStore(
-			config.GetString(config.StoreTorrentType),
-			config.GetStoreConfig(config.Torrent))
+		opts.GeodbEnabled = config.GeoDB.Enabled
+		opts.BatchInterval = config.Tracker.BatchUpdateIntervalParsed
+		opts.ReaperInterval = config.Tracker.ReaperIntervalParsed
+		opts.AnnInterval = config.Tracker.AnnounceIntervalParsed
+		opts.AnnIntervalMin = config.Tracker.AnnounceIntervalMinimumParsed
+		opts.AllowNonRoutable = config.Tracker.AllowNonRoutable
+		opts.AutoRegister = config.Tracker.AutoRegister
+		opts.Public = config.Tracker.Public
+		opts.TorrentCacheEnabled = config.TorrentStore.Cache
+		opts.PeerCacheEnabled = config.PeerStore.Cache
+		opts.UserCacheEnabled = config.UserStore.Cache
+		ts, err := store.NewTorrentStore(config.TorrentStore)
 		if err != nil {
 			log.Fatalf("Failed to setup torrent store: %s", err)
 		}
 		opts.Torrents = ts
-		p, err2 := store.NewPeerStore(config.GetString(config.StorePeersType),
-			config.GetStoreConfig(config.Peers))
+		p, err2 := store.NewPeerStore(config.PeerStore)
 		if err2 != nil {
 			log.Fatalf("Failed to setup peer store: %s", err2)
 		}
 		opts.Peers = p
-		u, err3 := store.NewUserStore(config.GetString(config.StoreUsersType),
-			config.GetStoreConfig(config.Users))
+		u, err3 := store.NewUserStore(config.UserStore)
 		if err3 != nil {
 			log.Fatalf("Failed to setup user store: %s", err3)
 		}
 		opts.Users = u
 		var geodb geo.Provider
-		if config.GetBool(config.GeodbEnabled) {
-			geodb, err = geo.New(config.GetString(config.GeodbPath))
+		if config.GeoDB.Enabled {
+			geodb, err = geo.New(config.GeoDB.Path)
 			if err != nil {
 				log.Fatalf("Could not validate geo database. You may need to run ./mika updategeo")
 			}
@@ -68,14 +64,14 @@ var serveCmd = &cobra.Command{
 		_ = tkr.LoadWhitelist()
 
 		btOpts := tracker.DefaultHTTPOpts()
-		btOpts.ListenAddr = config.GetString(config.TrackerListen)
-		btOpts.UseTLS = config.GetBool(config.TrackerTLS)
+		btOpts.ListenAddr = config.Tracker.Listen
+		btOpts.UseTLS = config.Tracker.TLS
 		btOpts.Handler = tracker.NewBitTorrentHandler(tkr)
 		btServer := tracker.NewHTTPServer(btOpts)
 
 		apiOpts := tracker.DefaultHTTPOpts()
-		apiOpts.ListenAddr = config.GetString(config.APIListen)
-		apiOpts.UseTLS = config.GetBool(config.APITLS)
+		apiOpts.ListenAddr = config.API.Listen
+		apiOpts.UseTLS = config.API.TLS
 		apiOpts.Handler = tracker.NewAPIHandler(tkr)
 		apiServer := tracker.NewHTTPServer(apiOpts)
 

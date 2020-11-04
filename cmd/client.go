@@ -26,11 +26,11 @@ var clientCmd = &cobra.Command{
 func newClient(cmd *cobra.Command) *client.Client {
 	host, err := cmd.Flags().GetString("host")
 	if err != nil {
-		host = config.GetString(config.APIListen)
+		host = config.API.Listen
 	}
 	key, err2 := cmd.Flags().GetString("key")
 	if err2 != nil {
-		key = config.GetString(config.APIKey)
+		key = config.API.Key
 	}
 	if strings.HasPrefix(host, ":") {
 		host = "http://localhost" + host

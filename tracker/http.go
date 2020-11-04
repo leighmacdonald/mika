@@ -181,7 +181,7 @@ func newRouter() *gin.Engine {
 }
 
 func noRoute(c *gin.Context) {
-	c.Data(http.StatusNotFound, gin.MIMEPlain, []byte("nope"))
+	c.String(http.StatusNotFound, "☃")
 }
 
 // NewBitTorrentHandler configures a router to handle tracker announce/scrape requests

@@ -48,3 +48,4 @@ src
 *.ZIP
 geo_data
 /install.sh
+/venv/

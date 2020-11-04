@@ -32,7 +32,7 @@ services:
 
   mika:
     build:
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfilesq
       context: "."
     restart: always
     depends_on:

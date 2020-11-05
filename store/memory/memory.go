@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
 	"sync"
@@ -259,14 +260,14 @@ func (ps *PeerStore) GetN(ih store.InfoHash, _ int) (store.Swarm, error) {
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the memory backing store
-func (td torrentDriver) New(_ interface{}) (store.TorrentStore, error) {
+func (td torrentDriver) New(_ config.StoreConfig) (store.TorrentStore, error) {
 	return NewTorrentStore(), nil
 }
 
 type peerDriver struct{}
 
 // New initialize a New implementation using the memory backing store
-func (pd peerDriver) New(_ interface{}) (store.PeerStore, error) {
+func (pd peerDriver) New(_ config.StoreConfig) (store.PeerStore, error) {
 	return NewPeerStore(), nil
 }
 
@@ -385,7 +386,7 @@ func (u *UserStore) Close() error {
 type userDriver struct{}
 
 // New creates a new memory backed user store.
-func (pd userDriver) New(_ interface{}) (store.UserStore, error) {
+func (pd userDriver) New(_ config.StoreConfig) (store.UserStore, error) {
 	return NewUserStore(), nil
 }
 

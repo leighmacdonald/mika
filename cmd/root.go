@@ -34,7 +34,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(func() {
 		if err := config.Read(cfgFile); err != nil {
-			log.Fatal("Could not load config")
+			log.Fatalf("Could not load & parse config: %v", err)
 		}
 	})
 

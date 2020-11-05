@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/consts"
+	"github.com/leighmacdonald/mika/util"
 	"github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"net/url"
@@ -13,183 +15,140 @@ import (
 	"time"
 )
 
-// StoreType is a mapping to the backing store types used
-type StoreType int
-
-const (
-	// Torrent maps to store_torrent_* config options
-	Torrent StoreType = iota
-	// Peers maps to store_peers_* config options
-	Peers
-	// Users maps to store_users_* config options
-	Users
+var (
+	General      generalConfig
+	Tracker      trackerConfig
+	API          apiConfig
+	TorrentStore StoreConfig
+	PeerStore    StoreConfig
+	UserStore    StoreConfig
+	GeoDB        geoDBConfig
 )
 
-// Key represents a known configuration key
-type Key string
+type fullConfig struct {
+	General generalConfig `mapstructure:"general"`
+	Tracker trackerConfig `mapstructure:"tracker"`
+	API     apiConfig     `mapstructure:"api"`
+	Stores  storeConfigs  `mapstructure:"stores"`
+	GeoDB   geoDBConfig   `mapstructure:"geodb"`
+}
 
-//noinspection GoUnusedConst
-const (
-	// GeneralRunMode defines the application run mode.
+type generalConfig struct {
+	// RunMode defines the application run mode.
 	// debug|release|testing
-	GeneralRunMode Key = "general_run_mode"
-
-	// GeneralLogLevel sets the logrus Logger level
+	RunMode string `mapstructure:"run_mode"`
+	// LogLevel sets the logrus Logger level
 	// info|warn|debug|trace
-	GeneralLogLevel Key = "general_log_level"
-
-	// GeneralLogColour toggles between colourised console output
+	LogLevel string `mapstructure:"log_level"`
+	// LogColour toggles between colourised console output
 	// true|false
-	GeneralLogColour Key = "general_log_colour"
+	LogColour bool `mapstructure:"log_colour"`
+}
 
-	// TrackerPublic enables/disables auto registration of torrents and users
+type storeConfigs struct {
+	Torrent StoreConfig `mapstructure:"torrent"`
+	Peers   StoreConfig `mapstructure:"peers"`
+	Users   StoreConfig `mapstructure:"users"`
+}
+
+type trackerConfig struct {
+	// Public enables/disables auto registration of torrents and users
 	// true|false
-	TrackerPublic Key = "tracker_public"
-	// TrackerAutoRegister will auto insert unknown info_hashes to be tracked
-	TrackerAutoRegister Key = "tracker_auto_register"
-	// TrackerListen sets the host and port to listen on
+	Public bool `mapstructure:"public"`
+	// Listen sets the host and port to listen on
 	// hostname:port
-	TrackerListen Key = "tracker_listen"
-	// TrackerTLS enables TLS for the tracker component
+	Listen string `mapstructure:"listen"`
+	// TLS enables TLS for the tracker component
 	// true|false
-	TrackerTLS Key = "tracker_tls"
-	// TrackerIPv6 enables ipv6 peers
+	TLS bool `mapstructure:"tls"`
+	// IPv6 enables ipv6 peers
 	// true|false
-	TrackerIPv6 Key = "tracker_ipv6"
-	// TrackerIPv6Only disables ipv4 peers
+	IPv6 bool `mapstructure:"ipv6"`
+	// IPv6Only disables ipv4 peers
 	// true|false
-	TrackerIPv6Only Key = "tracker_ipv6_only"
-	// TrackerReaperInterval defines how often we do a sweep of active swarms looking for stale
+	IPv6Only bool `mapstructure:"ipv6_only"`
+
+	AutoRegister bool `mapstructure:"auto_register"`
+	// ReaperInterval defines how often we do a sweep of active swarms looking for stale
 	// peers that can be removed.
 	// 60s|1m
-	TrackerReaperInterval Key = "tracker_reaper_interval"
-	// TrackerAnnounceInterval defines how often peers should announce. The lower this is
+	ReaperInterval       string `mapstructure:"reaper_interval"`
+	ReaperIntervalParsed time.Duration
+	// AnnounceInterval defines how often peers should announce. The lower this is
 	// the more load on your system you can expect
 	// 60s|1m
-	TrackerAnnounceInterval Key = "tracker_announce_interval"
-	// TrackerAnnounceIntervalMin is the minimum interval a client is allowed
+	AnnounceInterval       string `mapstructure:"announce_interval"`
+	AnnounceIntervalParsed time.Duration
+	// AnnounceIntervalMinimum is the minimum interval a client is allowed
 	// 60s|1m
-	TrackerAnnounceIntervalMin Key = "tracker_announce_interval_min"
+	AnnounceIntervalMinimum       string `mapstructure:"announce_interval_minimum"`
+	AnnounceIntervalMinimumParsed time.Duration
 	// TrackerHNRThreshold is how much time must pass before we mark a peer as Hit-N-Run
 	// 1d|12h|60m
-	TrackerHNRThreshold Key = "tracker_hnr_threshold"
+	HNRThreshold       string `mapstructure:"hnr_threshold"`
+	HNRThresholdParsed time.Duration
 	// TrackerBatchUpdateInterval defines how often we sync user stats to the back store
-	TrackerBatchUpdateInterval Key = "tracker_batch_update_interval"
+	BatchUpdateInterval       string `mapstructure:"batch_update_interval"`
+	BatchUpdateIntervalParsed time.Duration
 	// TrackerAllowNonRoutable defines whether we allow peers who are using non-public/routable addresses
-	TrackerAllowNonRoutable Key = "tracker_allow_non_routable"
+	AllowNonRoutable bool `mapstructure:"allow_non_routable"`
+	AllowClientIP    bool `mapstructure:"allow_client_ip"`
+}
 
-	TrackerAllowClientIP Key = "tracker_allow_client_ip"
-
-	// TrackerMaxPeers sets the max number of peers to return on an announce
-	TrackerMaxPeers Key = "tracker_max_peers"
-
+type apiConfig struct {
 	// APIListen sets the host and port that the admin API should bind to
 	// localhost:34001
-	APIListen Key = "api_listen"
+	Listen string `mapstructure:"listen"`
 	// APITLS enables TLS1.3 on the admin interface.
 	// true|false
-	APITLS Key = "api_tls"
+	TLS bool `mapstructure:"tls"`
 	// APIIPv6 enables ipv6 for the admin API
 	// true|false
-	APIIPv6 Key = "api_ipv6"
+	IPv6 bool `mapstructure:"ipv6"`
 	// APIIPv6Only disabled ipv4 to the admin interface
 	// true|false
-	APIIPv6Only Key = "api_ipv6_only"
+	IPv6Only bool `mapstructure:"ipv6_only"`
 	// APIKey Basic key authentication token for API calls
-	APIKey Key = "api_key"
-	// StoreTorrentType sets the backing store type to be used for torrents
+	Key string `mapstructure:"key"`
+}
+
+type StoreConfig struct {
+	// Type sets the backing store type to be used
 	// memory|redis|postgres|mysql|http
-	StoreTorrentType Key = "store_torrent_type"
+	Type string `mapstructure:"type"`
 	// StoreTorrentHost is the host to connect to
 	// localhost
-	StoreTorrentHost Key = "store_torrent_host"
+	Host string `mapstructure:"host"`
 	// StoreTorrentPort is the port to connect to
 	// 3306|6379|443
-	StoreTorrentPort Key = "store_torrent_port"
-	// StoreTorrentDatabase is the database / schema name to open on the backing store
+	Port int `mapstructure:"port"`
+	// User user to connect with
+	// mika
+	User string `mapstructure:"user"`
+	// Password password to connect with
+	// mika
+	Password string `mapstructure:"password"`
+	// Database is the database / schema name to open on the backing store
 	// Redis uses numeric values 0-16 by default
 	// mika|0
-	StoreTorrentDatabase Key = "store_torrent_database"
-	// StoreTorrentUser user to connect with
-	// mika
-	StoreTorrentUser Key = "store_torrent_user"
-	// StoreTorrentPassword password to connect with
-	// mika
-	StoreTorrentPassword Key = "store_torrent_password"
-	// StoreTorrentProperties sets additional properties passed to the backing store configuration
-	StoreTorrentProperties Key = "store_torrent_properties"
-	// StoreTorrentCache enabled the in-memory cache
-	StoreTorrentCache Key = "store_torrent_cache"
-
-	// StoreUsersType sets the backing store type to be used for users
-	// memory|redis|postgres|mysql|http
-	StoreUsersType Key = "store_users_type"
-	// StoreUsersHost is the host to connect to
-	// localhost
-	StoreUsersHost Key = "store_users_host"
-	// StoreUsersPort is the port to connect to
-	// 3306|6379|443
-	StoreUsersPort Key = "store_users_port"
-	// StoreUsersDatabase is the database / schema name to open on the backing store
-	// Redis uses numeric values 0-16 by default
-	// mika|0
-	StoreUsersDatabase Key = "store_users_database"
-	// StoreUsersUser user to connect with
-	// mika
-	StoreUsersUser Key = "store_users_user"
-	// StoreUsersPassword password to connect with
-	// mika
-	StoreUsersPassword Key = "store_users_password"
-	// StoreUsersProperties sets additional properties passed to the backing store configuration
-	StoreUsersProperties Key = "store_users_properties"
-	// StoreUsersCache enabled the in-memory cache
-	StoreUsersCache Key = "store_users_cache"
-
-	// StorePeersType sets the backing store type to be used for peers
-	// memory|redis|postgres|mysql|http
-	StorePeersType Key = "store_peers_type"
-	// StorePeersHost is the host to connect to
-	// localhost
-	StorePeersHost Key = "store_peers_host"
-	// StorePeersPort is the port to connect to
-	// 3306|6379|443
-	StorePeersPort Key = "store_peers_port"
-	// StorePeersDatabase is the database / schema name to open on the backing store
-	// Redis uses numeric values 0-16 by default
-	// mika|0
-	StorePeersDatabase Key = "store_peers_database"
-	// StorePeersUser user to connect with
-	// mika
-	StorePeersUser Key = "store_peers_user"
-	// StorePeersPassword password to connect with
-	// mika
-	StorePeersPassword Key = "store_peers_password"
-	// StorePeersProperties sets additional store specific properties passed to the backing store configuration
-	StorePeersProperties Key = "store_peers_properties"
-	// StorePeersCache enabled the in-memory cache
-	StorePeersCache Key = "store_peers_cache"
-	// GeodbPath sets the path to use for downloading and loading the geo database. Relative to the binary's path.
-	// ./path/to/file.mmdb
-	GeodbPath Key = "geodb_path"
-	// GeodbAPIKey is the MaxMind.com API key used to download the database
-	// XXXXXXXXXXXXXXXX
-	GeodbAPIKey Key = "geodb_api_key"
-	// GeodbEnabled toggles use of the geo database
-	// true|false
-	GeodbEnabled Key = "geodb_enabled"
-)
-
-// StoreConfig provides a common config struct for backing stores
-type StoreConfig struct {
-	Type     string
-	Host     string
-	Port     int
-	Username string
-	Password string
-	Database string
+	Database string `mapstructure:"database"`
 	// Properties will append a string of query args to the DSN
 	// Format: arg1=foo&arg2=bar
-	Properties string
+	Properties string `mapstructure:"properties"`
+	// Cache enabled the in-memory cache
+	Cache bool `mapstructure:"cache"`
+}
+
+type geoDBConfig struct {
+	// GeodbPath sets the path to use for downloading and loading the geo database. Relative to the binary's path.
+	// ./path/to/file.mmdb
+	Path string `mapstructure:"path"`
+	// GeodbAPIKey is the MaxMind.com API key used to download the database
+	// XXXXXXXXXXXXXXXX
+	APIKey string `mapstructure:"api_key"`
+	// GeodbEnabled toggles use of the geo database
+	// true|false
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // DSN constructs a URI for database connection strings
@@ -201,69 +160,13 @@ func (c StoreConfig) DSN() string {
 		props = "?" + props
 	}
 	s := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s%s",
-		c.Username, c.Password, c.Host, c.Port, c.Database, props)
+		c.User, c.Password, c.Host, c.Port, c.Database, props)
 	u, err := url.Parse(s)
 	if err != nil {
 		log.Fatalf("Failed to construct valid database DSN: %s", err.Error())
 		return ""
 	}
 	return u.String()
-}
-
-// GetStoreConfig returns the config options for the store type provided
-func GetStoreConfig(storeType StoreType) *StoreConfig {
-	switch storeType {
-	case Users:
-		return &StoreConfig{
-			Type:       GetString(StoreUsersType),
-			Host:       GetString(StoreUsersHost),
-			Port:       GetInt(StoreUsersPort),
-			Username:   GetString(StoreUsersUser),
-			Password:   GetString(StoreUsersPassword),
-			Database:   GetString(StoreUsersDatabase),
-			Properties: GetString(StoreUsersProperties),
-		}
-	case Torrent:
-		return &StoreConfig{
-			Type:       GetString(StoreTorrentType),
-			Host:       GetString(StoreTorrentHost),
-			Port:       GetInt(StoreTorrentPort),
-			Username:   GetString(StoreTorrentUser),
-			Password:   GetString(StoreTorrentPassword),
-			Database:   GetString(StoreTorrentDatabase),
-			Properties: GetString(StoreTorrentProperties),
-		}
-	default:
-		return &StoreConfig{
-			Type:       GetString(StorePeersType),
-			Host:       GetString(StorePeersHost),
-			Port:       GetInt(StorePeersPort),
-			Username:   GetString(StorePeersUser),
-			Password:   GetString(StorePeersPassword),
-			Database:   GetString(StorePeersDatabase),
-			Properties: GetString(StorePeersProperties),
-		}
-	}
-}
-
-// GetString enforces use of our consts for config keys
-func GetString(key Key) string {
-	return viper.GetString(string(key))
-}
-
-// GetBool enforces use of our consts for config keys
-func GetBool(key Key) bool {
-	return viper.GetBool(string(key))
-}
-
-// GetBool enforces use of our consts for config keys
-func GetInt(key Key) int {
-	return viper.GetInt(string(key))
-}
-
-// GetDuration enforces use of our consts for config keys
-func GetDuration(key Key) time.Duration {
-	return viper.GetDuration(string(key))
 }
 
 // Read reads in config file and ENV variables if set.
@@ -280,20 +183,53 @@ func Read(cfgFile string) error {
 	} else if cfgFile != "" {
 		viper.SetConfigName(cfgFile)
 	}
-
+	setDuration := func(target *time.Duration, value string) error {
+		d, err := util.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+		*target = d
+		return nil
+	}
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		log.Debugf("Using config file: %s", viper.ConfigFileUsed())
-		level := GetString(GeneralLogLevel)
-		colour := GetBool(GeneralLogColour)
-		setupLogger(level, colour)
-		gin.SetMode(GetString(GeneralRunMode))
+		full := fullConfig{}
+		if err := viper.Unmarshal(&full); err != nil {
+			return errors.Wrapf(err, "Failed to parse config")
+		}
+		durations := []struct {
+			target *time.Duration
+			value  string
+		}{
+			{&full.Tracker.AnnounceIntervalMinimumParsed, full.Tracker.AnnounceIntervalMinimum},
+			{&full.Tracker.AnnounceIntervalParsed, full.Tracker.AnnounceInterval},
+			{&full.Tracker.BatchUpdateIntervalParsed, full.Tracker.BatchUpdateInterval},
+			{&full.Tracker.HNRThresholdParsed, full.Tracker.HNRThreshold},
+			{&full.Tracker.ReaperIntervalParsed, full.Tracker.ReaperInterval},
+		}
+		for _, dur := range durations {
+			if err := setDuration(dur.target, dur.value); err != nil {
+				return errors.Wrapf(err, "Failed to parse time duration")
+			}
+		}
+		if full.API.Key == "" {
+			return errors.New("api.key cannot be empty")
+		}
+		General = full.General
+		Tracker = full.Tracker
+		API = full.API
+		TorrentStore = full.Stores.Torrent
+		PeerStore = full.Stores.Peers
+		UserStore = full.Stores.Users
+
+		setupLogger(General.LogLevel, General.LogColour)
+		gin.SetMode(General.RunMode)
 		return nil
 	}
 	return consts.ErrInvalidConfig
-
 }
 
 func setupLogger(levelStr string, colour bool) {
@@ -309,55 +245,11 @@ func setupLogger(levelStr string, colour bool) {
 	log.SetLevel(level)
 }
 
+func Save() error {
+	return viper.WriteConfig()
+}
+
 func init() {
 	// Setup our defaults
-	viper.SetDefault(string(GeneralRunMode), "release")
-	viper.SetDefault(string(GeneralLogLevel), "info")
-	viper.SetDefault(string(GeneralLogColour), false)
-
-	viper.SetDefault(string(TrackerPublic), false)
-	viper.SetDefault(string(TrackerListen), "0.0.0.0:34000")
-	viper.SetDefault(string(TrackerTLS), false)
-	viper.SetDefault(string(TrackerIPv6), false)
-	viper.SetDefault(string(TrackerIPv6Only), false)
-	viper.SetDefault(string(TrackerReaperInterval), "300s")
-	viper.SetDefault(string(TrackerAnnounceInterval), "30s")
-	viper.SetDefault(string(TrackerAnnounceIntervalMin), "10s")
-	viper.SetDefault(string(TrackerHNRThreshold), "6h")
-	viper.SetDefault(string(TrackerBatchUpdateInterval), "30s")
-	viper.SetDefault(string(TrackerAllowNonRoutable), false)
-	viper.SetDefault(string(TrackerAllowClientIP), false)
-
-	viper.SetDefault(string(APIListen), "0.0.0.0:34001")
-	viper.SetDefault(string(APITLS), false)
-	viper.SetDefault(string(APIIPv6), false)
-	viper.SetDefault(string(APIIPv6Only), false)
-
-	viper.SetDefault(string(StoreTorrentType), "memory")
-	viper.SetDefault(string(StoreTorrentHost), "")
-	viper.SetDefault(string(StoreTorrentPort), "")
-	viper.SetDefault(string(StoreTorrentUser), "")
-	viper.SetDefault(string(StoreTorrentPassword), "")
-	viper.SetDefault(string(StoreTorrentDatabase), "")
-	viper.SetDefault(string(StoreTorrentProperties), "")
-
-	viper.SetDefault(string(StorePeersType), "memory")
-	viper.SetDefault(string(StorePeersHost), "")
-	viper.SetDefault(string(StorePeersPort), "")
-	viper.SetDefault(string(StorePeersUser), "")
-	viper.SetDefault(string(StorePeersPassword), "")
-	viper.SetDefault(string(StorePeersDatabase), "")
-	viper.SetDefault(string(StorePeersProperties), "")
-
-	viper.SetDefault(string(StoreUsersType), "memory")
-	viper.SetDefault(string(StoreUsersHost), "")
-	viper.SetDefault(string(StoreUsersPort), "")
-	viper.SetDefault(string(StoreUsersUser), "")
-	viper.SetDefault(string(StoreUsersPassword), "")
-	viper.SetDefault(string(StoreUsersDatabase), "")
-	viper.SetDefault(string(StoreUsersProperties), "")
-
-	viper.SetDefault(string(GeodbEnabled), false)
-	viper.SetDefault(string(GeodbAPIKey), "")
-	viper.SetDefault(string(GeodbPath), "./")
+	//viper.SetDefault(string(GeneralRunMode), "release")
 }

@@ -1,101 +1,78 @@
-# release/debug/test
-general_run_mode: debug
-general_log_level: debug
-general_log_colour: true
+general:
+  # release/debug/test
+  run_mode: release
+  log_level: warn
+  log_colour: false
 
-# Allow anyone to participate in swarms. This disables passkey support.
-tracker_public: false
-# Port and optionally ip to listen on
-tracker_listen: ":34000"
-# Enable TLS for the tracker port
-tracker_tls: false
-# Enable IPv6 for the tracker
-tracker_ipv6: false
-# Do not allow ipv4 addresses to connect
-tracker_ipv6_only: false
-# How often to prune old peers that did not send a stopped event
-tracker_reaper_interval: 90s
-# Base announce interval
-tracker_announce_interval: 30s
-# Minimum announce interval that a client can request
-tracker_announce_interval_minimum: 10s
-tracker_hnr_threshold: 1d
-# How often to update stat counters for peers/torrents/users
-tracker_batch_update_interval: 30s
-# Allow any torrent/info_hash to be tracked
-tracker_auto_register: false
-# Allow non-routable (LAN/localhost) IP addresses
-tracker_allow_non_routable: false
-# Allow the use of client supplied IP addresses. Beware this can open up the
-# possibility of a form of DDOS attack against the client supplied IP
-tracker_allow_client_ip: false
+tracker:
+  # Allow anyone to participate in swarms. This disables passkey support.
+  public: false
+  listen: "0.0.0.0:34000"
+  tls: false
+  ipv6: false
+  ipv6_only: false
+  auto_register: true
+  reaper_interval: 90s
+  announce_interval: 30s
+  announce_interval_minimum: 10s
+  hnr_threshold: 1d
+  batch_update_interval: 30s
+  allow_non_routable: false
+  # Do we allow the use of client supplied IP addresses
+  allow_client_ip: false
+  max_peers: 60
 
-# API configuration
-#
-# Port and optionally host to listen on
-api_listen: ":34001"
-# Use TLS for the port
-api_tls: false
-# Listen on IPv6
-api_ipv6: false
-# Enforce IPv6 listener only
-api_ipv6_only: false
-# Key to control the system over the API
-api_key:
+api:
+  listen: ":34001"
+  tls: false
+  ipv6: false
+  ipv6_only: false
+  key:
 
-# Torrent driver
-#
-# Backend storage driver. One of: memory, mysql, postgres, redis
-store_torrent_type: mysql
-# Store host, if any
-store_torrent_host: 127.0.0.1
-# Store port, if any
-store_torrent_port: 3306
-# Storage driver username, if any
-store_torrent_user: mika
-# Password for the storage driver
-store_torrent_password: mika
-# Database to use, if any
-# For redis, the dbname should be the numeric database value
-store_torrent_database: mika
-# Additional properties to pass to the storage driver, if any
-# For mysql this should be: parseTime=true
-store_torrent_properties: parseTime=true
-# Enable the caching layer for the storage driver
-# This is automatically ignored for memory storage drivers
-store_torrent_cache: true
+stores:
+  # Stores can reference each other if using the same configurations
+  # Uncomment the section and remove the *reference value if you want to
+  # set a custom config for the store explicitly
+  #
+  # MySQL/MariaDB properties should contain parseTime=true
+  torrent: &torrent_store
+    # storage backend used. Once of: memory, mysql, postgres, redis
+    type: mysql
+    host: localhost
+    port: 3306
+    # For redis, the dbname should be the numeric db value and should differ from the redis cache db value
+    user: mika
+    password: mika
+    database: mika
+    properties: parseTime=true
+    cache: true
+  # Live peer cache backend storage config
+  peers: *torrent_store
+  # peers:
+  #   type: mysql
+  #   host: localhost
+  #   port: 3306
+  #   user: leigh
+  #   password: mika
+  #   database: mika
+  #   properties: parseTime=true
+  #   max_idle: 500
+  #   cache: true
+  # User backend storage config
+  users: *torrent_store
+  # users:
+  #   type: mysql
+  #   host: localhost2
+  #   port: 3306
+  #   user: leigh
+  #   password: orville
+  #   database: united
+  #   properties: parseTime=true
+  #   max_idle: 500
+  #   cache: true
 
-# Peer driver
-#
-# All valid options are the same as the torrent store above
-store_peers_type: memory
-store_peers_host:
-store_peers_port:
-store_peers_user:
-store_peers_password:
-store_peers_database:
-store_peers_properties:
-store_peers_max_idle: 500
-store_peers_cache: true
-
-# User driver
-#
-# All valid options are the same as the torrent store above
-store_users_type: mysql
-store_users_host: 127.0.0.1
-store_users_port: 3306
-store_users_user: mika
-store_users_password: mika
-store_users_database: mika
-store_users_properties: parseTime=true
-store_users_max_idle: 500
-store_users_cache: true
-
-# Geo location lookups for peers
-# Visit https://www.ip2location.com/ and sign up to get a license key
-# Path to store the downloaded database files
-geodb_path: "geo_data"
-# IP2Location.com API Key
-geodb_api_key:
-# Enable the feature.
-geodb_enabled: false
+geodb:
+  # Visit https://www.ip2location.com/ and sign up to get a license key
+  path: "geo_data"
+  api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  enabled: false

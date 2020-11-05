@@ -419,7 +419,7 @@ var (
 	connectionsMu *sync.RWMutex
 )
 
-func getOrCreateConn(cfg *config.StoreConfig) (*sqlx.DB, error) {
+func getOrCreateConn(cfg config.StoreConfig) (*sqlx.DB, error) {
 	connectionsMu.Lock()
 	defer connectionsMu.Unlock()
 	existing, found := connections[cfg.Host]
@@ -440,12 +440,8 @@ func getOrCreateConn(cfg *config.StoreConfig) (*sqlx.DB, error) {
 type userDriver struct{}
 
 // New creates a new mysql backed user store.
-func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	db, err := getOrCreateConn(c)
+func (ud userDriver) New(cfg config.StoreConfig) (store.UserStore, error) {
+	db, err := getOrCreateConn(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -455,12 +451,8 @@ func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the mysql backing store
-func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	db, err := getOrCreateConn(c)
+func (td torrentDriver) New(cfg config.StoreConfig) (store.TorrentStore, error) {
+	db, err := getOrCreateConn(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -470,12 +462,8 @@ func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 type peerDriver struct{}
 
 // New returns a mysql backed store.PeerStore driver
-func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	db, err := getOrCreateConn(c)
+func (pd peerDriver) New(cfg config.StoreConfig) (store.PeerStore, error) {
+	db, err := getOrCreateConn(cfg)
 	if err != nil {
 		return nil, err
 	}

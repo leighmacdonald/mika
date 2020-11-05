@@ -561,12 +561,8 @@ func (ps PeerStore) Close() error {
 type userDriver struct{}
 
 // New creates a new postgres backed user store.
-func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	db, err := pgx.Connect(context.Background(), c.DSN())
+func (ud userDriver) New(cfg config.StoreConfig) (store.UserStore, error) {
+	db, err := pgx.Connect(context.Background(), cfg.DSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres user store")
 	}
@@ -576,12 +572,8 @@ func (ud userDriver) New(cfg interface{}) (store.UserStore, error) {
 type peerDriver struct{}
 
 // New returns a postgres backed store.PeerStore driver
-func (pd peerDriver) New(cfg interface{}) (store.PeerStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	db, err := pgx.Connect(context.Background(), c.DSN())
+func (pd peerDriver) New(cfg config.StoreConfig) (store.PeerStore, error) {
+	db, err := pgx.Connect(context.Background(), cfg.DSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres peer store")
 	}
@@ -606,12 +598,8 @@ func NewTorrentStore(db *pgx.Conn) *TorrentStore {
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the postgres backing store
-func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
-	c, ok := cfg.(*config.StoreConfig)
-	if !ok {
-		return nil, consts.ErrInvalidConfig
-	}
-	db, err := pgx.Connect(context.Background(), c.DSN())
+func (td torrentDriver) New(cfg config.StoreConfig) (store.TorrentStore, error) {
+	db, err := pgx.Connect(context.Background(), cfg.DSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres torrent store")
 	}
@@ -620,7 +608,7 @@ func (td torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
 
 func makeDSN(c *config.StoreConfig) string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s%s",
-		c.Username, c.Password, c.Host, c.Port, c.Database, c.Properties)
+		c.User, c.Password, c.Host, c.Port, c.Database, c.Properties)
 }
 
 func init() {

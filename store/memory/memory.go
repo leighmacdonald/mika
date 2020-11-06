@@ -4,6 +4,8 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/pkg/errors"
+	"strings"
 	"sync"
 )
 
@@ -275,6 +277,70 @@ func (pd peerDriver) New(_ config.StoreConfig) (store.PeerStore, error) {
 type UserStore struct {
 	sync.RWMutex
 	users map[string]store.User
+	roles []store.Role
+}
+
+func (u *UserStore) RoleAdd(role store.Role) error {
+	u.Lock()
+	defer u.Unlock()
+	maxID := 0
+	for _, r := range u.roles {
+		if r.RoleID > maxID {
+			maxID = r.RoleID
+		}
+	}
+	for _, r := range u.roles {
+		if strings.ToLower(r.RoleName) == strings.ToLower(role.RoleName) {
+			return errors.Errorf("duplicate role_name: %s", role.RoleName)
+		}
+		if r.RoleID == role.RoleID {
+			return errors.Errorf("duplicate role_Id: %d", r.RoleID)
+		}
+	}
+	role.RoleID = maxID + 1
+	u.roles = append(u.roles, role)
+	return nil
+}
+
+func (u *UserStore) RoleDelete(roleID int) error {
+	conflicts := 0
+	for _, u := range u.users {
+		found := false
+		count := len(u.Roles)
+		for _, r := range u.Roles {
+			if r.RoleID == roleID {
+				found = true
+				break
+			}
+		}
+		if found && count == 1 {
+			conflicts++
+		}
+	}
+	if conflicts > 0 {
+		return errors.Errorf("Found %d users with only a single role, cannot remove only role", conflicts)
+	}
+	for _, user := range u.users {
+		if err := user.RemoveRole(roleID); err != nil {
+			return errors.Wrapf(err, "Failed to remove role")
+		}
+	}
+	found := false
+	for i := len(u.roles) - 1; i >= 0; i-- {
+		if u.roles[i].RoleID == roleID {
+			u.roles = append(u.roles[:i], u.roles[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		return errors.New("Unknown role_id")
+	}
+	return nil
+}
+
+func (u *UserStore) Roles() (store.Roles, error) {
+	return u.roles, nil
 }
 
 func (u *UserStore) Name() string {

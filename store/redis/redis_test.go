@@ -12,23 +12,23 @@ import (
 )
 
 func TestRedisTorrentStore(t *testing.T) {
-	ts, e := store.NewTorrentStore("redis", config.GetStoreConfig(config.Torrent))
+	ts, e := store.NewTorrentStore(config.TorrentStore)
 	require.NoError(t, e, e)
 	store.TestTorrentStore(t, ts)
 }
 
 func TestRedisUserStore(t *testing.T) {
-	us, e := store.NewUserStore("redis", config.GetStoreConfig(config.Users))
+	us, e := store.NewUserStore(config.UserStore)
 	require.NoError(t, e, e)
 	store.TestUserStore(t, us)
 }
 
 func TestRedisPeerStore(t *testing.T) {
-	client := redis.NewClient(newRedisConfig(config.GetStoreConfig(config.Torrent)))
+	client := redis.NewClient(newRedisConfig(config.PeerStore))
 	setupDB(t, client)
-	ts, err := store.NewTorrentStore("redis", config.GetStoreConfig(config.Torrent))
+	ts, err := store.NewTorrentStore(config.TorrentStore)
 	require.NoError(t, err)
-	ps, err := store.NewPeerStore("redis", config.GetStoreConfig(config.Peers))
+	ps, err := store.NewPeerStore(config.PeerStore)
 	require.NoError(t, err, err)
 	store.TestPeerStore(t, ps, ts, memory.NewUserStore())
 }
@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 		return
 	}
-	if config.GetString(config.GeneralRunMode) != "test" {
+	if config.General.RunMode != "test" {
 		log.Info("Skipping database tests, not running in testing mode")
 		os.Exit(0)
 		return

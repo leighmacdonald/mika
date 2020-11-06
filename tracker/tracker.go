@@ -9,6 +9,7 @@ import (
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
 	"github.com/leighmacdonald/mika/util"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sync/atomic"
 	"time"
@@ -91,24 +92,21 @@ type Opts struct {
 // stores and default interval values
 func NewDefaultOpts() *Opts {
 	return &Opts{
-		Torrents:            memory.NewTorrentStore(),
-		Peers:               memory.NewPeerStore(),
-		Users:               memory.NewUserStore(),
-		UserCacheEnabled:    false,
-		TorrentCacheEnabled: false,
-		PeerCacheEnabled:    false,
-		Geodb:               &geo.DummyProvider{},
-		GeodbEnabled:        false,
-		Public:              false,
-		AutoRegister:        false,
-		AllowNonRoutable:    false,
-		AllowClientIP:       false,
-		IPv6Only:            false,
-		ReaperInterval:      time.Second * 300,
-		AnnInterval:         time.Second * 60,
-		AnnIntervalMin:      time.Second * 30,
-		BatchInterval:       time.Second * 60,
-		MaxPeers:            100,
+		Torrents:         memory.NewTorrentStore(),
+		Peers:            memory.NewPeerStore(),
+		Users:            memory.NewUserStore(),
+		Geodb:            &geo.DummyProvider{},
+		GeodbEnabled:     false,
+		Public:           false,
+		AutoRegister:     false,
+		AllowNonRoutable: false,
+		AllowClientIP:    false,
+		IPv6Only:         false,
+		ReaperInterval:   time.Second * 300,
+		AnnInterval:      time.Second * 60,
+		AnnIntervalMin:   time.Second * 30,
+		BatchInterval:    time.Second * 60,
+		MaxPeers:         100,
 	}
 }
 
@@ -276,32 +274,16 @@ func New(ctx context.Context, opts *Opts) (*Tracker, error) {
 		StateUpdateChan:  make(chan store.UpdateState, 1000),
 		Whitelist:        make(map[string]store.WhiteListClient),
 		WhitelistMu:      &sync.RWMutex{},
+		TorrentsCache:    store.NewTorrentCache(),
+		UsersCache:       store.NewUserCache(),
+		PeerCache:        store.NewPeerCache(),
 	}
-	// Don't enable caching if we are already configured for a memory store.
-	if opts.TorrentCacheEnabled {
-		switch t.torrents.(type) {
-		case *memory.TorrentStore:
-			log.Warnf("Not enabling cache for in-memory torrent store, already in-memory")
-		default:
-			t.TorrentsCache = store.NewTorrentCache()
-		}
+	// Load known roles into memory
+	roles, err := t.users.Roles()
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to load roles")
 	}
-	if opts.UserCacheEnabled {
-		switch t.users.(type) {
-		case *memory.UserStore:
-			log.Warnf("Not enabling cache for in-memory user store, already in-memory.")
-		default:
-			t.UsersCache = store.NewUserCache()
-		}
-	}
-	if opts.PeerCacheEnabled {
-		switch t.peers.(type) {
-		case *memory.PeerStore:
-			log.Warnf("Not enabling cache for in-memory peer store, already in-memory.")
-		default:
-			t.PeerCache = store.NewPeerCache()
-		}
-	}
+	t.UsersCache.SetRoles(roles)
 	return t, nil
 }
 

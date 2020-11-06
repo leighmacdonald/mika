@@ -248,8 +248,3 @@ func setupLogger(levelStr string, colour bool) {
 func Save() error {
 	return viper.WriteConfig()
 }
-
-func init() {
-	// Setup our defaults
-	//viper.SetDefault(string(GeneralRunMode), "release")
-}

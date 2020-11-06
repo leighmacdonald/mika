@@ -9,6 +9,7 @@ import (
 type UserCache struct {
 	*sync.RWMutex
 	users map[string]User
+	roles Roles
 }
 
 // TorrentCache is a simple (dumb) in-memory cache for torrent items
@@ -93,6 +94,12 @@ func (cache *TorrentCache) Get(torrent *Torrent, hash InfoHash) bool {
 	}
 	*torrent = t
 	return true
+}
+
+func (cache *UserCache) SetRoles(roles Roles) {
+	cache.Lock()
+	cache.roles = roles
+	cache.Unlock()
 }
 
 func (cache *UserCache) Set(user User) {

@@ -15,8 +15,7 @@ import (
 )
 
 func TestTorrentDriver(t *testing.T) {
-	c := config.GetStoreConfig(config.Torrent)
-	db, err := pgx.Connect(context.Background(), makeDSN(c))
+	db, err := pgx.Connect(context.Background(), makeDSN(config.TorrentStore))
 	if err != nil {
 		t.Skipf("failed to connect to postgres torrent store: %s", err.Error())
 		return
@@ -26,7 +25,7 @@ func TestTorrentDriver(t *testing.T) {
 }
 
 func TestUserDriver(t *testing.T) {
-	db, err := pgx.Connect(context.Background(), makeDSN(config.GetStoreConfig(config.Users)))
+	db, err := pgx.Connect(context.Background(), makeDSN(config.UserStore))
 	if err != nil {
 		t.Skipf("failed to connect to postgres user store: %s", err.Error())
 		return
@@ -39,7 +38,7 @@ func TestUserDriver(t *testing.T) {
 }
 
 func TestPeerDriver(t *testing.T) {
-	db, err := pgx.Connect(context.Background(), makeDSN(config.GetStoreConfig(config.Peers)))
+	db, err := pgx.Connect(context.Background(), makeDSN(config.PeerStore))
 	if err != nil {
 		t.Skipf("failed to connect to postgres user store: %s", err.Error())
 		return
@@ -79,7 +78,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 		return
 	}
-	if config.GetString(config.GeneralRunMode) != "test" {
+	if config.General.RunMode != "test" {
 		log.Info("Skipping database tests, not running in testing mode")
 		os.Exit(0)
 		return

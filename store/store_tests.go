@@ -180,9 +180,57 @@ func TestTorrentStore(t *testing.T, ts TorrentStore) {
 
 // TestUserStore tests the user store for conformance to our interface
 func TestUserStore(t *testing.T, s UserStore) {
+	roles := Roles{
+		{
+			RoleName:        "Admin",
+			Priority:        1,
+			MultiUp:         1.0,
+			MultiDown:       1.0,
+			DownloadEnabled: true,
+			UploadEnabled:   true,
+		},
+		{
+			RoleName:        "Moderator",
+			Priority:        5,
+			MultiUp:         1.0,
+			MultiDown:       1.0,
+			DownloadEnabled: true,
+			UploadEnabled:   true,
+		},
+		{
+			RoleName:        "Member",
+			Priority:        15,
+			MultiUp:         1.0,
+			MultiDown:       1.0,
+			DownloadEnabled: true,
+			UploadEnabled:   true,
+		},
+		{
+			RoleName:        "Master",
+			Priority:        10,
+			MultiUp:         1.1,
+			MultiDown:       1.0,
+			DownloadEnabled: true,
+			UploadEnabled:   true,
+		},
+	}
+	for _, role := range roles {
+		require.NoError(t, s.RoleAdd(role), "Failed to add role")
+	}
+	fetchedRoles, err := s.Roles()
+	require.NoError(t, err, "failed to fetch roles")
+	require.Equal(t, len(roles), len(fetchedRoles))
+
+	require.NoError(t, s.RoleDelete(fetchedRoles[3].RoleID))
+	fetchedRolesDeleted, err := s.Roles()
+	require.NoError(t, err, "failed to fetch roles")
+	require.Equal(t, len(roles)-1, len(fetchedRolesDeleted))
+
 	var users []User
-	for i := 0; i < 5; i++ {
-		users = append(users, GenerateTestUser())
+	for i := 0; i < 3; i++ {
+		usr := GenerateTestUser()
+		usr.Roles = append(usr.Roles, fetchedRolesDeleted[i])
+		users = append(users, usr)
 	}
 	if users == nil {
 		t.Fatalf("[%s] Failed to setup users", s.Name())
@@ -192,6 +240,11 @@ func TestUserStore(t *testing.T, s UserStore) {
 	var fetchedUserPasskey User
 	require.NoError(t, s.GetByID(&fetchedUserID, users[0].UserID))
 	require.Equal(t, users[0], fetchedUserID)
+	var fetchUserWithRoles User
+	err = s.GetByID(&fetchUserWithRoles, users[0].UserID)
+	require.NoError(t, err)
+
+	require.True(t, len(fetchUserWithRoles.Roles) > 0)
 	require.NoError(t, s.GetByPasskey(&fetchedUserPasskey, users[0].Passkey))
 	require.Equal(t, users[0], fetchedUserPasskey)
 

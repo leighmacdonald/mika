@@ -29,13 +29,13 @@ func TestLatLong(t *testing.T) {
 }
 
 func isSkipped() bool {
-	return config.GetString(config.GeodbAPIKey) == "" || !util.Exists(filepath.Join(config.GetString(config.GeodbPath), geoDatabaseLocationFile))
+	return config.GeoDB.APIKey == "" || !util.Exists(filepath.Join(config.GeoDB.Path, geoDatabaseLocationFile))
 }
 func TestGetLocation(t *testing.T) {
 	if isSkipped() {
 		t.SkipNow()
 	}
-	db, err := New(config.GetString(config.GeodbPath))
+	db, err := New(config.GeoDB.Path)
 	require.NoError(t, err, "Failed to open database")
 	defer func() { db.Close() }()
 	ip4 := db.GetLocation(net.ParseIP("45.136.241.10"))
@@ -57,7 +57,7 @@ func TestDistance(t *testing.T) {
 	if isSkipped() {
 		t.SkipNow()
 	}
-	fp := util.FindFile(config.GetString(config.GeodbPath))
+	fp := util.FindFile(config.GeoDB.Path)
 	if !util.Exists(fp) {
 		t.Skipf("Invalid geodb directory")
 	}
@@ -72,7 +72,7 @@ func TestDistance(t *testing.T) {
 }
 
 func BenchmarkDistance(t *testing.B) {
-	db, _ := New(config.GetString(config.GeodbPath))
+	db, _ := New(config.GeoDB.Path)
 	defer func() { db.Close() }()
 	a := LatLong{38.000000, -97.000000}
 	b := LatLong{37.000000, -98.000000}
@@ -82,11 +82,11 @@ func BenchmarkDistance(t *testing.B) {
 }
 
 func TestDownloadDB(t *testing.T) {
-	key := config.GetString(config.GeodbAPIKey)
+	key := config.GeoDB.APIKey
 	if key == "" {
 		t.SkipNow()
 	}
-	p := util.FindFile(config.GetString(config.GeodbPath))
+	p := util.FindFile(config.GeoDB.Path)
 	for _, fp := range []string{geoDatabaseLocationFile, geoDatabaseASNFile4, geoDatabaseASNFile6} {
 		fullPath := filepath.Join(p, fp)
 		if util.Exists(fullPath) {

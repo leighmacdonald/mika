@@ -24,6 +24,18 @@ type UserStore struct {
 	ctx context.Context
 }
 
+func (us UserStore) Roles() (store.Roles, error) {
+	panic("implement me")
+}
+
+func (us UserStore) RoleAdd(role store.Role) error {
+	panic("implement me")
+}
+
+func (us UserStore) RoleDelete(roleID int) error {
+	panic("implement me")
+}
+
 func (us UserStore) Name() string {
 	return driverName
 }
@@ -606,7 +618,7 @@ func (td torrentDriver) New(cfg config.StoreConfig) (store.TorrentStore, error) 
 	return NewTorrentStore(db), nil
 }
 
-func makeDSN(c *config.StoreConfig) string {
+func makeDSN(c config.StoreConfig) string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s%s",
 		c.User, c.Password, c.Host, c.Port, c.Database, c.Properties)
 }

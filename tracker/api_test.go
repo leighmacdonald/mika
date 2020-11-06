@@ -162,15 +162,14 @@ func TestConfigUpdate(t *testing.T) {
 	}
 	tkr, handler := newTestAPI()
 	args := ConfigRequest{
-		UpdateKeys: []config.Key{
-			config.TrackerAnnounceInterval,
-			config.TrackerAnnounceIntervalMin,
-			config.TrackerReaperInterval,
-			config.TrackerBatchUpdateInterval,
-			config.TrackerMaxPeers,
-			config.TrackerAutoRegister,
-			config.TrackerAllowNonRoutable,
-			config.GeodbEnabled,
+		UpdateKeys: []string{
+			"tracker_announce_interval",
+			"tracker_announce_interval_minimum",
+			"tracker_reaper_interval",
+			"tracker_batch_update_interval",
+			"tracker_max_peers",
+			"tracker_auto_register",
+			"tracker_allow_non_routable",
 		},
 		TrackerAnnounceInterval:    60,
 		TrackerAnnounceIntervalMin: 30,
@@ -179,7 +178,6 @@ func TestConfigUpdate(t *testing.T) {
 		TrackerMaxPeers:            100,
 		TrackerAutoRegister:        true,
 		TrackerAllowNonRoutable:    true,
-		GeodbEnabled:               true,
 	}
 	w := performRequest(handler, "PATCH", "/config", args, nil)
 	require.Equal(t, 200, w.Code)

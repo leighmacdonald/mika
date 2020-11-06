@@ -12,7 +12,9 @@ have limits attached to them.
 - Separate build env for docker img
 - Get client info from header
 - Statistical event logging, prometheus/influx/etc?
-
+- Roles
+    - API for adding/deleting user roles
+    
 ## Maybe
 - Clustering support
 - [BEP0024 Tracker Returns External IP](http://bittorrent.org/beps/bep_0024.html)
@@ -20,3 +22,5 @@ have limits attached to them.
 - Connectivity check. Test the connectivity (NAT-Traversal) for a user the first time their IP:Port is
 announced. If failed, dont send peers.
 - GZip support? (likely actually increases overall size of responses except for some edge cases)
+
+

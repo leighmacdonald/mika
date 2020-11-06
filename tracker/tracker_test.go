@@ -162,6 +162,15 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 
 	tkr, err := NewTestTracker()
 	require.NoError(t, err, "Failed to init tracker")
+	// Whitelist our random peerids
+	tkr.Whitelist[string(leecher0.PeerID[0:8])] = store.WhiteListClient{
+		ClientPrefix: string(leecher0.PeerID[0:8]),
+		ClientName:   "Test-Leecher",
+	}
+	tkr.Whitelist[string(seeder0.PeerID[0:8])] = store.WhiteListClient{
+		ClientPrefix: string(seeder0.PeerID[0:8]),
+		ClientName:   "Test-Seeder",
+	}
 	time.Sleep(time.Millisecond * 200)
 	go tkr.StatWorker()
 	go tkr.PeerReaper()

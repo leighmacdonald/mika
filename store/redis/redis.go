@@ -58,6 +58,18 @@ type UserStore struct {
 	client *redis.Client
 }
 
+func (us UserStore) Roles() (store.Roles, error) {
+	panic("implement me")
+}
+
+func (us UserStore) RoleAdd(role store.Role) error {
+	panic("implement me")
+}
+
+func (us UserStore) RoleDelete(roleID int) error {
+	panic("implement me")
+}
+
 func (us UserStore) Name() string {
 	return driverName
 }

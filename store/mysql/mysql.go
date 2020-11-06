@@ -34,6 +34,23 @@ type UserStore struct {
 	db *sqlx.DB
 }
 
+func (u *UserStore) RoleAdd(role store.Role) error {
+	panic("implement me")
+}
+
+func (u *UserStore) RoleDelete(roleID int) error {
+	panic("implement me")
+}
+
+func (u *UserStore) Roles() (store.Roles, error) {
+	const q = `CALL roles_get_all()`
+	var groups store.Roles
+	if err := u.db.Select(&groups, q); err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
 func (u *UserStore) Name() string {
 	return driverName
 }

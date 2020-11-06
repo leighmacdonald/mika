@@ -21,7 +21,7 @@ func TestStoreConfig_DSN(t *testing.T) {
 		Type:       "postgres",
 		Host:       "localhost",
 		Port:       5432,
-		Username:   "test",
+		User:       "test",
 		Password:   "pass",
 		Database:   "db",
 		Properties: "arg1=foo&arg2=bar",

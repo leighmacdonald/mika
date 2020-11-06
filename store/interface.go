@@ -81,6 +81,10 @@ type UserStore interface {
 	Delete(user User) error
 	// Update is used to change a known user
 	Update(user User, oldPasskey string) error
+	// Roles fetches all known groups
+	Roles() (Roles, error)
+	RoleAdd(role Role) error
+	RoleDelete(roleID int) error
 	// Close will cleanup and close the underlying storage driver if necessary
 	Close() error
 	// Sync batch updates the backing store with the new UserStats provided

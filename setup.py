@@ -167,3 +167,4 @@ if __name__ == "__main__":
         print("Command doesnt exist: {}".format(command_arg))
         exit(1)
     exit(commands[command_arg]())
+

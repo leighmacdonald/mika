@@ -1,7 +1,4 @@
-/* create schema mika collate utf8mb4_unicode_ci; */
-
-DROP TABLE IF EXISTS torrent;
-create table torrent
+CREATE TABLE torrent
 (
     info_hash        binary(20)                     not null,
     total_uploaded   bigint unsigned   default 0    not null,
@@ -16,10 +13,9 @@ create table torrent
     leechers         int               default 0    not null,
     announces        int               default 0    not null,
     constraint pk_torrent primary key (info_hash)
-);
+); -- STMT
 
-DROP TABLE IF EXISTS users;
-create table users
+CREATE TABLE users
 (
     user_id          int unsigned auto_increment primary key,
     passkey          varchar(40)               not null,
@@ -29,9 +25,8 @@ create table users
     uploaded         bigint unsigned default 0 not null,
     announces        int             default 0 not null,
     constraint user_passkey_uindex unique (passkey)
-);
+); -- STMT
 
-DROP TABLE IF EXISTS peers;
 create table peers
 (
     peer_id          binary(20)                not null,
@@ -59,54 +54,104 @@ create table peers
     agent            varchar(100)              not null,
     crypto_level     int unsigned    default 0 not null,
     constraint peers_pk primary key (info_hash, peer_id)
-);
+); -- STMT
 
-DROP TABLE IF EXISTS whitelist;
 create table whitelist
 (
     client_prefix char(8)     not null primary key,
     client_name   varchar(20) not null
-);
+); -- STMT
 
+create table roles
+(
+    role_id          integer unsigned auto_increment,
+    role_name        varchar(64)                 not null,
+    priority         integer                     not null,
+    multi_up         decimal(5, 2) default -1.00 not null,
+    multi_down       decimal(5, 2) default -1.00 not null,
+    download_enabled boolean       default true  not null,
+    upload_enabled   boolean       default true  not null,
+    created_on       timestamp                   not null default current_timestamp(),
+    updated_on       timestamp                   not null default current_timestamp(),
+    constraint roles_pk
+        primary key (role_id)
+); -- STMT
 
--- USERS
-DROP PROCEDURE IF EXISTS user_by_passkey;
+create unique index role_priority_uindex on roles (priority); -- STMT
+
+create unique index roles_role_name_uindex
+    on roles (role_name); -- STMT
+
+create table user_roles
+(
+    user_id    int unsigned not null,
+    role_id    int unsigned not null,
+    created_on timestamp    not null,
+    constraint user_roles_roles_role_id_fk
+        foreign key (role_id) references roles (role_id),
+    constraint user_roles_users_user_id_fk
+        foreign key (user_id) references users (user_id)
+); -- STMT
+
+create unique index user_roles_uindex
+    on user_roles (user_id, role_id); -- STMT
+
+create table user_multi
+(
+    user_id     int unsigned                              not null,
+    info_hash   binary(20)                                not null,
+    multi_up    decimal(5, 2) default -1                  not null,
+    multi_down  decimal(5, 2) default -1                  not null,
+    created_on  timestamp     default current_timestamp() not null,
+    updated_on  timestamp     default current_timestamp() not null,
+    valid_until timestamp                                 null,
+    constraint user_multi_user_id_fk
+        foreign key (user_id) references users (user_id)
+); -- STMT
+
+create unique index user_multi_uindex
+    on user_multi (user_id, info_hash); -- STMT
+
 CREATE PROCEDURE user_by_passkey(IN in_passkey varchar(40))
 BEGIN
-    SELECT user_id,
-           passkey,
-           download_enabled,
-           is_deleted,
-           downloaded,
-           uploaded,
-           announces
-    FROM users
-    WHERE passkey = in_passkey;
-end;
+    SELECT u.user_id,
+           u.passkey,
+           u.download_enabled,
+           u.is_deleted,
+           u.downloaded,
+           u.uploaded,
+           u.announces,
+           GROUP_CONCAT(ur.role_id) as roles_ids
+    FROM users u
+             LEFT JOIN user_roles ur on u.user_id = ur.user_id
+    WHERE u.passkey = in_passkey
+    GROUP BY u.user_id;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS `user_by_id`;
+
 CREATE PROCEDURE user_by_id(IN in_user_id int)
 BEGIN
-    SELECT user_id,
-           passkey,
-           download_enabled,
-           is_deleted,
-           downloaded,
-           uploaded,
-           announces
-    FROM users
-    WHERE user_id = in_user_id;
-end;
+    SELECT u.user_id,
+           u.passkey,
+           u.download_enabled,
+           u.is_deleted,
+           u.downloaded,
+           u.uploaded,
+           u.announces,
+           GROUP_CONCAT(ur.role_id) as roles_ids
+    FROM users u
+             LEFT JOIN user_roles ur on u.user_id = ur.user_id
+    WHERE u.user_id = in_user_id
+    GROUP BY u.user_id;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS user_delete;
 CREATE PROCEDURE user_delete(IN in_user_id int)
 BEGIN
-    DELETE
-    FROM users
-    WHERE user_id = in_user_id;
-end;
+    DELETE FROM user_roles WHERE user_id = in_user_id;
+    DELETE FROM users WHERE user_id = in_user_id;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS user_add;
+
 CREATE PROCEDURE user_add(IN in_user_id int,
                           IN in_passkey varchar(40),
                           IN in_download_enabled bool,
@@ -119,9 +164,8 @@ BEGIN
     (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces)
     VALUES (in_user_id, in_passkey, in_download_enabled, in_is_deleted,
             in_downloaded, in_uploaded, in_announces);
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS user_update;
 CREATE PROCEDURE user_update(IN in_user_id int,
                              IN in_passkey varchar(40),
                              IN in_download_enabled bool,
@@ -140,9 +184,9 @@ BEGIN
         uploaded         = in_uploaded,
         announces        = in_announces
     WHERE passkey = if(in_old_passkey = '', in_passkey, in_old_passkey);
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS user_update_stats;
+
 CREATE PROCEDURE user_update_stats(IN in_passkey varchar(40),
                                    IN in_announces bigint,
                                    IN in_uploaded bigint,
@@ -153,13 +197,8 @@ BEGIN
         uploaded   = (uploaded + in_uploaded),
         downloaded = (downloaded + in_downloaded)
     WHERE passkey = in_passkey;
-END;
+END; -- STMT
 
--- END USERS
-
--- TORRENTS
-
-DROP PROCEDURE IF EXISTS torrent_by_infohash;
 CREATE PROCEDURE torrent_by_infohash(IN in_info_hash binary(20),
                                      IN in_deleted bool)
 BEGIN
@@ -178,32 +217,29 @@ BEGIN
     FROM torrent
     WHERE info_hash = in_info_hash
       AND is_deleted = in_deleted;
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS torrent_delete;
 CREATE PROCEDURE torrent_delete(IN in_info_hash binary(20))
 BEGIN
     DELETE
     FROM torrent
     WHERE info_hash = in_info_hash;
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS torrent_disable;
+
 CREATE PROCEDURE torrent_disable(IN in_info_hash binary(20))
 BEGIN
     UPDATE torrent
     SET is_deleted = true
     WHERE info_hash = in_info_hash;
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS torrent_add;
 CREATE PROCEDURE torrent_add(IN in_info_hash binary(20))
 BEGIN
     INSERT INTO torrent (info_hash)
     VALUES (in_info_hash);
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS torrent_update_stats;
 CREATE PROCEDURE torrent_update_stats(IN in_info_hash binary(20),
                                       IN in_total_downloaded bigint unsigned,
                                       IN in_total_uploaded bigint unsigned,
@@ -221,35 +257,31 @@ BEGIN
         seeders          = in_seeders,
         leechers         = in_leechers
     WHERE info_hash = in_info_hash;
-END;
+END; -- STMT
 
-DROP PROCEDURE IF EXISTS whitelist_all;
+
 CREATE PROCEDURE whitelist_all()
 BEGIN
     SELECT *
     FROM whitelist;
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS whitelist_add;
 CREATE PROCEDURE whitelist_add(IN in_client_prefix char(5),
                                IN in_client_name varchar(255))
 BEGIN
     INSERT INTO whitelist (client_prefix, client_name)
     VALUES (in_client_prefix, in_client_name);
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS whitelist_delete_by_prefix;
+
 CREATE PROCEDURE whitelist_delete_by_prefix(IN in_client_prefix varchar(255))
 BEGIN
     DELETE
     FROM whitelist
     WHERE client_prefix = in_client_prefix;
-end;
+end; -- STMT
 
--- END TORRENTS
 
--- PEERS
-DROP PROCEDURE IF EXISTS peer_update_stats;
 CREATE PROCEDURE peer_update_stats(IN in_info_hash binary(20),
                                    IN in_peer_id binary(20),
                                    IN in_total_downloaded bigint unsigned,
@@ -274,17 +306,15 @@ BEGIN
 
     WHERE info_hash = in_info_hash
       AND peer_id = in_peer_id;
-END;
+END; -- STMT
 
-DROP PROCEDURE IF EXISTS peer_reap;
 CREATE PROCEDURE peer_reap(IN in_expiry_time datetime)
 BEGIN
     DELETE
     FROM peers
     WHERE announce_last <= in_expiry_time;
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS peer_add;
 CREATE PROCEDURE peer_add(IN in_info_hash binary(20),
                           IN in_peer_id binary(20),
                           IN in_user_id int,
@@ -324,9 +354,8 @@ BEGIN
             in_asn,
             in_as_name,
             in_crypto_level);
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS peer_delete;
 CREATE PROCEDURE peer_delete(IN in_info_hash binary(20),
                              IN in_peer_id binary(20))
 BEGIN
@@ -334,9 +363,8 @@ BEGIN
     FROM peers
     WHERE info_hash = in_info_hash
       AND peer_id = in_peer_id;
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS peer_get;
 CREATE PROCEDURE peer_get(IN in_info_hash binary(20), IN in_peer_id binary(20))
 BEGIN
     SELECT peer_id,
@@ -364,9 +392,8 @@ BEGIN
     FROM peers
     WHERE info_hash = in_info_hash
       AND peer_id = in_peer_id;
-end;
+end; -- STMT
 
-DROP PROCEDURE IF EXISTS peer_get_n;
 CREATE PROCEDURE peer_get_n(IN in_info_hash binary(20), IN in_limit int)
 BEGIN
     SELECT peer_id,
@@ -394,5 +421,4 @@ BEGIN
     FROM peers
     WHERE info_hash = in_info_hash
     LIMIT in_limit;
-end;
--- END PEERS
+end; -- STMT

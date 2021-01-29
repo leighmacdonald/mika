@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
@@ -118,10 +119,9 @@ func oops(ctx *gin.Context, errCode errCode) {
 // preFlightChecks ensures our user meets the requirements to make an authorized request
 // THis is used within the request handler itself and not as a middleware because of the
 // slightly higher cost of passing data in through the request context
-func (t *Tracker) preFlightChecks(usr *store.User, pk string, c *gin.Context) bool {
-
+func preFlightChecks(usr *store.User, pk string, c *gin.Context) bool {
 	// Check that the user is valid before parsing anything
-	if t.Public {
+	if config.Tracker.Public {
 		usr.UserID = 1
 		return true
 	} else {
@@ -129,7 +129,7 @@ func (t *Tracker) preFlightChecks(usr *store.User, pk string, c *gin.Context) bo
 			oops(c, msgInvalidAuth)
 			return false
 		}
-		if err := t.UserGet(usr, pk); err != nil {
+		if err := UserGet(usr, pk); err != nil {
 			log.Debugf("Got invalid passkey")
 			oops(c, msgInvalidAuth)
 			return false
@@ -185,12 +185,10 @@ func noRoute(c *gin.Context) {
 }
 
 // NewBitTorrentHandler configures a router to handle tracker announce/scrape requests
-func NewBitTorrentHandler(tkr *Tracker) *gin.Engine {
+func NewBitTorrentHandler() *gin.Engine {
 	r := newRouter()
 	r.Use(handleTrackerErrors)
-	h := BitTorrentHandler{
-		tracker: tkr,
-	}
+	h := BitTorrentHandler{}
 	r.GET("/announce", h.announce)
 	r.GET("/scrape", h.scrape)
 	r.GET("/announce/:passkey", h.announce)

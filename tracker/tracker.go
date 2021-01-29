@@ -2,14 +2,12 @@ package tracker
 
 import (
 	"context"
-	"fmt"
+	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/metrics"
 	"github.com/leighmacdonald/mika/store"
-	"github.com/leighmacdonald/mika/store/memory"
 	"github.com/leighmacdonald/mika/util"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sync/atomic"
 	"time"
@@ -19,9 +17,7 @@ import (
 	"sync"
 )
 
-// Tracker is the main application struct used to tie all the discreet components together
-type Tracker struct {
-	*sync.RWMutex
+var (
 	// ctx is the master context used in the tracker, children contexts must use
 	// this for their parent
 	ctx context.Context
@@ -35,98 +31,71 @@ type Tracker struct {
 	peers     store.PeerStore
 	PeerCache *store.PeerCache
 
-	Geodb geo.Provider
-	// GeodbEnabled will enable the lookup of location data for peers
-	GeodbEnabled bool
-	// Public if true means we dont require a passkey / authorized user
-	Public bool
-	// If Public is true, this will allow unknown info_hashes to be automatically tracked
-	AutoRegister     bool
-	AllowNonRoutable bool
-	AllowClientIP    bool
-	// ReaperInterval is how often we can for dead peers in swarms
-	ReaperInterval time.Duration
-	AnnInterval    time.Duration
-	AnnIntervalMin time.Duration
-	BatchInterval  time.Duration
-	IPv6Only       bool
-	// MaxPeers is the max number of peers we send in an announce
-	MaxPeers        int
+	geodb geo.Provider
+
 	StateUpdateChan chan store.UpdateState
-	// Whitelist and whitelist lock
-	Whitelist   map[string]store.WhiteListClient
-	WhitelistMu *sync.RWMutex
+	// whitelist and whitelist lock
+	whitelist   map[string]store.WhiteListClient
+	whitelistMu *sync.RWMutex
+)
+
+func init() {
+	StateUpdateChan = make(chan store.UpdateState, 1000)
+	whitelist = make(map[string]store.WhiteListClient)
+	whitelistMu = &sync.RWMutex{}
+	TorrentsCache = store.NewTorrentCache()
+	UsersCache = store.NewUserCache()
+	PeerCache = store.NewPeerCache()
 }
 
-// Opts is used to configure tracker instances
-type Opts struct {
-	Torrents            store.TorrentStore
-	Peers               store.PeerStore
-	Users               store.UserStore
-	TorrentCacheEnabled bool
-	UserCacheEnabled    bool
-	PeerCacheEnabled    bool
-	Geodb               geo.Provider
-	// GeodbEnabled will enable the lookup of location data for peers
-	// TODO the dummy provider is probably sufficient
-	GeodbEnabled bool
-	// Public if true means we dont require a passkey / authorized user
-	Public bool
-	// If Public is true, this will allow unknown info_hashes to be automatically tracked
-	AutoRegister     bool
-	AllowNonRoutable bool
-	AllowClientIP    bool
-	// Dont enable dual-stack replies in ipv6 mode
-	IPv6Only bool
-	// ReaperInterval is how often we can for dead peers in swarms
-	ReaperInterval time.Duration
-	AnnInterval    time.Duration
-	AnnIntervalMin time.Duration
-	// How often we sync batch updates to backing stores
-	BatchInterval time.Duration
-	// MaxPeers is the max number of peers we send in an announce
-	MaxPeers int
-}
-
-// NewDefaultOpts returns a new tracker configuration using in-memory
-// stores and default interval values
-func NewDefaultOpts() *Opts {
-	return &Opts{
-		Torrents:         memory.NewTorrentStore(),
-		Peers:            memory.NewPeerStore(),
-		Users:            memory.NewUserStore(),
-		Geodb:            &geo.DummyProvider{},
-		GeodbEnabled:     false,
-		Public:           false,
-		AutoRegister:     false,
-		AllowNonRoutable: false,
-		AllowClientIP:    false,
-		IPv6Only:         false,
-		ReaperInterval:   time.Second * 300,
-		AnnInterval:      time.Second * 60,
-		AnnIntervalMin:   time.Second * 30,
-		BatchInterval:    time.Second * 60,
-		MaxPeers:         100,
+func Init() {
+	ts, err := store.NewTorrentStore(config.TorrentStore)
+	if err != nil {
+		log.Fatalf("Failed to setup torrent store: %s", err)
 	}
+	ps, err2 := store.NewPeerStore(config.PeerStore)
+	if err2 != nil {
+		log.Fatalf("Failed to setup peer store: %s", err2)
+	}
+	us, err3 := store.NewUserStore(config.UserStore)
+	if err3 != nil {
+		log.Fatalf("Failed to setup user store: %s", err3)
+	}
+	torrents = ts
+	users = us
+	peers = ps
+
+	var newGeodb geo.Provider
+	if config.GeoDB.Enabled {
+		newGeodb, err = geo.New(config.GeoDB.Path)
+		if err != nil {
+			log.Fatalf("Could not validate geo database. You may need to run ./mika updategeo")
+		}
+	} else {
+		newGeodb = &geo.DummyProvider{}
+	}
+	geodb = newGeodb
+
+	_ = LoadWhitelist()
 }
 
 // PeerReaper will call the store.PeerStore.Reap() function periodically. This is
 // used to clean peers that have not announced in a while from the swarm.
-func (t *Tracker) PeerReaper() {
-	peerTimer := time.NewTimer(t.ReaperInterval)
+func PeerReaper() {
+	peerTimer := time.NewTimer(config.Tracker.ReaperIntervalParsed)
 	for {
 		select {
 		case <-peerTimer.C:
-			expired := t.peers.Reap()
-			if t.PeerCache != nil {
+			expired := peers.Reap()
+			if PeerCache != nil {
 				for _, ph := range expired {
-					t.PeerCache.Delete(ph.InfoHash(), ph.PeerID())
+					PeerCache.Delete(ph.InfoHash(), ph.PeerID())
 				}
 			}
 			// We use a timer here so that config updates for the interval get applied
 			// on the next tick
-			peerTimer.Reset(t.ReaperInterval)
-		case <-t.ctx.Done():
+			peerTimer.Reset(config.Tracker.ReaperIntervalParsed)
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -135,8 +104,8 @@ func (t *Tracker) PeerReaper() {
 // StatWorker handles summing up stats for users/peers/torrents to be sent to the
 // backing stores for long term storage.
 // No locking required for these data sets
-func (t *Tracker) StatWorker() {
-	syncTimer := time.NewTimer(t.BatchInterval)
+func StatWorker() {
+	syncTimer := time.NewTimer(config.Tracker.BatchUpdateIntervalParsed)
 	userBatch := make(map[string]store.UserStats)
 	peerBatch := make(map[store.PeerHash]store.PeerStats)
 	torrentBatch := make(map[store.InfoHash]store.TorrentStats)
@@ -164,19 +133,19 @@ func (t *Tracker) StatWorker() {
 			}
 			// Send current copies of data to stores
 			log.Debugf("Calling Sync() on %d users", len(userBatchCopy))
-			if err := t.UserSync(userBatchCopy); err != nil {
+			if err := UserSync(userBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
 			log.Debugf("Calling Sync() on %d peers", len(userBatchCopy))
-			if err := t.PeerSync(peerBatchCopy); err != nil {
+			if err := PeerSync(peerBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
 			log.Debugf("Calling Sync() on %d torrents", len(userBatchCopy))
-			if err := t.TorrentSync(torrentBatchCopy); err != nil {
+			if err := TorrentSync(torrentBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
-			syncTimer.Reset(t.BatchInterval)
-		case u := <-t.StateUpdateChan:
+			syncTimer.Reset(config.Tracker.BatchUpdateIntervalParsed)
+		case u := <-StateUpdateChan:
 			ub, found := userBatch[u.Passkey]
 			if !found {
 				ub = store.UserStats{}
@@ -193,7 +162,7 @@ func (t *Tracker) StatWorker() {
 			var torrent store.Torrent
 			// Keep deleted true so that we can record any buffered stat updates from
 			// the client even though we deleted/disabled the torrent itself.
-			if err := t.TorrentGet(&torrent, u.InfoHash, false); err != nil {
+			if err := TorrentGet(&torrent, u.InfoHash, false); err != nil {
 				log.Errorf("No torrent found in batch update")
 				continue
 			}
@@ -237,125 +206,89 @@ func (t *Tracker) StatWorker() {
 				} else {
 					tb.Leechers--
 				}
-				if err := t.peerDelete(u.InfoHash, u.PeerID); err != nil {
+				if err := peerDelete(u.InfoHash, u.PeerID); err != nil {
 					log.Errorf("Could not remove peer from swarm: %s", err.Error())
 				}
 			}
 			userBatch[u.Passkey] = ub
 			torrentBatch[u.InfoHash] = tb
 			peerBatch[pHash] = pb
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			log.Debugf("Batch context closed")
 			return
 		}
 	}
 }
 
-// New creates a new Tracker instance with configured backend stores
-func New(ctx context.Context, opts *Opts) (*Tracker, error) {
-	t := &Tracker{
-		RWMutex:          &sync.RWMutex{},
-		ctx:              ctx,
-		torrents:         opts.Torrents,
-		peers:            opts.Peers,
-		users:            opts.Users,
-		Geodb:            opts.Geodb,
-		GeodbEnabled:     opts.GeodbEnabled,
-		Public:           opts.Public,
-		AllowNonRoutable: opts.AllowNonRoutable,
-		AllowClientIP:    opts.AllowClientIP,
-		IPv6Only:         opts.IPv6Only,
-		AutoRegister:     opts.AutoRegister,
-		ReaperInterval:   opts.ReaperInterval,
-		AnnInterval:      opts.AnnInterval,
-		AnnIntervalMin:   opts.AnnIntervalMin,
-		BatchInterval:    opts.BatchInterval,
-		MaxPeers:         opts.MaxPeers,
-		StateUpdateChan:  make(chan store.UpdateState, 1000),
-		Whitelist:        make(map[string]store.WhiteListClient),
-		WhitelistMu:      &sync.RWMutex{},
-		TorrentsCache:    store.NewTorrentCache(),
-		UsersCache:       store.NewUserCache(),
-		PeerCache:        store.NewPeerCache(),
-	}
-	// Load known roles into memory
-	roles, err := t.users.Roles()
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to load roles")
-	}
-	t.UsersCache.SetRoles(roles)
-	return t, nil
-}
+//// NewTestTracker sets up a tracker with fake data for testing
+//// This shouldn't really exist here, but its currently needed by other packages so its exported
+//func NewTestTracker() (*Tracker, error) {
+//	ctx := context.Background()
+//	userCount := 10
+//	torrentCount := 100
+//	opts := NewDefaultOpts()
+//	opts.BatchInterval = time.Millisecond * 100
+//	opts.ReaperInterval = time.Second * 10
+//	opts.AnnInterval = time.Second * 10
+//	opts.AnnIntervalMin = time.Second * 5
+//	opts.AutoRegister = false
+//	opts.MaxPeers = 50
+//	opts.AllowNonRoutable = false
+//	opts.AllowClientIP = true
+//	tracker, err := New(ctx, opts)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if err := tracker.LoadWhitelist(); err != nil {
+//		return nil, err
+//	}
+//	for i := 0; i < userCount; i++ {
+//		usr := store.GenerateTestUser()
+//		usr.Passkey = fmt.Sprintf("1234567890123456789%d", i)
+//		if err := tracker.users.Add(usr); err != nil {
+//			return nil, err
+//		}
+//	}
+//	for i := 0; i < torrentCount; i++ {
+//		if err := tracker.torrents.Add(store.GenerateTestTorrent()); err != nil {
+//			log.Panicf("Error adding torrent: %s", err.Error())
+//		}
+//	}
+//	return tracker, nil
+//}
 
-// NewTestTracker sets up a tracker with fake data for testing
-// This shouldn't really exist here, but its currently needed by other packages so its exported
-func NewTestTracker() (*Tracker, error) {
-	ctx := context.Background()
-	userCount := 10
-	torrentCount := 100
-	opts := NewDefaultOpts()
-	opts.BatchInterval = time.Millisecond * 100
-	opts.ReaperInterval = time.Second * 10
-	opts.AnnInterval = time.Second * 10
-	opts.AnnIntervalMin = time.Second * 5
-	opts.AutoRegister = false
-	opts.MaxPeers = 50
-	opts.AllowNonRoutable = false
-	opts.AllowClientIP = true
-	tracker, err := New(ctx, opts)
-	if err != nil {
-		return nil, err
-	}
-	if err := tracker.LoadWhitelist(); err != nil {
-		return nil, err
-	}
-	for i := 0; i < userCount; i++ {
-		usr := store.GenerateTestUser()
-		usr.Passkey = fmt.Sprintf("1234567890123456789%d", i)
-		if err := tracker.users.Add(usr); err != nil {
-			return nil, err
-		}
-	}
-	for i := 0; i < torrentCount; i++ {
-		if err := tracker.torrents.Add(store.GenerateTestTorrent()); err != nil {
-			log.Panicf("Error adding torrent: %s", err.Error())
-		}
-	}
-	return tracker, nil
-}
-
-func (t *Tracker) ClientWhitelisted(peerID store.PeerID) bool {
-	t.WhitelistMu.RLock()
-	_, found := t.Whitelist[string(peerID[0:8])]
-	t.WhitelistMu.RUnlock()
+func ClientWhitelisted(peerID store.PeerID) bool {
+	whitelistMu.RLock()
+	_, found := whitelist[string(peerID[0:8])]
+	whitelistMu.RUnlock()
 	return found
 }
 
 // LoadWhitelist will read the client white list from the tracker store and
 // load it into memory for quick lookups.
-func (t *Tracker) LoadWhitelist() error {
-	whitelist := make(map[string]store.WhiteListClient)
-	wl, err4 := t.torrents.WhiteListGetAll()
+func LoadWhitelist() error {
+	newWhitelist := make(map[string]store.WhiteListClient)
+	wl, err4 := torrents.WhiteListGetAll()
 	if err4 != nil {
-		log.Warnf("Whitelist empty, all clients are allowed")
+		log.Warnf("whitelist empty, all clients are allowed")
 	} else {
 		for _, cw := range wl {
-			whitelist[cw.ClientPrefix] = cw
+			newWhitelist[cw.ClientPrefix] = cw
 		}
 	}
-	t.Lock()
-	t.Whitelist = whitelist
-	t.Unlock()
+	whitelistMu.Lock()
+	whitelist = newWhitelist
+	whitelistMu.Unlock()
 	return nil
 }
-func (t *Tracker) TorrentAdd(torrent store.Torrent) error {
-	return t.torrents.Add(torrent)
+func TorrentAdd(torrent store.Torrent) error {
+	return torrents.Add(torrent)
 }
 
-func (t *Tracker) TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+func TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {
 	cached := false
-	if t.TorrentsCache != nil {
-		cached = t.TorrentsCache.Get(torrent, hash)
+	if TorrentsCache != nil {
+		cached = TorrentsCache.Get(torrent, hash)
 		if cached {
 			if torrent.IsDeleted && !deletedOk {
 				return consts.ErrInvalidInfoHash
@@ -363,129 +296,129 @@ func (t *Tracker) TorrentGet(torrent *store.Torrent, hash store.InfoHash, delete
 			return nil
 		}
 	}
-	if err := t.torrents.Get(torrent, hash, deletedOk); err != nil {
+	if err := torrents.Get(torrent, hash, deletedOk); err != nil {
 		return err
 	}
-	if t.TorrentsCache != nil && !cached {
-		t.TorrentsCache.Set(*torrent)
+	if TorrentsCache != nil && !cached {
+		TorrentsCache.Set(*torrent)
 	}
 	return nil
 }
 
-func (t *Tracker) UserGet(user *store.User, passkey string) error {
+func UserGet(user *store.User, passkey string) error {
 	cached := false
-	if t.UsersCache != nil {
-		cached = t.UsersCache.Get(user, passkey)
+	if UsersCache != nil {
+		cached = UsersCache.Get(user, passkey)
 		if cached {
 			return nil
 		}
 	}
-	if err := t.users.GetByPasskey(user, passkey); err != nil {
+	if err := users.GetByPasskey(user, passkey); err != nil {
 		return err
 	}
-	if t.UsersCache != nil && !cached {
-		t.UsersCache.Set(*user)
+	if UsersCache != nil && !cached {
+		UsersCache.Set(*user)
 	}
 	return nil
 }
 
-func (t *Tracker) UserAdd(user store.User) error {
-	if err := t.users.Add(user); err != nil {
+func UserAdd(user store.User) error {
+	if err := users.Add(user); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Tracker) PeerGet(peer *store.Peer, infoHash store.InfoHash, peerID store.PeerID) error {
-	if t.PeerCache != nil && t.PeerCache.Get(peer, infoHash, peerID) {
+func PeerGet(peer *store.Peer, infoHash store.InfoHash, peerID store.PeerID) error {
+	if PeerCache != nil && PeerCache.Get(peer, infoHash, peerID) {
 		return nil
 	}
-	if err := t.peers.Get(peer, infoHash, peerID); err != nil {
+	if err := peers.Get(peer, infoHash, peerID); err != nil {
 		return err
 	}
-	if t.PeerCache != nil {
-		t.PeerCache.Set(infoHash, *peer)
+	if PeerCache != nil {
+		PeerCache.Set(infoHash, *peer)
 	}
 	return nil
 }
 
-func (t *Tracker) PeerGetN(infoHash store.InfoHash, max int) (store.Swarm, error) {
-	swarm, err := t.peers.GetN(infoHash, max)
+func PeerGetN(infoHash store.InfoHash, max int) (store.Swarm, error) {
+	swarm, err := peers.GetN(infoHash, max)
 	if err != nil {
 		return store.Swarm{}, err
 	}
 	return swarm, nil
 }
 
-func (t *Tracker) PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
-	if err := t.peers.Add(infoHash, peer); err != nil {
+func PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
+	if err := peers.Add(infoHash, peer); err != nil {
 		return err
 	}
-	if t.PeerCache != nil {
-		t.PeerCache.Set(infoHash, peer)
+	if PeerCache != nil {
+		PeerCache.Set(infoHash, peer)
 		atomic.AddInt64(&metrics.PeersTotalCached, 1)
 	}
 	return nil
 }
-func (t *Tracker) peerDelete(infoHash store.InfoHash, peerID store.PeerID) error {
-	t.PeerCache.Delete(infoHash, peerID)
-	return t.peers.Delete(infoHash, peerID)
+func peerDelete(infoHash store.InfoHash, peerID store.PeerID) error {
+	PeerCache.Delete(infoHash, peerID)
+	return peers.Delete(infoHash, peerID)
 }
 
-func (t *Tracker) UserSync(batch map[string]store.UserStats) error {
-	if err := t.users.Sync(batch); err != nil {
+func UserSync(batch map[string]store.UserStats) error {
+	if err := users.Sync(batch); err != nil {
 		return err
 	}
-	if t.UsersCache != nil {
+	if UsersCache != nil {
 		var usr store.User
 		for passkey, stats := range batch {
-			if t.UsersCache.Get(&usr, passkey) {
+			if UsersCache.Get(&usr, passkey) {
 				usr.Downloaded += stats.Downloaded
 				usr.Uploaded += stats.Uploaded
 				usr.Announces += stats.Announces
-				t.UsersCache.Set(usr)
+				UsersCache.Set(usr)
 			}
 		}
 	}
 	return nil
 }
 
-func (t *Tracker) PeerSync(batch map[store.PeerHash]store.PeerStats) error {
-	if err := t.peers.Sync(batch); err != nil {
+func PeerSync(batch map[store.PeerHash]store.PeerStats) error {
+	if err := peers.Sync(batch); err != nil {
 		return err
 	}
-	if t.PeerCache != nil {
+	if PeerCache != nil {
 		var peer store.Peer
 		for ph, stats := range batch {
 			sum := stats.Totals()
-			if t.PeerCache.Get(&peer, ph.InfoHash(), ph.PeerID()) {
+			if PeerCache.Get(&peer, ph.InfoHash(), ph.PeerID()) {
 				peer.Downloaded += sum.TotalDn
 				peer.Uploaded += sum.TotalUp
 				peer.SpeedDN = uint32(sum.SpeedDn)
 				peer.SpeedUP = uint32(sum.SpeedUp)
 				peer.SpeedDNMax = util.UMax32(peer.SpeedDNMax, uint32(sum.SpeedDn))
 				peer.SpeedUPMax = util.UMax32(peer.SpeedUPMax, uint32(sum.SpeedUp))
-				t.PeerCache.Set(ph.InfoHash(), peer)
+				PeerCache.Set(ph.InfoHash(), peer)
 			}
 		}
 	}
 	return nil
 }
 
-func (t *Tracker) TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
-	if err := t.torrents.Sync(batch); err != nil {
+func TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
+	if err := torrents.Sync(batch); err != nil {
 		return err
 	}
-	if t.TorrentsCache != nil {
+	if TorrentsCache != nil {
 		for ih, stats := range batch {
-			t.TorrentsCache.Update(ih, stats)
+			TorrentsCache.Update(ih, stats)
 		}
 	}
 	return nil
 }
 
 // Stats returns the current cumulative stats for the tracker
-func (t *Tracker) Stats() GlobalStats {
+func Stats() GlobalStats {
 	var s GlobalStats
 
 	return s

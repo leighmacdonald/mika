@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+option go_package = "github.com/leighmacdonald/mika/rpc";
+
+import "google/protobuf/empty.proto";
+
+package mika;
+
+message WhiteListParams {
+  string prefix = 1;
+  string name = 2;
+}
+
+message WhiteList {
+  string prefix = 1;
+  string name = 2;
+}
+
+message WhiteListDeleteParams {
+  string prefix = 1;
+}
+
+message WhiteListResponse {
+  repeated WhiteList whitelist = 1;
+}
+
+message ConfigUpdateParams {
+  int32 tracker_announce_interval = 1;
+  int32 tracker_announce_interval_min = 2;
+  int32 tracker_reaper_interval = 3;
+  int32 tracker_batch_update_interval = 4;
+  int32 tracker_max_peers = 5;
+  bool geodb_enabled = 6;
+}
+
+service Config {
+  rpc ConfigUpdate(ConfigUpdateParams) returns (google.protobuf.Empty) {}
+  rpc WhiteListAdd(WhiteListParams) returns (google.protobuf.Empty) {}
+  rpc WhiteListDelete(WhiteListDeleteParams) returns (google.protobuf.Empty) {}
+  rpc WhiteList(google.protobuf.Empty) returns (WhiteListResponse) {}
+}

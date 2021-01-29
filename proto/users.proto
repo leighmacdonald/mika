@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option go_package = "github.com/leighmacdonald/mika/rpc";
+
+import "google/protobuf/empty.proto";
+
+package mika;
+
+message User {
+  int64 UserID = 1;
+  string UserName = 2;
+}
+
+message UserID {
+  int32 user_id = 1;
+  string user_name = 2;
+}
+
+message UserAddParams {
+  string user_name = 1;
+  string passkey = 2;
+}
+
+message UserUpdateParams {
+  int64 user_id = 1;
+  string user_name = 2;
+  string passkey = 3;
+  bool enabled = 4;
+  bool deleted = 5;
+}
+
+service Users {
+  rpc Get(UserID) returns (User) {}
+  rpc All(google.protobuf.Empty) returns (stream User) {}
+  rpc Update(UserUpdateParams) returns (User) {}
+  rpc Delete(UserID) returns (google.protobuf.Empty) {}
+  rpc Add(UserAddParams) returns (User) {}
+}

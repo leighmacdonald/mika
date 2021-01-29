@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+option go_package = "github.com/leighmacdonald/mika/rpc";
+
+import "google/protobuf/empty.proto";
+
+package mika;
+
+message InfoHashParam {
+  bytes info_hash = 1;
+}
+
+message Torrent {
+  int64 torrent_id = 1;
+  bytes info_hash = 2;
+  string name = 3;
+  int32 seeders = 4;
+  int32 leechers = 5;
+}
+
+message TorrentParams {
+  int64 torrentID = 1;
+}
+
+message TorrentAddParams {
+  string name = 1;
+  bytes info_hash = 2;
+  double multi_up = 3;
+  double multi_dn = 4;
+}
+
+message TorrentUpdateParams {
+  string name = 1;
+  bool deleted = 2;
+  bool enabled = 3;
+  string reason = 4;
+  string multi_up = 5;
+  string multi_dn = 6;
+}
+
+service Torrents {
+  rpc GetTorrent(TorrentParams) returns (Torrent) {}
+  rpc TorrentAdd(TorrentAddParams) returns (Torrent) {}
+  rpc TorrentDelete(InfoHashParam) returns (google.protobuf.Empty) {}
+  rpc TorrentUpdate(TorrentUpdateParams) returns (Torrent) {}
+}

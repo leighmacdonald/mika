@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/metrics"
 	"github.com/leighmacdonald/mika/store"
@@ -17,7 +18,6 @@ import (
 // BitTorrentHandler is the public HTTP interface for the tracker handling announces and
 // scrape requests
 type BitTorrentHandler struct {
-	tracker *Tracker
 }
 
 // Represents an announce received from the bittorrent client
@@ -116,12 +116,12 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 	if !exists || len(peerID) != 20 {
 		return nil, msgInvalidPeerID
 	}
-	ipAddr, ipv6, err2 := getIP(q, h.tracker.AllowClientIP, c)
+	ipAddr, ipv6, err2 := getIP(q, config.Tracker.AllowClientIP, c)
 	if err2 != nil {
 		log.Errorf("Failed to parse client ip: %s", c.Request.RemoteAddr)
 		return nil, msgMalformedRequest
 	}
-	if !h.tracker.AllowNonRoutable && util.IsPrivateIP(ipAddr) {
+	if !config.Tracker.AllowNonRoutable && util.IsPrivateIP(ipAddr) {
 		log.Warnf("Attempt to use non-routable IP value: %s", ipAddr.String())
 		return nil, msgMalformedRequest
 	}
@@ -164,7 +164,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	atomic.AddInt64(&metrics.AnnounceTotal, 1)
 	pk := c.Param("passkey")
 	var usr store.User
-	if valid := h.tracker.preFlightChecks(&usr, pk, c); !valid {
+	if valid := preFlightChecks(&usr, pk, c); !valid {
 		oops(c, msgInvalidAuth)
 		atomic.AddInt64(&metrics.AnnounceStatusUnauthorized, 1)
 		return
@@ -176,21 +176,21 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		atomic.AddInt64(&metrics.AnnounceStatusMalformed, 1)
 		return
 	}
-	if !h.tracker.ClientWhitelisted(req.PeerID) {
+	if !ClientWhitelisted(req.PeerID) {
 		oops(c, msgBadClient)
 		return
 	}
-	if pk == "" && h.tracker.Public {
+	if pk == "" && config.Tracker.Public {
 		// Use client key to track user stats for public mode
 		pk = req.Key
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
 	var tor store.Torrent
-	if err := h.tracker.TorrentGet(&tor, req.InfoHash, false); err != nil || tor.IsDeleted {
-		if h.tracker.AutoRegister {
+	if err := TorrentGet(&tor, req.InfoHash, false); err != nil || tor.IsDeleted {
+		if config.Tracker.AutoRegister {
 			tor.InfoHash = req.InfoHash
 			tor.IsEnabled = true
-			if err := h.tracker.TorrentAdd(tor); err != nil {
+			if err := TorrentAdd(tor); err != nil {
 				log.Errorf("Failed to auto register torrent: %s", err.Error())
 				oops(c, msgGenericError)
 				return
@@ -213,7 +213,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		return
 	}
 	var peer store.Peer
-	err := h.tracker.PeerGet(&peer, tor.InfoHash, req.PeerID)
+	err := PeerGet(&peer, tor.InfoHash, req.PeerID)
 	if err != nil {
 		if err == consts.ErrInvalidPeerID {
 			// Create a new peer for the swarm
@@ -225,12 +225,12 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 			peer.Left = req.Left
 			// TODO allow this to be updated in the perm storage when a client changes settings
 			peer.CryptoLevel = req.CryptoLevel
-			l := h.tracker.Geodb.GetLocation(peer.IP)
+			l := geodb.GetLocation(peer.IP)
 			peer.Location = l.LatLong
 			peer.ASN = l.ASN
 			peer.AS = l.AS
 			peer.CountryCode = l.ISOCode
-			if err := h.tracker.PeerAdd(tor.InfoHash, peer); err != nil {
+			if err := PeerAdd(tor.InfoHash, peer); err != nil {
 				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
 				oops(c, msgGenericError)
 				return
@@ -242,7 +242,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	} else {
 		peer.AnnounceLast = time.Now()
 	}
-	peers, err2 := h.tracker.PeerGetN(tor.InfoHash, h.tracker.MaxPeers)
+	peersFound, err2 := PeerGetN(tor.InfoHash, config.Tracker.MaxPeers)
 	if err2 != nil {
 		log.Errorf("Could not read peers from swarm: %s", err2.Error())
 		oops(c, msgGenericError)
@@ -251,15 +251,15 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	dict := bencode.Dict{
 		"complete":     tor.Seeders,
 		"incomplete":   tor.Leechers,
-		"interval":     int(h.tracker.AnnInterval.Seconds()),
-		"min interval": int(h.tracker.AnnIntervalMin.Seconds()),
+		"interval":     int(config.Tracker.AnnounceIntervalParsed.Seconds()),
+		"min interval": int(config.Tracker.AnnounceIntervalMinimumParsed.Seconds()),
 	}
 	// TODO IP.To16() != nil validation for v4 in v6 addresses
-	if !req.IPv6 || (req.IPv6 && !h.tracker.IPv6Only) {
-		dict["peers"] = makeCompactPeers(peers, peer.PeerID, false, req.CryptoLevel)
+	if !req.IPv6 || (req.IPv6 && !config.Tracker.IPv6Only) {
+		dict["peers"] = makeCompactPeers(peersFound, peer.PeerID, false, req.CryptoLevel)
 	}
 	if req.IPv6 {
-		dict["peers6"] = makeCompactPeers(peers, peer.PeerID, true, req.CryptoLevel)
+		dict["peers6"] = makeCompactPeers(peersFound, peer.PeerID, true, req.CryptoLevel)
 	}
 	var outBytes bytes.Buffer
 	if err := bencode.NewEncoder(&outBytes).Encode(dict); err != nil {
@@ -269,7 +269,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 	c.Data(int(msgOk), gin.MIMEPlain, outBytes.Bytes())
 	// Send state to another go channel for updating outside of the announce request
 	// so that we can respond asap
-	h.tracker.StateUpdateChan <- store.UpdateState{
+	StateUpdateChan <- store.UpdateState{
 		Passkey:    pk,
 		InfoHash:   tor.InfoHash,
 		PeerID:     peer.PeerID,

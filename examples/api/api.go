@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/store/memory"
-	"github.com/leighmacdonald/mika/tracker"
 	"github.com/leighmacdonald/mika/util"
 	"log"
 	"net/http"
@@ -216,7 +215,9 @@ func (s *ServerExample) userSync(c *gin.Context) {
 }
 
 func (s *ServerExample) userDelete(c *gin.Context) {
-	var us tracker.UserDeleteRequest
+	var us struct {
+		Passkey string
+	}
 	if err := c.BindJSON(&us); err != nil {
 		errResponse(c, http.StatusBadRequest, err.Error())
 		return

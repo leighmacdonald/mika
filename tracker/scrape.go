@@ -12,7 +12,7 @@ import (
 // scrape handles the bittorrent scrape protocol for
 func (h *BitTorrentHandler) scrape(c *gin.Context) {
 	var user store.User
-	if !h.tracker.preFlightChecks(&user, c.Param("passkey"), c) {
+	if !preFlightChecks(&user, c.Param("passkey"), c) {
 		return
 	}
 	q, err := queryStringParser(c.Request.URL.RawQuery)
@@ -39,7 +39,7 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 			continue
 		}
 		var torrent store.Torrent
-		if err := h.tracker.TorrentGet(&torrent, ih, false); err != nil {
+		if err := TorrentGet(&torrent, ih, false); err != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}

@@ -18,7 +18,7 @@ import (
 var (
 	General      generalConfig
 	Tracker      trackerConfig
-	API          apiConfig
+	API          rpcConfig
 	TorrentStore StoreConfig
 	PeerStore    StoreConfig
 	UserStore    StoreConfig
@@ -28,7 +28,7 @@ var (
 type fullConfig struct {
 	General generalConfig `mapstructure:"general"`
 	Tracker trackerConfig `mapstructure:"tracker"`
-	API     apiConfig     `mapstructure:"api"`
+	API     rpcConfig     `mapstructure:"api"`
 	Stores  storeConfigs  `mapstructure:"stores"`
 	GeoDB   geoDBConfig   `mapstructure:"geodb"`
 }
@@ -93,9 +93,11 @@ type trackerConfig struct {
 	// TrackerAllowNonRoutable defines whether we allow peers who are using non-public/routable addresses
 	AllowNonRoutable bool `mapstructure:"allow_non_routable"`
 	AllowClientIP    bool `mapstructure:"allow_client_ip"`
+
+	MaxPeers int `mapstructure:"max_peers"`
 }
 
-type apiConfig struct {
+type rpcConfig struct {
 	// APIListen sets the host and port that the admin API should bind to
 	// localhost:34001
 	Listen string `mapstructure:"listen"`

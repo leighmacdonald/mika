@@ -11,10 +11,10 @@ vet:
 fmt:
 	@go fmt . ./...
 
-build_debug:
+build_debug: protoc
 	@go build $(DEBUG_FLAGS) $(GO_FLAGS) -o mika
 
-build: fmt
+build: fmt protoc
 	@go build $(GO_FLAGS)
 
 run:
@@ -29,7 +29,7 @@ test:
 testcover:
 	@go test -race -coverprofile c.out $(GO_FLAGS) ./...
 
-lint:
+lint: protoc
 	@golangci-lint run
 
 bench:
@@ -46,5 +46,8 @@ image_tag:
 
 docker_run: image_latest
 	@docker-compose run --rm mika
+
+protoc:
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/config.proto proto/users.proto proto/torrents.proto
 
 ## EOF

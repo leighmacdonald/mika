@@ -29,35 +29,42 @@ type MariaDBStore struct {
 	db *sqlx.DB
 }
 
-func (s *MariaDBStore) UserRoles(userID uint32) ([]store.Role, error) {
+func (s *MariaDBStore) RoleByID(role *store.Role, roleID uint32) error {
 	const q = `
-		SELECT r.role_id, r.role_name, r.priority, r.multi_up, r.multi_down, 
-		       r.download_enabled, r.upload_enabled, r.created_on, r.updated_on 
-		FROM roles r
-		LEFT JOIN user_roles ur on r.role_id = ur.role_id
-		WHERE ur.user_id = ?`
-	var roles store.Roles
-	if err := s.db.Select(&roles, q, userID); err != nil {
-		return nil, err
-	}
-	return roles, nil
-}
-
-func (s *MariaDBStore) RoleAdd(role store.Role) error {
-	const q = `
-		INSERT INTO roles 
-		    (role_name, priority, multi_up, multi_down, download_enabled, upload_enabled, created_on, updated_on) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := s.db.Exec(q, role.RoleName, role.Priority, role.MultiUp, role.MultiDown, role.DownloadEnabled,
-		role.UploadEnabled, role.CreatedOn, role.UpdateOn)
-	if err != nil {
-		return errors.Wrap(err, "Failed to create role")
+		SELECT 
+       		role_id, role_name, priority, multi_up, multi_down, 
+       		download_enabled, upload_enabled, created_on, updated_on 
+		FROM role 
+		WHERE role_id = ?`
+	if err := s.db.Get(role, q, roleID); err != nil {
+		if err.Error() == ErrNoResults {
+			return consts.ErrInvalidRole
+		}
+		return errors.Wrap(err, "Could not query user by passkey")
 	}
 	return nil
 }
 
-func (s *MariaDBStore) RoleDelete(roleID int) error {
-	const q = `DELETE FROM roles WHERE role_id = ?`
+func (s *MariaDBStore) RoleAdd(role *store.Role) error {
+	const q = `
+		INSERT INTO role 
+		    (role_name, priority, multi_up, multi_down, download_enabled, upload_enabled, created_on, updated_on) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	res, err := s.db.Exec(q, role.RoleName, role.Priority, role.MultiUp, role.MultiDown, role.DownloadEnabled,
+		role.UploadEnabled, role.CreatedOn, role.UpdateOn)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create role")
+	}
+	i, err := res.LastInsertId()
+	if err != nil {
+		return errors.Wrap(err, "Failed to get role id")
+	}
+	role.RoleID = uint32(i)
+	return nil
+}
+
+func (s *MariaDBStore) RoleDelete(roleID uint32) error {
+	const q = `DELETE FROM role WHERE role_id = ?`
 	if _, err := s.db.Exec(q, roleID); err != nil {
 		return errors.Wrap(err, "Failed to delete role")
 	}
@@ -69,7 +76,7 @@ func (s *MariaDBStore) Roles() (store.Roles, error) {
 		SELECT 
 		    role_id, role_name, priority, multi_up, multi_down, download_enabled, 
        		upload_enabled, created_on, updated_on 
-		FROM roles`
+		FROM role`
 	var roles store.Roles
 	if err := s.db.Select(&roles, q); err != nil {
 		return nil, err
@@ -79,7 +86,7 @@ func (s *MariaDBStore) Roles() (store.Roles, error) {
 
 // Sync batch updates the backing store with the new UserStats provided
 func (s *MariaDBStore) UserSync(b map[string]store.UserStats) error {
-	const q = ` UPDATE users
+	const q = ` UPDATE user
     SET announces  = (announces + ?),
         uploaded   = (uploaded + ?),
         downloaded = (downloaded + ?)
@@ -95,7 +102,7 @@ func (s *MariaDBStore) UserSync(b map[string]store.UserStats) error {
 		return errors.Wrap(err, "Failed to prepare user Sync() tx")
 	}
 	for passkey, stats := range b {
-		_, err := stmt.Exec(passkey, stats.Announces, stats.Uploaded, stats.Downloaded)
+		_, err := stmt.Exec(stats.Announces, stats.Uploaded, stats.Downloaded, passkey)
 		if err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back user Sync() tx")
@@ -111,15 +118,28 @@ func (s *MariaDBStore) UserSync(b map[string]store.UserStats) error {
 }
 
 // Add will add a new user to the backing store
-func (s *MariaDBStore) UserAdd(user store.User) error {
-	const q = `INSERT INTO users
-    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces)
-    VALUES (?, ?, ?, ?, ?, ?, ?);`
-	_, err := s.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
-		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces)
-	if err != nil {
-		return errors.Wrap(err, "Failed to add user to store")
+func (s *MariaDBStore) UserAdd(user *store.User) error {
+	if user.RoleID == 0 {
+		return errors.New("Must supply at least 1 role")
 	}
+	const q = `INSERT INTO user
+    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces, role_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
+	res, err2 := s.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
+		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces, user.RoleID)
+	if err2 != nil {
+		return errors.Wrap(err2, "Failed to add user to store")
+	}
+	i, err3 := res.LastInsertId()
+	if err3 != nil {
+		return errors.Wrap(err3, "Failed to get role id")
+	}
+	user.UserID = uint32(i)
+	r := &store.Role{}
+	if err := s.RoleByID(r, user.RoleID); err != nil {
+		return errors.Wrap(err, "Failed to load role")
+	}
+	user.Role = r
 	return nil
 }
 
@@ -129,14 +149,16 @@ func (s *MariaDBStore) UserAdd(user store.User) error {
 // return ErrUnauthorized.
 func (s *MariaDBStore) UserGetByPasskey(user *store.User, passkey string) error {
 	const q = `
-		SELECT u.user_id,
-           u.passkey,
-           u.download_enabled,
-           u.is_deleted,
-           u.downloaded,
-           u.uploaded,
-           u.announces
-		FROM users u
+		SELECT 
+		    u.user_id,
+           	u.passkey,
+           	u.download_enabled,
+           	u.is_deleted,
+           	u.downloaded,
+           	u.uploaded,
+           	u.announces,
+			u.role_id
+		FROM user u
 		WHERE u.passkey = ?;`
 	if err := s.db.Get(user, q, passkey); err != nil {
 		if err.Error() == ErrNoResults {
@@ -144,25 +166,27 @@ func (s *MariaDBStore) UserGetByPasskey(user *store.User, passkey string) error 
 		}
 		return errors.Wrap(err, "Could not query user by passkey")
 	}
-	r, err := s.UserRoles(user.UserID)
-	if err != nil {
-		return errors.Wrap(err, "Could not query user roles by user_id")
+	r := &store.Role{}
+	if err := s.RoleByID(r, user.RoleID); err != nil {
+		return errors.Wrap(err, "Failed to load role")
 	}
-	user.Roles = r
+	user.Role = r
 	return nil
 }
 
 // GetByID returns a user matching the userId
 func (s *MariaDBStore) UserGetByID(user *store.User, userID uint32) error {
 	const q = `
-		SELECT u.user_id,
-           u.passkey,
-           u.download_enabled,
-           u.is_deleted,
-           u.downloaded,
-           u.uploaded,
-           u.announces
-    	FROM users u
+		SELECT 
+		    u.user_id,
+           	u.passkey,
+           	u.download_enabled,
+           	u.is_deleted,
+           	u.downloaded,
+           	u.uploaded,
+           	u.announces,
+			u.role_id
+    	FROM user u
     	WHERE u.user_id = ?`
 	if err := s.db.Get(user, q, userID); err != nil {
 		if err.Error() == ErrNoResults {
@@ -170,20 +194,20 @@ func (s *MariaDBStore) UserGetByID(user *store.User, userID uint32) error {
 		}
 		return errors.Wrap(err, "Could not query user by user_id")
 	}
-	r, err := s.UserRoles(user.UserID)
-	if err != nil {
-		return errors.Wrap(err, "Could not query user roles by user_id")
+	r := &store.Role{}
+	if err := s.RoleByID(r, user.RoleID); err != nil {
+		return errors.Wrap(err, "Failed to load role")
 	}
-	user.Roles = r
+	user.Role = r
 	return nil
 }
 
 // Delete removes a user from the backing store
-func (s *MariaDBStore) UserDelete(user store.User) error {
+func (s *MariaDBStore) UserDelete(user *store.User) error {
 	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
-	const q = `DELETE FROM users WHERE user_id = ?;`
+	const q = `DELETE FROM user WHERE user_id = ?;`
 	if _, err := s.db.Exec(q, user.UserID); err != nil {
 		return errors.Wrap(err, "Failed to delete user")
 	}
@@ -191,9 +215,9 @@ func (s *MariaDBStore) UserDelete(user store.User) error {
 	return nil
 }
 
-func (s *MariaDBStore) UserUpdate(user store.User, oldPasskey string) error {
+func (s *MariaDBStore) UserUpdate(user *store.User, oldPasskey string) error {
 	const q = `
-		UPDATE users
+		UPDATE user
 		SET user_id          = ?,
 			passkey          = ?,
 			download_enabled = ?,
@@ -219,7 +243,7 @@ func (s *MariaDBStore) Name() string {
 	return driverName
 }
 
-func (s *MariaDBStore) TorrentUpdate(torrent store.Torrent) error {
+func (s *MariaDBStore) TorrentUpdate(torrent *store.Torrent) error {
 	const q = `
 		UPDATE 
 		    torrent 
@@ -364,7 +388,7 @@ func (s *MariaDBStore) TorrentGet(t *store.Torrent, hash store.InfoHash, deleted
 }
 
 // Add inserts a new torrent into the backing store
-func (s *MariaDBStore) TorrentAdd(t store.Torrent) error {
+func (s *MariaDBStore) TorrentAdd(t *store.Torrent) error {
 	const q = `INSERT INTO torrent (info_hash) VALUES (?);`
 	_, err := s.db.Exec(q, t.InfoHash.Bytes())
 	if err != nil {

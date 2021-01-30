@@ -40,37 +40,37 @@ func AddDriver(name string, driver Driver) {
 // To disable a user they MUST be deleted from the active user cache
 type Store interface {
 	// Add will add a new user to the backing store
-	UserAdd(u User) error
+	UserAdd(u *User) error
 	// GetByPasskey returns a user matching the passkey
 	UserGetByPasskey(user *User, passkey string) error
 	// GetByID returns a user matching the userId
 	UserGetByID(user *User, userID uint32) error
 	// Delete removes a user from the backing store
-	UserDelete(user User) error
+	UserDelete(user *User) error
 	// Update is used to change a known user
-	UserUpdate(user User, oldPasskey string) error
-	// UserRoles returns the rows attached to a user
-	UserRoles(userID uint32) ([]Role, error)
+	UserUpdate(user *User, oldPasskey string) error
 
 	// Roles fetches all known groups
 	Roles() (Roles, error)
+	// Roles fetches all known groups
+	RoleByID(role *Role, roleID uint32) error
 	// RoleAdd adds a new role to the system
-	RoleAdd(role Role) error
+	RoleAdd(role *Role) error
 	// RoleDelete permanently deletes a role from the system
-	RoleDelete(roleID int) error
+	RoleDelete(roleID uint32) error
 
 	// Close will cleanup and close the underlying storage driver if necessary
 	UserSync(b map[string]UserStats) error
 
 	// Add adds a new torrent to the backing store
-	TorrentAdd(t Torrent) error
+	TorrentAdd(t *Torrent) error
 	// Delete will mark a torrent as deleted in the backing store.
 	// If dropRow is true, it will permanently remove the torrent from the store
 	TorrentDelete(ih InfoHash, dropRow bool) error
 	// Get returns the Torrent matching the infohash
 	TorrentGet(torrent *Torrent, hash InfoHash, deletedOk bool) error
 	// Update will update certain parameters within the torrent
-	TorrentUpdate(torrent Torrent) error
+	TorrentUpdate(torrent *Torrent) error
 	// TorrentSync batch updates the backing store with the new TorrentStats provided
 	TorrentSync(b map[InfoHash]TorrentStats) error
 

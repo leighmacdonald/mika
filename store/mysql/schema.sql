@@ -1,33 +1,4 @@
-create table peers
-(
-    peer_id binary(20) not null,
-    info_hash binary(20) not null,
-    user_id int unsigned not null,
-    ipv6 tinyint(1) not null,
-    addr_ip int unsigned not null,
-    addr_port smallint unsigned not null,
-    total_downloaded bigint unsigned default 0 not null,
-    total_uploaded bigint unsigned default 0 not null,
-    total_left bigint unsigned default 0 not null,
-    total_time int unsigned default 0 not null,
-    total_announces int unsigned default 0 not null,
-    speed_up int unsigned default 0 not null,
-    speed_dn int unsigned default 0 not null,
-    speed_up_max int unsigned default 0 not null,
-    speed_dn_max int unsigned default 0 not null,
-    announce_first datetime not null,
-    announce_last datetime not null,
-    announce_prev datetime not null,
-    location point not null,
-    country_code char(2) default '' not null,
-    asn int unsigned default 0 not null,
-    as_name varchar(255) default '' not null,
-    agent varchar(100) not null,
-    crypto_level int unsigned default 0 not null,
-    primary key (info_hash, peer_id)
-);
-
-create table roles
+create table role
 (
     role_id int unsigned auto_increment
         primary key,
@@ -62,18 +33,21 @@ create table torrent
     announces int default 0 not null
 );
 
-create table users
+create table user
 (
     user_id int unsigned auto_increment
         primary key,
-    passkey varchar(40) not null,
-    download_enabled tinyint(1) default 1 not null,
+    role_id int unsigned not null,
     is_deleted tinyint(1) default 0 not null,
     downloaded bigint unsigned default 0 not null,
     uploaded bigint unsigned default 0 not null,
     announces int default 0 not null,
+    passkey varchar(40) not null,
+    download_enabled tinyint(1) default 1 not null,
     constraint user_passkey_uindex
-        unique (passkey)
+        unique (passkey),
+    constraint users_roles_role_id_fk
+        foreign key (role_id) references role (role_id)
 );
 
 create table user_multi
@@ -88,21 +62,7 @@ create table user_multi
     constraint user_multi_uindex
         unique (user_id, info_hash),
     constraint user_multi_user_id_fk
-        foreign key (user_id) references users (user_id)
-);
-
-create table user_roles
-(
-    user_id int unsigned not null,
-    role_id int unsigned not null,
-    created_on timestamp default current_timestamp() not null on update current_timestamp(),
-    constraint user_roles_uindex
-        unique (user_id, role_id),
-    constraint user_roles_roles_role_id_fk
-        foreign key (role_id) references roles (role_id),
-    constraint user_roles_users_user_id_fk
-        foreign key (user_id) references users (user_id)
-            on delete cascade
+        foreign key (user_id) references user (user_id)
 );
 
 create table whitelist

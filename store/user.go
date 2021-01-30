@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"time"
 )
 
@@ -13,27 +12,11 @@ type User struct {
 	Passkey         string `db:"passkey" json:"passkey"`
 	IsDeleted       bool   `db:"is_deleted" json:"is_deleted"`
 	DownloadEnabled bool   `db:"download_enabled" json:"download_enabled"`
-	Downloaded      uint64 `json:"downloaded"`
-	Uploaded        uint64 `json:"uploaded"`
-	Announces       uint32 `json:"announces"`
-	RoleIDs         string `json:"-" db:"role_ids"`
-	Roles           []Role `json:"roles"`
-}
-
-// RemoveRole removes a role from a User.Roles slice
-func (u User) RemoveRole(roleID int) error {
-	found := false
-	for i := len(u.Roles) - 1; i >= 0; i-- {
-		if u.Roles[i].RoleID == roleID {
-			u.Roles = append(u.Roles[:i], u.Roles[i+1:]...)
-			found = true
-			break
-		}
-	}
-	if !found {
-		return errors.New("role not attached to user")
-	}
-	return nil
+	Downloaded      uint64 `db:"downloaded" json:"downloaded"`
+	Uploaded        uint64 `db:"uploaded" json:"uploaded"`
+	Announces       uint32 `db:"announces" json:"announces"`
+	RoleID          uint32 `json:"role_id" db:"role_id"`
+	Role            *Role  `json:"role" db:"-"`
 }
 
 // Valid performs basic validation of the user info ensuring we have the minimum required
@@ -43,11 +26,11 @@ func (u User) Valid() bool {
 }
 
 // Users is a slice of known users
-type Users []User
-type Roles []Role
+type Users []*User
+type Roles []*Role
 
 // Remove removes a users from a Users slice
-func (users Users) Remove(p User) []User {
+func (users Users) Remove(p *User) []*User {
 	for i := len(users) - 1; i >= 0; i-- {
 		if users[i].UserID == p.UserID {
 			return append(users[:i], users[i+1:]...)
@@ -57,7 +40,7 @@ func (users Users) Remove(p User) []User {
 }
 
 type Role struct {
-	RoleID          int       `json:"role_id" db:"role_id"`
+	RoleID          uint32    `json:"role_id" db:"role_id"`
 	RoleName        string    `json:"role_name" db:"role_name"`
 	Priority        int       `json:"priority" db:"priority"`
 	MultiUp         float64   `json:"multi_up" db:"multi_up"`

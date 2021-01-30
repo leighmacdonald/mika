@@ -58,7 +58,7 @@ func findPeer(swarm Swarm, p1 Peer) (Peer, error) {
 // TestTorrentStore tests the interface implementation
 func TestStore(t *testing.T, s Store) {
 	torrentA := GenerateTestTorrent()
-	require.NoError(t, s.TorrentAdd(torrentA))
+	require.NoError(t, s.TorrentAdd(&torrentA))
 	var fetchedTorrent Torrent
 	require.NoError(t, s.TorrentGet(&fetchedTorrent, torrentA.InfoHash, false))
 	require.Equal(t, torrentA.InfoHash, fetchedTorrent.InfoHash)
@@ -147,26 +147,22 @@ func TestStore(t *testing.T, s Store) {
 	require.NoError(t, err, "failed to fetch roles")
 	require.Equal(t, len(roles)-1, len(fetchedRolesDeleted))
 
-	var users []User
+	var users []*User
 	for i := 0; i < 3; i++ {
 		usr := GenerateTestUser()
-		usr.Roles = append(usr.Roles, fetchedRolesDeleted[i])
-		users = append(users, usr)
+		usr.RoleID = fetchedRolesDeleted[i].RoleID
+		users = append(users, &usr)
 	}
 	if users == nil {
 		t.Fatalf("[%s] Failed to setup users", s.Name())
 	}
 	require.NoError(t, s.UserAdd(users[0]))
-	var fetchedUserID User
-	var fetchedUserPasskey User
-	require.NoError(t, s.UserGetByID(&fetchedUserID, users[0].UserID))
+	fetchedUserID := &User{}
+	fetchedUserPasskey := &User{}
+	require.NoError(t, s.UserGetByID(fetchedUserID, users[0].UserID))
 	require.Equal(t, users[0], fetchedUserID)
-	var fetchUserWithRoles User
-	err = s.UserGetByID(&fetchUserWithRoles, users[0].UserID)
-	require.NoError(t, err)
 
-	require.True(t, len(fetchUserWithRoles.Roles) > 0)
-	require.NoError(t, s.UserGetByPasskey(&fetchedUserPasskey, users[0].Passkey))
+	require.NoError(t, s.UserGetByPasskey(fetchedUserPasskey, users[0].Passkey))
 	require.Equal(t, users[0], fetchedUserPasskey)
 
 	batchUpdate := map[string]UserStats{
@@ -185,7 +181,7 @@ func TestStore(t *testing.T, s Store) {
 	require.Equal(t, uint32(10)+users[0].Announces, updatedUser.Announces)
 
 	newUser := GenerateTestUser()
-	require.NoError(t, s.UserUpdate(newUser, users[0].Passkey))
+	require.NoError(t, s.UserUpdate(&newUser, users[0].Passkey))
 	var fetchedNewUser User
 	require.NoError(t, s.UserGetByPasskey(&fetchedNewUser, newUser.Passkey))
 	require.Equal(t, newUser.UserID, fetchedNewUser.UserID)

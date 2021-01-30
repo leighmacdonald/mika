@@ -5,10 +5,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"strings"
-
 	// imported for side-effects
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -17,7 +13,6 @@ import (
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"net"
 	"sync"
 	"time"
 )
@@ -29,38 +24,69 @@ const (
 // ErrNoResults is the string returned from the driver when no rows are returned
 const ErrNoResults = "sql: no rows in result set"
 
-// UserStore is the MySQL backed store.UserStore implementation
-type UserStore struct {
+// MariaDBStore is the MariaDB backed store.Store implementation
+type MariaDBStore struct {
 	db *sqlx.DB
 }
 
-func (u *UserStore) RoleAdd(role store.Role) error {
-	panic("implement me")
-}
-
-func (u *UserStore) RoleDelete(roleID int) error {
-	panic("implement me")
-}
-
-func (u *UserStore) Roles() (store.Roles, error) {
-	const q = `CALL roles_get_all()`
-	var groups store.Roles
-	if err := u.db.Select(&groups, q); err != nil {
+func (s *MariaDBStore) UserRoles(userID uint32) ([]store.Role, error) {
+	const q = `
+		SELECT r.role_id, r.role_name, r.priority, r.multi_up, r.multi_down, 
+		       r.download_enabled, r.upload_enabled, r.created_on, r.updated_on 
+		FROM roles r
+		LEFT JOIN user_roles ur on r.role_id = ur.role_id
+		WHERE ur.user_id = ?`
+	var roles store.Roles
+	if err := s.db.Select(&roles, q, userID); err != nil {
 		return nil, err
 	}
-	return groups, nil
+	return roles, nil
 }
 
-func (u *UserStore) Name() string {
-	return driverName
+func (s *MariaDBStore) RoleAdd(role store.Role) error {
+	const q = `
+		INSERT INTO roles 
+		    (role_name, priority, multi_up, multi_down, download_enabled, upload_enabled, created_on, updated_on) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := s.db.Exec(q, role.RoleName, role.Priority, role.MultiUp, role.MultiDown, role.DownloadEnabled,
+		role.UploadEnabled, role.CreatedOn, role.UpdateOn)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create role")
+	}
+	return nil
+}
+
+func (s *MariaDBStore) RoleDelete(roleID int) error {
+	const q = `DELETE FROM roles WHERE role_id = ?`
+	if _, err := s.db.Exec(q, roleID); err != nil {
+		return errors.Wrap(err, "Failed to delete role")
+	}
+	return nil
+}
+
+func (s *MariaDBStore) Roles() (store.Roles, error) {
+	const q = `
+		SELECT 
+		    role_id, role_name, priority, multi_up, multi_down, download_enabled, 
+       		upload_enabled, created_on, updated_on 
+		FROM roles`
+	var roles store.Roles
+	if err := s.db.Select(&roles, q); err != nil {
+		return nil, err
+	}
+	return roles, nil
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (u *UserStore) Sync(b map[string]store.UserStats) error {
-	const q = `CALL user_update_stats(?, ?, ?, ?)`
+func (s *MariaDBStore) UserSync(b map[string]store.UserStats) error {
+	const q = ` UPDATE users
+    SET announces  = (announces + ?),
+        uploaded   = (uploaded + ?),
+        downloaded = (downloaded + ?)
+    WHERE passkey = ?;`
 	// TODO use ctx for timeout
 	ctx := context.Background()
-	tx, err := u.db.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "Failed to being user Sync() tx")
 	}
@@ -85,9 +111,11 @@ func (u *UserStore) Sync(b map[string]store.UserStats) error {
 }
 
 // Add will add a new user to the backing store
-func (u *UserStore) Add(user store.User) error {
-	const q = `CALL user_add(?, ?, ?, ?, ?, ?, ?)`
-	_, err := u.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
+func (s *MariaDBStore) UserAdd(user store.User) error {
+	const q = `INSERT INTO users
+    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces)
+    VALUES (?, ?, ?, ?, ?, ?, ?);`
+	_, err := s.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
 		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
@@ -99,45 +127,82 @@ func (u *UserStore) Add(user store.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (u *UserStore) GetByPasskey(user *store.User, passkey string) error {
-	const q = `CALL user_by_passkey(?)`
-	if err := u.db.Get(user, q, passkey); err != nil {
+func (s *MariaDBStore) UserGetByPasskey(user *store.User, passkey string) error {
+	const q = `
+		SELECT u.user_id,
+           u.passkey,
+           u.download_enabled,
+           u.is_deleted,
+           u.downloaded,
+           u.uploaded,
+           u.announces
+		FROM users u
+		WHERE u.passkey = ?;`
+	if err := s.db.Get(user, q, passkey); err != nil {
 		if err.Error() == ErrNoResults {
 			return consts.ErrInvalidUser
 		}
 		return errors.Wrap(err, "Could not query user by passkey")
 	}
+	r, err := s.UserRoles(user.UserID)
+	if err != nil {
+		return errors.Wrap(err, "Could not query user roles by user_id")
+	}
+	user.Roles = r
 	return nil
 }
 
 // GetByID returns a user matching the userId
-func (u *UserStore) GetByID(user *store.User, userID uint32) error {
-	const q = `CALL user_by_id(?)`
-	if err := u.db.Get(user, q, userID); err != nil {
+func (s *MariaDBStore) UserGetByID(user *store.User, userID uint32) error {
+	const q = `
+		SELECT u.user_id,
+           u.passkey,
+           u.download_enabled,
+           u.is_deleted,
+           u.downloaded,
+           u.uploaded,
+           u.announces
+    	FROM users u
+    	WHERE u.user_id = ?`
+	if err := s.db.Get(user, q, userID); err != nil {
 		if err.Error() == ErrNoResults {
 			return consts.ErrInvalidUser
 		}
 		return errors.Wrap(err, "Could not query user by user_id")
 	}
+	r, err := s.UserRoles(user.UserID)
+	if err != nil {
+		return errors.Wrap(err, "Could not query user roles by user_id")
+	}
+	user.Roles = r
 	return nil
 }
 
 // Delete removes a user from the backing store
-func (u *UserStore) Delete(user store.User) error {
+func (s *MariaDBStore) UserDelete(user store.User) error {
 	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
-	const q = `CALL user_delete(?)`
-	if _, err := u.db.Exec(q, user.UserID); err != nil {
+	const q = `DELETE FROM users WHERE user_id = ?;`
+	if _, err := s.db.Exec(q, user.UserID); err != nil {
 		return errors.Wrap(err, "Failed to delete user")
 	}
 	user.UserID = 0
 	return nil
 }
 
-func (u *UserStore) Update(user store.User, oldPasskey string) error {
-	const q = `CALL user_update(?, ?, ?, ?, ?, ?, ?, ?)`
-	if _, err := u.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
+func (s *MariaDBStore) UserUpdate(user store.User, oldPasskey string) error {
+	const q = `
+		UPDATE users
+		SET user_id          = ?,
+			passkey          = ?,
+			download_enabled = ?,
+			is_deleted       = ?,
+			downloaded       = ?,
+			uploaded         = ?,
+			announces        = ?
+		WHERE passkey = ?`
+	if _, err := s.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
 		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces,
 		oldPasskey); err != nil {
 		return errors.Wrapf(err, "Failed to update user")
@@ -146,20 +211,15 @@ func (u *UserStore) Update(user store.User, oldPasskey string) error {
 }
 
 // Close will close the underlying database connection and clear the local caches
-func (u *UserStore) Close() error {
-	return u.db.Close()
+func (s *MariaDBStore) Close() error {
+	return s.db.Close()
 }
 
-// TorrentStore implements the store.TorrentStore interface for mysql
-type TorrentStore struct {
-	db *sqlx.DB
-}
-
-func (s *TorrentStore) Name() string {
+func (s *MariaDBStore) Name() string {
 	return driverName
 }
 
-func (s *TorrentStore) Update(torrent store.Torrent) error {
+func (s *MariaDBStore) TorrentUpdate(torrent store.Torrent) error {
 	const q = `
 		UPDATE 
 		    torrent 
@@ -196,8 +256,17 @@ func (s *TorrentStore) Update(torrent store.Torrent) error {
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats) error {
-	const q = `CALL torrent_update_stats(?, ?, ?, ?, ?, ?, ?)`
+func (s *MariaDBStore) TorrentSync(b map[store.InfoHash]store.TorrentStats) error {
+	const q = ` 
+		UPDATE
+			torrent
+		SET total_downloaded = (total_downloaded + ?),
+			total_uploaded   = (total_uploaded + ?),
+			announces        = (announces + ?),
+			total_completed  = (total_completed + ?),
+			seeders          = ?,
+			leechers         = ?
+		WHERE info_hash = ?`
 	tx, err := s.db.Begin()
 	if err != nil {
 		return errors.Wrap(err, "Failed to being torrent Sync() tx")
@@ -208,13 +277,13 @@ func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats) error {
 	}
 	for ih, stats := range b {
 		if _, err := stmt.Exec(
-			ih.Bytes(),
 			stats.Downloaded,
 			stats.Uploaded,
 			stats.Announces,
 			stats.Snatches,
 			stats.Seeders,
 			stats.Leechers,
+			ih.Bytes(),
 		); err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back torrent Sync() tx")
@@ -229,13 +298,13 @@ func (s *TorrentStore) Sync(b map[store.InfoHash]store.TorrentStats) error {
 }
 
 // Conn returns the underlying database driver
-func (s *TorrentStore) Conn() interface{} {
+func (s *MariaDBStore) Conn() interface{} {
 	return s.db
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (s *TorrentStore) WhiteListDelete(client store.WhiteListClient) error {
-	const q = `CALL whitelist_delete_by_prefix(?)`
+func (s *MariaDBStore) WhiteListDelete(client store.WhiteListClient) error {
+	const q = `DELETE FROM whitelist WHERE client_prefix = ?`
 	if _, err := s.db.Exec(q, client.ClientPrefix); err != nil {
 		return errors.Wrap(err, "Failed to delete client whitelist")
 	}
@@ -243,8 +312,8 @@ func (s *TorrentStore) WhiteListDelete(client store.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (s *TorrentStore) WhiteListAdd(client store.WhiteListClient) error {
-	const q = `CALL whitelist_add(?, ?)`
+func (s *MariaDBStore) WhiteListAdd(client store.WhiteListClient) error {
+	const q = ` INSERT INTO whitelist (client_prefix, client_name) VALUES (?, ?);`
 	if _, err := s.db.Exec(q, client.ClientPrefix, client.ClientName); err != nil {
 		return errors.Wrap(err, "Failed to insert new whitelist entry")
 	}
@@ -252,24 +321,36 @@ func (s *TorrentStore) WhiteListAdd(client store.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (s *TorrentStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
+func (s *MariaDBStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
 	var wl []store.WhiteListClient
-	const q = `CALL whitelist_all()`
+	const q = `SELECT client_prefix, client_name FROM whitelist;`
 	if err := s.db.Select(&wl, q); err != nil {
 		return nil, errors.Wrap(err, "Failed to select client whitelists")
 	}
 	return wl, nil
 }
 
-// Close will close the underlying mysql database connection
-func (s *TorrentStore) Close() error {
-	return s.db.Close()
-}
-
 // Get returns a torrent for the hash provided
-func (s *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
-	const q = `CALL torrent_by_infohash(?, ?)`
-	err := s.db.Get(t, q, hash.Bytes(), deletedOk)
+func (s *MariaDBStore) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+	const q = `
+		SELECT 
+			info_hash,
+           	total_uploaded,
+           	total_downloaded,
+           	total_completed,
+           	is_deleted,
+           	is_enabled,
+           	reason,
+           	multi_up,
+           	multi_dn,
+           	seeders,
+           	leechers,
+           	announces
+    	FROM 
+    	    torrent
+    	WHERE 
+    	    is_deleted = ? AND info_hash = ?`
+	err := s.db.Get(t, q, deletedOk, hash.Bytes())
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return consts.ErrInvalidInfoHash
@@ -283,8 +364,8 @@ func (s *TorrentStore) Get(t *store.Torrent, hash store.InfoHash, deletedOk bool
 }
 
 // Add inserts a new torrent into the backing store
-func (s *TorrentStore) Add(t store.Torrent) error {
-	const q = `CALL torrent_add(?)`
+func (s *MariaDBStore) TorrentAdd(t store.Torrent) error {
+	const q = `INSERT INTO torrent (info_hash) VALUES (?);`
 	_, err := s.db.Exec(q, t.InfoHash.Bytes())
 	if err != nil {
 		return err
@@ -294,141 +375,19 @@ func (s *TorrentStore) Add(t store.Torrent) error {
 
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (s *TorrentStore) Delete(ih store.InfoHash, dropRow bool) error {
+func (s *MariaDBStore) TorrentDelete(ih store.InfoHash, dropRow bool) error {
 	var err error
 	if dropRow {
-		const dropQ = `CALL torrent_delete(?)`
+		const dropQ = `DELETE FROM torrent WHERE info_hash = ?;`
 		_, err = s.db.Exec(dropQ, ih.Bytes())
 	} else {
-		const updateQ = `CALL torrent_disable(?)`
+		const updateQ = ` UPDATE torrent SET is_deleted = true WHERE info_hash = ?;`
 		_, err = s.db.NamedExec(updateQ, ih.Bytes())
-
 	}
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-// PeerStore is the mysql backed implementation of store.PeerStore
-type PeerStore struct {
-	db *sqlx.DB
-}
-
-func (ps *PeerStore) Name() string {
-	return driverName
-}
-
-// Sync batch updates the backing store with the new PeerStats provided
-func (ps *PeerStore) Sync(b map[store.PeerHash]store.PeerStats) error {
-	const q = `CALL peer_update_stats(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	tx, err := ps.db.Begin()
-	if err != nil {
-		return errors.Wrap(err, "Failed to being user Sync() tx")
-	}
-	stmt, err2 := tx.Prepare(q)
-	if err2 != nil {
-		return errors.Wrap(err2, "Failed to prepare user Sync() tx")
-	}
-	for ph, stats := range b {
-		sum := stats.Totals()
-		if _, err := stmt.Exec(ph.InfoHash().Bytes(), ph.PeerID().Bytes(),
-			sum.TotalDn, sum.TotalUp, len(stats.Hist), sum.LastAnn,
-			sum.SpeedDn, sum.SpeedUp, sum.SpeedDnMax, sum.SpeedUpMax); err != nil {
-			if err := tx.Rollback(); err != nil {
-				log.Errorf("Failed to roll back peer Sync() tx")
-			}
-			return errors.Wrap(err, "Failed to exec peer Sync() tx")
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return errors.Wrap(err, "Failed to commit user Sync() tx")
-	}
-	return nil
-}
-
-// Reap will loop through the peers removing any stale entries from active swarms
-// TODO fetch peer hashes for expired peers to flush local caches
-func (ps *PeerStore) Reap() []store.PeerHash {
-	var peerHashes []store.PeerHash
-	const q = `CALL peer_reap(?)`
-	rows, err := ps.db.Exec(q, time.Now().Add(-15*time.Minute))
-	if err != nil {
-		log.Errorf("Failed to reap peers: %s", err.Error())
-		return nil
-	}
-	count, err2 := rows.RowsAffected()
-	if err2 != nil {
-		log.Errorf("Failed to get reap count: %s", err2)
-	}
-	log.Debugf("Reaped %d peers", count)
-	return peerHashes
-}
-
-// Close will close the underlying database connection
-func (ps *PeerStore) Close() error {
-	return ps.db.Close()
-}
-
-// Add insets the peer into the swarm of the torrent provided
-func (ps *PeerStore) Add(ih store.InfoHash, p store.Peer) error {
-	const q = `CALL peer_add(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	point := fmt.Sprintf("POINT(%s)", p.Location.String())
-	ip6 := strings.Count(p.IP.String(), ":") > 1
-	_, err := ps.db.Exec(q, ih.Bytes(), p.PeerID.Bytes(), p.UserID, ip6, p.IP.String(), p.Port, point,
-		p.AnnounceFirst, p.AnnounceLast, p.Downloaded, p.Uploaded, p.Left, p.Client,
-		p.CountryCode, p.ASN, p.AS, int(p.CryptoLevel))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Delete will remove a peer from the swarm of the torrent provided
-func (ps *PeerStore) Delete(ih store.InfoHash, p store.PeerID) error {
-	const q = `CALL peer_delete(?, ?)`
-	_, err := ps.db.Exec(q, ih.Bytes(), p.Bytes())
-	return err
-}
-
-// Get will fetch the peer from the swarm if it exists
-func (ps *PeerStore) Get(peer *store.Peer, ih store.InfoHash, peerID store.PeerID) error {
-	const q = `CALL peer_get(?, ?)`
-	if err := ps.db.Get(peer, q, ih.Bytes(), peerID.Bytes()); err != nil {
-		if errors.Is(sql.ErrNoRows, err) {
-			return consts.ErrInvalidPeerID
-		}
-		return errors.Wrap(err, "Error looking up peer")
-	}
-	return nil
-}
-
-// GetN will fetch the torrents swarm member peers
-func (ps *PeerStore) GetN(ih store.InfoHash, limit int) (store.Swarm, error) {
-	const q = `CALL peer_get_n(?, ?)`
-	swarm := store.NewSwarm()
-	rows, err := ps.db.Query(q, ih.Bytes(), limit)
-	if err != nil {
-		return swarm, err
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Errorf("failed to close query rows: %s", err)
-		}
-	}()
-	var p store.Peer
-	var ip string
-
-	for rows.Next() {
-		if err := rows.Scan(&p.PeerID, &p.InfoHash, &p.UserID, &p.IPv6, &ip, &p.Port, &p.Downloaded, &p.Uploaded,
-			&p.Left, &p.TotalTime, &p.Announces, &p.SpeedUP, &p.SpeedDN, &p.SpeedUPMax, &p.SpeedDNMax,
-			&p.Location, &p.AnnounceLast, &p.AnnounceFirst, &p.CountryCode, &p.ASN, &p.AS, &p.CryptoLevel); err != nil {
-			return swarm, err
-		}
-		p.IP = net.ParseIP(ip)
-		swarm.Add(p)
-	}
-	return swarm, nil
 }
 
 var (
@@ -454,43 +413,19 @@ func getOrCreateConn(cfg config.StoreConfig) (*sqlx.DB, error) {
 	return db, nil
 }
 
-type userDriver struct{}
+type driver struct{}
 
 // New creates a new mysql backed user store.
-func (ud userDriver) New(cfg config.StoreConfig) (store.UserStore, error) {
+func (ud driver) New(cfg config.StoreConfig) (store.Store, error) {
 	db, err := getOrCreateConn(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &UserStore{db: db}, nil
-}
-
-type torrentDriver struct{}
-
-// New initialize a TorrentStore implementation using the mysql backing store
-func (td torrentDriver) New(cfg config.StoreConfig) (store.TorrentStore, error) {
-	db, err := getOrCreateConn(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &TorrentStore{db: db}, nil
-}
-
-type peerDriver struct{}
-
-// New returns a mysql backed store.PeerStore driver
-func (pd peerDriver) New(cfg config.StoreConfig) (store.PeerStore, error) {
-	db, err := getOrCreateConn(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &PeerStore{db: db}, nil
+	return &MariaDBStore{db: db}, nil
 }
 
 func init() {
 	connections = make(map[string]*sqlx.DB)
 	connectionsMu = &sync.RWMutex{}
-	store.AddUserDriver(driverName, userDriver{})
-	store.AddTorrentDriver(driverName, torrentDriver{})
-	store.AddPeerDriver(driverName, peerDriver{})
+	store.AddDriver(driverName, driver{})
 }

@@ -15,11 +15,6 @@ import (
 	"time"
 )
 
-// BitTorrentHandler is the public HTTP interface for the tracker handling announces and
-// scrape requests
-type BitTorrentHandler struct {
-}
-
 // Represents an announce received from the bittorrent client
 //
 // TODO use gin binding func?
@@ -98,7 +93,7 @@ type announceRequest struct {
 }
 
 // Parse the query string into an announceRequest struct
-func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCode) {
+func newAnnounce(c *gin.Context) (*announceRequest, errCode) {
 	q, err := queryStringParser(c.Request.URL.RawQuery)
 	if err != nil {
 		return nil, msgMalformedRequest
@@ -158,7 +153,7 @@ func (h *BitTorrentHandler) newAnnounce(c *gin.Context) (*announceRequest, errCo
 // NOTE we ONLY support compact response formats (binary format) by design even though its
 // technically breaking the protocol specs.
 // There is no reason to support the older less efficient model for private needs
-func (h *BitTorrentHandler) announce(c *gin.Context) {
+func announce(c *gin.Context) {
 	// Check that the user is valid before parsing anything
 	start := time.Now()
 	atomic.AddInt64(&metrics.AnnounceTotal, 1)
@@ -170,7 +165,7 @@ func (h *BitTorrentHandler) announce(c *gin.Context) {
 		return
 	}
 	// Parse the announce into an announceRequest
-	req, code := h.newAnnounce(c)
+	req, code := newAnnounce(c)
 	if code != msgOk {
 		oops(c, code)
 		atomic.AddInt64(&metrics.AnnounceStatusMalformed, 1)

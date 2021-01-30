@@ -53,7 +53,7 @@ func userIDKey(userID uint32) string {
 	return fmt.Sprintf("%s:%d", prefixUserID, userID)
 }
 
-// UserStore is the redis backed store.TorrentStore implementation
+// UserStore is the redis backed store.StoreI implementation
 type UserStore struct {
 	client *redis.Client
 }
@@ -200,7 +200,7 @@ func (us UserStore) Close() error {
 	return us.client.Close()
 }
 
-// TorrentStore is the redis backed store.TorrentStore implementation
+// TorrentStore is the redis backed store.StoreI implementation
 type TorrentStore struct {
 	client *redis.Client
 }
@@ -550,7 +550,7 @@ func newRedisConfig(c config.StoreConfig) *redis.Options {
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the redis backing store
-func (td torrentDriver) New(cfg config.StoreConfig) (store.TorrentStore, error) {
+func (td torrentDriver) New(cfg config.StoreConfig) (store.StoreI, error) {
 	client := redis.NewClient(newRedisConfig(cfg))
 	return &TorrentStore{
 		client: client,
@@ -583,12 +583,12 @@ func (pd peerDriver) New(cfg config.StoreConfig) (store.PeerStore, error) {
 type userDriver struct{}
 
 // New initialize a New implementation using the redis backing store
-func (pd userDriver) New(cfg config.StoreConfig) (store.UserStore, error) {
+func (pd userDriver) New(cfg config.StoreConfig) (store.Store, error) {
 	return &UserStore{client: redis.NewClient(newRedisConfig(cfg))}, nil
 }
 
 func init() {
 	store.AddUserDriver(driverName, userDriver{})
 	store.AddPeerDriver(driverName, peerDriver{})
-	store.AddTorrentDriver(driverName, torrentDriver{})
+	store.AddDriver(driverName, torrentDriver{})
 }

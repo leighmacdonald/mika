@@ -36,7 +36,7 @@ const (
 
 type torrentDriver struct{}
 
-// TorrentStore is the HTTP API backed store.TorrentStore implementation
+// StoreI is the HTTP API backed store.StoreI implementation
 type TorrentStore struct {
 	*client.AuthedClient
 }
@@ -240,13 +240,13 @@ func (ps PeerStore) Close() error {
 	return nil
 }
 
-// NewTorrentStore instantiates a new http torrent store
+// NewStore instantiates a new http torrent store
 func NewTorrentStore(key string, baseURL string) *TorrentStore {
 	return &TorrentStore{client.NewAuthedClient(key, fullSchema(baseURL))}
 }
 
-// New initialize a TorrentStore implementation using the HTTP API backing store
-func (t torrentDriver) New(cfg interface{}) (store.TorrentStore, error) {
+// New initialize a StoreI implementation using the HTTP API backing store
+func (t torrentDriver) New(cfg interface{}) (store.StoreI, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -272,7 +272,7 @@ func (p peerDriver) New(cfg interface{}) (store.PeerStore, error) {
 	return NewPeerStore(c.Password, c.Host), nil
 }
 
-// UserStore is the HTTP API backed store.UserStore implementation
+// Store is the HTTP API backed store.Store implementation
 type UserStore struct {
 	*client.AuthedClient
 }
@@ -384,7 +384,7 @@ type userDriver struct{}
 // This should be everything up to the /api/... path
 // eg: http://localhost:35000 will be translated into:
 // http://localhost:35000/api/user/pk/12345678901234567890
-func (p userDriver) New(cfg interface{}) (store.UserStore, error) {
+func (p userDriver) New(cfg interface{}) (store.Store, error) {
 	c, ok := cfg.(*config.StoreConfig)
 	if !ok {
 		return nil, consts.ErrInvalidConfig
@@ -396,5 +396,5 @@ func (p userDriver) New(cfg interface{}) (store.UserStore, error) {
 func init() {
 	store.AddUserDriver(driverName, userDriver{})
 	store.AddPeerDriver(driverName, peerDriver{})
-	store.AddTorrentDriver(driverName, torrentDriver{})
+	store.AddDriver(driverName, torrentDriver{})
 }

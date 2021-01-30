@@ -223,6 +223,7 @@ func Read(cfgFile string) error {
 		General = full.General
 		Tracker = full.Tracker
 		API = full.API
+		GeoDB = full.GeoDB
 		TorrentStore = full.Stores.Torrent
 		PeerStore = full.Stores.Peers
 		UserStore = full.Stores.Users

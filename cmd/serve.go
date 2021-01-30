@@ -30,8 +30,8 @@ var serveCmd = &cobra.Command{
 		btOpts.Handler = tracker.NewBitTorrentHandler()
 		btServer := tracker.NewHTTPServer(btOpts)
 
-		go tracker.PeerReaper()
-		go tracker.StatWorker()
+		go tracker.PeerReaper(ctx)
+		go tracker.StatWorker(ctx)
 
 		lis, err := net.Listen("tcp", config.API.Listen)
 		if err != nil {
@@ -61,6 +61,12 @@ var serveCmd = &cobra.Command{
 			}
 		}()
 
+		go func() {
+			if errRpc := btServer.ListenAndServe(); errRpc != nil {
+				log.Errorf("HTTP error: %v", errRpc)
+			}
+		}()
+
 		util.WaitForSignal(ctx, func(ctx context.Context) error {
 			if err := btServer.Shutdown(ctx); err != nil {
 				log.Fatalf("Error closing servers gracefully; %s", err)
@@ -72,14 +78,4 @@ var serveCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// serveCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// serveCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

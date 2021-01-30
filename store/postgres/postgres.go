@@ -18,7 +18,7 @@ const (
 	driverName = "postgres"
 )
 
-// UserStore is the postgres backed store.UserStore implementation
+// UserStore is the postgres backed store.Store implementation
 type UserStore struct {
 	db  *pgx.Conn
 	ctx context.Context
@@ -85,21 +85,21 @@ func (us UserStore) Sync(batch map[string]store.UserStats) error {
 	defer cancel()
 	tx, err := us.db.Begin(c)
 	if err != nil {
-		return errors.Wrap(err, "postgres.UserStore.Sync Failed to being transaction")
+		return errors.Wrap(err, "postgres.Store.Sync Failed to being transaction")
 	}
 	defer func() { _ = tx.Rollback(c) }()
 	_, err = tx.Prepare(c, txName, q)
 	if err != nil {
-		return errors.Wrap(err, "postgres.UserStore.Sync Failed to being transaction")
+		return errors.Wrap(err, "postgres.Store.Sync Failed to being transaction")
 	}
 
 	for passkey, stats := range batch {
 		if _, err := tx.Exec(c, txName, stats.Downloaded, stats.Uploaded, stats.Announces, passkey); err != nil {
-			return errors.Wrapf(err, "postgres.UserStore.Sync failed to Exec tx")
+			return errors.Wrapf(err, "postgres.Store.Sync failed to Exec tx")
 		}
 	}
 	if err := tx.Commit(c); err != nil {
-		return errors.Wrapf(err, "postgres.UserStore.Sync failed to commit tx")
+		return errors.Wrapf(err, "postgres.Store.Sync failed to commit tx")
 	}
 	return nil
 }
@@ -184,7 +184,7 @@ func (us UserStore) Close() error {
 	return us.db.Close(c)
 }
 
-// TorrentStore implements the store.TorrentStore interface for postgres
+// TorrentStore implements the store.StoreI interface for postgres
 type TorrentStore struct {
 	db  *pgx.Conn
 	ctx context.Context
@@ -573,7 +573,7 @@ func (ps PeerStore) Close() error {
 type userDriver struct{}
 
 // New creates a new postgres backed user store.
-func (ud userDriver) New(cfg config.StoreConfig) (store.UserStore, error) {
+func (ud userDriver) New(cfg config.StoreConfig) (store.Store, error) {
 	db, err := pgx.Connect(context.Background(), cfg.DSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres user store")
@@ -610,7 +610,7 @@ func NewTorrentStore(db *pgx.Conn) *TorrentStore {
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the postgres backing store
-func (td torrentDriver) New(cfg config.StoreConfig) (store.TorrentStore, error) {
+func (td torrentDriver) New(cfg config.StoreConfig) (store.StoreI, error) {
 	db, err := pgx.Connect(context.Background(), cfg.DSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to postgres torrent store")
@@ -626,5 +626,5 @@ func makeDSN(c config.StoreConfig) string {
 func init() {
 	store.AddUserDriver(driverName, userDriver{})
 	store.AddPeerDriver(driverName, peerDriver{})
-	store.AddTorrentDriver(driverName, torrentDriver{})
+	store.AddDriver(driverName, torrentDriver{})
 }

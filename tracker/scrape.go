@@ -10,7 +10,7 @@ import (
 )
 
 // scrape handles the bittorrent scrape protocol for
-func (h *BitTorrentHandler) scrape(c *gin.Context) {
+func scrape(c *gin.Context) {
 	var user store.User
 	if !preFlightChecks(&user, c.Param("passkey"), c) {
 		return

@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/chihaya/bencode"
@@ -99,6 +100,7 @@ type sr struct {
 }
 
 func TestBitTorrentHandler_Scrape(t *testing.T) {
+	ctx := context.Background()
 	torrent0 := store.GenerateTestTorrent()
 	leecher0 := store.GenerateTestPeer()
 	seeder0 := store.GenerateTestPeer()
@@ -107,8 +109,8 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 
 	Init()
 	time.Sleep(time.Millisecond * 200)
-	go StatWorker()
-	go PeerReaper()
+	go StatWorker(ctx)
+	go PeerReaper(ctx)
 	rh := NewBitTorrentHandler()
 
 	require.NoError(t, torrents.Add(torrent0), "Failed to add test torrent")
@@ -151,6 +153,7 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 }
 
 func TestBitTorrentHandler_Announce(t *testing.T) {
+	ctx := context.Background()
 	torrent0 := store.GenerateTestTorrent()
 	leecher0 := store.GenerateTestPeer()
 	seeder0 := store.GenerateTestPeer()
@@ -170,8 +173,8 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 		ClientName:   "Test-Seeder",
 	}
 	time.Sleep(time.Millisecond * 200)
-	go StatWorker()
-	go PeerReaper()
+	go StatWorker(ctx)
+	go PeerReaper(ctx)
 	rh := NewBitTorrentHandler()
 
 	require.NoError(t, torrents.Add(torrent0), "Failed to add test torrent")

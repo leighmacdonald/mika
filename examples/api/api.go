@@ -24,9 +24,9 @@ type (
 	ServerExample struct {
 		Addr        string
 		Router      *gin.Engine
-		Users       store.UserStore
+		Users       store.Store
 		Peers       store.PeerStore
-		Torrents    store.TorrentStore
+		Torrents    store.StoreI
 		WhiteList   map[string]store.WhiteListClient
 		WhiteListMx *sync.RWMutex
 	}
@@ -416,34 +416,34 @@ func New(listenAddr string, pathPrefix string, authKey string) *http.Server {
 	// Conn() and Close() do not need any endpoints, they are noop when using http backed
 	// stores.
 
-	// UserStore implementations
+	// Store implementations
 
-	// UserStore.Add
+	// Store.Add
 	s.Router.POST(pathPrefix+"/api/user", s.userAdd)
-	// UserStore.Delete
+	// Store.Delete
 	s.Router.DELETE(pathPrefix+"/api/user/:passkey", s.userDelete)
-	// UserStore.Sync
+	// Store.Sync
 	s.Router.POST(pathPrefix+"/api/user/sync", s.userSync)
-	// UserStore.GetByPasskey
+	// Store.GetByPasskey
 	s.Router.GET(pathPrefix+"/api/user/pk/:passkey", s.getUserByPasskey)
-	// UserStore.GetByID
+	// Store.GetByID
 	s.Router.GET(pathPrefix+"/api/user/id/:user_id", s.getUserByID)
 
-	// TorrentStore implementations
+	// StoreI implementations
 
-	// TorrentStore.WhiteListGetAll
+	// StoreI.WhiteListGetAll
 	s.Router.GET(pathPrefix+"/api/whitelist", s.getWhitelist)
-	// TorrentStore.WhiteListDelete
+	// StoreI.WhiteListDelete
 	s.Router.DELETE(pathPrefix+"/api/whitelist/:prefix", s.deleteWhitelist)
-	// TorrentStore.WhiteListAdd
+	// StoreI.WhiteListAdd
 	s.Router.POST(pathPrefix+"/api/whitelist", s.addWhitelist)
-	// TorrentStore.Add
+	// StoreI.Add
 	s.Router.POST(pathPrefix+"/api/torrent", s.addTorrent)
-	// TorrentStore.Get
+	// StoreI.Get
 	s.Router.GET(pathPrefix+"/api/torrent/:info_hash", s.getTorrent)
-	// TorrentStore.Delete
+	// StoreI.Delete
 	s.Router.DELETE(pathPrefix+"/api/torrent/:info_hash", s.deleteTorrent)
-	// TorrentStore.Sync
+	// StoreI.Sync
 	s.Router.POST(pathPrefix+"/api/torrent/sync", s.torrentSync)
 
 	// PeerStore implementations

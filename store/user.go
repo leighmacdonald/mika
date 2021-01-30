@@ -1,6 +1,9 @@
 package store
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // User defines a basic user known to the tracker
 // All users are considered enabled if they exist. You must remove them from the
@@ -54,11 +57,13 @@ func (users Users) Remove(p User) []User {
 }
 
 type Role struct {
-	RoleID          int     `json:"role_id" db:"role_id"`
-	RoleName        string  `json:"role_name" db:"role_name"`
-	Priority        int     `json:"priority" db:"priority"`
-	MultiUp         float64 `json:"multi_up" db:"multi_up"`
-	MultiDown       float64 `json:"multi_down" db:"multi_down"`
-	DownloadEnabled bool    `json:"download_enabled" db:"download_enabled"`
-	UploadEnabled   bool    `json:"upload_enabled" db:"upload_enabled"`
+	RoleID          int       `json:"role_id" db:"role_id"`
+	RoleName        string    `json:"role_name" db:"role_name"`
+	Priority        int       `json:"priority" db:"priority"`
+	MultiUp         float64   `json:"multi_up" db:"multi_up"`
+	MultiDown       float64   `json:"multi_down" db:"multi_down"`
+	DownloadEnabled bool      `json:"download_enabled" db:"download_enabled"`
+	UploadEnabled   bool      `json:"upload_enabled" db:"upload_enabled"`
+	CreatedOn       time.Time `json:"created_on" db:"created_on"`
+	UpdateOn        time.Time `json:"updated_on" db:"updated_on"`
 }

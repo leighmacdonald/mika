@@ -13,7 +13,7 @@ const (
 	driverName = "memory"
 )
 
-// TorrentStore is the memory backed store.TorrentStore implementation
+// TorrentStore is the memory backed store.StoreI implementation
 type TorrentStore struct {
 	sync.RWMutex
 	torrents  map[store.InfoHash]store.Torrent
@@ -262,7 +262,7 @@ func (ps *PeerStore) GetN(ih store.InfoHash, _ int) (store.Swarm, error) {
 type torrentDriver struct{}
 
 // New initialize a TorrentStore implementation using the memory backing store
-func (td torrentDriver) New(_ config.StoreConfig) (store.TorrentStore, error) {
+func (td torrentDriver) New(_ config.StoreConfig) (store.StoreI, error) {
 	return NewTorrentStore(), nil
 }
 
@@ -273,7 +273,7 @@ func (pd peerDriver) New(_ config.StoreConfig) (store.PeerStore, error) {
 	return NewPeerStore(), nil
 }
 
-// UserStore is the memory backed store.UserStore implementation
+// UserStore is the memory backed store.Store implementation
 type UserStore struct {
 	sync.RWMutex
 	users map[string]store.User
@@ -452,12 +452,12 @@ func (u *UserStore) Close() error {
 type userDriver struct{}
 
 // New creates a new memory backed user store.
-func (pd userDriver) New(_ config.StoreConfig) (store.UserStore, error) {
+func (pd userDriver) New(_ config.StoreConfig) (store.Store, error) {
 	return NewUserStore(), nil
 }
 
 func init() {
 	store.AddUserDriver(driverName, userDriver{})
 	store.AddPeerDriver(driverName, peerDriver{})
-	store.AddTorrentDriver(driverName, torrentDriver{})
+	store.AddDriver(driverName, torrentDriver{})
 }

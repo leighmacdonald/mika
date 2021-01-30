@@ -189,6 +189,7 @@ func DownloadDB(outputPath string, apiKey string) error {
 		wg.Add(1)
 		req := u
 		go func() {
+			log.Infof("Downloading geodb: %s", req.dbName)
 			if err := dl(req); err != nil {
 				log.Errorf("Failed to download geo database: %s", err.Error())
 			}
@@ -196,6 +197,7 @@ func DownloadDB(outputPath string, apiKey string) error {
 		}()
 	}
 	wg.Wait()
+	log.Info("Update complete")
 	return exitErr
 }
 

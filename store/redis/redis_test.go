@@ -12,7 +12,7 @@ import (
 )
 
 func TestRedisTorrentStore(t *testing.T) {
-	ts, e := store.NewTorrentStore(config.TorrentStore)
+	ts, e := store.NewStore(config.TorrentStore)
 	require.NoError(t, e, e)
 	store.TestTorrentStore(t, ts)
 }
@@ -26,7 +26,7 @@ func TestRedisUserStore(t *testing.T) {
 func TestRedisPeerStore(t *testing.T) {
 	client := redis.NewClient(newRedisConfig(config.PeerStore))
 	setupDB(t, client)
-	ts, err := store.NewTorrentStore(config.TorrentStore)
+	ts, err := store.NewStore(config.TorrentStore)
 	require.NoError(t, err)
 	ps, err := store.NewPeerStore(config.PeerStore)
 	require.NoError(t, err, err)

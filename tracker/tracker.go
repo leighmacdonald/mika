@@ -18,14 +18,11 @@ import (
 )
 
 var (
-	// ctx is the master context used in the tracker, children contexts must use
-	// this for their parent
-	ctx context.Context
-
-	torrents      store.TorrentStore
+	storeMu       = &sync.RWMutex{}
+	torrents      store.StoreI
 	TorrentsCache *store.TorrentCache
 
-	users      store.UserStore
+	users      store.Store
 	UsersCache *store.UserCache
 
 	peers     store.PeerStore
@@ -43,13 +40,20 @@ func init() {
 	StateUpdateChan = make(chan store.UpdateState, 1000)
 	whitelist = make(map[string]store.WhiteListClient)
 	whitelistMu = &sync.RWMutex{}
+	memCfg := config.StoreConfig{Type: "memory"}
+	ts, _ := store.NewStore(memCfg)
+	us, _ := store.NewUserStore(memCfg)
+	ps, _ := store.NewPeerStore(memCfg)
+	torrents = ts
+	users = us
+	peers = ps
 	TorrentsCache = store.NewTorrentCache()
 	UsersCache = store.NewUserCache()
 	PeerCache = store.NewPeerCache()
 }
 
 func Init() {
-	ts, err := store.NewTorrentStore(config.TorrentStore)
+	ts, err := store.NewStore(config.TorrentStore)
 	if err != nil {
 		log.Fatalf("Failed to setup torrent store: %s", err)
 	}
@@ -61,10 +65,11 @@ func Init() {
 	if err3 != nil {
 		log.Fatalf("Failed to setup user store: %s", err3)
 	}
+	storeMu.Lock()
 	torrents = ts
 	users = us
 	peers = ps
-
+	storeMu.Unlock()
 	var newGeodb geo.Provider
 	if config.GeoDB.Enabled {
 		newGeodb, err = geo.New(config.GeoDB.Path)
@@ -81,7 +86,7 @@ func Init() {
 
 // PeerReaper will call the store.PeerStore.Reap() function periodically. This is
 // used to clean peers that have not announced in a while from the swarm.
-func PeerReaper() {
+func PeerReaper(ctx context.Context) {
 	peerTimer := time.NewTimer(config.Tracker.ReaperIntervalParsed)
 	for {
 		select {
@@ -104,7 +109,7 @@ func PeerReaper() {
 // StatWorker handles summing up stats for users/peers/torrents to be sent to the
 // backing stores for long term storage.
 // No locking required for these data sets
-func StatWorker() {
+func StatWorker(ctx context.Context) {
 	syncTimer := time.NewTimer(config.Tracker.BatchUpdateIntervalParsed)
 	userBatch := make(map[string]store.UserStats)
 	peerBatch := make(map[store.PeerHash]store.PeerStats)

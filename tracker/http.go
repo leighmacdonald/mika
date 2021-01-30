@@ -188,11 +188,10 @@ func noRoute(c *gin.Context) {
 func NewBitTorrentHandler() *gin.Engine {
 	r := newRouter()
 	r.Use(handleTrackerErrors)
-	h := BitTorrentHandler{}
-	r.GET("/announce", h.announce)
-	r.GET("/scrape", h.scrape)
-	r.GET("/announce/:passkey", h.announce)
-	r.GET("/scrape/:passkey", h.scrape)
+	r.GET("/announce", announce)
+	r.GET("/scrape", scrape)
+	r.GET("/announce/:passkey", announce)
+	r.GET("/scrape/:passkey", scrape)
 	r.NoRoute(noRoute)
 	return r
 }

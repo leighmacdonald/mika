@@ -180,8 +180,8 @@ func announce(c *gin.Context) {
 		pk = req.Key
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
-	var tor store.Torrent
-	if err := TorrentGet(&tor, req.InfoHash, false); err != nil || tor.IsDeleted {
+	var tor *store.Torrent
+	if err := TorrentGet(tor, req.InfoHash, false); err != nil || tor.IsDeleted {
 		if config.Tracker.AutoRegister {
 			tor.InfoHash = req.InfoHash
 			tor.IsEnabled = true
@@ -207,8 +207,7 @@ func announce(c *gin.Context) {
 		c.Data(int(msgInvalidInfoHash), gin.MIMEPlain, responseError(tor.Reason))
 		return
 	}
-	var peer store.Peer
-	err := PeerGet(&peer, tor.InfoHash, req.PeerID)
+	peer, err := PeerGet(tor.InfoHash, req.PeerID)
 	if err != nil {
 		if err == consts.ErrInvalidPeerID {
 			// Create a new peer for the swarm
@@ -281,7 +280,7 @@ func announce(c *gin.Context) {
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(swarm store.Swarm, skipID store.PeerID, v6 bool, cl consts.CryptoLevel) []byte {
+func makeCompactPeers(swarm *store.Swarm, skipID store.PeerID, v6 bool, cl consts.CryptoLevel) []byte {
 	var buf bytes.Buffer
 	swarm.RLock()
 	for _, peer := range swarm.Peers {

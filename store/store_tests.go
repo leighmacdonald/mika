@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/stretchr/testify/require"
@@ -36,7 +35,7 @@ func GenerateTestTorrent() Torrent {
 }
 
 // GenerateTestPeer creates a peer using fake data for the provided user. Used for testing.
-func GenerateTestPeer() Peer {
+func GenerateTestPeer() *Peer {
 	token, _ := util.GenRandomBytes(20)
 	ih := PeerIDFromString(string(token))
 	p := NewPeer(
@@ -45,14 +44,6 @@ func GenerateTestPeer() Peer {
 		net.ParseIP("1.2.3.4"),
 		uint16(rand.Intn(60000)))
 	return p
-}
-
-func findPeer(swarm Swarm, p1 Peer) (Peer, error) {
-	p, found := swarm.Peers[p1.PeerID]
-	if !found {
-		return Peer{}, errors.New("unknown peer")
-	}
-	return p, nil
 }
 
 // TestTorrentStore tests the interface implementation

@@ -28,6 +28,7 @@ var (
 	// ErrInvalidUser is used when a user lookup fails
 	ErrInvalidUser = errors.New("invalid user")
 	ErrInvalidRole = errors.New("invalid role")
+	ErrInvalidPeer = errors.New("invalid peer")
 	// ErrInvalidClient is used when an invalid client is requested/used
 	ErrInvalidClient = errors.New("invalid torrent client")
 	// ErrBadResponseCode is returned when a HTTP request returns a non 200 code

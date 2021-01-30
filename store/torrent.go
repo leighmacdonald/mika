@@ -145,6 +145,8 @@ type Torrent struct {
 	Announces uint64  `db:"announces" json:"announces"`
 	Seeders   int     `db:"seeders" json:"seeders"`
 	Leechers  int     `db:"leechers" json:"leechers"`
+
+	Peers *Swarm
 }
 
 type TorrentUpdate struct {

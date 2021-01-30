@@ -5,11 +5,8 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
-	"github.com/leighmacdonald/mika/metrics"
 	"github.com/leighmacdonald/mika/store"
-	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
-	"sync/atomic"
 	"time"
 
 	// Imported for side-effects for NewTestTracker
@@ -18,18 +15,11 @@ import (
 )
 
 var (
-	storeMu       = &sync.RWMutex{}
-	torrents      store.StoreI
-	TorrentsCache *store.TorrentCache
-
-	users      store.Store
-	UsersCache *store.UserCache
-
-	peers     store.PeerStore
-	PeerCache *store.PeerCache
-
-	geodb geo.Provider
-
+	storeMu         *sync.RWMutex
+	db              store.Store
+	geodb           geo.Provider
+	torrents        map[store.InfoHash]*store.Torrent
+	users           map[string]*store.User
 	StateUpdateChan chan store.UpdateState
 	// whitelist and whitelist lock
 	whitelist   map[string]store.WhiteListClient
@@ -37,19 +27,16 @@ var (
 )
 
 func init() {
+	storeMu = &sync.RWMutex{}
 	StateUpdateChan = make(chan store.UpdateState, 1000)
 	whitelist = make(map[string]store.WhiteListClient)
 	whitelistMu = &sync.RWMutex{}
+
 	memCfg := config.StoreConfig{Type: "memory"}
 	ts, _ := store.NewStore(memCfg)
-	us, _ := store.NewUserStore(memCfg)
-	ps, _ := store.NewPeerStore(memCfg)
-	torrents = ts
-	users = us
-	peers = ps
-	TorrentsCache = store.NewTorrentCache()
-	UsersCache = store.NewUserCache()
-	PeerCache = store.NewPeerCache()
+	db = ts
+	torrents = make(map[store.InfoHash]*store.Torrent)
+	users = make(map[string]*store.User)
 }
 
 func Init() {
@@ -57,18 +44,8 @@ func Init() {
 	if err != nil {
 		log.Fatalf("Failed to setup torrent store: %s", err)
 	}
-	ps, err2 := store.NewPeerStore(config.PeerStore)
-	if err2 != nil {
-		log.Fatalf("Failed to setup peer store: %s", err2)
-	}
-	us, err3 := store.NewUserStore(config.UserStore)
-	if err3 != nil {
-		log.Fatalf("Failed to setup user store: %s", err3)
-	}
 	storeMu.Lock()
-	torrents = ts
-	users = us
-	peers = ps
+	db = ts
 	storeMu.Unlock()
 	var newGeodb geo.Provider
 	if config.GeoDB.Enabled {
@@ -91,12 +68,13 @@ func PeerReaper(ctx context.Context) {
 	for {
 		select {
 		case <-peerTimer.C:
-			expired := peers.Reap()
-			if PeerCache != nil {
-				for _, ph := range expired {
-					PeerCache.Delete(ph.InfoHash(), ph.PeerID())
-				}
-			}
+			// TODO FIXME
+			//expired := peers.Reap()
+			//if PeerCache != nil {
+			//	for _, ph := range expired {
+			//		PeerCache.Delete(ph.InfoHash(), ph.PeerID())
+			//	}
+			//}
 			// We use a timer here so that config updates for the interval get applied
 			// on the next tick
 			peerTimer.Reset(config.Tracker.ReaperIntervalParsed)
@@ -106,7 +84,7 @@ func PeerReaper(ctx context.Context) {
 	}
 }
 
-// StatWorker handles summing up stats for users/peers/torrents to be sent to the
+// StatWorker handles summing up stats for users/peers/db to be sent to the
 // backing stores for long term storage.
 // No locking required for these data sets
 func StatWorker(ctx context.Context) {
@@ -141,11 +119,11 @@ func StatWorker(ctx context.Context) {
 			if err := UserSync(userBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
-			log.Debugf("Calling Sync() on %d peers", len(userBatchCopy))
-			if err := PeerSync(peerBatchCopy); err != nil {
-				log.Errorf(err.Error())
-			}
-			log.Debugf("Calling Sync() on %d torrents", len(userBatchCopy))
+			//log.Debugf("Calling Sync() on %d peers", len(userBatchCopy))
+			//if err := PeerSync(peerBatchCopy); err != nil {
+			//	log.Errorf(err.Error())
+			//}
+			log.Debugf("Calling Sync() on %d db", len(userBatchCopy))
 			if err := TorrentSync(torrentBatchCopy); err != nil {
 				log.Errorf(err.Error())
 			}
@@ -255,7 +233,7 @@ func StatWorker(ctx context.Context) {
 //		}
 //	}
 //	for i := 0; i < torrentCount; i++ {
-//		if err := tracker.torrents.Add(store.GenerateTestTorrent()); err != nil {
+//		if err := tracker.db.Add(store.GenerateTestTorrent()); err != nil {
 //			log.Panicf("Error adding torrent: %s", err.Error())
 //		}
 //	}
@@ -273,7 +251,7 @@ func ClientWhitelisted(peerID store.PeerID) bool {
 // load it into memory for quick lookups.
 func LoadWhitelist() error {
 	newWhitelist := make(map[string]store.WhiteListClient)
-	wl, err4 := torrents.WhiteListGetAll()
+	wl, err4 := db.WhiteListGetAll()
 	if err4 != nil {
 		log.Warnf("whitelist empty, all clients are allowed")
 	} else {
@@ -286,138 +264,103 @@ func LoadWhitelist() error {
 	whitelistMu.Unlock()
 	return nil
 }
-func TorrentAdd(torrent store.Torrent) error {
-	return torrents.Add(torrent)
+func TorrentAdd(torrent *store.Torrent) error {
+	return db.TorrentAdd(torrent)
 }
 
 func TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {
-	cached := false
-	if TorrentsCache != nil {
-		cached = TorrentsCache.Get(torrent, hash)
-		if cached {
-			if torrent.IsDeleted && !deletedOk {
-				return consts.ErrInvalidInfoHash
-			}
-			return nil
-		}
-	}
-	if err := torrents.Get(torrent, hash, deletedOk); err != nil {
+	// TODO
+	if err := db.TorrentGet(torrent, hash, deletedOk); err != nil {
 		return err
-	}
-	if TorrentsCache != nil && !cached {
-		TorrentsCache.Set(*torrent)
 	}
 	return nil
 }
 
 func UserGet(user *store.User, passkey string) error {
-	cached := false
-	if UsersCache != nil {
-		cached = UsersCache.Get(user, passkey)
-		if cached {
-			return nil
-		}
-	}
-	if err := users.GetByPasskey(user, passkey); err != nil {
-		return err
-	}
-	if UsersCache != nil && !cached {
-		UsersCache.Set(*user)
-	}
-	return nil
-}
-
-func UserAdd(user store.User) error {
-	if err := users.Add(user); err != nil {
+	// TODO
+	if err := db.UserGetByPasskey(user, passkey); err != nil {
 		return err
 	}
 	return nil
 }
 
-func PeerGet(peer *store.Peer, infoHash store.InfoHash, peerID store.PeerID) error {
-	if PeerCache != nil && PeerCache.Get(peer, infoHash, peerID) {
-		return nil
-	}
-	if err := peers.Get(peer, infoHash, peerID); err != nil {
+func UserAdd(user *store.User) error {
+	if err := db.UserAdd(user); err != nil {
 		return err
-	}
-	if PeerCache != nil {
-		PeerCache.Set(infoHash, *peer)
 	}
 	return nil
 }
 
-func PeerGetN(infoHash store.InfoHash, max int) (store.Swarm, error) {
-	swarm, err := peers.GetN(infoHash, max)
+func PeerGet(infoHash store.InfoHash, peerID store.PeerID) (*store.Peer, error) {
+	// TODO
+	tor, found := torrents[infoHash]
+	if !found {
+		return nil, consts.ErrInvalidInfoHash
+	}
+	p, err := tor.Peers.Get(peerID)
 	if err != nil {
-		return store.Swarm{}, err
+		return nil, consts.ErrInvalidPeerID
 	}
+	return p, consts.ErrInvalidPeer
+}
+
+func PeerGetN(infoHash store.InfoHash, max int) (*store.Swarm, error) {
+	_, found := torrents[infoHash]
+	if !found {
+		return nil, consts.ErrInvalidInfoHash
+	}
+	swarm := &store.Swarm{}
+	// TODO get swarm
 	return swarm, nil
 }
 
-func PeerAdd(infoHash store.InfoHash, peer store.Peer) error {
-	if err := peers.Add(infoHash, peer); err != nil {
-		return err
-	}
-	if PeerCache != nil {
-		PeerCache.Set(infoHash, peer)
-		atomic.AddInt64(&metrics.PeersTotalCached, 1)
-	}
+func PeerAdd(infoHash store.InfoHash, peer *store.Peer) error {
+	// TODO
+	//if err := peers.Add(infoHash, peer); err != nil {
+	//	return err
+	//}
 	return nil
 }
+
 func peerDelete(infoHash store.InfoHash, peerID store.PeerID) error {
-	PeerCache.Delete(infoHash, peerID)
-	return peers.Delete(infoHash, peerID)
+	// TODO
+	//PeerCache.Delete(infoHash, peerID)
+	//return peers.Delete(infoHash, peerID)
+	return nil
 }
 
 func UserSync(batch map[string]store.UserStats) error {
-	if err := users.Sync(batch); err != nil {
+	if err := db.UserSync(batch); err != nil {
 		return err
-	}
-	if UsersCache != nil {
-		var usr store.User
-		for passkey, stats := range batch {
-			if UsersCache.Get(&usr, passkey) {
-				usr.Downloaded += stats.Downloaded
-				usr.Uploaded += stats.Uploaded
-				usr.Announces += stats.Announces
-				UsersCache.Set(usr)
-			}
-		}
 	}
 	return nil
 }
 
-func PeerSync(batch map[store.PeerHash]store.PeerStats) error {
-	if err := peers.Sync(batch); err != nil {
-		return err
-	}
-	if PeerCache != nil {
-		var peer store.Peer
-		for ph, stats := range batch {
-			sum := stats.Totals()
-			if PeerCache.Get(&peer, ph.InfoHash(), ph.PeerID()) {
-				peer.Downloaded += sum.TotalDn
-				peer.Uploaded += sum.TotalUp
-				peer.SpeedDN = uint32(sum.SpeedDn)
-				peer.SpeedUP = uint32(sum.SpeedUp)
-				peer.SpeedDNMax = util.UMax32(peer.SpeedDNMax, uint32(sum.SpeedDn))
-				peer.SpeedUPMax = util.UMax32(peer.SpeedUPMax, uint32(sum.SpeedUp))
-				PeerCache.Set(ph.InfoHash(), peer)
-			}
-		}
-	}
-	return nil
-}
+//func PeerSync(batch map[store.PeerHash]store.PeerStats) error {
+//	if err := peers.Sync(batch); err != nil {
+//		return err
+//	}
+//	if PeerCache != nil {
+//		var peer store.Peer
+//		for ph, stats := range batch {
+//			sum := stats.Totals()
+//			if PeerCache.Get(&peer, ph.InfoHash(), ph.PeerID()) {
+//				peer.Downloaded += sum.TotalDn
+//				peer.Uploaded += sum.TotalUp
+//				peer.SpeedDN = uint32(sum.SpeedDn)
+//				peer.SpeedUP = uint32(sum.SpeedUp)
+//				peer.SpeedDNMax = util.UMax32(peer.SpeedDNMax, uint32(sum.SpeedDn))
+//				peer.SpeedUPMax = util.UMax32(peer.SpeedUPMax, uint32(sum.SpeedUp))
+//				PeerCache.Set(ph.InfoHash(), peer)
+//			}
+//		}
+//	}
+//	return nil
+//}
 
 func TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
-	if err := torrents.Sync(batch); err != nil {
+	if err := db.TorrentSync(batch); err != nil {
 		return err
-	}
-	if TorrentsCache != nil {
-		for ih, stats := range batch {
-			TorrentsCache.Update(ih, stats)
-		}
 	}
 	return nil
 }

@@ -129,7 +129,7 @@ func (peer *Peer) Valid() bool {
 
 // Swarm is a set of users participating in a torrent
 type Swarm struct {
-	Peers    map[PeerID]Peer
+	Peers    map[PeerID]*Peer
 	Seeders  int
 	Leechers int
 	*sync.RWMutex
@@ -138,7 +138,7 @@ type Swarm struct {
 // NewSwarm instantiates a new swarm
 func NewSwarm() Swarm {
 	return Swarm{
-		Peers:    make(map[PeerID]Peer),
+		Peers:    make(map[PeerID]*Peer),
 		Seeders:  0,
 		Leechers: 0,
 		RWMutex:  &sync.RWMutex{},
@@ -153,14 +153,14 @@ func (swarm Swarm) Remove(p PeerID) {
 }
 
 // Add inserts a new peer into the swarm
-func (swarm Swarm) Add(p Peer) {
+func (swarm Swarm) Add(p *Peer) {
 	swarm.Lock()
 	swarm.Peers[p.PeerID] = p
 	swarm.Unlock()
 }
 
 // UpdatePeer will update a swarm member with new stats
-func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (Peer, bool) {
+func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (*Peer, bool) {
 	swarm.Lock()
 	peer, ok := swarm.Peers[peerID]
 	if !ok {
@@ -194,33 +194,19 @@ func (swarm Swarm) ReapExpired(infoHash InfoHash) []PeerHash {
 }
 
 // Get will copy a peer into the peer pointer passed in if it exists.
-func (swarm Swarm) Get(peer *Peer, peerID PeerID) error {
+func (swarm Swarm) Get(peerID PeerID) (*Peer, error) {
 	swarm.RLock()
 	defer swarm.RUnlock()
 	p, found := swarm.Peers[peerID]
 	if !found {
-		return consts.ErrInvalidPeerID
+		return nil, consts.ErrInvalidPeerID
 	}
-	*peer = p
-	return nil
-}
-
-func (swarm Swarm) Update(p Peer) error {
-	swarm.RLock()
-	_, found := swarm.Peers[p.PeerID]
-	swarm.RUnlock()
-	if !found {
-		return consts.ErrInvalidPeerID
-	}
-	swarm.Lock()
-	swarm.Peers[p.PeerID] = p
-	swarm.Unlock()
-	return nil
+	return p, nil
 }
 
 // NewPeer create a new peer instance for inserting into a swarm
-func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
-	return Peer{
+func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
+	return &Peer{
 		IP:            ip,
 		Port:          port,
 		AnnounceLast:  time.Now(),

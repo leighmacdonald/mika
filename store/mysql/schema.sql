@@ -30,7 +30,9 @@ create table torrent
     multi_dn decimal(5,2) default 1.00 not null,
     seeders int default 0 not null,
     leechers int default 0 not null,
-    announces int default 0 not null
+    announces int default 0 not null,
+    created_on datetime default current_timestamp() not null,
+    updated_on datetime default current_timestamp() not null
 );
 
 create table user
@@ -43,7 +45,10 @@ create table user
     uploaded bigint unsigned default 0 not null,
     announces int default 0 not null,
     passkey varchar(40) not null,
-    download_enabled tinyint(1) default 1 not null,
+    uploaded_real bigint unsigned default 0 not null,
+    downloaded_real bigint unsigned default 0 not null,
+    created_on datetime default current_timestamp() not null,
+    updated_on datetime default current_timestamp() not null,
     constraint user_passkey_uindex
         unique (passkey),
     constraint users_roles_role_id_fk

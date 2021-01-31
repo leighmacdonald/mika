@@ -6,14 +6,10 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type UserServer struct {
-	pb.UnimplementedUsersServer
-}
-
-func (s *UserServer) GetUser(context.Context, *pb.UserID) (*pb.User, error) {
+func (s *MikaService) GetUser(context.Context, *pb.UserID) (*pb.User, error) {
 	return nil, nil
 }
 
-func (s *UserServer) GetUsers(_ *emptypb.Empty, stream pb.UsersServer) error {
+func (s *MikaService) GetUsers(_ *emptypb.Empty, stream *pb.User) error {
 	return nil
 }

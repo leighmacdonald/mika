@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package mika;
+
+import "proto/config.proto";
+import "proto/tracker.proto";
+import "proto/role.proto";
+import "proto/user.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/leighmacdonald/mika/rpc";
+
+service Mika {
+  rpc ConfigUpdate(ConfigUpdateParams) returns (google.protobuf.Empty) {}
+  rpc WhiteListAdd(WhiteListParams) returns (google.protobuf.Empty) {}
+  rpc WhiteListDelete(WhiteListDeleteParams) returns (google.protobuf.Empty) {}
+  rpc WhiteList(google.protobuf.Empty) returns (WhiteListResponse) {}
+
+  rpc TorrentGet(TorrentParams) returns (Torrent) {}
+  rpc TorrentAdd(TorrentAddParams) returns (Torrent) {}
+  rpc TorrentDelete(InfoHashParam) returns (google.protobuf.Empty) {}
+  rpc TorrentUpdate(TorrentUpdateParams) returns (Torrent) {}
+
+  rpc UserGet(UserID) returns (User) {}
+  rpc UserAll(google.protobuf.Empty) returns (stream User) {}
+  rpc UserSave(UserUpdateParams) returns (User) {}
+  rpc UserDelete(UserID) returns (google.protobuf.Empty) {}
+  rpc UserAdd(UserAddParams) returns (User) {}
+
+  rpc RoleAll(google.protobuf.Empty) returns (stream Role ) {}
+  rpc RoleAdd(RoleAddParams) returns (Role) {}
+  rpc RoleDelete(RoleID) returns (google.protobuf.Empty) {}
+  rpc RoleSave(Role) returns (google.protobuf.Empty) {}
+}

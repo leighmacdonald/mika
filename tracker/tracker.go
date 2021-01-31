@@ -20,6 +20,7 @@ var (
 	geodb           geo.Provider
 	torrents        map[store.InfoHash]*store.Torrent
 	users           map[string]*store.User
+	roles           map[uint32]*store.Role
 	StateUpdateChan chan store.UpdateState
 	// whitelist and whitelist lock
 	whitelist   map[string]store.WhiteListClient
@@ -37,6 +38,7 @@ func init() {
 	db = ts
 	torrents = make(map[store.InfoHash]*store.Torrent)
 	users = make(map[string]*store.User)
+	roles = make(map[uint32]*store.Role)
 }
 
 func Init() {

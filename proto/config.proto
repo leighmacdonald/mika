@@ -2,8 +2,6 @@ syntax = "proto3";
 
 option go_package = "github.com/leighmacdonald/mika/rpc";
 
-import "google/protobuf/empty.proto";
-
 package mika;
 
 message WhiteListParams {
@@ -33,9 +31,3 @@ message ConfigUpdateParams {
   bool geodb_enabled = 6;
 }
 
-service Config {
-  rpc ConfigUpdate(ConfigUpdateParams) returns (google.protobuf.Empty) {}
-  rpc WhiteListAdd(WhiteListParams) returns (google.protobuf.Empty) {}
-  rpc WhiteListDelete(WhiteListDeleteParams) returns (google.protobuf.Empty) {}
-  rpc WhiteList(google.protobuf.Empty) returns (WhiteListResponse) {}
-}

@@ -52,16 +52,16 @@ var serveCmd = &cobra.Command{
 		//	opts = []grpc.ServerOption{grpc.Creds(creds)}
 		//}
 		grpcServer := grpc.NewServer(rpcOpts...)
-		pb.RegisterUsersServer(grpcServer, &rpc.UserServer{})
-		pb.RegisterTorrentsServer(grpcServer, &rpc.TorrentServer{})
-		pb.RegisterConfigServer(grpcServer, &rpc.ConfigServer{})
+		pb.RegisterMikaServer(grpcServer, &rpc.MikaService{})
 		go func() {
+			log.Infof("Starting gRPC service")
 			if errRpc := grpcServer.Serve(lis); errRpc != nil {
 				log.Errorf("gRPC error: %v", errRpc)
 			}
 		}()
 
 		go func() {
+			log.Infof("Starting tracker service")
 			if errRpc := btServer.ListenAndServe(); errRpc != nil {
 				log.Errorf("HTTP error: %v", errRpc)
 			}

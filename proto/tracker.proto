@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option go_package = "github.com/leighmacdonald/mika/rpc";
 
-import "google/protobuf/empty.proto";
+import "proto/common.proto";
 
 package mika;
 
@@ -16,6 +16,7 @@ message Torrent {
   string name = 3;
   int32 seeders = 4;
   int32 leechers = 5;
+  TimeMeta time = 6;
 }
 
 message TorrentParams {
@@ -36,11 +37,4 @@ message TorrentUpdateParams {
   string reason = 4;
   string multi_up = 5;
   string multi_dn = 6;
-}
-
-service Torrents {
-  rpc GetTorrent(TorrentParams) returns (Torrent) {}
-  rpc TorrentAdd(TorrentAddParams) returns (Torrent) {}
-  rpc TorrentDelete(InfoHashParam) returns (google.protobuf.Empty) {}
-  rpc TorrentUpdate(TorrentUpdateParams) returns (Torrent) {}
 }

@@ -48,6 +48,7 @@ docker_run: image_latest
 	@docker-compose run --rm mika
 
 protoc:
-	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/config.proto proto/users.proto proto/torrents.proto
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+	    proto/common.proto proto/config.proto proto/user.proto proto/tracker.proto proto/role.proto proto/mika.proto
 
 ## EOF

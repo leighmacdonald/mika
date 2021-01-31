@@ -113,13 +113,13 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 	go PeerReaper(ctx)
 	rh := NewBitTorrentHandler()
 
-	require.NoError(t, db.Add(torrent0), "Failed to add test torrent")
+	require.NoError(t, db.TorrentAdd(&torrent0), "Failed to add test torrent")
 	for _, u := range []store.User{user0, user1} {
-		require.NoError(t, users.Add(u), "Failed to add test user")
+		require.NoError(t, UserAdd(&u), "Failed to add test user")
 	}
-	require.NoError(t, peers.Add(torrent0.InfoHash, leecher0))
-	require.NoError(t, peers.Add(torrent0.InfoHash, seeder0))
-	require.NoError(t, db.Sync(map[store.InfoHash]store.TorrentStats{
+	torrent0.Peers.Add(leecher0)
+	torrent0.Peers.Add(seeder0)
+	require.NoError(t, db.TorrentSync(map[store.InfoHash]store.TorrentStats{
 		torrent0.InfoHash: {
 			Seeders:    1,
 			Leechers:   1,
@@ -177,9 +177,9 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 	go PeerReaper(ctx)
 	rh := NewBitTorrentHandler()
 
-	require.NoError(t, db.Add(torrent0), "Failed to add test torrent")
+	require.NoError(t, TorrentAdd(&torrent0), "Failed to add test torrent")
 	for _, u := range []store.User{user0, user1} {
-		require.NoError(t, users.Add(u), "Failed to add test user")
+		require.NoError(t, UserAdd(&u), "Failed to add test user")
 	}
 
 	type stateExpected struct {
@@ -302,19 +302,21 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			var peer store.Peer
 			if a.state.HasPeer {
 				// If we expect a peer (!stopped event)
-				require.NoError(t, peers.Get(&peer, a.req.Ih, a.req.PID), "Failed to get peer (%d)", i)
+				_, err := PeerGet(a.req.Ih, a.req.PID)
+				require.NoError(t, err, "Failed to get peer (%d)", i)
 				require.Equal(t, a.state.Uploaded, peer.Uploaded, "Invalid uploaded (%d)", i)
 				require.Equal(t, a.state.Downloaded, peer.Downloaded, "Invalid downloaded (%d)", i)
 				require.Equal(t, a.state.Left, peer.Left, "Invalid left (%d)", i)
 				require.Equal(t, a.state.Port, peer.Port, "Invalid port (%d)", i)
 				require.Equal(t, a.state.IP, peer.IP.String(), "Invalid ip (%d)", i)
 			} else {
-				require.Error(t, peers.Get(&peer, a.req.Ih, a.req.PID), "Got peer when we shouldn't (%d)", i)
+				_, err2 := PeerGet(a.req.Ih, a.req.PID)
+				require.Error(t, err2, "Got peer when we shouldn't (%d)", i)
 			}
-			swarm, err := peers.GetN(torrent0.InfoHash, 1000)
+			swarm, err := PeerGetN(torrent0.InfoHash, 1000)
 			require.NoError(t, err, "Failed to fetch all peers (%d)", i)
 			var torrent store.Torrent
-			require.NoError(t, db.Get(&torrent, torrent0.InfoHash, false))
+			require.NoError(t, TorrentGet(&torrent, torrent0.InfoHash, false))
 			require.Equal(t, a.state.SwarmSize, len(swarm.Peers), "Invalid swarm size (%d)", i)
 			require.Equal(t, a.state.Seeders, torrent.Seeders, "Invalid seeder count (%d)", i)
 			require.Equal(t, a.state.Leechers, torrent.Leechers, "Invalid leecher count (%d)", i)

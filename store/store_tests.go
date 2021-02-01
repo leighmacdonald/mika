@@ -92,7 +92,7 @@ func TestStore(t *testing.T, s Store) {
 	clientsUpdated, _ := s.WhiteListGetAll()
 	require.Equal(t, len(wlClients)-1, len(clientsUpdated))
 
-	roles := Roles{
+	roles := []*Role{
 		{
 			RoleName:        "Admin",
 			Priority:        1,
@@ -141,7 +141,7 @@ func TestStore(t *testing.T, s Store) {
 	var users []*User
 	for i := 0; i < 3; i++ {
 		usr := GenerateTestUser()
-		usr.RoleID = fetchedRolesDeleted[i].RoleID
+		usr.RoleID = fetchedRolesDeleted[uint32(i)].RoleID
 		users = append(users, &usr)
 	}
 	if users == nil {
@@ -172,9 +172,9 @@ func TestStore(t *testing.T, s Store) {
 	require.Equal(t, uint32(10)+users[0].Announces, updatedUser.Announces)
 
 	newUser := GenerateTestUser()
-	require.NoError(t, s.UserUpdate(&newUser, users[0].Passkey))
+	require.NoError(t, s.UserSave(&newUser))
 	var fetchedNewUser User
-	require.NoError(t, s.UserGetByPasskey(&fetchedNewUser, newUser.Passkey))
+	require.NoError(t, s.UserGetByID(&fetchedNewUser, newUser.UserID))
 	require.Equal(t, newUser.UserID, fetchedNewUser.UserID)
 	require.Equal(t, newUser.Passkey, fetchedNewUser.Passkey)
 	require.Equal(t, newUser.IsDeleted, fetchedNewUser.IsDeleted)

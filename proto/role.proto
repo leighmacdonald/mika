@@ -19,7 +19,7 @@ message Role {
 }
 
 message RoleID {
-  int32 role_id = 1;
+  uint32 role_id = 1;
   string role_name = 2;
 }
 

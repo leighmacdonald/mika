@@ -24,6 +24,18 @@ type Driver struct {
 	ctx context.Context
 }
 
+func (d *Driver) Users() (store.Users, error) {
+	panic("implement me")
+}
+
+func (d *Driver) Torrents() (store.Torrents, error) {
+	panic("implement me")
+}
+
+func (d *Driver) RoleSave(role *store.Role) error {
+	panic("implement me")
+}
+
 func (d *Driver) Roles() (store.Roles, error) {
 	panic("implement me")
 }
@@ -40,28 +52,24 @@ func (d *Driver) RoleDelete(roleID uint32) error {
 	panic("implement me")
 }
 
-func (d *Driver) UserUpdate(user *store.User, oldPasskey string) error {
+func (d *Driver) UserSave(user *store.User) error {
 	const q = `
 		UPDATE
 			users
 		SET
-			user_id = $1,
-		    passkey = $2,
-		    is_deleted = $3,
-		    download_enabled = $4,
-		    downloaded = $5,
-		    uploaded = $6,
-		    announces = $7
+		    passkey = $1,
+		    is_deleted = $2,
+		    download_enabled = $3,
+		    downloaded = $4,
+		    uploaded = $5,
+		    announces = $6
 		WHERE
-			passkey = $8
+			user_id = $7
 	`
-	passkey := user.Passkey
-	if oldPasskey != "" {
-		passkey = oldPasskey
-	}
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
-	_, err := d.db.Exec(c, q, user.UserID, user.Passkey, user.IsDeleted, user.DownloadEnabled, user.Downloaded, user.Uploaded, user.Announces, passkey)
+	_, err := d.db.Exec(c, q, user.Passkey, user.IsDeleted, user.DownloadEnabled,
+		user.Downloaded, user.Uploaded, user.Announces, user.UserID)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to update user: %d", user.UserID)
 	}

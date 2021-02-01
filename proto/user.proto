@@ -7,24 +7,28 @@ import "proto/common.proto";
 package mika;
 
 message User {
-  int64 user_id = 1;
+  uint32 user_id = 1;
   uint32 role_id = 2;
-  int64 remote_id = 3;
+  uint64 remote_id = 3;
   string user_name = 4;
-  int64 downloaded = 5;
-  int64 uploaded = 6;
+  uint64 downloaded = 5;
+  uint64 uploaded = 6;
   string passkey = 7;
-  TimeMeta time = 9;
+  bool is_deleted = 8;
+  bool download_enabled = 9;
+  uint32 announces = 10;
+  TimeMeta time = 11;
 }
 
 message UserID {
-  int32 user_id = 1;
-  string user_name = 2;
+  uint32 user_id = 1;
+  uint64 remote_id = 2;
+  string passkey = 3;
 }
 
 message UserAddParams {
   uint32 role_id = 1;
-  int64 remote_id = 2;
+  uint64 remote_id = 2;
   string user_name = 3;
   bool download_enabled = 4;
   uint64 downloaded = 5;
@@ -33,11 +37,12 @@ message UserAddParams {
 }
 
 message UserUpdateParams {
-  uint32 role_id = 1;
-  int64 remote_id = 2;
-  string user_name = 3;
-  bool download_enabled = 4;
-  int64 downloaded = 5;
-  int64 uploaded = 6;
-  string passkey = 7;
+  uint32 user_id = 1;
+  uint32 role_id = 2;
+  uint64 remote_id = 3;
+  string user_name = 4;
+  bool download_enabled = 5;
+  uint64 downloaded = 6;
+  uint64 uploaded = 7;
+  string passkey = 8;
 }

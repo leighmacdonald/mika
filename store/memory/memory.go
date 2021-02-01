@@ -131,13 +131,25 @@ func NewDriver() *Driver {
 type Driver struct {
 	swarms      map[store.InfoHash]store.Swarm
 	users       map[string]*store.User
-	roles       []*store.Role
-	torrents    map[store.InfoHash]*store.Torrent
+	roles       store.Roles
+	torrents    store.Torrents
 	whitelist   []store.WhiteListClient
 	rolesMu     *sync.RWMutex
 	torrentsMu  *sync.RWMutex
 	usersMu     *sync.RWMutex
 	whitelistMu *sync.RWMutex
+}
+
+func (d *Driver) Users() (store.Users, error) {
+	return d.users, nil
+}
+
+func (d *Driver) Torrents() (store.Torrents, error) {
+	return d.torrents, nil
+}
+
+func (d *Driver) RoleSave(_ *store.Role) error {
+	return nil
 }
 
 func (d *Driver) RoleByID(role *store.Role, roleID uint32) error {
@@ -168,7 +180,7 @@ func (d *Driver) RoleAdd(role *store.Role) error {
 		}
 	}
 	role.RoleID = maxID + 1
-	d.roles = append(d.roles, role)
+	d.roles[role.RoleID] = role
 	return nil
 }
 
@@ -184,17 +196,7 @@ func (d *Driver) RoleDelete(roleID uint32) error {
 	if conflicts > 0 {
 		return errors.Errorf("Found %d users with only a single role, cannot remove only role", conflicts)
 	}
-	found := false
-	for i := len(d.roles) - 1; i >= 0; i-- {
-		if d.roles[i].RoleID == roleID {
-			d.roles = append(d.roles[:i], d.roles[i+1:]...)
-			found = true
-			break
-		}
-	}
-	if !found {
-		return errors.New("Unknown role_id")
-	}
+	delete(d.roles, roleID)
 	return nil
 }
 
@@ -203,7 +205,7 @@ func (d *Driver) Roles() (store.Roles, error) {
 }
 
 // Update is used to change a known user
-func (d *Driver) UserUpdate(_ *store.User, _ string) error {
+func (d *Driver) UserSave(_ *store.User) error {
 	return nil
 }
 
@@ -280,7 +282,7 @@ func (d *Driver) Close() error {
 	d.users = make(map[string]*store.User)
 	d.usersMu.Unlock()
 	d.torrentsMu.Lock()
-	d.torrents = make(map[store.InfoHash]*store.Torrent)
+	d.torrents = make(store.Torrents)
 	d.torrentsMu.Unlock()
 	return nil
 }

@@ -29,6 +29,51 @@ type MariaDBStore struct {
 	db *sqlx.DB
 }
 
+func (s *MariaDBStore) Users() (store.Users, error) {
+	const q = `
+		SELECT user_id, role_id, is_deleted, downloaded, uploaded, 
+		       announces, passkey, download_enabled 
+		FROM user`
+	var users []*store.User
+	if err := s.db.Select(&users, q); err != nil {
+		return nil, errors.Wrap(err, "Failed to get all users")
+	}
+	result := store.Users{}
+	for _, u := range users {
+		result[u.Passkey] = u
+	}
+	return result, nil
+}
+
+func (s *MariaDBStore) Torrents() (store.Torrents, error) {
+	const q = `
+		SELECT info_hash, total_uploaded, total_downloaded, total_completed, 
+		       is_deleted, is_enabled, reason, multi_up, multi_dn, seeders, leechers, announces 
+		FROM torrent`
+	var torrents []*store.Torrent
+	if err := s.db.Select(&torrents, q); err != nil {
+		return nil, errors.Wrap(err, "Failed to get all torrents")
+	}
+	result := store.Torrents{}
+	for _, t := range torrents {
+		result[t.InfoHash] = t
+	}
+	return result, nil
+}
+
+func (s *MariaDBStore) RoleSave(role *store.Role) error {
+	const q = `
+		UPDATE role 
+		SET download_enabled = :download_enabled, upload_enabled = :upload_enabled, 
+		    multi_down = :multi_down, multi_up = :multi_up, 
+		    priority = :priority, role_name = :role_name
+		WHERE role_id = ?`
+	if _, err := s.db.NamedExec(q, role); err != nil {
+		return errors.Wrap(err, "Failed to save role")
+	}
+	return nil
+}
+
 func (s *MariaDBStore) RoleByID(role *store.Role, roleID uint32) error {
 	const q = `
 		SELECT 
@@ -77,11 +122,15 @@ func (s *MariaDBStore) Roles() (store.Roles, error) {
 		    role_id, role_name, priority, multi_up, multi_down, download_enabled, 
        		upload_enabled, created_on, updated_on 
 		FROM role`
-	var roles store.Roles
+	var roles []*store.Role
 	if err := s.db.Select(&roles, q); err != nil {
 		return nil, err
 	}
-	return roles, nil
+	result := store.Roles{}
+	for _, t := range roles {
+		result[t.RoleID] = t
+	}
+	return result, nil
 }
 
 // Sync batch updates the backing store with the new UserStats provided
@@ -215,20 +264,20 @@ func (s *MariaDBStore) UserDelete(user *store.User) error {
 	return nil
 }
 
-func (s *MariaDBStore) UserUpdate(user *store.User, oldPasskey string) error {
+func (s *MariaDBStore) UserSave(user *store.User) error {
 	const q = `
 		UPDATE user
-		SET user_id          = ?,
+		SET
 			passkey          = ?,
 			download_enabled = ?,
 			is_deleted       = ?,
 			downloaded       = ?,
 			uploaded         = ?,
 			announces        = ?
-		WHERE passkey = ?`
-	if _, err := s.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
+		WHERE user_id = ?`
+	if _, err := s.db.Exec(q, user.Passkey, user.DownloadEnabled,
 		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces,
-		oldPasskey); err != nil {
+		user.UserID); err != nil {
 		return errors.Wrapf(err, "Failed to update user")
 	}
 	return nil

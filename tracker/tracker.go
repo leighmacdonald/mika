@@ -37,8 +37,8 @@ func init() {
 	ts, _ := store.NewStore(memCfg)
 	db = ts
 	torrents = make(map[store.InfoHash]*store.Torrent)
-	users = make(map[string]*store.User)
-	roles = make(map[uint32]*store.Role)
+	users = make(store.Users)
+	roles = make(store.Roles)
 }
 
 func Init() {
@@ -61,6 +61,33 @@ func Init() {
 	geodb = newGeodb
 
 	_ = LoadWhitelist()
+	roles = loadRoles()
+	users = loadUsers()
+	torrents = loadTorrents()
+}
+
+func loadRoles() store.Roles {
+	roleSet, err := db.Roles()
+	if err != nil {
+		log.Fatalf("Failed to load roles")
+	}
+	return roleSet
+}
+
+func loadUsers() store.Users {
+	users, err := db.Users()
+	if err != nil {
+		log.Fatalf("Failed to load users")
+	}
+	return users
+}
+
+func loadTorrents() store.Torrents {
+	torrentSet, err := db.Torrents()
+	if err != nil {
+		log.Fatalf("Failed to load torrents")
+	}
+	return torrentSet
 }
 
 // PeerReaper will call the store.PeerStore.Reap() function periodically. This is
@@ -266,6 +293,7 @@ func LoadWhitelist() error {
 	whitelistMu.Unlock()
 	return nil
 }
+
 func TorrentAdd(torrent *store.Torrent) error {
 	return db.TorrentAdd(torrent)
 }
@@ -273,21 +301,6 @@ func TorrentAdd(torrent *store.Torrent) error {
 func TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {
 	// TODO
 	if err := db.TorrentGet(torrent, hash, deletedOk); err != nil {
-		return err
-	}
-	return nil
-}
-
-func UserGet(user *store.User, passkey string) error {
-	// TODO
-	if err := db.UserGetByPasskey(user, passkey); err != nil {
-		return err
-	}
-	return nil
-}
-
-func UserAdd(user *store.User) error {
-	if err := db.UserAdd(user); err != nil {
 		return err
 	}
 	return nil
@@ -328,13 +341,6 @@ func peerDelete(infoHash store.InfoHash, peerID store.PeerID) error {
 	// TODO
 	//PeerCache.Delete(infoHash, peerID)
 	//return peers.Delete(infoHash, peerID)
-	return nil
-}
-
-func UserSync(batch map[string]store.UserStats) error {
-	if err := db.UserSync(batch); err != nil {
-		return err
-	}
 	return nil
 }
 

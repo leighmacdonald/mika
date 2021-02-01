@@ -39,6 +39,7 @@ func AddDriver(name string, driver Driver) {
 // These should be cached indefinitely, we treat any known user as allowed to connect.
 // To disable a user they MUST be deleted from the active user cache
 type Store interface {
+	Users() (Users, error)
 	// Add will add a new user to the backing store
 	UserAdd(u *User) error
 	// GetByPasskey returns a user matching the passkey
@@ -48,7 +49,7 @@ type Store interface {
 	// Delete removes a user from the backing store
 	UserDelete(user *User) error
 	// Update is used to change a known user
-	UserUpdate(user *User, oldPasskey string) error
+	UserSave(user *User) error
 
 	// Roles fetches all known groups
 	Roles() (Roles, error)
@@ -58,10 +59,13 @@ type Store interface {
 	RoleAdd(role *Role) error
 	// RoleDelete permanently deletes a role from the system
 	RoleDelete(roleID uint32) error
+	// RoleSave commits the role to persistent store
+	RoleSave(role *Role) error
 
 	// Close will cleanup and close the underlying storage driver if necessary
 	UserSync(b map[string]UserStats) error
 
+	Torrents() (Torrents, error)
 	// Add adds a new torrent to the backing store
 	TorrentAdd(t *Torrent) error
 	// Delete will mark a torrent as deleted in the backing store.

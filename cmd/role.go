@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/leighmacdonald/mika/client"
 	pb "github.com/leighmacdonald/mika/proto"
+	"github.com/leighmacdonald/mika/rpc"
+	"github.com/leighmacdonald/mika/store"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -33,10 +35,12 @@ var roleAddCmd = &cobra.Command{
 			log.Fatalf("Failed to connect to tracker")
 			return
 		}
-		if _, err2 := client.RoleAdd(context.Background(), roleAddParam, nil); err2 != nil {
+		r, err2 := client.RoleAdd(context.Background(), roleAddParam)
+		if err2 != nil {
 			log.Fatalf("Failed to add new role: %v", err2)
 		}
-		log.Infof("Role added successfully")
+		role := rpc.PBToRole(r)
+		role.Log().Infof("Role added successfully (id: %d, name: )", r.RoleId)
 	},
 }
 
@@ -56,6 +60,7 @@ var roleListCmd = &cobra.Command{
 			log.Fatalf("Failed to fetch roles: %v", err)
 			return
 		}
+		var roles []*store.Role
 		for {
 			in, err := stream.Recv()
 			if err == io.EOF {
@@ -65,8 +70,11 @@ var roleListCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalf("Failed to receive a note : %v", err)
 			}
+			roles = append(roles, rpc.PBToRole(in))
+		}
+		for _, r := range roles {
 			log.Infof("Name: %s, ID: %d RemoteID: %d MultiUp %.1f MultiDn %.1f",
-				in.RoleName, in.RoleId, in.RemoteId, in.MultiUp, in.MultiDown)
+				r.RoleName, r.RoleID, r.RemoteID, r.MultiUp, r.MultiDown)
 		}
 	},
 }

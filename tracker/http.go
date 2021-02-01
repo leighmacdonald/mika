@@ -129,11 +129,13 @@ func preFlightChecks(usr *store.User, pk string, c *gin.Context) bool {
 			oops(c, msgInvalidAuth)
 			return false
 		}
-		if err := UserGet(usr, pk); err != nil {
+		foundUser, err := UserGetByPasskey(pk)
+		if err != nil {
 			log.Debugf("Got invalid passkey")
 			oops(c, msgInvalidAuth)
 			return false
 		}
+		usr = foundUser
 		return usr.Valid()
 	}
 }

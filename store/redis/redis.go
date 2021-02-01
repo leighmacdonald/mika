@@ -57,6 +57,18 @@ type Driver struct {
 	peerTTL time.Duration
 }
 
+func (d *Driver) Users() (store.Users, error) {
+	panic("implement me")
+}
+
+func (d *Driver) Torrents() (store.Torrents, error) {
+	panic("implement me")
+}
+
+func (d *Driver) RoleSave(role *store.Role) error {
+	panic("implement me")
+}
+
 func (d *Driver) RoleByID(role *store.Role, roleID uint32) error {
 	panic("implement me")
 }
@@ -172,22 +184,15 @@ func (d *Driver) UserDelete(user *store.User) error {
 	return nil
 }
 
-func (d *Driver) UserUpdate(user *store.User, oldPasskey string) error {
-	passkey := user.Passkey
-	if oldPasskey != "" {
-		passkey = oldPasskey
-	}
-	exists, err := d.client.Exists(userKey(passkey)).Result()
+func (d *Driver) UserSave(user *store.User) error {
+	exists, err := d.client.Exists(userKey(user.Passkey)).Result()
 	if err != nil || exists == 0 {
 		return err
 	}
 	pipe := d.client.TxPipeline()
 	pipe.HSet(userKey(user.Passkey), userMap(user))
 	pipe.Set(userIDKey(user.UserID), user.Passkey, 0)
-	if oldPasskey != "" {
-		// remove old user object when switching to a new passkey as its the key
-		pipe.Del(userKey(passkey))
-	}
+	// TODO handle changing passkeys properly, this will not remove the old
 	if _, err := pipe.Exec(); err != nil {
 		return errors.Wrap(err, "Failed to add user to store")
 	}

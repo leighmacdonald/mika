@@ -235,7 +235,7 @@ func NewTorrent(ih InfoHash) Torrent {
 }
 
 // Torrents is a basic type alias for multiple torrents
-type Torrents []Torrent
+type Torrents map[InfoHash]*Torrent
 
 // WhiteListClient defines a whitelisted bittorrent client allowed to participate
 // in swarms. This is not a foolproof solution as its fairly trivial for a motivated

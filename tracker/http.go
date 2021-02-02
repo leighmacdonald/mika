@@ -61,9 +61,9 @@ var (
 
 // Err maps a tracker error code to a error
 //noinspection GoUnusedExportedFunction
-func Err(code errCode) error {
-	return responseStringMap[code]
-}
+//func Err(code errCode) error {
+//	return responseStringMap[code]
+//}
 
 // getIP Parses and returns a IP from a query
 // If a IP header exists, it will be used instead of the client provided query parameter

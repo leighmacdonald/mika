@@ -115,6 +115,7 @@ func UserToPB(u *store.User) *pb.User {
 			CreatedOn: timestamppb.New(u.CreatedOn),
 			UpdatedOn: timestamppb.New(u.UpdatedOn),
 		},
+		Role: RoleToPB(u.Role),
 	}
 }
 
@@ -132,6 +133,6 @@ func PBToUser(u *pb.User) *store.User {
 		RemoteID:        u.RemoteId,
 		CreatedOn:       u.Time.CreatedOn.AsTime(),
 		UpdatedOn:       u.Time.UpdatedOn.AsTime(),
-		Role:            nil,
+		Role:            PBToRole(u.Role),
 	}
 }

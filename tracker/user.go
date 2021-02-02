@@ -3,6 +3,7 @@ package tracker
 import (
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
 )
 
 func Users() store.Users {
@@ -10,6 +11,9 @@ func Users() store.Users {
 }
 
 func UserAdd(user *store.User) error {
+	if user.Passkey == "" {
+		user.Passkey = util.NewPasskey()
+	}
 	if err := db.UserAdd(user); err != nil {
 		return err
 	}
@@ -47,7 +51,7 @@ func UserSave(user *store.User) error {
 	return db.UserSave(user)
 }
 
-func UserSync(batch map[string]store.UserStats) error {
+func userSync(batch []*store.User) error {
 	if err := db.UserSync(batch); err != nil {
 		return err
 	}

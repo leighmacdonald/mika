@@ -5,15 +5,13 @@ package mysql
 
 import (
 	"context"
-	// imported for side-effects
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"sync"
 	"time"
 )
 
@@ -24,12 +22,12 @@ const (
 // ErrNoResults is the string returned from the driver when no rows are returned
 const ErrNoResults = "sql: no rows in result set"
 
-// MariaDBStore is the MariaDB backed store.Store implementation
-type MariaDBStore struct {
+// Driver is the MariaDB backed store.Store implementation
+type Driver struct {
 	db *sqlx.DB
 }
 
-func (s *MariaDBStore) Users() (store.Users, error) {
+func (s *Driver) Users() (store.Users, error) {
 	const q = `
 		SELECT user_id, role_id, is_deleted, downloaded, uploaded, 
 		       announces, passkey, download_enabled 
@@ -45,10 +43,11 @@ func (s *MariaDBStore) Users() (store.Users, error) {
 	return result, nil
 }
 
-func (s *MariaDBStore) Torrents() (store.Torrents, error) {
+func (s *Driver) Torrents() (store.Torrents, error) {
 	const q = `
 		SELECT info_hash, total_uploaded, total_downloaded, total_completed, 
-		       is_deleted, is_enabled, reason, multi_up, multi_dn, seeders, leechers, announces 
+		       is_deleted, is_enabled, reason, multi_up, multi_dn, seeders, leechers, announces,
+		       title, created_on, updated_on
 		FROM torrent`
 	var torrents []*store.Torrent
 	if err := s.db.Select(&torrents, q); err != nil {
@@ -61,7 +60,7 @@ func (s *MariaDBStore) Torrents() (store.Torrents, error) {
 	return result, nil
 }
 
-func (s *MariaDBStore) RoleSave(role *store.Role) error {
+func (s *Driver) RoleSave(role *store.Role) error {
 	const q = `
 		UPDATE role 
 		SET download_enabled = :download_enabled, upload_enabled = :upload_enabled, 
@@ -74,7 +73,7 @@ func (s *MariaDBStore) RoleSave(role *store.Role) error {
 	return nil
 }
 
-func (s *MariaDBStore) RoleByID(role *store.Role, roleID uint32) error {
+func (s *Driver) RoleByID(role *store.Role, roleID uint32) error {
 	const q = `
 		SELECT 
        		role_id, role_name, priority, multi_up, multi_down, 
@@ -90,7 +89,7 @@ func (s *MariaDBStore) RoleByID(role *store.Role, roleID uint32) error {
 	return nil
 }
 
-func (s *MariaDBStore) RoleAdd(role *store.Role) error {
+func (s *Driver) RoleAdd(role *store.Role) error {
 	const q = `
 		INSERT INTO role 
 		    (role_name, priority, multi_up, multi_down, download_enabled, upload_enabled, created_on, updated_on) 
@@ -108,7 +107,7 @@ func (s *MariaDBStore) RoleAdd(role *store.Role) error {
 	return nil
 }
 
-func (s *MariaDBStore) RoleDelete(roleID uint32) error {
+func (s *Driver) RoleDelete(roleID uint32) error {
 	const q = `DELETE FROM role WHERE role_id = ?`
 	if _, err := s.db.Exec(q, roleID); err != nil {
 		return errors.Wrap(err, "Failed to delete role")
@@ -116,7 +115,7 @@ func (s *MariaDBStore) RoleDelete(roleID uint32) error {
 	return nil
 }
 
-func (s *MariaDBStore) Roles() (store.Roles, error) {
+func (s *Driver) Roles() (store.Roles, error) {
 	const q = `
 		SELECT 
 		    role_id, role_name, priority, multi_up, multi_down, download_enabled, 
@@ -134,7 +133,7 @@ func (s *MariaDBStore) Roles() (store.Roles, error) {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (s *MariaDBStore) UserSync(b map[string]store.UserStats) error {
+func (s *Driver) UserSync(b []*store.User) error {
 	const q = ` UPDATE user
     SET announces  = (announces + ?),
         uploaded   = (uploaded + ?),
@@ -167,15 +166,15 @@ func (s *MariaDBStore) UserSync(b map[string]store.UserStats) error {
 }
 
 // Add will add a new user to the backing store
-func (s *MariaDBStore) UserAdd(user *store.User) error {
+func (s *Driver) UserAdd(user *store.User) error {
 	if user.RoleID == 0 {
 		return errors.New("Must supply at least 1 role")
 	}
 	const q = `INSERT INTO user
-    (user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces, role_id)
+    (passkey, download_enabled, is_deleted, downloaded, uploaded, announces, role_id, remote_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
-	res, err2 := s.db.Exec(q, user.UserID, user.Passkey, user.DownloadEnabled,
-		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces, user.RoleID)
+	res, err2 := s.db.Exec(q, user.Passkey, user.DownloadEnabled,
+		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces, user.RoleID, user.RemoteID)
 	if err2 != nil {
 		return errors.Wrap(err2, "Failed to add user to store")
 	}
@@ -196,7 +195,7 @@ func (s *MariaDBStore) UserAdd(user *store.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (s *MariaDBStore) UserGetByPasskey(user *store.User, passkey string) error {
+func (s *Driver) UserGetByPasskey(user *store.User, passkey string) error {
 	const q = `
 		SELECT 
 		    u.user_id,
@@ -224,7 +223,7 @@ func (s *MariaDBStore) UserGetByPasskey(user *store.User, passkey string) error 
 }
 
 // GetByID returns a user matching the userId
-func (s *MariaDBStore) UserGetByID(user *store.User, userID uint32) error {
+func (s *Driver) UserGetByID(user *store.User, userID uint32) error {
 	const q = `
 		SELECT 
 		    u.user_id,
@@ -252,7 +251,7 @@ func (s *MariaDBStore) UserGetByID(user *store.User, userID uint32) error {
 }
 
 // Delete removes a user from the backing store
-func (s *MariaDBStore) UserDelete(user *store.User) error {
+func (s *Driver) UserDelete(user *store.User) error {
 	if user.UserID == 0 {
 		return errors.New("User doesnt have a user_id")
 	}
@@ -264,7 +263,7 @@ func (s *MariaDBStore) UserDelete(user *store.User) error {
 	return nil
 }
 
-func (s *MariaDBStore) UserSave(user *store.User) error {
+func (s *Driver) UserSave(user *store.User) error {
 	const q = `
 		UPDATE user
 		SET
@@ -284,15 +283,15 @@ func (s *MariaDBStore) UserSave(user *store.User) error {
 }
 
 // Close will close the underlying database connection and clear the local caches
-func (s *MariaDBStore) Close() error {
+func (s *Driver) Close() error {
 	return s.db.Close()
 }
 
-func (s *MariaDBStore) Name() string {
+func (s *Driver) Name() string {
 	return driverName
 }
 
-func (s *MariaDBStore) TorrentUpdate(torrent *store.Torrent) error {
+func (s *Driver) TorrentUpdate(torrent *store.Torrent) error {
 	const q = `
 		UPDATE 
 		    torrent 
@@ -329,7 +328,7 @@ func (s *MariaDBStore) TorrentUpdate(torrent *store.Torrent) error {
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (s *MariaDBStore) TorrentSync(b map[store.InfoHash]store.TorrentStats) error {
+func (s *Driver) TorrentSync(b []*store.Torrent) error {
 	const q = ` 
 		UPDATE
 			torrent
@@ -348,15 +347,15 @@ func (s *MariaDBStore) TorrentSync(b map[store.InfoHash]store.TorrentStats) erro
 	if err2 != nil {
 		return errors.Wrap(err2, "Failed to prepare torrent Sync() tx")
 	}
-	for ih, stats := range b {
+	for _, t := range b {
 		if _, err := stmt.Exec(
-			stats.Downloaded,
-			stats.Uploaded,
-			stats.Announces,
-			stats.Snatches,
-			stats.Seeders,
-			stats.Leechers,
-			ih.Bytes(),
+			t.Downloaded,
+			t.Uploaded,
+			t.Announces,
+			t.Snatches,
+			t.Seeders,
+			t.Leechers,
+			t.InfoHash.Bytes(),
 		); err != nil {
 			if err := tx.Rollback(); err != nil {
 				log.Errorf("Failed to roll back torrent Sync() tx")
@@ -371,12 +370,12 @@ func (s *MariaDBStore) TorrentSync(b map[store.InfoHash]store.TorrentStats) erro
 }
 
 // Conn returns the underlying database driver
-func (s *MariaDBStore) Conn() interface{} {
+func (s *Driver) Conn() interface{} {
 	return s.db
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (s *MariaDBStore) WhiteListDelete(client store.WhiteListClient) error {
+func (s *Driver) WhiteListDelete(client *store.WhiteListClient) error {
 	const q = `DELETE FROM whitelist WHERE client_prefix = ?`
 	if _, err := s.db.Exec(q, client.ClientPrefix); err != nil {
 		return errors.Wrap(err, "Failed to delete client whitelist")
@@ -385,7 +384,7 @@ func (s *MariaDBStore) WhiteListDelete(client store.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (s *MariaDBStore) WhiteListAdd(client store.WhiteListClient) error {
+func (s *Driver) WhiteListAdd(client *store.WhiteListClient) error {
 	const q = ` INSERT INTO whitelist (client_prefix, client_name) VALUES (?, ?);`
 	if _, err := s.db.Exec(q, client.ClientPrefix, client.ClientName); err != nil {
 		return errors.Wrap(err, "Failed to insert new whitelist entry")
@@ -394,8 +393,8 @@ func (s *MariaDBStore) WhiteListAdd(client store.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (s *MariaDBStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
-	var wl []store.WhiteListClient
+func (s *Driver) WhiteListGetAll() ([]*store.WhiteListClient, error) {
+	var wl []*store.WhiteListClient
 	const q = `SELECT client_prefix, client_name FROM whitelist;`
 	if err := s.db.Select(&wl, q); err != nil {
 		return nil, errors.Wrap(err, "Failed to select client whitelists")
@@ -404,7 +403,7 @@ func (s *MariaDBStore) WhiteListGetAll() ([]store.WhiteListClient, error) {
 }
 
 // Get returns a torrent for the hash provided
-func (s *MariaDBStore) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+func (s *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
 	const q = `
 		SELECT 
 			info_hash,
@@ -437,18 +436,28 @@ func (s *MariaDBStore) TorrentGet(t *store.Torrent, hash store.InfoHash, deleted
 }
 
 // Add inserts a new torrent into the backing store
-func (s *MariaDBStore) TorrentAdd(t *store.Torrent) error {
-	const q = `INSERT INTO torrent (info_hash) VALUES (?);`
-	_, err := s.db.Exec(q, t.InfoHash.Bytes())
+func (s *Driver) TorrentAdd(t *store.Torrent) error {
+	t.CreatedOn = time.Now()
+	t.UpdatedOn = t.CreatedOn
+	const q = `
+		INSERT INTO torrent (info_hash, multi_up, multi_dn, title, created_on, updated_on) 
+		VALUES (?, ?, ?, ?, ?, ?);`
+	_, err := s.db.Exec(q, t.InfoHash.Bytes(), t.MultiUp, t.MultiDn, t.Title, t.CreatedOn, t.UpdatedOn)
 	if err != nil {
-		return err
+		myErr, ok := err.(*mysql.MySQLError)
+		if ok { // MySQL error
+			if myErr.Number == 1062 {
+				return consts.ErrDuplicate
+			}
+		}
+		return errors.Wrap(err, "Failed to add torrent to store")
 	}
 	return nil
 }
 
 // Delete will mark a torrent as deleted in the backing store.
 // If dropRow is true, it will permanently remove the torrent from the store
-func (s *MariaDBStore) TorrentDelete(ih store.InfoHash, dropRow bool) error {
+func (s *Driver) TorrentDelete(ih store.InfoHash, dropRow bool) error {
 	var err error
 	if dropRow {
 		const dropQ = `DELETE FROM torrent WHERE info_hash = ?;`
@@ -463,18 +472,10 @@ func (s *MariaDBStore) TorrentDelete(ih store.InfoHash, dropRow bool) error {
 	return nil
 }
 
-var (
-	connections   map[string]*sqlx.DB
-	connectionsMu *sync.RWMutex
-)
+type driver struct{}
 
-func getOrCreateConn(cfg config.StoreConfig) (*sqlx.DB, error) {
-	connectionsMu.Lock()
-	defer connectionsMu.Unlock()
-	existing, found := connections[cfg.Host]
-	if found {
-		return existing, nil
-	}
+// New creates a new mysql backed user store.
+func (ud driver) New(cfg config.StoreConfig) (store.Store, error) {
 	db, err := sqlx.Connect(driverName, cfg.DSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "Could not connect to mysql database")
@@ -482,23 +483,9 @@ func getOrCreateConn(cfg config.StoreConfig) (*sqlx.DB, error) {
 	db.SetMaxOpenConns(50)
 	db.SetMaxIdleConns(50)
 	db.SetConnMaxLifetime(time.Second * 10)
-	connections[cfg.Host] = db
-	return db, nil
-}
-
-type driver struct{}
-
-// New creates a new mysql backed user store.
-func (ud driver) New(cfg config.StoreConfig) (store.Store, error) {
-	db, err := getOrCreateConn(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &MariaDBStore{db: db}, nil
+	return &Driver{db: db}, nil
 }
 
 func init() {
-	connections = make(map[string]*sqlx.DB)
-	connectionsMu = &sync.RWMutex{}
 	store.AddDriver(driverName, driver{})
 }

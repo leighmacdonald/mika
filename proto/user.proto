@@ -3,6 +3,7 @@ syntax = "proto3";
 option go_package = "github.com/leighmacdonald/mika/rpc";
 
 import "proto/common.proto";
+import "proto/role.proto";
 
 package mika;
 
@@ -18,6 +19,7 @@ message User {
   bool download_enabled = 9;
   uint32 announces = 10;
   TimeMeta time = 11;
+  Role role = 12;
 }
 
 message UserID {

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"strings"
 )
 
 func (s *MikaService) RoleAll(_ *emptypb.Empty, stream pb.Mika_RoleAllServer) error {
@@ -92,12 +93,20 @@ func (s *MikaService) RoleDelete(ctx context.Context, roleID *pb.RoleID) (*empty
 	if roleID.RoleId > 0 {
 		rID = roleID.RoleId
 	} else if roleID.RoleName != "" {
-
+		for _, role := range tracker.RoleAll() {
+			if strings.ToLower(role.RoleName) == roleID.RoleName {
+				rID = role.RoleID
+				break
+			}
+		}
+	}
+	if rID <= 0 {
+		return nil, status.Errorf(codes.NotFound, "role does not exist")
 	}
 	if err := tracker.RoleDelete(rID); err != nil {
 		return nil, errors.Wrapf(err, "Failed to delete role: %s", err.Error())
 	}
-	return nil, status.Errorf(codes.Unimplemented, "method RoleDelete not implemented")
+	return &emptypb.Empty{}, nil
 }
 
 func (s *MikaService) RoleSave(context.Context, *pb.Role) (*emptypb.Empty, error) {

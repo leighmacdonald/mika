@@ -17,7 +17,7 @@ const schemaCreate = "store/mysql/schema.sql"
 func TestDriver(t *testing.T) {
 	// multiStatements=true is required to exec the full schema at once
 	db := sqlx.MustConnect(driverName, config.TorrentStore.DSN())
-	store.TestStore(t, &MariaDBStore{db: db})
+	store.TestStore(t, &Driver{db: db})
 }
 
 func execSchema(db *sqlx.DB, schemaPath string) {

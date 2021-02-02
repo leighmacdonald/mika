@@ -8,15 +8,24 @@ package mika;
 
 message InfoHashParam {
   bytes info_hash = 1;
+  string info_hash_hex = 2;
 }
 
 message Torrent {
-  int64 torrent_id = 1;
-  bytes info_hash = 2;
-  string name = 3;
-  int32 seeders = 4;
-  int32 leechers = 5;
-  TimeMeta time = 6;
+  bytes info_hash = 1;
+  uint32 snatches = 2;
+  uint64 uploaded = 3;
+  uint64 downloaded = 4;
+  bool is_deleted = 5;
+  bool is_enabled = 6;
+  string reason = 7;
+  double multi_up = 8;
+  double multi_dn = 9;
+  uint64 announces = 10;
+  uint32 seeders = 11;
+  uint32 leechers = 12;
+  string title = 13;
+  TimeMeta time = 14;
 }
 
 message TorrentParams {
@@ -24,14 +33,14 @@ message TorrentParams {
 }
 
 message TorrentAddParams {
-  string name = 1;
+  string title = 1;
   bytes info_hash = 2;
   double multi_up = 3;
   double multi_dn = 4;
 }
 
 message TorrentUpdateParams {
-  string name = 1;
+  string title = 1;
   bool deleted = 2;
   bool enabled = 3;
   string reason = 4;

@@ -14,11 +14,11 @@ fmt:
 build_debug: protoc
 	@go build $(DEBUG_FLAGS) $(GO_FLAGS) -o mika
 
-build: fmt protoc
+build: protoc fmt
 	@go build $(GO_FLAGS)
 
 run:
-	@go run $(GO_FLAGS) -race cmd/mika/mika.go
+	@go run $(GO_FLAGS) -race main.go
 
 install: deps
 	@go install $(GO_FLAGS) ./...
@@ -46,6 +46,9 @@ image_tag:
 
 docker_run: image_latest
 	@docker-compose run --rm mika
+
+mysql_schema:
+	mysqldump -u mika -pmika mika -d --skip-add-drop-table --skip-dump-date -r store/mysql/schema.sql --skip-set-charset
 
 protoc:
 	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative \

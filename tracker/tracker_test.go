@@ -164,11 +164,11 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 
 	Init()
 	// whitelist our random peerids
-	whitelist[string(leecher0.PeerID[0:8])] = store.WhiteListClient{
+	whitelist[string(leecher0.PeerID[0:8])] = &store.WhiteListClient{
 		ClientPrefix: string(leecher0.PeerID[0:8]),
 		ClientName:   "Test-Leecher",
 	}
-	whitelist[string(seeder0.PeerID[0:8])] = store.WhiteListClient{
+	whitelist[string(seeder0.PeerID[0:8])] = &store.WhiteListClient{
 		ClientPrefix: string(seeder0.PeerID[0:8]),
 		ClientName:   "Test-Seeder",
 	}

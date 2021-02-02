@@ -171,6 +171,7 @@ func announce(c *gin.Context) {
 		atomic.AddInt64(&metrics.AnnounceStatusMalformed, 1)
 		return
 	}
+	// TODO save this check
 	if !ClientWhitelisted(req.PeerID) {
 		oops(c, msgBadClient)
 		return
@@ -180,8 +181,9 @@ func announce(c *gin.Context) {
 		pk = req.Key
 	}
 	// Get & Validate the torrent associated with the info_hash supplies
-	var tor *store.Torrent
-	if err := TorrentGet(tor, req.InfoHash, false); err != nil || tor.IsDeleted {
+	tor, errGet := TorrentGet(req.InfoHash, false)
+	if errGet != nil || tor.IsDeleted {
+		tor = &store.Torrent{}
 		if config.Tracker.AutoRegister {
 			tor.InfoHash = req.InfoHash
 			tor.IsEnabled = true
@@ -207,7 +209,7 @@ func announce(c *gin.Context) {
 		c.Data(int(msgInvalidInfoHash), gin.MIMEPlain, responseError(tor.Reason))
 		return
 	}
-	peer, err := PeerGet(tor.InfoHash, req.PeerID)
+	peer, err := tor.Peers.Get(req.PeerID)
 	if err != nil {
 		if err == consts.ErrInvalidPeerID {
 			// Create a new peer for the swarm
@@ -224,11 +226,7 @@ func announce(c *gin.Context) {
 			peer.ASN = l.ASN
 			peer.AS = l.AS
 			peer.CountryCode = l.ISOCode
-			if err := PeerAdd(tor.InfoHash, peer); err != nil {
-				log.Errorf("Failed to insert peer into swarm: %s", err.Error())
-				oops(c, msgGenericError)
-				return
-			}
+			tor.Peers.Add(peer)
 		} else {
 			oops(c, msgGenericError)
 			return
@@ -236,7 +234,7 @@ func announce(c *gin.Context) {
 	} else {
 		peer.AnnounceLast = time.Now()
 	}
-	peersFound, err2 := PeerGetN(tor.InfoHash, config.Tracker.MaxPeers)
+	peersFound, err2 := tor.Peers.GetN(config.Tracker.MaxPeers)
 	if err2 != nil {
 		log.Errorf("Could not read peers from swarm: %s", err2.Error())
 		oops(c, msgGenericError)
@@ -261,29 +259,62 @@ func announce(c *gin.Context) {
 		return
 	}
 	c.Data(int(msgOk), gin.MIMEPlain, outBytes.Bytes())
-	// Send state to another go channel for updating outside of the announce request
-	// so that we can respond asap
-	StateUpdateChan <- store.UpdateState{
-		Passkey:    pk,
-		InfoHash:   tor.InfoHash,
-		PeerID:     peer.PeerID,
-		Uploaded:   uint64(req.Uploaded),
-		Downloaded: uint64(req.Downloaded),
-		Left:       req.Left,
-		Event:      req.Event,
-		Timestamp:  time.Now(),
-		Paused:     peer.Paused,
+	updateStates(req, peer, tor, &usr)
+	metrics.AddAnnounceTime(time.Since(start).Nanoseconds())
+	tor.Log().Debug("Announced")
+}
+
+func updateStates(req *announceRequest, peer *store.Peer, tor *store.Torrent, user *store.User) {
+	switch req.Event {
+	case consts.PAUSED:
+		if !peer.Paused {
+			atomic.AddUint32(&tor.Seeders, 1)
+		}
+	case consts.STARTED:
+		if peer.Left == 0 {
+			atomic.AddUint32(&tor.Seeders, 1)
+		} else {
+			atomic.AddUint32(&tor.Leechers, 1)
+		}
+	case consts.COMPLETED:
+		atomic.AddUint32(&tor.Snatches, 1)
+		atomic.AddUint32(&tor.Seeders, 1)
+		if tor.Leechers >= 1 {
+			atomic.SwapUint32(&tor.Seeders, tor.Leechers-1)
+		}
+	case consts.STOPPED:
+		// Paused considered a seeder
+		if peer.Paused || peer.Left == 0 {
+			if tor.Seeders > 0 {
+				atomic.SwapUint32(&tor.Seeders, tor.Seeders-1)
+			}
+		} else {
+			if tor.Leechers > 0 {
+				atomic.SwapUint32(&tor.Leechers, tor.Leechers-1)
+			}
+		}
+
+		//if err := peerDelete(u.InfoHash, u.PeerID); err != nil {
+		//	log.Errorf("Could not remove peer from swarm: %s", err.Error())
+		//}
 	}
 	atomic.AddInt64(&metrics.AnnounceStatusOK, 1)
-	metrics.AddAnnounceTime(time.Since(start).Nanoseconds())
+	atomic.AddUint32(&peer.Announces, 1)
+	atomic.SwapUint32(&peer.Left, req.Left)
+	atomic.AddUint64(&tor.Announces, 1)
+	atomic.AddUint64(&tor.Uploaded, uint64(float64(req.Uploaded)*tor.MultiUp))
+	atomic.AddUint64(&tor.Downloaded, uint64(float64(req.Downloaded)*tor.MultiDn))
+	atomic.AddUint64(&tor.UploadedReal, uint64(req.Uploaded))
+	atomic.AddUint64(&tor.DownloadedReal, uint64(req.Downloaded))
+	atomic.AddUint32(&tor.Writes, 1)
+	atomic.AddUint32(&user.Writes, 1)
 }
 
 // Generate a compact peer field array containing the byte representations
 // of a peers IP+Port appended to each other
-func makeCompactPeers(swarm *store.Swarm, skipID store.PeerID, v6 bool, cl consts.CryptoLevel) []byte {
+func makeCompactPeers(swarm []*store.Peer, skipID store.PeerID, v6 bool, cl consts.CryptoLevel) []byte {
 	var buf bytes.Buffer
-	swarm.RLock()
-	for _, peer := range swarm.Peers {
+	for _, peer := range swarm {
 		if cl == consts.Required {
 			if !(peer.CryptoLevel == consts.Required || peer.CryptoLevel == consts.Supported) {
 				continue
@@ -302,6 +333,5 @@ func makeCompactPeers(swarm *store.Swarm, skipID store.PeerID, v6 bool, cl const
 		}
 
 	}
-	swarm.RUnlock()
 	return buf.Bytes()
 }

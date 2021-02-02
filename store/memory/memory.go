@@ -43,23 +43,7 @@ func (d *Driver) TorrentDelete(ih store.InfoHash, _ bool) error {
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (d *Driver) TorrentSync(b map[store.InfoHash]store.TorrentStats) error {
-	d.torrentsMu.Lock()
-	defer d.torrentsMu.Unlock()
-	for ih, stats := range b {
-		t, found := d.torrents[ih]
-		if !found {
-			// Deleted torrent before sync occurred
-			continue
-		}
-		t.Uploaded += stats.Uploaded
-		t.Downloaded += stats.Downloaded
-		t.Snatches += stats.Snatches
-		t.Seeders += stats.Seeders
-		t.Leechers += stats.Leechers
-		t.Announces += stats.Announces
-		d.torrents[ih] = t
-	}
+func (d *Driver) TorrentSync(_ []*store.Torrent) error {
 	return nil
 }
 
@@ -69,7 +53,7 @@ func (d *Driver) Conn() interface{} {
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (d *Driver) WhiteListDelete(client store.WhiteListClient) error {
+func (d *Driver) WhiteListDelete(client *store.WhiteListClient) error {
 	d.whitelistMu.Lock()
 	defer d.whitelistMu.Unlock()
 	// Remove removes a peer from a slice
@@ -83,7 +67,7 @@ func (d *Driver) WhiteListDelete(client store.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (d *Driver) WhiteListAdd(client store.WhiteListClient) error {
+func (d *Driver) WhiteListAdd(client *store.WhiteListClient) error {
 	d.whitelistMu.Lock()
 	defer d.whitelistMu.Unlock()
 	d.whitelist = append(d.whitelist, client)
@@ -91,10 +75,13 @@ func (d *Driver) WhiteListAdd(client store.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (d *Driver) WhiteListGetAll() ([]store.WhiteListClient, error) {
+func (d *Driver) WhiteListGetAll() ([]*store.WhiteListClient, error) {
 	d.whitelistMu.RLock()
 	defer d.whitelistMu.RUnlock()
-	wl := d.whitelist
+	var wl []*store.WhiteListClient
+	for _, wlc := range d.whitelist {
+		wl = append(wl, wlc)
+	}
 	return wl, nil
 }
 
@@ -133,7 +120,7 @@ type Driver struct {
 	users       map[string]*store.User
 	roles       store.Roles
 	torrents    store.Torrents
-	whitelist   []store.WhiteListClient
+	whitelist   []*store.WhiteListClient
 	rolesMu     *sync.RWMutex
 	torrentsMu  *sync.RWMutex
 	usersMu     *sync.RWMutex
@@ -210,20 +197,7 @@ func (d *Driver) UserSave(_ *store.User) error {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (d *Driver) UserSync(b map[string]store.UserStats) error {
-	d.usersMu.Lock()
-	defer d.usersMu.Unlock()
-	for passkey, stats := range b {
-		user, found := d.users[passkey]
-		if !found {
-			// Deleted user
-			continue
-		}
-		user.Announces += stats.Announces
-		user.Downloaded += stats.Downloaded
-		user.Uploaded += stats.Uploaded
-		d.users[passkey] = user
-	}
+func (d *Driver) UserSync(_ []*store.User) error {
 	return nil
 }
 

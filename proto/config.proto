@@ -4,11 +4,6 @@ option go_package = "github.com/leighmacdonald/mika/rpc";
 
 package mika;
 
-message WhiteListParams {
-  string prefix = 1;
-  string name = 2;
-}
-
 message WhiteList {
   string prefix = 1;
   string name = 2;
@@ -16,10 +11,6 @@ message WhiteList {
 
 message WhiteListDeleteParams {
   string prefix = 1;
-}
-
-message WhiteListResponse {
-  repeated WhiteList whitelist = 1;
 }
 
 message ConfigUpdateParams {

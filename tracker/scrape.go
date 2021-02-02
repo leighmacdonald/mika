@@ -38,8 +38,8 @@ func scrape(c *gin.Context) {
 			log.Errorf("Failed to decode info hash in scrape: %s", ihStr)
 			continue
 		}
-		var torrent store.Torrent
-		if err := TorrentGet(&torrent, ih, false); err != nil {
+		torrent, err2 := TorrentGet(ih, false)
+		if err2 != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}

@@ -11,6 +11,7 @@ import (
 type User struct {
 	UserID          uint32    `db:"user_id" json:"user_id"`
 	RoleID          uint32    `json:"role_id" db:"role_id"`
+	RemoteID        uint64    `json:"remote_id" db:"remote_id"`
 	UserName        string    `db:"user_name" json:"user_name"`
 	Passkey         string    `db:"passkey" json:"passkey"`
 	IsDeleted       bool      `db:"is_deleted" json:"is_deleted"`
@@ -18,10 +19,13 @@ type User struct {
 	Downloaded      uint64    `db:"downloaded" json:"downloaded"`
 	Uploaded        uint64    `db:"uploaded" json:"uploaded"`
 	Announces       uint32    `db:"announces" json:"announces"`
-	RemoteID        uint64    `db:"remote_id" json:"remote_id"`
 	CreatedOn       time.Time `db:"created_on" json:"created_on"`
 	UpdatedOn       time.Time `db:"updated_on" json:"updated_on"`
 	Role            *Role     `json:"role" db:"-"`
+
+	// Keeps track of how often the values have been changes
+	// TODO Items with the most writes will get written to soonest
+	Writes uint32 `db:"-" json:"-"`
 }
 
 func (u User) Log() *log.Entry {
@@ -36,7 +40,12 @@ func (u User) Valid() bool {
 
 // Users is a slice of known users
 type Users map[string]*User
+
+// Roles is a map of roles by role_id
 type Roles map[uint32]*Role
+
+// WhiteList is a map of whitelisted clients by 8 chars of client prefix
+type WhiteList map[string]*WhiteListClient
 
 // Remove removes a users from a Users slice
 func (users Users) Remove(p *User) {
@@ -45,7 +54,7 @@ func (users Users) Remove(p *User) {
 
 type Role struct {
 	RoleID          uint32    `json:"role_id" db:"role_id"`
-	RemoteID        int64     `json:"remote_id" db:"remote_id"`
+	RemoteID        uint64    `json:"remote_id" db:"remote_id"`
 	RoleName        string    `json:"role_name" db:"role_name"`
 	Priority        int32     `json:"priority" db:"priority"`
 	MultiUp         float64   `json:"multi_up" db:"multi_up"`

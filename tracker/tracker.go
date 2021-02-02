@@ -6,7 +6,11 @@ import (
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/geo"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"sort"
+	"sync/atomic"
 	"time"
 
 	// Imported for side-effects for NewTestTracker
@@ -15,28 +19,24 @@ import (
 )
 
 var (
-	storeMu         *sync.RWMutex
-	db              store.Store
-	geodb           geo.Provider
-	torrents        map[store.InfoHash]*store.Torrent
-	users           map[string]*store.User
-	roles           map[uint32]*store.Role
-	StateUpdateChan chan store.UpdateState
-	// whitelist and whitelist lock
-	whitelist   map[string]store.WhiteListClient
+	storeMu     *sync.RWMutex
+	db          store.Store
+	users       store.Users
+	roles       store.Roles
+	whitelist   store.WhiteList
+	torrents    store.Torrents
+	geodb       geo.Provider
 	whitelistMu *sync.RWMutex
 )
 
 func init() {
 	storeMu = &sync.RWMutex{}
-	StateUpdateChan = make(chan store.UpdateState, 1000)
-	whitelist = make(map[string]store.WhiteListClient)
+	whitelist = make(store.WhiteList)
 	whitelistMu = &sync.RWMutex{}
-
 	memCfg := config.StoreConfig{Type: "memory"}
 	ts, _ := store.NewStore(memCfg)
 	db = ts
-	torrents = make(map[store.InfoHash]*store.Torrent)
+	torrents = make(store.Torrents)
 	users = make(store.Users)
 	roles = make(store.Roles)
 }
@@ -66,6 +66,10 @@ func Init() {
 	torrents = loadTorrents()
 }
 
+func mapRoleToUser(u *store.User) {
+	u.Role = roles[u.RoleID]
+}
+
 func loadRoles() store.Roles {
 	roleSet, err := db.Roles()
 	if err != nil {
@@ -75,17 +79,23 @@ func loadRoles() store.Roles {
 }
 
 func loadUsers() store.Users {
-	users, err := db.Users()
+	us, err := db.Users()
 	if err != nil {
 		log.Fatalf("Failed to load users")
 	}
-	return users
+	for _, u := range us {
+		mapRoleToUser(u)
+	}
+	return us
 }
 
 func loadTorrents() store.Torrents {
 	torrentSet, err := db.Torrents()
 	if err != nil {
 		log.Fatalf("Failed to load torrents")
+	}
+	for _, t := range torrentSet {
+		t.Peers = store.NewSwarm()
 	}
 	return torrentSet
 }
@@ -113,118 +123,56 @@ func PeerReaper(ctx context.Context) {
 	}
 }
 
+func findDirtyUsers(n int) ([]*store.User, error) {
+	var sorted []*store.User
+	for _, t := range users {
+		sorted = append(sorted, t)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Writes < sorted[j].Writes
+	})
+	return sorted[0:util.Min(n, len(sorted))], nil
+}
+
+func findDirtyTorrents(n int) ([]*store.Torrent, error) {
+	var sorted []*store.Torrent
+	for _, t := range torrents {
+		sorted = append(sorted, t)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Writes < sorted[j].Writes
+	})
+	return sorted[0:util.Min(n, len(sorted))], nil
+}
+
 // StatWorker handles summing up stats for users/peers/db to be sent to the
 // backing stores for long term storage.
 // No locking required for these data sets
 func StatWorker(ctx context.Context) {
 	syncTimer := time.NewTimer(config.Tracker.BatchUpdateIntervalParsed)
-	userBatch := make(map[string]store.UserStats)
-	peerBatch := make(map[store.PeerHash]store.PeerStats)
-	torrentBatch := make(map[store.InfoHash]store.TorrentStats)
 	for {
 		select {
 		case <-syncTimer.C:
-			// Copy the maps to pass into the go routine call. At the same time deleting
-			// the existing values
-			userBatchCopy := make(map[string]store.UserStats)
-			for k, v := range userBatch {
-				userBatchCopy[k] = v
-				delete(userBatch, k)
-			}
-
-			peerBatchCopy := make(map[store.PeerHash]store.PeerStats)
-			for k, v := range peerBatch {
-				peerBatchCopy[k] = v
-				delete(peerBatch, k)
-			}
-
-			torrentBatchCopy := make(map[store.InfoHash]store.TorrentStats)
-			for k, v := range torrentBatch {
-				torrentBatchCopy[k] = v
-				delete(torrentBatch, k)
-			}
-			// Send current copies of data to stores
-			log.Debugf("Calling Sync() on %d users", len(userBatchCopy))
-			if err := UserSync(userBatchCopy); err != nil {
-				log.Errorf(err.Error())
-			}
-			//log.Debugf("Calling Sync() on %d peers", len(userBatchCopy))
-			//if err := PeerSync(peerBatchCopy); err != nil {
-			//	log.Errorf(err.Error())
-			//}
-			log.Debugf("Calling Sync() on %d db", len(userBatchCopy))
-			if err := TorrentSync(torrentBatchCopy); err != nil {
-				log.Errorf(err.Error())
-			}
-			syncTimer.Reset(config.Tracker.BatchUpdateIntervalParsed)
-		case u := <-StateUpdateChan:
-			ub, found := userBatch[u.Passkey]
-			if !found {
-				ub = store.UserStats{}
-			}
-			tb, found := torrentBatch[u.InfoHash]
-			if !found {
-				tb = store.TorrentStats{}
-			}
-			pHash := store.NewPeerHash(u.InfoHash, u.PeerID)
-			pb, peerFound := peerBatch[pHash]
-			if !peerFound {
-				pb = store.PeerStats{}
-			}
-			var torrent store.Torrent
-			// Keep deleted true so that we can record any buffered stat updates from
-			// the client even though we deleted/disabled the torrent itself.
-			if err := TorrentGet(&torrent, u.InfoHash, false); err != nil {
-				log.Errorf("No torrent found in batch update")
+			dUsers, err := findDirtyUsers(100)
+			if err != nil {
+				log.Errorf("Failed to fetch dirty users: %v", err)
 				continue
 			}
-			// Global user stats
-			ub.Uploaded += uint64(float64(u.Uploaded) * torrent.MultiUp)
-			ub.Downloaded += uint64(float64(u.Downloaded) * torrent.MultiDn)
-			ub.Announces++
-
-			// Peer stats
-			pb.Hist = append(pb.Hist, store.AnnounceHist{
-				Downloaded: u.Downloaded,
-				Uploaded:   u.Uploaded,
-				Timestamp:  u.Timestamp,
-			})
-			pb.Left = u.Left
-
-			// Global torrent stats
-			tb.Announces++
-			tb.Uploaded += u.Uploaded
-			tb.Downloaded += u.Downloaded
-
-			switch u.Event {
-			case consts.PAUSED:
-				if !pb.Paused {
-					tb.Seeders++
-				}
-			case consts.STARTED:
-				if u.Left == 0 {
-					tb.Seeders++
-				} else {
-					tb.Leechers++
-				}
-			case consts.COMPLETED:
-				tb.Snatches++
-				tb.Seeders++
-				tb.Leechers--
-			case consts.STOPPED:
-				// Paused considered a seeder
-				if u.Paused || u.Left == 0 {
-					tb.Seeders--
-				} else {
-					tb.Leechers--
-				}
-				if err := peerDelete(u.InfoHash, u.PeerID); err != nil {
-					log.Errorf("Could not remove peer from swarm: %s", err.Error())
-				}
+			if err2 := userSync(dUsers); err2 != nil {
+				log.Errorf("Failed to sync dirty users: %v", err2)
+				continue
 			}
-			userBatch[u.Passkey] = ub
-			torrentBatch[u.InfoHash] = tb
-			peerBatch[pHash] = pb
+
+			dTorrents, err3 := findDirtyTorrents(100)
+			if err3 != nil {
+				log.Errorf("Failed to fetch dirty torrents: %v", err3)
+				continue
+			}
+			if err4 := torrentSync(dTorrents); err4 != nil {
+				log.Errorf("Failed to sync dirty torrents: %v", err4)
+				continue
+			}
+			syncTimer.Reset(config.Tracker.BatchUpdateIntervalParsed)
 		case <-ctx.Done():
 			log.Debugf("Batch context closed")
 			return
@@ -276,10 +224,36 @@ func ClientWhitelisted(peerID store.PeerID) bool {
 	return found
 }
 
+func WhiteListAdd(wl *store.WhiteListClient) error {
+	if err := db.WhiteListAdd(wl); err != nil {
+		return errors.Wrap(err, "Failed to add new client whitelist")
+	}
+	whitelistMu.Lock()
+	defer whitelistMu.Unlock()
+	whitelist[wl.ClientPrefix] = wl
+	return nil
+}
+
+func WhiteListGet(p string) (*store.WhiteListClient, error) {
+	w, found := whitelist[p]
+	if !found {
+		return nil, consts.ErrInvalidClient
+	}
+	return w, nil
+}
+
+func WhiteListDelete(wl *store.WhiteListClient) error {
+	if err := db.WhiteListDelete(wl); err != nil {
+		return err
+	}
+	delete(whitelist, wl.ClientPrefix)
+	return nil
+}
+
 // LoadWhitelist will read the client white list from the tracker store and
 // load it into memory for quick lookups.
 func LoadWhitelist() error {
-	newWhitelist := make(map[string]store.WhiteListClient)
+	newWhitelist := make(store.WhiteList)
 	wl, err4 := db.WhiteListGetAll()
 	if err4 != nil {
 		log.Warnf("whitelist empty, all clients are allowed")
@@ -294,53 +268,40 @@ func LoadWhitelist() error {
 	return nil
 }
 
-func TorrentAdd(torrent *store.Torrent) error {
-	return db.TorrentAdd(torrent)
+func WhiteList() store.WhiteList {
+	return whitelist
 }
 
-func TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {
-	// TODO
-	if err := db.TorrentGet(torrent, hash, deletedOk); err != nil {
+func Torrents() store.Torrents {
+	return torrents
+}
+
+func TorrentAdd(torrent *store.Torrent) error {
+	torrent.CreatedOn = time.Now()
+	torrent.UpdatedOn = time.Now()
+	if err := db.TorrentAdd(torrent); err != nil {
+		return errors.Wrapf(err, "Failed to add torrent")
+	}
+	torrents[torrent.InfoHash] = torrent
+	return nil
+}
+
+func TorrentGet(hash store.InfoHash, deletedOk bool) (*store.Torrent, error) {
+	t, found := torrents[hash]
+	if !found {
+		return nil, consts.ErrInvalidInfoHash
+	}
+	if !deletedOk && t.IsDeleted {
+		return nil, consts.ErrInvalidInfoHash
+	}
+	return t, nil
+}
+
+func TorrentDelete(torrent *store.Torrent) error {
+	if err := db.TorrentDelete(torrent.InfoHash, true); err != nil {
 		return err
 	}
-	return nil
-}
-
-func PeerGet(infoHash store.InfoHash, peerID store.PeerID) (*store.Peer, error) {
-	// TODO
-	tor, found := torrents[infoHash]
-	if !found {
-		return nil, consts.ErrInvalidInfoHash
-	}
-	p, err := tor.Peers.Get(peerID)
-	if err != nil {
-		return nil, consts.ErrInvalidPeerID
-	}
-	return p, consts.ErrInvalidPeer
-}
-
-func PeerGetN(infoHash store.InfoHash, max int) (*store.Swarm, error) {
-	_, found := torrents[infoHash]
-	if !found {
-		return nil, consts.ErrInvalidInfoHash
-	}
-	swarm := &store.Swarm{}
-	// TODO get swarm
-	return swarm, nil
-}
-
-func PeerAdd(infoHash store.InfoHash, peer *store.Peer) error {
-	// TODO
-	//if err := peers.Add(infoHash, peer); err != nil {
-	//	return err
-	//}
-	return nil
-}
-
-func peerDelete(infoHash store.InfoHash, peerID store.PeerID) error {
-	// TODO
-	//PeerCache.Delete(infoHash, peerID)
-	//return peers.Delete(infoHash, peerID)
+	torrent.IsDeleted = true
 	return nil
 }
 
@@ -366,18 +327,14 @@ func peerDelete(infoHash store.InfoHash, peerID store.PeerID) error {
 //	return nil
 //}
 
-func TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
+func torrentSync(batch []*store.Torrent) error {
 	if err := db.TorrentSync(batch); err != nil {
 		return err
 	}
+	for _, t := range batch {
+		atomic.SwapUint32(&t.Writes, 0)
+	}
 	return nil
-}
-
-// Stats returns the current cumulative stats for the tracker
-func Stats() GlobalStats {
-	var s GlobalStats
-
-	return s
 }
 
 // GlobalStats holds basic stats for the running tracker

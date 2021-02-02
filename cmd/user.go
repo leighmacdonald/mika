@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/leighmacdonald/mika/client"
 	pb "github.com/leighmacdonald/mika/proto"
 	"github.com/leighmacdonald/mika/rpc"
@@ -17,13 +19,50 @@ import (
 var (
 	roleStr      = ""
 	userAddParam = &pb.UserAddParams{}
+	userGetParam = &pb.UserID{}
 )
 
 // userCmd represents user admin commands
 var userCmd = &cobra.Command{
-	Use:   "user",
-	Short: "user commands",
-	Long:  `user commands`,
+	Use:               "user",
+	Short:             "user commands",
+	Long:              `user commands`,
+	PersistentPreRunE: connectRPC,
+}
+
+func renderUsers(users []*store.User, title string) {
+	t := defaultTable(title)
+	t.AppendHeader(table.Row{"id", "rid", "role", "passkey", "ratio", "downloaded", "uploaded", "download_en",
+		"deleted", "created_on", "updated_on"})
+	for _, user := range users {
+		t.AppendRow(table.Row{
+			user.UserID, user.RemoteID, user.Role.RoleName, user.Passkey,
+			fmt.Sprintf("%.2f", float64(user.Uploaded)/float64(user.Downloaded)),
+			user.Downloaded, user.Uploaded, user.DownloadEnabled, user.IsDeleted, user.CreatedOn, user.UpdatedOn})
+	}
+	t.SortBy([]table.SortBy{{
+		Name: "id",
+	}})
+	t.Render()
+}
+
+// userGetCmd can be used to add users
+var userGetCmd = &cobra.Command{
+	Use:   "get",
+	Short: "Get a user from the tracker",
+	Long:  `Get a user from the tracker`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if userGetParam.Passkey == "" && userGetParam.RemoteId == 0 && userGetParam.UserId == 0 {
+			log.Fatalf("Must provide at least one ID type (-p,-u,-r)")
+			return
+		}
+		pbUser, err := cl.UserGet(context.Background(), userGetParam)
+		if err != nil {
+			log.Fatalf("Failed to fetch user: %v", err)
+			return
+		}
+		renderUsers([]*store.User{rpc.PBToUser(pbUser)}, "User info")
+	},
 }
 
 // userAddCmd can be used to add users
@@ -84,6 +123,12 @@ var userAddCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(userCmd)
 	userCmd.AddCommand(userAddCmd)
+	userCmd.AddCommand(userGetCmd)
+
+	userGetCmd.Flags().StringVarP(&userGetParam.Passkey, "passkey", "p", "", "User passkey")
+	userGetCmd.Flags().Uint32VarP(&userGetParam.UserId, "user_id", "u", 0, "Internal tracker user ID")
+	userGetCmd.Flags().Uint64VarP(&userGetParam.RemoteId, "remote_id", "r", 0, "Remote user ID")
+
 	userAddCmd.Flags().StringVarP(&userAddParam.UserName, "name", "n", "", "Username of the user")
 	userAddCmd.Flags().StringVarP(&userAddParam.Passkey, "passkey", "p", "", "Passkey for user. (default: random)")
 	userAddCmd.Flags().BoolVarP(&userAddParam.DownloadEnabled, "download_enabled", "D", true, "Passkey for user. (default: true)")

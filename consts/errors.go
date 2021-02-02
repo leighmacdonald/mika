@@ -33,4 +33,6 @@ var (
 	ErrInvalidClient = errors.New("invalid torrent client")
 	// ErrBadResponseCode is returned when a HTTP request returns a non 200 code
 	ErrBadResponseCode = errors.New("bad response code returned")
+
+	ErrCannotConnect = errors.New("cannot connect to server")
 )

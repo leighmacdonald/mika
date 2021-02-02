@@ -22,8 +22,6 @@ var serveCmd = &cobra.Command{
 		ctx := context.Background()
 		tracker.Init()
 
-		_ = tracker.LoadWhitelist()
-
 		btOpts := tracker.DefaultHTTPOpts()
 		btOpts.ListenAddr = config.Tracker.Listen
 		btOpts.UseTLS = config.Tracker.TLS

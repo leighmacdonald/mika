@@ -20,10 +20,11 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MikaClient interface {
 	ConfigUpdate(ctx context.Context, in *ConfigUpdateParams, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	WhiteListAdd(ctx context.Context, in *WhiteListParams, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	WhiteListAdd(ctx context.Context, in *WhiteList, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	WhiteListDelete(ctx context.Context, in *WhiteListDeleteParams, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	WhiteList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*WhiteListResponse, error)
-	TorrentGet(ctx context.Context, in *TorrentParams, opts ...grpc.CallOption) (*Torrent, error)
+	WhiteListAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Mika_WhiteListAllClient, error)
+	TorrentAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Mika_TorrentAllClient, error)
+	TorrentGet(ctx context.Context, in *InfoHashParam, opts ...grpc.CallOption) (*Torrent, error)
 	TorrentAdd(ctx context.Context, in *TorrentAddParams, opts ...grpc.CallOption) (*Torrent, error)
 	TorrentDelete(ctx context.Context, in *InfoHashParam, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	TorrentUpdate(ctx context.Context, in *TorrentUpdateParams, opts ...grpc.CallOption) (*Torrent, error)
@@ -55,7 +56,7 @@ func (c *mikaClient) ConfigUpdate(ctx context.Context, in *ConfigUpdateParams, o
 	return out, nil
 }
 
-func (c *mikaClient) WhiteListAdd(ctx context.Context, in *WhiteListParams, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *mikaClient) WhiteListAdd(ctx context.Context, in *WhiteList, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/mika.Mika/WhiteListAdd", in, out, opts...)
 	if err != nil {
@@ -73,16 +74,71 @@ func (c *mikaClient) WhiteListDelete(ctx context.Context, in *WhiteListDeletePar
 	return out, nil
 }
 
-func (c *mikaClient) WhiteList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*WhiteListResponse, error) {
-	out := new(WhiteListResponse)
-	err := c.cc.Invoke(ctx, "/mika.Mika/WhiteList", in, out, opts...)
+func (c *mikaClient) WhiteListAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Mika_WhiteListAllClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Mika_ServiceDesc.Streams[0], "/mika.Mika/WhiteListAll", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &mikaWhiteListAllClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
 
-func (c *mikaClient) TorrentGet(ctx context.Context, in *TorrentParams, opts ...grpc.CallOption) (*Torrent, error) {
+type Mika_WhiteListAllClient interface {
+	Recv() (*WhiteList, error)
+	grpc.ClientStream
+}
+
+type mikaWhiteListAllClient struct {
+	grpc.ClientStream
+}
+
+func (x *mikaWhiteListAllClient) Recv() (*WhiteList, error) {
+	m := new(WhiteList)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *mikaClient) TorrentAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Mika_TorrentAllClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Mika_ServiceDesc.Streams[1], "/mika.Mika/TorrentAll", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &mikaTorrentAllClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Mika_TorrentAllClient interface {
+	Recv() (*Torrent, error)
+	grpc.ClientStream
+}
+
+type mikaTorrentAllClient struct {
+	grpc.ClientStream
+}
+
+func (x *mikaTorrentAllClient) Recv() (*Torrent, error) {
+	m := new(Torrent)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *mikaClient) TorrentGet(ctx context.Context, in *InfoHashParam, opts ...grpc.CallOption) (*Torrent, error) {
 	out := new(Torrent)
 	err := c.cc.Invoke(ctx, "/mika.Mika/TorrentGet", in, out, opts...)
 	if err != nil {
@@ -128,7 +184,7 @@ func (c *mikaClient) UserGet(ctx context.Context, in *UserID, opts ...grpc.CallO
 }
 
 func (c *mikaClient) UserAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Mika_UserAllClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Mika_ServiceDesc.Streams[0], "/mika.Mika/UserAll", opts...)
+	stream, err := c.cc.NewStream(ctx, &Mika_ServiceDesc.Streams[2], "/mika.Mika/UserAll", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +243,7 @@ func (c *mikaClient) UserAdd(ctx context.Context, in *UserAddParams, opts ...grp
 }
 
 func (c *mikaClient) RoleAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Mika_RoleAllClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Mika_ServiceDesc.Streams[1], "/mika.Mika/RoleAll", opts...)
+	stream, err := c.cc.NewStream(ctx, &Mika_ServiceDesc.Streams[3], "/mika.Mika/RoleAll", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -250,10 +306,11 @@ func (c *mikaClient) RoleSave(ctx context.Context, in *Role, opts ...grpc.CallOp
 // for forward compatibility
 type MikaServer interface {
 	ConfigUpdate(context.Context, *ConfigUpdateParams) (*emptypb.Empty, error)
-	WhiteListAdd(context.Context, *WhiteListParams) (*emptypb.Empty, error)
+	WhiteListAdd(context.Context, *WhiteList) (*emptypb.Empty, error)
 	WhiteListDelete(context.Context, *WhiteListDeleteParams) (*emptypb.Empty, error)
-	WhiteList(context.Context, *emptypb.Empty) (*WhiteListResponse, error)
-	TorrentGet(context.Context, *TorrentParams) (*Torrent, error)
+	WhiteListAll(*emptypb.Empty, Mika_WhiteListAllServer) error
+	TorrentAll(*emptypb.Empty, Mika_TorrentAllServer) error
+	TorrentGet(context.Context, *InfoHashParam) (*Torrent, error)
 	TorrentAdd(context.Context, *TorrentAddParams) (*Torrent, error)
 	TorrentDelete(context.Context, *InfoHashParam) (*emptypb.Empty, error)
 	TorrentUpdate(context.Context, *TorrentUpdateParams) (*Torrent, error)
@@ -276,16 +333,19 @@ type UnimplementedMikaServer struct {
 func (UnimplementedMikaServer) ConfigUpdate(context.Context, *ConfigUpdateParams) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConfigUpdate not implemented")
 }
-func (UnimplementedMikaServer) WhiteListAdd(context.Context, *WhiteListParams) (*emptypb.Empty, error) {
+func (UnimplementedMikaServer) WhiteListAdd(context.Context, *WhiteList) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WhiteListAdd not implemented")
 }
 func (UnimplementedMikaServer) WhiteListDelete(context.Context, *WhiteListDeleteParams) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WhiteListDelete not implemented")
 }
-func (UnimplementedMikaServer) WhiteList(context.Context, *emptypb.Empty) (*WhiteListResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method WhiteList not implemented")
+func (UnimplementedMikaServer) WhiteListAll(*emptypb.Empty, Mika_WhiteListAllServer) error {
+	return status.Errorf(codes.Unimplemented, "method WhiteListAll not implemented")
 }
-func (UnimplementedMikaServer) TorrentGet(context.Context, *TorrentParams) (*Torrent, error) {
+func (UnimplementedMikaServer) TorrentAll(*emptypb.Empty, Mika_TorrentAllServer) error {
+	return status.Errorf(codes.Unimplemented, "method TorrentAll not implemented")
+}
+func (UnimplementedMikaServer) TorrentGet(context.Context, *InfoHashParam) (*Torrent, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TorrentGet not implemented")
 }
 func (UnimplementedMikaServer) TorrentAdd(context.Context, *TorrentAddParams) (*Torrent, error) {
@@ -356,7 +416,7 @@ func _Mika_ConfigUpdate_Handler(srv interface{}, ctx context.Context, dec func(i
 }
 
 func _Mika_WhiteListAdd_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WhiteListParams)
+	in := new(WhiteList)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -368,7 +428,7 @@ func _Mika_WhiteListAdd_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/mika.Mika/WhiteListAdd",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MikaServer).WhiteListAdd(ctx, req.(*WhiteListParams))
+		return srv.(MikaServer).WhiteListAdd(ctx, req.(*WhiteList))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -391,26 +451,50 @@ func _Mika_WhiteListDelete_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Mika_WhiteList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
+func _Mika_WhiteListAll_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(MikaServer).WhiteList(ctx, in)
+	return srv.(MikaServer).WhiteListAll(m, &mikaWhiteListAllServer{stream})
+}
+
+type Mika_WhiteListAllServer interface {
+	Send(*WhiteList) error
+	grpc.ServerStream
+}
+
+type mikaWhiteListAllServer struct {
+	grpc.ServerStream
+}
+
+func (x *mikaWhiteListAllServer) Send(m *WhiteList) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _Mika_TorrentAll_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/mika.Mika/WhiteList",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MikaServer).WhiteList(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(MikaServer).TorrentAll(m, &mikaTorrentAllServer{stream})
+}
+
+type Mika_TorrentAllServer interface {
+	Send(*Torrent) error
+	grpc.ServerStream
+}
+
+type mikaTorrentAllServer struct {
+	grpc.ServerStream
+}
+
+func (x *mikaTorrentAllServer) Send(m *Torrent) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _Mika_TorrentGet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TorrentParams)
+	in := new(InfoHashParam)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -422,7 +506,7 @@ func _Mika_TorrentGet_Handler(srv interface{}, ctx context.Context, dec func(int
 		FullMethod: "/mika.Mika/TorrentGet",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MikaServer).TorrentGet(ctx, req.(*TorrentParams))
+		return srv.(MikaServer).TorrentGet(ctx, req.(*InfoHashParam))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -669,10 +753,6 @@ var Mika_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Mika_WhiteListDelete_Handler,
 		},
 		{
-			MethodName: "WhiteList",
-			Handler:    _Mika_WhiteList_Handler,
-		},
-		{
 			MethodName: "TorrentGet",
 			Handler:    _Mika_TorrentGet_Handler,
 		},
@@ -718,6 +798,16 @@ var Mika_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "WhiteListAll",
+			Handler:       _Mika_WhiteListAll_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "TorrentAll",
+			Handler:       _Mika_TorrentAll_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "UserAll",
 			Handler:       _Mika_UserAll_Handler,

@@ -63,7 +63,7 @@ type Store interface {
 	RoleSave(role *Role) error
 
 	// Close will cleanup and close the underlying storage driver if necessary
-	UserSync(b map[string]UserStats) error
+	UserSync(b []*User) error
 
 	Torrents() (Torrents, error)
 	// Add adds a new torrent to the backing store
@@ -76,14 +76,14 @@ type Store interface {
 	// Update will update certain parameters within the torrent
 	TorrentUpdate(torrent *Torrent) error
 	// TorrentSync batch updates the backing store with the new TorrentStats provided
-	TorrentSync(b map[InfoHash]TorrentStats) error
+	TorrentSync(b []*Torrent) error
 
 	// WhiteListDelete removes a client from the global whitelist
-	WhiteListDelete(client WhiteListClient) error
+	WhiteListDelete(client *WhiteListClient) error
 	// WhiteListAdd will insert a new client prefix into the allowed clients list
-	WhiteListAdd(client WhiteListClient) error
+	WhiteListAdd(client *WhiteListClient) error
 	// WhiteListGetAll fetches all known whitelisted clients
-	WhiteListGetAll() ([]WhiteListClient, error)
+	WhiteListGetAll() ([]*WhiteListClient, error)
 
 	// Conn returns the underlying connection, if any
 	Conn() interface{}

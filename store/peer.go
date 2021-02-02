@@ -64,6 +64,8 @@ func (p PeerID) URLEncode() string {
 	return fmt.Sprintf("%s", p.Bytes())
 }
 
+type Peers map[PeerID]*Peer
+
 // Peer represents a single unique peer in a swarm
 type Peer struct {
 	// Total amount uploaded as reported by client
@@ -129,16 +131,16 @@ func (peer *Peer) Valid() bool {
 
 // Swarm is a set of users participating in a torrent
 type Swarm struct {
-	Peers    map[PeerID]Peer
+	Peers
 	Seeders  int
 	Leechers int
 	*sync.RWMutex
 }
 
 // NewSwarm instantiates a new swarm
-func NewSwarm() Swarm {
-	return Swarm{
-		Peers:    make(map[PeerID]Peer),
+func NewSwarm() *Swarm {
+	return &Swarm{
+		Peers:    make(map[PeerID]*Peer),
 		Seeders:  0,
 		Leechers: 0,
 		RWMutex:  &sync.RWMutex{},
@@ -146,25 +148,25 @@ func NewSwarm() Swarm {
 }
 
 // Remove removes a peer from a slice
-func (swarm Swarm) Remove(p PeerID) {
-	swarm.Lock()
-	delete(swarm.Peers, p)
-	swarm.Unlock()
+func (s Swarm) Remove(p PeerID) {
+	s.Lock()
+	delete(s.Peers, p)
+	s.Unlock()
 }
 
 // Add inserts a new peer into the swarm
-func (swarm Swarm) Add(p Peer) {
-	swarm.Lock()
-	swarm.Peers[p.PeerID] = p
-	swarm.Unlock()
+func (s Swarm) Add(p *Peer) {
+	s.Lock()
+	s.Peers[p.PeerID] = p
+	s.Unlock()
 }
 
 // UpdatePeer will update a swarm member with new stats
-func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (Peer, bool) {
-	swarm.Lock()
-	peer, ok := swarm.Peers[peerID]
+func (s Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (*Peer, bool) {
+	s.Lock()
+	peer, ok := s.Peers[peerID]
 	if !ok {
-		swarm.Unlock()
+		s.Unlock()
 		return peer, false
 	}
 	for _, s := range stats.Hist {
@@ -174,53 +176,53 @@ func (swarm Swarm) UpdatePeer(peerID PeerID, stats PeerStats) (Peer, bool) {
 	}
 	peer.Announces += uint32(len(stats.Hist))
 	peer.Left = stats.Left
-	swarm.Peers[peerID] = peer
-	swarm.Unlock()
+	s.Peers[peerID] = peer
+	s.Unlock()
 	return peer, true
 }
 
 // ReapExpired will delete any peers from the swarm that are considered expired
-func (swarm Swarm) ReapExpired(infoHash InfoHash) []PeerHash {
-	swarm.Lock()
+func (s Swarm) ReapExpired(infoHash InfoHash) []PeerHash {
+	s.Lock()
 	var peerHashes []PeerHash
-	for k, peer := range swarm.Peers {
+	for k, peer := range s.Peers {
 		if peer.Expired() {
-			delete(swarm.Peers, k)
+			delete(s.Peers, k)
 			peerHashes = append(peerHashes, NewPeerHash(infoHash, peer.PeerID))
 		}
 	}
-	swarm.Unlock()
+	s.Unlock()
 	return peerHashes
 }
 
 // Get will copy a peer into the peer pointer passed in if it exists.
-func (swarm Swarm) Get(peer *Peer, peerID PeerID) error {
-	swarm.RLock()
-	defer swarm.RUnlock()
-	p, found := swarm.Peers[peerID]
+func (s Swarm) Get(peerID PeerID) (*Peer, error) {
+	s.RLock()
+	defer s.RUnlock()
+	p, found := s.Peers[peerID]
 	if !found {
-		return consts.ErrInvalidPeerID
+		return nil, consts.ErrInvalidPeerID
 	}
-	*peer = p
-	return nil
+	return p, nil
 }
 
-func (swarm Swarm) Update(p Peer) error {
-	swarm.RLock()
-	_, found := swarm.Peers[p.PeerID]
-	swarm.RUnlock()
-	if !found {
-		return consts.ErrInvalidPeerID
+// Get will copy a peer into the peer pointer passed in if it exists.
+func (s Swarm) GetN(n int) ([]*Peer, error) {
+	s.RLock()
+	defer s.RUnlock()
+	var peerSet []*Peer
+	for _, p := range s.Peers {
+		peerSet = append(peerSet, p)
+		if len(peerSet) >= n {
+			break
+		}
 	}
-	swarm.Lock()
-	swarm.Peers[p.PeerID] = p
-	swarm.Unlock()
-	return nil
+	return peerSet, nil
 }
 
 // NewPeer create a new peer instance for inserting into a swarm
-func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) Peer {
-	return Peer{
+func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
+	return &Peer{
 		IP:            ip,
 		Port:          port,
 		AnnounceLast:  time.Now(),

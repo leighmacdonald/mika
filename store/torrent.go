@@ -126,12 +126,16 @@ func (ih *InfoHash) RawString() string {
 // Torrent is the core struct for our torrent being tracked
 type Torrent struct {
 	InfoHash InfoHash `db:"info_hash" json:"info_hash"`
-	Snatches uint16   `db:"total_completed" json:"total_completed"`
+	Snatches uint32   `db:"total_completed" json:"total_completed"`
 	// This is stored as MB to reduce storage costs
 	Uploaded uint64 `db:"total_uploaded" json:"total_uploaded"`
 	// This is stored as MB to reduce storage costs
 	Downloaded uint64 `db:"total_downloaded" json:"total_downloaded"`
-	IsDeleted  bool   `db:"is_deleted" json:"is_deleted"`
+	// This is stored as MB to reduce storage costs. Totals without multipliers added
+	UploadedReal uint64 `db:"total_uploaded_real" json:"total_uploaded_real"`
+	// This is stored as MB to reduce storage costs.  Totals without multipliers added
+	DownloadedReal uint64 `db:"total_downloaded_real" json:"total_downloaded_real"`
+	IsDeleted      bool   `db:"is_deleted" json:"is_deleted"`
 	// When you have a message to pass to a client set enabled = false and set the reason message.
 	// If IsDeleted is true, then nothing will be returned to the client
 	IsEnabled bool `db:"is_enabled" json:"is_enabled"`
@@ -141,10 +145,28 @@ type Torrent struct {
 	MultiUp float64 `db:"multi_up" json:"multi_up"`
 	// Download multiplier added to the users totals
 	// 0 denotes freeleech status
-	MultiDn   float64 `db:"multi_dn" json:"multi_dn"`
-	Announces uint64  `db:"announces" json:"announces"`
-	Seeders   int     `db:"seeders" json:"seeders"`
-	Leechers  int     `db:"leechers" json:"leechers"`
+	MultiDn   float64   `db:"multi_dn" json:"multi_dn"`
+	Announces uint64    `db:"announces" json:"announces"`
+	Seeders   uint32    `db:"seeders" json:"seeders"`
+	Leechers  uint32    `db:"leechers" json:"leechers"`
+	Title     string    `db:"title" json:"title"`
+	CreatedOn time.Time `db:"created_on" json:"created_on"`
+	UpdatedOn time.Time `db:"updated_on" json:"updated_on"`
+
+	Peers *Swarm `db:"-" json:"peers"`
+
+	// Keeps track of how often the values have been changes
+	// TODO Items with the most writes will get written to soonest
+	Writes uint32 `db:"-" json:"-"`
+}
+
+func (t *Torrent) Log() *log.Entry {
+	return log.WithFields(log.Fields{
+		"seeders":  t.Seeders,
+		"leechers": t.Leechers,
+		"snatches": t.Snatches,
+		"ann":      t.Announces,
+	})
 }
 
 type TorrentUpdate struct {
@@ -160,9 +182,9 @@ type TorrentUpdate struct {
 // TorrentStats is used to relay info stats for a torrent around. It contains rolled up stats
 // from peer info as well as the normal torrent stats.
 type TorrentStats struct {
-	Seeders    int    `json:"seeders"`
-	Leechers   int    `json:"leechers"`
-	Snatches   uint16 `json:"snatches"`
+	Seeders    uint32 `json:"seeders"`
+	Leechers   uint32 `json:"leechers"`
+	Snatches   uint32 `json:"snatches"`
 	Uploaded   uint64 `json:"uploaded"`
 	Downloaded uint64 `json:"downloaded"`
 	Announces  uint64 `json:"announces"`
@@ -187,6 +209,7 @@ type PeerStats struct {
 	Hist   []AnnounceHist
 	Paused bool
 }
+
 type PeerSummary struct {
 	TotalUp    uint64
 	TotalDn    uint64
@@ -233,7 +256,7 @@ func NewTorrent(ih InfoHash) Torrent {
 }
 
 // Torrents is a basic type alias for multiple torrents
-type Torrents []Torrent
+type Torrents map[InfoHash]*Torrent
 
 // WhiteListClient defines a whitelisted bittorrent client allowed to participate
 // in swarms. This is not a foolproof solution as its fairly trivial for a motivated

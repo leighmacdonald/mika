@@ -10,9 +10,9 @@ import (
 )
 
 // scrape handles the bittorrent scrape protocol for
-func (h *BitTorrentHandler) scrape(c *gin.Context) {
+func scrape(c *gin.Context) {
 	var user store.User
-	if !h.tracker.preFlightChecks(&user, c.Param("passkey"), c) {
+	if !preFlightChecks(&user, c.Param("passkey"), c) {
 		return
 	}
 	q, err := queryStringParser(c.Request.URL.RawQuery)
@@ -21,7 +21,7 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 		oops(c, msgMalformedRequest)
 		return
 	}
-	// Technically no info hashes means we are supposed to send data for all known torrents.
+	// Technically no info hashes means we are supposed to send data for all known db.
 	// This is something we do NOT want to do in a private tracker scenario (or really public for that matter)
 	// TODO Add a config toggle for this?
 	// TODO Its not technically malformed, should we return a empty file set instead?
@@ -30,7 +30,7 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 		oops(c, msgMalformedRequest)
 		return
 	}
-	// Todo limit scrape to N torrents
+	// Todo limit scrape to N db
 	resp := make(bencode.Dict, len(q.InfoHashes))
 	var ih store.InfoHash
 	for _, ihStr := range q.InfoHashes {
@@ -38,8 +38,8 @@ func (h *BitTorrentHandler) scrape(c *gin.Context) {
 			log.Errorf("Failed to decode info hash in scrape: %s", ihStr)
 			continue
 		}
-		var torrent store.Torrent
-		if err := h.tracker.TorrentGet(&torrent, ih, false); err != nil {
+		torrent, err2 := TorrentGet(ih, false)
+		if err2 != nil {
 			log.Debugf("Scrape request for invalid torrent: %s", ih)
 			continue
 		}

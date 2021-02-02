@@ -6,7 +6,6 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
-	"github.com/leighmacdonald/mika/store/memory"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
@@ -21,30 +20,7 @@ func TestTorrentDriver(t *testing.T) {
 		return
 	}
 	setupDB(t, db)
-	store.TestTorrentStore(t, &TorrentStore{db: db, ctx: context.Background()})
-}
-
-func TestUserDriver(t *testing.T) {
-	db, err := pgx.Connect(context.Background(), makeDSN(config.UserStore))
-	if err != nil {
-		t.Skipf("failed to connect to postgres user store: %s", err.Error())
-		return
-	}
-	setupDB(t, db)
-	store.TestUserStore(t, &UserStore{
-		db:  db,
-		ctx: context.Background(),
-	})
-}
-
-func TestPeerDriver(t *testing.T) {
-	db, err := pgx.Connect(context.Background(), makeDSN(config.PeerStore))
-	if err != nil {
-		t.Skipf("failed to connect to postgres user store: %s", err.Error())
-		return
-	}
-	setupDB(t, db)
-	store.TestPeerStore(t, NewPeerStore(db), memory.NewTorrentStore(), memory.NewUserStore())
+	store.TestStore(t, &Driver{db: db, ctx: context.Background()})
 }
 
 func clearDB(db *pgx.Conn) {

@@ -62,6 +62,14 @@ func UMax(a, b uint) uint {
 	return b
 }
 
+// Min is math.Min for int
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // UMin64 is math.Min for uint64
 func UMin64(a, b uint64) uint64 {
 	if a < b {

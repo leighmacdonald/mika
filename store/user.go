@@ -1,36 +1,35 @@
 package store
 
-import "errors"
+import (
+	log "github.com/sirupsen/logrus"
+	"time"
+)
 
 // User defines a basic user known to the tracker
 // All users are considered enabled if they exist. You must remove them from the
 // backing store to ensure they cannot access any resources
 type User struct {
-	UserID          uint32 `db:"user_id" json:"user_id"`
-	Passkey         string `db:"passkey" json:"passkey"`
-	IsDeleted       bool   `db:"is_deleted" json:"is_deleted"`
-	DownloadEnabled bool   `db:"download_enabled" json:"download_enabled"`
-	Downloaded      uint64 `json:"downloaded"`
-	Uploaded        uint64 `json:"uploaded"`
-	Announces       uint32 `json:"announces"`
-	RoleIDs         string `json:"-" db:"role_ids"`
-	Roles           []Role `json:"roles"`
+	UserID          uint32    `db:"user_id" json:"user_id"`
+	RoleID          uint32    `json:"role_id" db:"role_id"`
+	RemoteID        uint64    `json:"remote_id" db:"remote_id"`
+	UserName        string    `db:"user_name" json:"user_name"`
+	Passkey         string    `db:"passkey" json:"passkey"`
+	IsDeleted       bool      `db:"is_deleted" json:"is_deleted"`
+	DownloadEnabled bool      `db:"download_enabled" json:"download_enabled"`
+	Downloaded      uint64    `db:"downloaded" json:"downloaded"`
+	Uploaded        uint64    `db:"uploaded" json:"uploaded"`
+	Announces       uint32    `db:"announces" json:"announces"`
+	CreatedOn       time.Time `db:"created_on" json:"created_on"`
+	UpdatedOn       time.Time `db:"updated_on" json:"updated_on"`
+	Role            *Role     `json:"role" db:"-"`
+
+	// Keeps track of how often the values have been changes
+	// TODO Items with the most writes will get written to soonest
+	Writes uint32 `db:"-" json:"-"`
 }
 
-// RemoveRole removes a role from a User.Roles slice
-func (u User) RemoveRole(roleID int) error {
-	found := false
-	for i := len(u.Roles) - 1; i >= 0; i-- {
-		if u.Roles[i].RoleID == roleID {
-			u.Roles = append(u.Roles[:i], u.Roles[i+1:]...)
-			found = true
-			break
-		}
-	}
-	if !found {
-		return errors.New("role not attached to user")
-	}
-	return nil
+func (u User) Log() *log.Entry {
+	return log.WithFields(log.Fields{"id": u.UserID, "name": u.UserName, "rid": u.RemoteID})
 }
 
 // Valid performs basic validation of the user info ensuring we have the minimum required
@@ -40,25 +39,32 @@ func (u User) Valid() bool {
 }
 
 // Users is a slice of known users
-type Users []User
-type Roles []Role
+type Users map[string]*User
+
+// Roles is a map of roles by role_id
+type Roles map[uint32]*Role
+
+// WhiteList is a map of whitelisted clients by 8 chars of client prefix
+type WhiteList map[string]*WhiteListClient
 
 // Remove removes a users from a Users slice
-func (users Users) Remove(p User) []User {
-	for i := len(users) - 1; i >= 0; i-- {
-		if users[i].UserID == p.UserID {
-			return append(users[:i], users[i+1:]...)
-		}
-	}
-	return users
+func (users Users) Remove(p *User) {
+	delete(users, p.Passkey)
 }
 
 type Role struct {
-	RoleID          int     `json:"role_id" db:"role_id"`
-	RoleName        string  `json:"role_name" db:"role_name"`
-	Priority        int     `json:"priority" db:"priority"`
-	MultiUp         float64 `json:"multi_up" db:"multi_up"`
-	MultiDown       float64 `json:"multi_down" db:"multi_down"`
-	DownloadEnabled bool    `json:"download_enabled" db:"download_enabled"`
-	UploadEnabled   bool    `json:"upload_enabled" db:"upload_enabled"`
+	RoleID          uint32    `json:"role_id" db:"role_id"`
+	RemoteID        uint64    `json:"remote_id" db:"remote_id"`
+	RoleName        string    `json:"role_name" db:"role_name"`
+	Priority        int32     `json:"priority" db:"priority"`
+	MultiUp         float64   `json:"multi_up" db:"multi_up"`
+	MultiDown       float64   `json:"multi_down" db:"multi_down"`
+	DownloadEnabled bool      `json:"download_enabled" db:"download_enabled"`
+	UploadEnabled   bool      `json:"upload_enabled" db:"upload_enabled"`
+	CreatedOn       time.Time `json:"created_on" db:"created_on"`
+	UpdateOn        time.Time `json:"updated_on" db:"updated_on"`
+}
+
+func (r Role) Log() *log.Entry {
+	return log.WithFields(log.Fields{"id": r.RoleID, "name": r.RoleName, "rid": r.RemoteID})
 }

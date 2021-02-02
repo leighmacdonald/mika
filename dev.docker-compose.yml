@@ -21,14 +21,14 @@ services:
     volumes:
       - ./docker/mysql_init.sql:/docker-entrypoint-initdb.d/00_mysql_init.sql
       - ./store/mysql/schema.sql:/docker-entrypoint-initdb.d/10_schema.sql
+    ports:
+      - 3306:3306
     networks:
-      - mika_testing
+      bri
 
   redis:
     image: redis:6-alpine
     restart: always
-    networks:
-      - mika_dev
 
   mika:
     build:
@@ -40,12 +40,6 @@ services:
     volumes:
       - geo_data:/app/geo_data
       - ./docker/mika.yaml:/app/mika.yaml
-    networks:
-      - mika_dev
 
 volumes:
   geo_data:
-
-networks:
-  mika_dev:
-    driver: bridge

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"github.com/chihaya/bencode"
 	"github.com/gin-gonic/gin"
+	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/pkg/errors"
@@ -60,9 +61,9 @@ var (
 
 // Err maps a tracker error code to a error
 //noinspection GoUnusedExportedFunction
-func Err(code errCode) error {
-	return responseStringMap[code]
-}
+//func Err(code errCode) error {
+//	return responseStringMap[code]
+//}
 
 // getIP Parses and returns a IP from a query
 // If a IP header exists, it will be used instead of the client provided query parameter
@@ -118,10 +119,9 @@ func oops(ctx *gin.Context, errCode errCode) {
 // preFlightChecks ensures our user meets the requirements to make an authorized request
 // THis is used within the request handler itself and not as a middleware because of the
 // slightly higher cost of passing data in through the request context
-func (t *Tracker) preFlightChecks(usr *store.User, pk string, c *gin.Context) bool {
-
+func preFlightChecks(usr *store.User, pk string, c *gin.Context) bool {
 	// Check that the user is valid before parsing anything
-	if t.Public {
+	if config.Tracker.Public {
 		usr.UserID = 1
 		return true
 	} else {
@@ -129,11 +129,13 @@ func (t *Tracker) preFlightChecks(usr *store.User, pk string, c *gin.Context) bo
 			oops(c, msgInvalidAuth)
 			return false
 		}
-		if err := t.UserGet(usr, pk); err != nil {
+		foundUser, err := UserGetByPasskey(pk)
+		if err != nil {
 			log.Debugf("Got invalid passkey")
 			oops(c, msgInvalidAuth)
 			return false
 		}
+		usr = foundUser
 		return usr.Valid()
 	}
 }
@@ -185,16 +187,13 @@ func noRoute(c *gin.Context) {
 }
 
 // NewBitTorrentHandler configures a router to handle tracker announce/scrape requests
-func NewBitTorrentHandler(tkr *Tracker) *gin.Engine {
+func NewBitTorrentHandler() *gin.Engine {
 	r := newRouter()
 	r.Use(handleTrackerErrors)
-	h := BitTorrentHandler{
-		tracker: tkr,
-	}
-	r.GET("/announce", h.announce)
-	r.GET("/scrape", h.scrape)
-	r.GET("/announce/:passkey", h.announce)
-	r.GET("/scrape/:passkey", h.scrape)
+	r.GET("/announce", announce)
+	r.GET("/scrape", scrape)
+	r.GET("/announce/:passkey", announce)
+	r.GET("/scrape/:passkey", scrape)
 	r.NoRoute(noRoute)
 	return r
 }

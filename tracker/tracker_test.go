@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/chihaya/bencode"
@@ -99,26 +100,26 @@ type sr struct {
 }
 
 func TestBitTorrentHandler_Scrape(t *testing.T) {
+	ctx := context.Background()
 	torrent0 := store.GenerateTestTorrent()
 	leecher0 := store.GenerateTestPeer()
 	seeder0 := store.GenerateTestPeer()
 	user0 := store.GenerateTestUser()
 	user1 := store.GenerateTestUser()
 
-	tkr, err := NewTestTracker()
-	require.NoError(t, err, "Failed to init tracker")
+	Init()
 	time.Sleep(time.Millisecond * 200)
-	go tkr.StatWorker()
-	go tkr.PeerReaper()
-	rh := NewBitTorrentHandler(tkr)
+	go StatWorker(ctx)
+	go PeerReaper(ctx)
+	rh := NewBitTorrentHandler()
 
-	require.NoError(t, tkr.torrents.Add(torrent0), "Failed to add test torrent")
+	require.NoError(t, db.TorrentAdd(&torrent0), "Failed to add test torrent")
 	for _, u := range []store.User{user0, user1} {
-		require.NoError(t, tkr.users.Add(u), "Failed to add test user")
+		require.NoError(t, UserAdd(&u), "Failed to add test user")
 	}
-	require.NoError(t, tkr.peers.Add(torrent0.InfoHash, leecher0))
-	require.NoError(t, tkr.peers.Add(torrent0.InfoHash, seeder0))
-	require.NoError(t, tkr.torrents.Sync(map[store.InfoHash]store.TorrentStats{
+	torrent0.Peers.Add(leecher0)
+	torrent0.Peers.Add(seeder0)
+	require.NoError(t, db.TorrentSync(map[store.InfoHash]store.TorrentStats{
 		torrent0.InfoHash: {
 			Seeders:    1,
 			Leechers:   1,
@@ -152,6 +153,7 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 }
 
 func TestBitTorrentHandler_Announce(t *testing.T) {
+	ctx := context.Background()
 	torrent0 := store.GenerateTestTorrent()
 	leecher0 := store.GenerateTestPeer()
 	seeder0 := store.GenerateTestPeer()
@@ -160,25 +162,24 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 
 	unregisteredTorrent := store.GenerateTestTorrent()
 
-	tkr, err := NewTestTracker()
-	require.NoError(t, err, "Failed to init tracker")
-	// Whitelist our random peerids
-	tkr.Whitelist[string(leecher0.PeerID[0:8])] = store.WhiteListClient{
+	Init()
+	// whitelist our random peerids
+	whitelist[string(leecher0.PeerID[0:8])] = &store.WhiteListClient{
 		ClientPrefix: string(leecher0.PeerID[0:8]),
 		ClientName:   "Test-Leecher",
 	}
-	tkr.Whitelist[string(seeder0.PeerID[0:8])] = store.WhiteListClient{
+	whitelist[string(seeder0.PeerID[0:8])] = &store.WhiteListClient{
 		ClientPrefix: string(seeder0.PeerID[0:8]),
 		ClientName:   "Test-Seeder",
 	}
 	time.Sleep(time.Millisecond * 200)
-	go tkr.StatWorker()
-	go tkr.PeerReaper()
-	rh := NewBitTorrentHandler(tkr)
+	go StatWorker(ctx)
+	go PeerReaper(ctx)
+	rh := NewBitTorrentHandler()
 
-	require.NoError(t, tkr.torrents.Add(torrent0), "Failed to add test torrent")
+	require.NoError(t, TorrentAdd(&torrent0), "Failed to add test torrent")
 	for _, u := range []store.User{user0, user1} {
-		require.NoError(t, tkr.users.Add(u), "Failed to add test user")
+		require.NoError(t, UserAdd(&u), "Failed to add test user")
 	}
 
 	type stateExpected struct {
@@ -301,19 +302,21 @@ func TestBitTorrentHandler_Announce(t *testing.T) {
 			var peer store.Peer
 			if a.state.HasPeer {
 				// If we expect a peer (!stopped event)
-				require.NoError(t, tkr.peers.Get(&peer, a.req.Ih, a.req.PID), "Failed to get peer (%d)", i)
+				_, err := PeerGet(a.req.Ih, a.req.PID)
+				require.NoError(t, err, "Failed to get peer (%d)", i)
 				require.Equal(t, a.state.Uploaded, peer.Uploaded, "Invalid uploaded (%d)", i)
 				require.Equal(t, a.state.Downloaded, peer.Downloaded, "Invalid downloaded (%d)", i)
 				require.Equal(t, a.state.Left, peer.Left, "Invalid left (%d)", i)
 				require.Equal(t, a.state.Port, peer.Port, "Invalid port (%d)", i)
 				require.Equal(t, a.state.IP, peer.IP.String(), "Invalid ip (%d)", i)
 			} else {
-				require.Error(t, tkr.peers.Get(&peer, a.req.Ih, a.req.PID), "Got peer when we shouldn't (%d)", i)
+				_, err2 := PeerGet(a.req.Ih, a.req.PID)
+				require.Error(t, err2, "Got peer when we shouldn't (%d)", i)
 			}
-			swarm, err := tkr.peers.GetN(torrent0.InfoHash, 1000)
+			swarm, err := PeerGetN(torrent0.InfoHash, 1000)
 			require.NoError(t, err, "Failed to fetch all peers (%d)", i)
 			var torrent store.Torrent
-			require.NoError(t, tkr.torrents.Get(&torrent, torrent0.InfoHash, false))
+			require.NoError(t, TorrentGet(&torrent, torrent0.InfoHash, false))
 			require.Equal(t, a.state.SwarmSize, len(swarm.Peers), "Invalid swarm size (%d)", i)
 			require.Equal(t, a.state.Seeders, torrent.Seeders, "Invalid seeder count (%d)", i)
 			require.Equal(t, a.state.Leechers, torrent.Leechers, "Invalid leecher count (%d)", i)

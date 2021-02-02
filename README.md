@@ -41,8 +41,6 @@ port differing from the standard tracker port. This port is configured for TLS1.
     queries which is why we require these versions at minimum.
     - `redis` Redis provides an in-memory datastore which does get persisted to disk (if enabled in redis).
     - `memory` A simple in-memory storage which is not persisted anywhere.
-    - `http` By implementing compatible REST API endpoints on your own HTTP service, we can communicate over REST with your own independent system. This is a good
-    option if you don't know Go or do not want to change  your database schema to be compatible. Several authentication methods will be implemented.
     - `custom` You can easily add support for your own storage backends by implementing store.UserStore, store.PeerStore or store.TorrentStore interfaces as needed. PRs for
      new implementations welcomed.
 
@@ -84,11 +82,6 @@ Not currently planned, but maybe in the future:
 ## Build Notes
 
 The minimum required version of go for building from the source is `1.14+`.
-
-To also build the demo http server add the demos build tags.
-
-    go build -tags demos 
-    ./mika demoapi
 
 ## Usage
 

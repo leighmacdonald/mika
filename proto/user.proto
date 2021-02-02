@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+option go_package = "github.com/leighmacdonald/mika/rpc";
+
+import "proto/common.proto";
+import "proto/role.proto";
+
+package mika;
+
+message User {
+  uint32 user_id = 1;
+  uint32 role_id = 2;
+  uint64 remote_id = 3;
+  string user_name = 4;
+  uint64 downloaded = 5;
+  uint64 uploaded = 6;
+  string passkey = 7;
+  bool is_deleted = 8;
+  bool download_enabled = 9;
+  uint32 announces = 10;
+  TimeMeta time = 11;
+  Role role = 12;
+}
+
+message UserID {
+  uint32 user_id = 1;
+  uint64 remote_id = 2;
+  string passkey = 3;
+}
+
+message UserAddParams {
+  uint32 role_id = 1;
+  uint64 remote_id = 2;
+  string user_name = 3;
+  bool download_enabled = 4;
+  uint64 downloaded = 5;
+  uint64 uploaded = 6;
+  string passkey = 7;
+}
+
+message UserUpdateParams {
+  uint32 user_id = 1;
+  uint32 role_id = 2;
+  uint64 remote_id = 3;
+  string user_name = 4;
+  bool download_enabled = 5;
+  uint64 downloaded = 6;
+  uint64 uploaded = 7;
+  string passkey = 8;
+}

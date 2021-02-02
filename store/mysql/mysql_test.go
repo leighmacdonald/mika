@@ -4,36 +4,20 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
-	"github.com/leighmacdonald/mika/store/memory"
 	"github.com/leighmacdonald/mika/util"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 )
 
 const schemaDrop = "store/mysql/drop.sql"
 const schemaCreate = "store/mysql/schema.sql"
 
-func TestTorrentDriver(t *testing.T) {
+func TestDriver(t *testing.T) {
 	// multiStatements=true is required to exec the full schema at once
 	db := sqlx.MustConnect(driverName, config.TorrentStore.DSN())
-	store.TestTorrentStore(t, &TorrentStore{db: db})
-}
-
-func TestUserDriver(t *testing.T) {
-	db := sqlx.MustConnect(driverName, config.UserStore.DSN())
-	store.TestUserStore(t, &UserStore{
-		db: db,
-	})
-}
-
-func TestPeerStore(t *testing.T) {
-	db := sqlx.MustConnect(driverName, config.PeerStore.DSN())
-	ts := memory.NewTorrentStore()
-	us := memory.NewUserStore()
-	store.TestPeerStore(t, &PeerStore{db: db}, ts, us)
+	store.TestStore(t, &Driver{db: db})
 }
 
 func execSchema(db *sqlx.DB, schemaPath string) {
@@ -42,12 +26,13 @@ func execSchema(db *sqlx.DB, schemaPath string) {
 	if err != nil {
 		panic("Cannot read schema file")
 	}
-	for _, stmt := range strings.Split(string(b), "-- STMT") {
-		if !strings.HasPrefix(stmt, "-- ") && strings.Contains(stmt, ";") {
-			log.Debugf("SQL: %s", stmt)
-			db.MustExec(stmt)
-		}
-	}
+	db.MustExec(string(b))
+	//for _, stmt := range strings.Split(string(b), "-- STMT") {
+	//	if !strings.HasPrefix(stmt, "-- ") && strings.Contains(stmt, ";") {
+	//		log.Debugf("SQL: %s", stmt)
+	//		db.MustExec(string(b))
+	//	}
+	//}
 }
 
 func TestMain(m *testing.M) {

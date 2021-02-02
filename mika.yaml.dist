@@ -44,7 +44,7 @@ stores:
     user: mika
     password: mika
     database: mika
-    properties: parseTime=true
+    properties: parseTime=true&multiStatements=true
     cache: true
   # Live peer cache backend storage config
   peers: *torrent_store

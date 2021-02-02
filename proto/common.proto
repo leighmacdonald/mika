@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "github.com/leighmacdonald/mika/rpc";
+
+import "google/protobuf/timestamp.proto";
+
+package mika;
+
+message TimeMeta {
+  google.protobuf.Timestamp created_on = 1;
+  google.protobuf.Timestamp updated_on = 2;
+}

@@ -77,7 +77,7 @@ func (d *Driver) RoleSave(role *store.Role) error {
 	panic("implement me")
 }
 
-func (d *Driver) RoleByID(role *store.Role, roleID uint32) error {
+func (d *Driver) RoleByID(roleID uint32) (*store.Role, error) {
 	panic("implement me")
 }
 
@@ -150,10 +150,11 @@ func (d *Driver) UserAdd(u *store.User) error {
 }
 
 // GetByPasskey returns the hash values set of the passkey and maps it to a User struct
-func (d *Driver) UserGetByPasskey(user *store.User, passkey string) error {
+func (d *Driver) UserGetByPasskey(passkey string) (*store.User, error) {
+	var user store.User
 	v, err := d.client.HGetAll(userKey(passkey)).Result()
 	if err != nil {
-		return errors.Wrap(err, "Failed to retrieve user by passkey")
+		return nil, errors.Wrap(err, "Failed to retrieve user by passkey")
 	}
 	user.Passkey = v["passkey"]
 	user.UserID = util.StringToUInt32(v["user_id"], 0)
@@ -163,22 +164,22 @@ func (d *Driver) UserGetByPasskey(user *store.User, passkey string) error {
 	user.DownloadEnabled = util.StringToBool(v["download_enabled"], false)
 	user.IsDeleted = util.StringToBool(v["is_deleted"], false)
 	if !user.Valid() {
-		return consts.ErrInvalidState
+		return nil, consts.ErrInvalidState
 	}
-	return nil
+	return &user, nil
 }
 
 // GetByID will query the passkey:user_id index for the passkey and return the matching user
-func (d *Driver) UserGetByID(user *store.User, userID uint32) error {
+func (d *Driver) UserGetByID(userID uint32) (*store.User, error) {
 	passkey, err := d.client.Get(userIDKey(userID)).Result()
 	if err != nil {
 		log.Warnf("Failed to lookup user by ID, no passkey mapped: %d", userID)
-		return consts.ErrInvalidUser
+		return nil, consts.ErrInvalidUser
 	}
 	if passkey == "" {
-		return consts.ErrInvalidUser
+		return nil, consts.ErrInvalidUser
 	}
-	return d.UserGetByPasskey(user, passkey)
+	return d.UserGetByPasskey(passkey)
 }
 
 // Delete drops a user from redis.
@@ -329,22 +330,23 @@ func (d *Driver) TorrentDelete(ih store.InfoHash, dropRow bool) error {
 }
 
 // Get returns the Torrent matching the infohash
-func (d *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+func (d *Driver) TorrentGet(hash store.InfoHash, deletedOk bool) (*store.Torrent, error) {
+	var t store.Torrent
 	v, err := d.client.HGetAll(torrentKey(hash)).Result()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ihStr, found := v["info_hash"]
 	if !found {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
 	var infoHash store.InfoHash
 	if err := store.InfoHashFromHex(&infoHash, ihStr); err != nil {
-		return errors.Wrap(err, "Failed to decode info_hash")
+		return nil, errors.Wrap(err, "Failed to decode info_hash")
 	}
 	isDeleted := util.StringToBool(v["is_deleted"], false)
 	if isDeleted && !deletedOk {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
 	t.InfoHash = infoHash
 	t.Snatches = util.StringToUInt32(v["total_completed"], 0)
@@ -358,7 +360,7 @@ func (d *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk boo
 	t.Announces = util.StringToUInt64(v["announces"], 0)
 	t.Seeders = util.StringToUInt32(v["seeders"], 0)
 	t.Leechers = util.StringToUInt32(v["leechers"], 0)
-	return nil
+	return &t, nil
 }
 
 func (d *Driver) Name() string {

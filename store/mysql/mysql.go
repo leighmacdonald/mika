@@ -103,20 +103,21 @@ func (s *Driver) RoleSave(role *store.Role) error {
 	return nil
 }
 
-func (s *Driver) RoleByID(role *store.Role, roleID uint32) error {
+func (s *Driver) RoleByID(roleID uint32) (*store.Role, error) {
 	const q = `
 		SELECT 
        		role_id, role_name, priority, multi_up, multi_down, 
        		download_enabled, upload_enabled, created_on, updated_on 
 		FROM role 
 		WHERE role_id = ?`
+	var role *store.Role
 	if err := s.db.Get(role, q, roleID); err != nil {
 		if err.Error() == ErrNoResults {
-			return consts.ErrInvalidRole
+			return nil, consts.ErrInvalidRole
 		}
-		return errors.Wrap(err, "Could not query user by passkey")
+		return nil, errors.Wrap(err, "Could not query user by passkey")
 	}
-	return nil
+	return role, nil
 }
 
 func (s *Driver) RoleAdd(role *store.Role) error {
@@ -215,8 +216,8 @@ func (s *Driver) UserAdd(user *store.User) error {
 		return errors.Wrap(err3, "Failed to get role id")
 	}
 	user.UserID = uint32(i)
-	r := &store.Role{}
-	if err := s.RoleByID(r, user.RoleID); err != nil {
+	r, err := s.RoleByID(user.RoleID)
+	if err != nil {
 		return errors.Wrap(err, "Failed to load role")
 	}
 	user.Role = r
@@ -227,7 +228,7 @@ func (s *Driver) UserAdd(user *store.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (s *Driver) UserGetByPasskey(user *store.User, passkey string) error {
+func (s *Driver) UserGetByPasskey(passkey string) (*store.User, error) {
 	const q = `
 		SELECT 
 		    u.user_id,
@@ -240,22 +241,23 @@ func (s *Driver) UserGetByPasskey(user *store.User, passkey string) error {
 			u.role_id
 		FROM user u
 		WHERE u.passkey = ?;`
-	if err := s.db.Get(user, q, passkey); err != nil {
+	var user store.User
+	if err := s.db.Get(&user, q, passkey); err != nil {
 		if err.Error() == ErrNoResults {
-			return consts.ErrInvalidUser
+			return nil, consts.ErrInvalidUser
 		}
-		return errors.Wrap(err, "Could not query user by passkey")
+		return nil, errors.Wrap(err, "Could not query user by passkey")
 	}
-	r := &store.Role{}
-	if err := s.RoleByID(r, user.RoleID); err != nil {
-		return errors.Wrap(err, "Failed to load role")
+	r, err := s.RoleByID(user.RoleID)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to load role")
 	}
 	user.Role = r
-	return nil
+	return &user, nil
 }
 
 // GetByID returns a user matching the userId
-func (s *Driver) UserGetByID(user *store.User, userID uint32) error {
+func (s *Driver) UserGetByID(userID uint32) (*store.User, error) {
 	const q = `
 		SELECT 
 		    u.user_id,
@@ -268,18 +270,19 @@ func (s *Driver) UserGetByID(user *store.User, userID uint32) error {
 			u.role_id
     	FROM user u
     	WHERE u.user_id = ?`
-	if err := s.db.Get(user, q, userID); err != nil {
+	var user store.User
+	if err := s.db.Get(&user, q, userID); err != nil {
 		if err.Error() == ErrNoResults {
-			return consts.ErrInvalidUser
+			return nil, consts.ErrInvalidUser
 		}
-		return errors.Wrap(err, "Could not query user by user_id")
+		return nil, errors.Wrap(err, "Could not query user by user_id")
 	}
-	r := &store.Role{}
-	if err := s.RoleByID(r, user.RoleID); err != nil {
-		return errors.Wrap(err, "Failed to load role")
+	r, err := s.RoleByID(user.RoleID)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to load role")
 	}
 	user.Role = r
-	return nil
+	return &user, nil
 }
 
 // Delete removes a user from the backing store
@@ -435,7 +438,7 @@ func (s *Driver) WhiteListGetAll() ([]*store.WhiteListClient, error) {
 }
 
 // Get returns a torrent for the hash provided
-func (s *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+func (s *Driver) TorrentGet(hash store.InfoHash, deletedOk bool) (*store.Torrent, error) {
 	const q = `
 		SELECT 
 			info_hash,
@@ -454,17 +457,18 @@ func (s *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk boo
     	    torrent
     	WHERE 
     	    is_deleted = ? AND info_hash = ?`
-	err := s.db.Get(t, q, deletedOk, hash.Bytes())
+	var t store.Torrent
+	err := s.db.Get(&t, q, deletedOk, hash.Bytes())
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
-			return consts.ErrInvalidInfoHash
+			return nil, consts.ErrInvalidInfoHash
 		}
-		return err
+		return nil, err
 	}
 	if t.IsDeleted && !deletedOk {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
-	return nil
+	return &t, nil
 }
 
 // Add inserts a new torrent into the backing store

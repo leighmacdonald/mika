@@ -47,7 +47,7 @@ func (d *Driver) Roles() (store.Roles, error) {
 	panic("implement me")
 }
 
-func (d *Driver) RoleByID(role *store.Role, roleID uint32) error {
+func (d *Driver) RoleByID(roleID uint32) (*store.Role, error) {
 	panic("implement me")
 }
 
@@ -140,7 +140,7 @@ func (d *Driver) UserAdd(user *store.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (d *Driver) UserGetByPasskey(user *store.User, passkey string) error {
+func (d *Driver) UserGetByPasskey(passkey string) (*store.User, error) {
 	const q = `
 		SELECT 
 		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
@@ -150,16 +150,17 @@ func (d *Driver) UserGetByPasskey(user *store.User, passkey string) error {
 		    passkey = $1`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
+	var user store.User
 	err := d.db.QueryRow(c, q, passkey).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
 		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
-		return errors.Wrap(err, "Failed to fetch user by passkey")
+		return nil, errors.Wrap(err, "Failed to fetch user by passkey")
 	}
-	return nil
+	return &user, nil
 }
 
 // GetByID returns a user matching the userId
-func (d *Driver) UserGetByID(user *store.User, userID uint32) error {
+func (d *Driver) UserGetByID(userID uint32) (*store.User, error) {
 	const q = `
 		SELECT 
 		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
@@ -169,12 +170,13 @@ func (d *Driver) UserGetByID(user *store.User, userID uint32) error {
 		    user_id = $1`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
+	var user store.User
 	err := d.db.QueryRow(c, q, userID).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
 		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
-		return errors.Wrap(err, "Failed to fetch user by user_id")
+		return nil, errors.Wrap(err, "Failed to fetch user by user_id")
 	}
-	return nil
+	return &user, nil
 }
 
 // Delete removes a user from the backing store
@@ -308,7 +310,7 @@ func (d *Driver) TorrentDelete(ih store.InfoHash, dropRow bool) error {
 }
 
 // TorrentGet returns a torrent for the hash provided
-func (d *Driver) TorrentGet(t *store.Torrent, ih store.InfoHash, deletedOk bool) error {
+func (d *Driver) TorrentGet(ih store.InfoHash, deletedOk bool) (*store.Torrent, error) {
 	const q = `
 		SELECT 
 			info_hash::bytea, total_uploaded, total_downloaded, total_completed, 
@@ -319,6 +321,7 @@ func (d *Driver) TorrentGet(t *store.Torrent, ih store.InfoHash, deletedOk bool)
 		    info_hash = $1 AND is_deleted = false`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
+	var t store.Torrent
 	var b []byte
 	err := d.db.QueryRow(c, q, ih.Bytes()).Scan(
 		&b, // TODO implement pgx custom types to map automatically
@@ -337,14 +340,14 @@ func (d *Driver) TorrentGet(t *store.Torrent, ih store.InfoHash, deletedOk bool)
 	copy(t.InfoHash[:], b)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			return consts.ErrInvalidInfoHash
+			return nil, consts.ErrInvalidInfoHash
 		}
-		return err
+		return nil, err
 	}
 	if t.IsDeleted && !deletedOk {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
-	return nil
+	return &t, nil
 }
 
 // Close will close the underlying postgres database connection

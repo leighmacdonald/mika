@@ -81,18 +81,17 @@ func (d *Driver) WhiteListGetAll() ([]*store.WhiteListClient, error) {
 }
 
 // Get returns the Torrent matching the infohash
-func (d *Driver) TorrentGet(torrent *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+func (d *Driver) TorrentGet(hash store.InfoHash, deletedOk bool) (*store.Torrent, error) {
 	d.torrentsMu.RLock()
 	t, found := d.torrents[hash]
 	d.torrentsMu.RUnlock()
 	if !found {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
 	if t.IsDeleted && !deletedOk {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
-	torrent = t
-	return nil
+	return t, nil
 }
 
 // NewPeerStore instantiates a new in-memory peer store
@@ -142,14 +141,13 @@ func (d *Driver) RoleSave(r *store.Role) error {
 	return nil
 }
 
-func (d *Driver) RoleByID(role *store.Role, roleID uint32) error {
+func (d *Driver) RoleByID(roleID uint32) (*store.Role, error) {
 	for _, r := range d.roles {
 		if r.RoleID == roleID {
-			role = r
-			return nil
+			return r, nil
 		}
 	}
-	return consts.ErrInvalidRole
+	return nil, consts.ErrInvalidRole
 }
 
 func (d *Driver) RoleAdd(role *store.Role) error {
@@ -189,7 +187,7 @@ func (d *Driver) Roles() (store.Roles, error) {
 }
 
 // Update is used to change a known user
-func (d *Driver) UserSave(_ *store.User) error {
+func (d *Driver) UserSave(u *store.User) error {
 	return nil
 }
 
@@ -216,28 +214,26 @@ func (d *Driver) UserAdd(usr *store.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (d *Driver) UserGetByPasskey(usr *store.User, passkey string) error {
+func (d *Driver) UserGetByPasskey(passkey string) (*store.User, error) {
 	d.usersMu.RLock()
 	user, found := d.users[passkey]
 	d.usersMu.RUnlock()
 	if !found {
-		return consts.ErrUnauthorized
+		return nil, consts.ErrUnauthorized
 	}
-	usr = user
-	return nil
+	return user, nil
 }
 
 // GetByID returns a user matching the userId
-func (d *Driver) UserGetByID(user *store.User, userID uint32) error {
+func (d *Driver) UserGetByID(userID uint32) (*store.User, error) {
 	d.usersMu.RLock()
 	defer d.usersMu.RUnlock()
 	for _, usr := range d.users {
 		if usr.UserID == userID {
-			user = usr
-			return nil
+			return usr, nil
 		}
 	}
-	return consts.ErrUnauthorized
+	return nil, consts.ErrUnauthorized
 }
 
 // Delete removes a user from the backing store

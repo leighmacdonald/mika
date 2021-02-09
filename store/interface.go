@@ -43,9 +43,9 @@ type Store interface {
 	// UserAdd will add a new user to the backing store
 	UserAdd(u *User) error
 	// UserGetByPasskey returns a user matching the passkey
-	UserGetByPasskey(user *User, passkey string) error
+	UserGetByPasskey(passkey string) (*User, error)
 	// UserGetByID returns a user matching the userId
-	UserGetByID(user *User, userID uint32) error
+	UserGetByID(userID uint32) (*User, error)
 	// UserDelete removes a user from the backing store
 	UserDelete(user *User) error
 	// UserSave is used to change a known user
@@ -56,7 +56,7 @@ type Store interface {
 	// Roles fetches all known groups
 	Roles() (Roles, error)
 	// Roles fetches all known groups
-	RoleByID(role *Role, roleID uint32) error
+	RoleByID(roleID uint32) (*Role, error)
 	// RoleAdd adds a new role to the system
 	RoleAdd(role *Role) error
 	// RoleDelete permanently deletes a role from the system
@@ -72,7 +72,7 @@ type Store interface {
 	// If dropRow is true, it will permanently remove the torrent from the store
 	TorrentDelete(ih InfoHash, dropRow bool) error
 	// TorrentGet returns the Torrent matching the infohash
-	TorrentGet(torrent *Torrent, hash InfoHash, deletedOk bool) error
+	TorrentGet(hash InfoHash, deletedOk bool) (*Torrent, error)
 	// TorrentSave will update certain parameters within the torrent
 	TorrentSave(torrent *Torrent) error
 	// TorrentSync batch updates the backing store with the new TorrentStats provided

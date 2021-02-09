@@ -106,10 +106,8 @@ type sr struct {
 }
 
 func TestMain(m *testing.M) {
-	if err := config.Read(""); err != nil {
-		log.Errorf("Failed to read config: %v", err)
-		os.Exit(1)
-	}
+	config.General.RunMode = "test"
+	config.Tracker.AllowNonRoutable = false
 	Init()
 	if err := seedTestTracker(); err != nil {
 		log.Errorf("Failed to seed tracker for test: %v", err)

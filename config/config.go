@@ -16,11 +16,51 @@ import (
 )
 
 var (
-	General generalConfig
-	Tracker trackerConfig
-	API     rpcConfig
-	Store   StoreConfig
-	GeoDB   geoDBConfig
+	General = generalConfig{
+		RunMode:   "",
+		LogLevel:  "",
+		LogColour: false,
+	}
+	Tracker = trackerConfig{
+		Public:                        false,
+		Listen:                        "0.0.0.0:34000",
+		TLS:                           false,
+		IPv6:                          false,
+		IPv6Only:                      false,
+		AutoRegister:                  false,
+		ReaperInterval:                "90s",
+		ReaperIntervalParsed:          90 * time.Second,
+		AnnounceInterval:              "30s",
+		AnnounceIntervalParsed:        30 * time.Second,
+		AnnounceIntervalMinimum:       "10s",
+		AnnounceIntervalMinimumParsed: 10 * time.Second,
+		HNRThreshold:                  "1d",
+		HNRThresholdParsed:            24 * time.Hour,
+		BatchUpdateInterval:           "30s",
+		BatchUpdateIntervalParsed:     30 * time.Second,
+		AllowNonRoutable:              true,
+		AllowClientIP:                 false,
+		MaxPeers:                      50,
+	}
+	API = rpcConfig{
+		Listen: "localhost:34001",
+		TLS:    false,
+		Key:    "",
+	}
+	Store = StoreConfig{
+		Type:       "memory",
+		Host:       "",
+		Port:       0,
+		User:       "",
+		Password:   "",
+		Database:   "",
+		Properties: "",
+	}
+	GeoDB = geoDBConfig{
+		Path:    "",
+		APIKey:  "",
+		Enabled: false,
+	}
 )
 
 type fullConfig struct {

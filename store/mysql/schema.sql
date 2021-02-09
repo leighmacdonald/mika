@@ -16,7 +16,7 @@
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `role` (
+CREATE TABLE IF NOT EXISTS `role` (
   `role_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `remote_id` bigint(20) unsigned NOT NULL DEFAULT 0,
   `role_name` varchar(64) NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE `role` (
   PRIMARY KEY (`role_id`),
   UNIQUE KEY `role_priority_uindex` (`priority`),
   UNIQUE KEY `roles_role_name_uindex` (`role_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -39,7 +39,7 @@ CREATE TABLE `role` (
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `torrent` (
+CREATE TABLE IF NOT EXISTS `torrent` (
   `info_hash` binary(20) NOT NULL,
   `total_uploaded` bigint(20) unsigned NOT NULL DEFAULT 0,
   `total_downloaded` bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -68,7 +68,7 @@ CREATE TABLE `torrent` (
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `user` (
+CREATE TABLE IF NOT EXISTS `user` (
   `user_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `role_id` int(10) unsigned NOT NULL,
   `remote_id` bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -83,9 +83,8 @@ CREATE TABLE `user` (
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `user_passkey_uindex` (`passkey`),
   KEY `users_roles_role_id_fk` (`role_id`),
-  CONSTRAINT `users_roles_role_id_fk` FOREIGN KEY (`role_id`) REFERENCES `role` (`role_id`),
-  CONSTRAINT `pk_exists` CHECK (octet_length(`passkey`) >= 20 and octet_length(`passkey`) <= 40)
-) ENGINE=InnoDB AUTO_INCREMENT=1396 DEFAULT CHARSET=utf8mb4;
+  CONSTRAINT `users_roles_role_id_fk` FOREIGN KEY (`role_id`) REFERENCES `role` (`role_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1397 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -94,7 +93,7 @@ CREATE TABLE `user` (
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `user_multi` (
+CREATE TABLE IF NOT EXISTS `user_multi` (
   `user_id` int(10) unsigned NOT NULL,
   `info_hash` binary(20) NOT NULL,
   `multi_up` decimal(5,2) NOT NULL DEFAULT -1.00,
@@ -113,7 +112,7 @@ CREATE TABLE `user_multi` (
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `whitelist` (
+CREATE TABLE IF NOT EXISTS `whitelist` (
   `client_prefix` char(8) NOT NULL,
   `client_name` varchar(20) NOT NULL,
   PRIMARY KEY (`client_prefix`)

@@ -9,6 +9,7 @@ import (
 	"github.com/leighmacdonald/mika/metrics"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"sync/atomic"
@@ -183,15 +184,19 @@ func announce(c *gin.Context) {
 	// Get & Validate the torrent associated with the info_hash supplies
 	tor, errGet := TorrentGet(req.InfoHash, false)
 	if errGet != nil || tor.IsDeleted {
-		tor = &store.Torrent{}
+		if !errors.Is(errGet, consts.ErrInvalidInfoHash) {
+			log.Errorf("Error fetching torrent: %v", errGet)
+			oops(c, msgGenericError)
+			return
+		}
 		if config.Tracker.AutoRegister {
-			tor.InfoHash = req.InfoHash
-			tor.IsEnabled = true
-			if err := TorrentAdd(tor); err != nil {
+			newTor := store.NewTorrent(req.InfoHash)
+			if err := TorrentAdd(&newTor); err != nil {
 				log.Errorf("Failed to auto register torrent: %s", err.Error())
 				oops(c, msgGenericError)
 				return
 			}
+			tor = &newTor
 		} else {
 			log.Debugf("No torrent found matching: %x", req.InfoHash.Bytes())
 			oops(c, msgInvalidInfoHash)
@@ -218,7 +223,6 @@ func announce(c *gin.Context) {
 			// state update. Left is set because its always a static value being set and a (safe) data race
 			// can occur for counting seeder/leecher states
 			peer.Client = store.ClientString(req.PeerID).String()
-			peer.Left = req.Left
 			// TODO allow this to be updated in the perm storage when a client changes settings
 			peer.CryptoLevel = req.CryptoLevel
 			l := geodb.GetLocation(peer.IP)
@@ -234,6 +238,7 @@ func announce(c *gin.Context) {
 	} else {
 		peer.AnnounceLast = time.Now()
 	}
+	atomic.SwapUint32(&peer.Left, req.Left)
 	peersFound, err2 := tor.Peers.GetN(config.Tracker.MaxPeers)
 	if err2 != nil {
 		log.Errorf("Could not read peers from swarm: %s", err2.Error())
@@ -258,8 +263,8 @@ func announce(c *gin.Context) {
 		oops(c, msgGenericError)
 		return
 	}
-	c.Data(int(msgOk), gin.MIMEPlain, outBytes.Bytes())
 	updateStates(req, peer, tor, &usr)
+	c.Data(int(msgOk), gin.MIMEPlain, outBytes.Bytes())
 	metrics.AddAnnounceTime(time.Since(start).Nanoseconds())
 	tor.Log().Debug("Announced")
 }
@@ -280,7 +285,7 @@ func updateStates(req *announceRequest, peer *store.Peer, tor *store.Torrent, us
 		atomic.AddUint32(&tor.Snatches, 1)
 		atomic.AddUint32(&tor.Seeders, 1)
 		if tor.Leechers >= 1 {
-			atomic.SwapUint32(&tor.Seeders, tor.Leechers-1)
+			atomic.SwapUint32(&tor.Leechers, tor.Leechers-1)
 		}
 	case consts.STOPPED:
 		// Paused considered a seeder
@@ -293,7 +298,7 @@ func updateStates(req *announceRequest, peer *store.Peer, tor *store.Torrent, us
 				atomic.SwapUint32(&tor.Leechers, tor.Leechers-1)
 			}
 		}
-
+		tor.Peers.Remove(peer.PeerID)
 		//if err := peerDelete(u.InfoHash, u.PeerID); err != nil {
 		//	log.Errorf("Could not remove peer from swarm: %s", err.Error())
 		//}
@@ -301,6 +306,8 @@ func updateStates(req *announceRequest, peer *store.Peer, tor *store.Torrent, us
 	atomic.AddInt64(&metrics.AnnounceStatusOK, 1)
 	atomic.AddUint32(&peer.Announces, 1)
 	atomic.SwapUint32(&peer.Left, req.Left)
+	atomic.AddUint64(&peer.Downloaded, uint64(req.Downloaded))
+	atomic.AddUint64(&peer.Uploaded, uint64(req.Uploaded))
 	atomic.AddUint64(&tor.Announces, 1)
 	atomic.AddUint64(&tor.Uploaded, uint64(float64(req.Uploaded)*tor.MultiUp))
 	atomic.AddUint64(&tor.Downloaded, uint64(float64(req.Downloaded)*tor.MultiDn))

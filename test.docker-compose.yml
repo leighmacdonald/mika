@@ -29,7 +29,7 @@ services:
       - mysql
     volumes:
       - geo_data:/app/geo_data
-      - ./docker/mika_testing_mysql.yaml:/app/mika.yaml
+      - ./docker/mika_testing_mysql_disabled.yaml:/app/mika.yaml
     networks:
       - mika_test
     command: "make test"

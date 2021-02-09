@@ -57,6 +57,14 @@ type Driver struct {
 	peerTTL time.Duration
 }
 
+func (d *Driver) TorrentSave(torrent *store.Torrent) error {
+	panic("implement me")
+}
+
+func (d *Driver) Migrate() error {
+	panic("implement me")
+}
+
 func (d *Driver) Users() (store.Users, error) {
 	panic("implement me")
 }
@@ -87,33 +95,33 @@ func (d *Driver) RoleDelete(roleID uint32) error {
 
 // Sync batch updates the backing store with the new UserStats provided
 // TODO leverage cache layer so we can pipeline the updates w/o query first
-func (d *Driver) UserSync(b map[string]store.UserStats) error {
-	for passkey, stats := range b {
-		old, err := d.client.HGetAll(userKey(passkey)).Result()
-		if err != nil {
-			return errors.Wrap(err, "Failed to get user from redis")
-		}
-		var downloaded uint64
-		var uploaded uint64
-		var announces uint32
-		downloadedStr, found := old["downloaded"]
-		if found {
-			downloaded = util.StringToUInt64(downloadedStr, 0)
-		}
-		uploadedStr, found := old["uploaded"]
-		if found {
-			uploaded = util.StringToUInt64(uploadedStr, 0)
-		}
-		announcesStr, found := old["announces"]
-		if found {
-			announces = util.StringToUInt32(announcesStr, 0)
-		}
-		d.client.HSet(userKey(passkey), map[string]interface{}{
-			"downloaded": downloaded + stats.Downloaded,
-			"uploaded":   uploaded + stats.Uploaded,
-			"announces":  announces + stats.Announces,
-		})
-	}
+func (d *Driver) UserSync(b []*store.User) error {
+	//for passkey, stats := range b {
+	//	old, err := d.client.HGetAll(userKey(passkey)).Result()
+	//	if err != nil {
+	//		return errors.Wrap(err, "Failed to get user from redis")
+	//	}
+	//	var downloaded uint64
+	//	var uploaded uint64
+	//	var announces uint32
+	//	downloadedStr, found := old["downloaded"]
+	//	if found {
+	//		downloaded = util.StringToUInt64(downloadedStr, 0)
+	//	}
+	//	uploadedStr, found := old["uploaded"]
+	//	if found {
+	//		uploaded = util.StringToUInt64(uploadedStr, 0)
+	//	}
+	//	announcesStr, found := old["announces"]
+	//	if found {
+	//		announces = util.StringToUInt32(announcesStr, 0)
+	//	}
+	//	d.client.HSet(userKey(passkey), map[string]interface{}{
+	//		"downloaded": downloaded + stats.Downloaded,
+	//		"uploaded":   uploaded + stats.Uploaded,
+	//		"announces":  announces + stats.Announces,
+	//	})
+	//}
 	return nil
 }
 
@@ -213,19 +221,19 @@ func (d *Driver) TorrentUpdate(torrent *store.Torrent) error {
 }
 
 // Sync batch updates the backing store with the new TorrentStats provided
-func (d *Driver) TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
-	pipe := d.client.TxPipeline()
-	for ih, s := range batch {
-		pipe.HIncrBy(torrentKey(ih), "seeders", int64(s.Seeders))
-		pipe.HIncrBy(torrentKey(ih), "leechers", int64(s.Leechers))
-		pipe.HIncrBy(torrentKey(ih), "total_completed", int64(s.Snatches))
-		pipe.HIncrBy(torrentKey(ih), "total_uploaded", int64(s.Uploaded))
-		pipe.HIncrBy(torrentKey(ih), "total_downloaded", int64(s.Downloaded))
-		pipe.HIncrBy(torrentKey(ih), "announces", int64(s.Announces))
-	}
-	if _, err := pipe.Exec(); err != nil {
-		return err
-	}
+func (d *Driver) TorrentSync(batch []*store.Torrent) error {
+	//pipe := d.client.TxPipeline()
+	//for ih, s := range batch {
+	//	pipe.HIncrBy(torrentKey(ih), "seeders", int64(s.Seeders))
+	//	pipe.HIncrBy(torrentKey(ih), "leechers", int64(s.Leechers))
+	//	pipe.HIncrBy(torrentKey(ih), "total_completed", int64(s.Snatches))
+	//	pipe.HIncrBy(torrentKey(ih), "total_uploaded", int64(s.Uploaded))
+	//	pipe.HIncrBy(torrentKey(ih), "total_downloaded", int64(s.Downloaded))
+	//	pipe.HIncrBy(torrentKey(ih), "announces", int64(s.Announces))
+	//}
+	//if _, err := pipe.Exec(); err != nil {
+	//	return err
+	//}
 	return nil
 }
 
@@ -235,7 +243,7 @@ func (d *Driver) Conn() interface{} {
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (d *Driver) WhiteListDelete(client store.WhiteListClient) error {
+func (d *Driver) WhiteListDelete(client *store.WhiteListClient) error {
 	res, err := d.client.Del(whiteListKey(client.ClientPrefix)).Result()
 	if err != nil {
 		return errors.Wrap(err, "Failed to remove whitelisted client")
@@ -247,7 +255,7 @@ func (d *Driver) WhiteListDelete(client store.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (d *Driver) WhiteListAdd(client store.WhiteListClient) error {
+func (d *Driver) WhiteListAdd(client *store.WhiteListClient) error {
 	valueMap := map[string]interface{}{
 		"client_prefix": client.ClientPrefix,
 		"client_name":   client.ClientName,
@@ -260,18 +268,18 @@ func (d *Driver) WhiteListAdd(client store.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (d *Driver) WhiteListGetAll() ([]store.WhiteListClient, error) {
+func (d *Driver) WhiteListGetAll() ([]*store.WhiteListClient, error) {
 	prefixes, err := d.client.Keys(fmt.Sprintf("%s*", prefixWhitelist)).Result()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch whitelist keys")
 	}
-	var wl []store.WhiteListClient
+	var wl []*store.WhiteListClient
 	for _, prefix := range prefixes {
 		valueMap, err := d.client.HGetAll(whiteListKey(prefix)).Result()
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to fetch whitelist value for: %s", whiteListKey(prefix))
 		}
-		wl = append(wl, store.WhiteListClient{
+		wl = append(wl, &store.WhiteListClient{
 			ClientPrefix: valueMap["client_prefix"],
 			ClientName:   valueMap["client_name"],
 		})
@@ -339,7 +347,7 @@ func (d *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk boo
 		return consts.ErrInvalidInfoHash
 	}
 	t.InfoHash = infoHash
-	t.Snatches = util.StringToUInt16(v["total_completed"], 0)
+	t.Snatches = util.StringToUInt32(v["total_completed"], 0)
 	t.Uploaded = util.StringToUInt64(v["total_uploaded"], 0)
 	t.Downloaded = util.StringToUInt64(v["total_downloaded"], 0)
 	t.IsDeleted = isDeleted
@@ -348,8 +356,8 @@ func (d *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk boo
 	t.MultiUp = util.StringToFloat64(v["multi_up"], 1.0)
 	t.MultiDn = util.StringToFloat64(v["multi_dn"], 1.0)
 	t.Announces = util.StringToUInt64(v["announces"], 0)
-	t.Seeders = util.StringToUInt(v["seeders"], 0)
-	t.Leechers = util.StringToUInt(v["leechers"], 0)
+	t.Seeders = util.StringToUInt32(v["seeders"], 0)
+	t.Leechers = util.StringToUInt32(v["leechers"], 0)
 	return nil
 }
 

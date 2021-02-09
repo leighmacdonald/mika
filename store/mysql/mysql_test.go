@@ -16,7 +16,7 @@ const schemaCreate = "store/mysql/schema.sql"
 
 func TestDriver(t *testing.T) {
 	// multiStatements=true is required to exec the full schema at once
-	db := sqlx.MustConnect(driverName, config.TorrentStore.DSN())
+	db := sqlx.MustConnect(driverName, config.Store.DSN())
 	store.TestStore(t, &Driver{db: db})
 }
 
@@ -37,7 +37,7 @@ func execSchema(db *sqlx.DB, schemaPath string) {
 
 func TestMain(m *testing.M) {
 	if err := config.Read("mika_testing_mysql"); err != nil {
-		log.Info("Skipping database tests, failed to find config: mika_testing_mysql.yaml")
+		log.Info("Skipping database tests, failed to find config: mika_testing.yaml")
 		os.Exit(0)
 		return
 	}
@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 		return
 	}
-	db := sqlx.MustConnect(driverName, config.TorrentStore.DSN())
+	db := sqlx.MustConnect(driverName, config.Store.DSN())
 	execSchema(db, schemaDrop)
 	execSchema(db, schemaCreate)
 	defer execSchema(db, schemaDrop)

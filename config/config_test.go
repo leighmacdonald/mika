@@ -1,14 +1,9 @@
 package config
 
 import (
-	"github.com/leighmacdonald/mika/consts"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
-
-func TestRead(t *testing.T) {
-	require.Equal(t, consts.ErrInvalidConfig, Read("invalid_config_path.yaml"))
-}
 
 func TestLogger(t *testing.T) {
 	require.Panics(t, func() {

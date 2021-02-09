@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/leighmacdonald/golib"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/util"
 	"github.com/stretchr/testify/require"
@@ -11,10 +12,23 @@ import (
 	"time"
 )
 
+// GenerateTestRole creates a role using fake data. Used for testing.
+func GenerateTestRole() Role {
+	return Role{
+		RoleName:        golib.RandomString(10),
+		Priority:        100,
+		MultiUp:         1.0,
+		MultiDown:       1.0,
+		DownloadEnabled: true,
+		UploadEnabled:   true,
+		CreatedOn:       util.Now(),
+		UpdateOn:        util.Now(),
+	}
+}
+
 // GenerateTestUser creates a peer using fake data. Used for testing.
 func GenerateTestUser() User {
 	return User{
-		UserID:          uint32(rand.Intn(10000)),
 		Passkey:         util.NewPasskey(),
 		IsDeleted:       false,
 		DownloadEnabled: true,
@@ -37,10 +51,10 @@ func GenerateTestTorrent() Torrent {
 // GenerateTestPeer creates a peer using fake data for the provided user. Used for testing.
 func GenerateTestPeer() *Peer {
 	token, _ := util.GenRandomBytes(20)
-	ih := PeerIDFromString(string(token))
+	pid := PeerIDFromString(string(token))
 	p := NewPeer(
 		uint32(rand.Intn(1000000)),
-		ih,
+		pid,
 		net.ParseIP("1.2.3.4"),
 		uint16(rand.Intn(60000)))
 	return p

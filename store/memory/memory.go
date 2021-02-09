@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -17,7 +18,7 @@ func (d *Driver) Name() string {
 	return driverName
 }
 
-func (d *Driver) TorrentUpdate(_ *store.Torrent) error {
+func (d *Driver) TorrentSave(_ *store.Torrent) error {
 	return nil
 }
 
@@ -56,21 +57,15 @@ func (d *Driver) Conn() interface{} {
 func (d *Driver) WhiteListDelete(client *store.WhiteListClient) error {
 	d.whitelistMu.Lock()
 	defer d.whitelistMu.Unlock()
-	// Remove removes a peer from a slice
-	for i := len(d.whitelist) - 1; i >= 0; i-- {
-		if d.whitelist[i].ClientPrefix == client.ClientPrefix {
-			d.whitelist = append(d.whitelist[:i], d.whitelist[i+1:]...)
-			return nil
-		}
-	}
-	return consts.ErrInvalidClient
+	delete(d.whitelist, client.ClientPrefix)
+	return nil
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
 func (d *Driver) WhiteListAdd(client *store.WhiteListClient) error {
 	d.whitelistMu.Lock()
 	defer d.whitelistMu.Unlock()
-	d.whitelist = append(d.whitelist, client)
+	d.whitelist[client.ClientPrefix] = client
 	return nil
 }
 
@@ -103,28 +98,33 @@ func (d *Driver) TorrentGet(torrent *store.Torrent, hash store.InfoHash, deleted
 // NewPeerStore instantiates a new in-memory peer store
 func NewDriver() *Driver {
 	return &Driver{
-		swarms:     make(map[store.InfoHash]store.Swarm),
-		users:      make(map[string]*store.User),
-		roles:      nil,
-		torrents:   make(map[store.InfoHash]*store.Torrent),
-		rolesMu:    &sync.RWMutex{},
-		torrentsMu: &sync.RWMutex{},
-		usersMu:    &sync.RWMutex{},
-		whitelist:  nil,
+		users:       make(store.Users),
+		roles:       make(store.Roles),
+		torrents:    make(store.Torrents),
+		whitelist:   make(store.WhiteList),
+		rolesMu:     &sync.RWMutex{},
+		torrentsMu:  &sync.RWMutex{},
+		usersMu:     &sync.RWMutex{},
+		whitelistMu: &sync.RWMutex{},
 	}
 }
 
 // Driver is the memory backed store.Store implementation
 type Driver struct {
-	swarms      map[store.InfoHash]store.Swarm
-	users       map[string]*store.User
+	users       store.Users
 	roles       store.Roles
 	torrents    store.Torrents
-	whitelist   []*store.WhiteListClient
+	whitelist   store.WhiteList
 	rolesMu     *sync.RWMutex
 	torrentsMu  *sync.RWMutex
 	usersMu     *sync.RWMutex
 	whitelistMu *sync.RWMutex
+	lastUserID  uint32
+	lastRoleID  uint32
+}
+
+func (d *Driver) Migrate() error {
+	return nil
 }
 
 func (d *Driver) Users() (store.Users, error) {
@@ -135,7 +135,10 @@ func (d *Driver) Torrents() (store.Torrents, error) {
 	return d.torrents, nil
 }
 
-func (d *Driver) RoleSave(_ *store.Role) error {
+func (d *Driver) RoleSave(r *store.Role) error {
+	if r.RoleID == 0 {
+		return d.RoleAdd(r)
+	}
 	return nil
 }
 
@@ -152,12 +155,7 @@ func (d *Driver) RoleByID(role *store.Role, roleID uint32) error {
 func (d *Driver) RoleAdd(role *store.Role) error {
 	d.rolesMu.Lock()
 	defer d.rolesMu.Unlock()
-	maxID := uint32(0)
-	for _, r := range d.roles {
-		if r.RoleID > maxID {
-			maxID = r.RoleID
-		}
-	}
+	atomic.AddUint32(&role.RoleID, atomic.AddUint32(&d.lastRoleID, 1))
 	for _, r := range d.roles {
 		if strings.ToLower(r.RoleName) == strings.ToLower(role.RoleName) {
 			return errors.Errorf("duplicate role_name: %s", role.RoleName)
@@ -166,7 +164,6 @@ func (d *Driver) RoleAdd(role *store.Role) error {
 			return errors.Errorf("duplicate role_Id: %d", r.RoleID)
 		}
 	}
-	role.RoleID = maxID + 1
 	d.roles[role.RoleID] = role
 	return nil
 }
@@ -205,6 +202,7 @@ func (d *Driver) UserSync(_ []*store.User) error {
 func (d *Driver) UserAdd(usr *store.User) error {
 	d.usersMu.Lock()
 	defer d.usersMu.Unlock()
+	atomic.AddUint32(&usr.UserID, atomic.AddUint32(&d.lastUserID, 1))
 	for _, existing := range d.users {
 		if existing.UserID == usr.UserID {
 			return consts.ErrDuplicate

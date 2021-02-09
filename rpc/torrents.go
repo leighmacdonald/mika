@@ -114,7 +114,7 @@ func (s *MikaService) TorrentDelete(_ context.Context, params *pb.InfoHashParam)
 }
 
 func (s *MikaService) TorrentUpdate(context.Context, *pb.TorrentUpdateParams) (*pb.Torrent, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TorrentUpdate not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method TorrentSave not implemented")
 }
 
 func (s *MikaService) TorrentAll(_ *emptypb.Empty, stream pb.Mika_TorrentAllServer) error {

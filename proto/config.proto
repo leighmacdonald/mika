@@ -4,6 +4,10 @@ option go_package = "github.com/leighmacdonald/mika/rpc";
 
 package mika;
 
+message WhiteListAllResponse {
+  repeated WhiteList whitelists = 1;
+}
+
 message WhiteList {
   string prefix = 1;
   string name = 2;
@@ -13,7 +17,7 @@ message WhiteListDeleteParams {
   string prefix = 1;
 }
 
-message ConfigUpdateParams {
+message ConfigSaveParams {
   int32 tracker_announce_interval = 1;
   int32 tracker_announce_interval_min = 2;
   int32 tracker_reaper_interval = 3;
@@ -22,3 +26,54 @@ message ConfigUpdateParams {
   bool geodb_enabled = 6;
 }
 
+message ConfigGeneral {
+  string run_mode = 1;
+  string log_level = 2;
+  bool log_colour = 3;
+}
+
+message ConfigTracker {
+  bool public = 1;
+  string listen = 2;
+  bool tls = 3;
+  bool ipv6 = 4;
+  bool ipv6_only = 5;
+  bool auto_register = 6;
+  string reaper_interval = 7;
+  string announce_interval = 8;
+  string announce_interval_min = 9;
+  string hnr_threshold = 10;
+  bool allow_non_routable = 11;
+  bool allow_client_ip = 12;
+  uint32 max_peers = 13;
+}
+
+message ConfigRPC {
+  string listen = 1;
+  bool tls = 2;
+  bool key = 3;
+}
+
+message ConfigStore {
+  string type = 1;
+  string host = 2;
+  uint32 port = 3;
+  string user = 4;
+  string password = 5;
+  string database = 6;
+  string properties = 7;
+}
+
+message ConfigGeoDB {
+  string path = 1;
+  string api_key = 2;
+  bool enabled = 3;
+}
+
+message ConfigAllResponse {
+  ConfigGeneral general = 1;
+  ConfigTracker tracker = 2;
+  ConfigRPC rpc = 3;
+  ConfigStore store = 4;
+  ConfigGeoDB geodb = 5;
+}

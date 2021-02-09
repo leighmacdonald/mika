@@ -14,15 +14,6 @@ func RoleAll() []*store.Role {
 	return roleSet
 }
 
-func RoleAdd(role *store.Role) error {
-	if err := db.RoleAdd(role); err != nil {
-		return errors.Wrap(err, "Failed to add role")
-	}
-	roles[role.RoleID] = role
-	role.Log().Debug("Role added successfully")
-	return nil
-}
-
 func RoleDelete(roleID uint32) error {
 	// TODO check user for dangling role references
 	if err := db.RoleDelete(roleID); err != nil {
@@ -33,10 +24,11 @@ func RoleDelete(roleID uint32) error {
 	return nil
 }
 
-func RoleSave(role *store.Role) error {
+func RoleAdd(role *store.Role) error {
 	if err := db.RoleSave(role); err != nil {
 		return errors.Wrap(err, "Failed to save role")
 	}
+	roles[role.RoleID] = role
 	role.Log().Debug("Role saved successfully")
 	return nil
 }

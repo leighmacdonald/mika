@@ -251,6 +251,7 @@ func NewTorrent(ih InfoHash) Torrent {
 		IsEnabled: true,
 		MultiUp:   1.0,
 		MultiDn:   1.0,
+		Peers:     NewSwarm(),
 	}
 	return torrent
 }

@@ -7,11 +7,15 @@ import (
 	"context"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/leighmacdonald/golib"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"path"
 	"time"
 )
 
@@ -25,6 +29,18 @@ const ErrNoResults = "sql: no rows in result set"
 // Driver is the MariaDB backed store.Store implementation
 type Driver struct {
 	db *sqlx.DB
+}
+
+func (s *Driver) Migrate() error {
+	schemaFile := golib.FindFile(path.Join("store", "mysql", "schema.sql"), path.Join("mika"))
+	body, err := ioutil.ReadFile(schemaFile)
+	if err != nil {
+		return errors.Wrap(err, "failed to read schema.sql")
+	}
+	if _, err := s.db.Exec(string(body)); err != nil {
+		return errors.Wrap(err, "failed to execute migrate query")
+	}
+	return nil
 }
 
 func (s *Driver) Users() (store.Users, error) {
@@ -62,13 +78,27 @@ func (s *Driver) Torrents() (store.Torrents, error) {
 
 func (s *Driver) RoleSave(role *store.Role) error {
 	const q = `
-		UPDATE role 
-		SET download_enabled = :download_enabled, upload_enabled = :upload_enabled, 
+		INSERT INTO role (
+            remote_id, role_name, priority, multi_up, multi_down, 
+		    download_enabled, upload_enabled, created_on, updated_on) 
+		VALUES 
+		    (:remote_id, :role_name, :priority, :multi_up, :multi_down, 
+		    :download_enabled, :upload_enabled, :created_on, :updated_on)
+		ON DUPLICATE KEY UPDATE 
+			remote_id = :remote_id, download_enabled = :download_enabled, upload_enabled = :upload_enabled, 
 		    multi_down = :multi_down, multi_up = :multi_up, 
 		    priority = :priority, role_name = :role_name
-		WHERE role_id = ?`
-	if _, err := s.db.NamedExec(q, role); err != nil {
+		`
+	res, err := s.db.NamedExec(q, role)
+	if err != nil {
 		return errors.Wrap(err, "Failed to save role")
+	}
+	if role.RoleID == 0 {
+		id, err := res.LastInsertId()
+		if err != nil {
+			return errors.Wrap(err, "Failed to get insert id")
+		}
+		role.RoleID = uint32(id)
 	}
 	return nil
 }
@@ -170,11 +200,13 @@ func (s *Driver) UserAdd(user *store.User) error {
 	if user.RoleID == 0 {
 		return errors.New("Must supply at least 1 role")
 	}
-	const q = `INSERT INTO user
-    (passkey, download_enabled, is_deleted, downloaded, uploaded, announces, role_id, remote_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
-	res, err2 := s.db.Exec(q, user.Passkey, user.DownloadEnabled,
-		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces, user.RoleID, user.RemoteID)
+	const q = `
+		INSERT INTO user
+    		(role_id, remote_id, is_deleted, downloaded, uploaded, announces, passkey, 
+     		download_enabled, created_on, updated_on)
+    	VALUES (:role_id, :remote_id, :is_deleted, :downloaded, :uploaded, :announces, :passkey, 
+     		:download_enabled, :created_on, :updated_on);`
+	res, err2 := s.db.NamedExec(q, user)
 	if err2 != nil {
 		return errors.Wrap(err2, "Failed to add user to store")
 	}
@@ -291,7 +323,7 @@ func (s *Driver) Name() string {
 	return driverName
 }
 
-func (s *Driver) TorrentUpdate(torrent *store.Torrent) error {
+func (s *Driver) TorrentSave(torrent *store.Torrent) error {
 	const q = `
 		UPDATE 
 		    torrent 
@@ -437,7 +469,7 @@ func (s *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk boo
 
 // Add inserts a new torrent into the backing store
 func (s *Driver) TorrentAdd(t *store.Torrent) error {
-	t.CreatedOn = time.Now()
+	t.CreatedOn = util.Now()
 	t.UpdatedOn = t.CreatedOn
 	const q = `
 		INSERT INTO torrent (info_hash, multi_up, multi_dn, title, created_on, updated_on) 

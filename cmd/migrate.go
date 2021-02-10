@@ -24,7 +24,7 @@ var migrateCmd = &cobra.Command{
 				DownloadEnabled: true,
 				UploadEnabled:   true,
 				CreatedOn:       util.Now(),
-				UpdateOn:        util.Now(),
+				UpdatedOn:       util.Now(),
 			}
 			if err := tracker.RoleAdd(&role); err != nil {
 				log.Fatalf("Failed to save role: %v", err)

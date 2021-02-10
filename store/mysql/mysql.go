@@ -126,7 +126,7 @@ func (s *Driver) RoleAdd(role *store.Role) error {
 		    (role_name, priority, multi_up, multi_down, download_enabled, upload_enabled, created_on, updated_on) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	res, err := s.db.Exec(q, role.RoleName, role.Priority, role.MultiUp, role.MultiDown, role.DownloadEnabled,
-		role.UploadEnabled, role.CreatedOn, role.UpdateOn)
+		role.UploadEnabled, role.CreatedOn, role.UpdatedOn)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create role")
 	}

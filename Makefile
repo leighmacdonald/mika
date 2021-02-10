@@ -14,7 +14,7 @@ fmt:
 build_debug: protoc
 	@go build $(DEBUG_FLAGS) $(GO_FLAGS) -o mika
 
-build: protoc fmt
+build: fmt
 	@go build $(GO_FLAGS)
 
 run:

@@ -13,6 +13,7 @@ import (
 func TestRedisTorrentStore(t *testing.T) {
 	ts, e := store.NewStore(config.Store)
 	require.NoError(t, e, e)
+	setupDB(t, ts.Conn().(*redis.Client))
 	store.TestStore(t, ts)
 }
 
@@ -34,11 +35,12 @@ func setupDB(t *testing.T, c *redis.Client) {
 }
 
 func TestMain(m *testing.M) {
-	if err := config.Read("mika_testing_redis"); err != nil {
-		log.Info("Skipping database tests, failed to find config: mika_testing_redis.yaml")
-		os.Exit(0)
-		return
-	}
+	config.General.RunMode = "test"
+	config.Store.Type = driverName
+	config.Store.User = "mika"
+	config.Store.Host = "localhost"
+	config.Store.Database = "10"
+	config.Store.Port = 6379
 	if config.General.RunMode != "test" {
 		log.Info("Skipping database tests, not running in testing mode")
 		os.Exit(0)

@@ -39,6 +39,16 @@ func StringToUInt(s string, def int) int {
 	return int(v)
 }
 
+// StringToInt32 converts a string to a uint32 returning a default value on failure
+func StringToInt32(s string, def int32) int32 {
+	v, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		log.Warnf("failed to parse uint32 value: %s", s)
+		return def
+	}
+	return int32(v)
+}
+
 // StringToUInt32 converts a string to a uint32 returning a default value on failure
 func StringToUInt32(s string, def uint32) uint32 {
 	v, err := strconv.ParseInt(s, 10, 32)

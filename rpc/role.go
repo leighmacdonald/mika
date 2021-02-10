@@ -29,7 +29,7 @@ func (s *MikaService) RoleAll(_ *emptypb.Empty, stream pb.Mika_RoleAllServer) er
 			MultiDown:       r.MultiDown,
 			Time: &pb.TimeMeta{
 				CreatedOn: timestamppb.New(r.CreatedOn),
-				UpdatedOn: timestamppb.New(r.UpdateOn),
+				UpdatedOn: timestamppb.New(r.UpdatedOn),
 			},
 		})
 		if err != nil {
@@ -51,7 +51,7 @@ func RoleToPB(r *store.Role) *pb.Role {
 		MultiDown:       r.MultiDown,
 		Time: &pb.TimeMeta{
 			CreatedOn: timestamppb.New(r.CreatedOn),
-			UpdatedOn: timestamppb.New(r.UpdateOn),
+			UpdatedOn: timestamppb.New(r.UpdatedOn),
 		},
 	}
 }
@@ -67,7 +67,7 @@ func PBToRole(r *pb.Role) *store.Role {
 		DownloadEnabled: r.DownloadEnabled,
 		UploadEnabled:   r.UploadEnabled,
 		CreatedOn:       r.Time.CreatedOn.AsTime(),
-		UpdateOn:        r.Time.UpdatedOn.AsTime(),
+		UpdatedOn:       r.Time.UpdatedOn.AsTime(),
 	}
 }
 

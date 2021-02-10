@@ -22,7 +22,7 @@ func GenerateTestRole() Role {
 		DownloadEnabled: true,
 		UploadEnabled:   true,
 		CreatedOn:       util.Now(),
-		UpdateOn:        util.Now(),
+		UpdatedOn:       util.Now(),
 	}
 }
 
@@ -163,11 +163,11 @@ func TestStore(t *testing.T, s Store) {
 	require.NoError(t, s.UserAdd(users[0]))
 	fetchedUserID, err := s.UserGetByID(users[0].UserID)
 	require.NoError(t, err)
-	require.Equal(t, users[0], fetchedUserID)
+	require.Equal(t, users[0].RoleID, fetchedUserID.RoleID)
 
 	fetchedUserPasskey, err := s.UserGetByPasskey(users[0].Passkey)
 	require.NoError(t, err)
-	require.Equal(t, users[0], fetchedUserPasskey)
+	require.Equal(t, users[0].RoleID, fetchedUserPasskey.RoleID)
 
 	//batchUpdate := []*User{
 	//	{

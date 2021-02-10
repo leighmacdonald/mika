@@ -23,7 +23,9 @@ const (
 	prefixTorrent   = "t"
 	prefixPeer      = "p"
 	prefixUser      = "u"
+	prefixRole      = "r"
 	prefixUserID    = "user_id_pk"
+	prefixRoleID    = "role_id_pk"
 )
 
 func whiteListKey(prefix string) string {
@@ -50,6 +52,10 @@ func userIDKey(userID uint32) string {
 	return fmt.Sprintf("%s:%d", prefixUserID, userID)
 }
 
+func roleIDKey(roleID uint32) string {
+	return fmt.Sprintf("%s:%d", prefixRole, roleID)
+}
+
 // Driver is the redis backed store.StoreI implementation
 type Driver struct {
 	client  *redis.Client
@@ -62,7 +68,7 @@ func (d *Driver) TorrentSave(torrent *store.Torrent) error {
 }
 
 func (d *Driver) Migrate() error {
-	panic("implement me")
+	return nil
 }
 
 func (d *Driver) Users() (store.Users, error) {
@@ -74,23 +80,95 @@ func (d *Driver) Torrents() (store.Torrents, error) {
 }
 
 func (d *Driver) RoleSave(role *store.Role) error {
-	panic("implement me")
+	if role.RoleID == 0 {
+		return d.RoleAdd(role)
+	}
+	pipe := d.client.TxPipeline()
+	pipe.HSet(roleIDKey(role.RoleID), roleMap(role))
+	if _, err := pipe.Exec(); err != nil {
+		return errors.Wrap(err, "Failed to add user to store")
+	}
+	return nil
 }
 
 func (d *Driver) RoleByID(roleID uint32) (*store.Role, error) {
-	panic("implement me")
+	r, err := d.client.HGetAll(roleIDKey(roleID)).Result()
+	if err != nil {
+		return nil, err
+	}
+	var role store.Role
+	resultToRole(r, &role)
+	return &role, err
+}
+
+func resultToRole(r map[string]string, role *store.Role) {
+	role.RoleID = util.StringToUInt32(r["role_id"], 0)
+	role.RemoteID = util.StringToUInt64(r["remote_id"], 0)
+	role.RoleName = r["role_name"]
+	role.Priority = util.StringToInt32(r["priority"], 0)
+	role.MultiUp = util.StringToFloat64(r["multi_up"], 1.0)
+	role.MultiDown = util.StringToFloat64(r["multi_down"], 1.0)
+	role.DownloadEnabled = util.StringToBool(r["download_enabled"], true)
+	role.UploadEnabled = util.StringToBool(r["upload_enabled"], true)
+	role.CreatedOn = util.StringToTime(r["created_on"])
+	role.UpdatedOn = util.StringToTime(r["updated_on"])
+}
+
+func (d *Driver) nextRoleID() (uint32, error) {
+	newID, err := d.client.Incr(prefixRole + "_id_seq").Result()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(newID), nil
+}
+
+func (d *Driver) nextUserID() (uint32, error) {
+	newID, err := d.client.Incr(prefixUser + "_id_seq").Result()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(newID), nil
 }
 
 func (d *Driver) Roles() (store.Roles, error) {
-	panic("implement me")
+	roleIds, err := d.client.Keys(prefixRole + ":*").Result()
+	if err != nil {
+		return nil, err
+	}
+	roles := store.Roles{}
+	for _, roleID := range roleIds {
+		res, err := d.client.HGetAll(roleID).Result()
+		if err != nil {
+			return nil, err
+		}
+		var r store.Role
+		resultToRole(res, &r)
+		roles[r.RoleID] = &r
+	}
+	return roles, err
 }
 
 func (d *Driver) RoleAdd(role *store.Role) error {
-	panic("implement me")
+	newID, err := d.nextRoleID()
+	if err != nil {
+		return err
+	}
+	role.RoleID = newID
+	if _, err := d.client.HSet(roleIDKey(role.RoleID), roleMap(role)).Result(); err != nil {
+		return errors.Wrap(err, "Failed to add user to store")
+	}
+	return nil
 }
 
 func (d *Driver) RoleDelete(roleID uint32) error {
-	panic("implement me")
+	r, err := d.client.Del(roleIDKey(roleID)).Result()
+	if err != nil {
+		return errors.Wrap(err, "Could not delete role")
+	}
+	if r <= 0 {
+		return consts.ErrInvalidRole
+	}
+	return nil
 }
 
 // Sync batch updates the backing store with the new UserStats provided
@@ -128,23 +206,52 @@ func (d *Driver) UserSync(b []*store.User) error {
 func userMap(u *store.User) map[string]interface{} {
 	return map[string]interface{}{
 		"user_id":          u.UserID,
-		"passkey":          u.Passkey,
-		"download_enabled": u.DownloadEnabled,
+		"role_id":          u.RoleID,
+		"remote_id":        u.RemoteID,
 		"is_deleted":       u.IsDeleted,
 		"downloaded":       u.Downloaded,
 		"uploaded":         u.Uploaded,
 		"announces":        u.Announces,
+		"passkey":          u.Passkey,
+		"download_enabled": u.DownloadEnabled,
+		"created_on":       u.CreatedOn.Format(time.RFC1123Z),
+		"updated_on":       u.UpdatedOn.Format(time.RFC1123Z),
+	}
+}
+
+func roleMap(r *store.Role) map[string]interface{} {
+	return map[string]interface{}{
+		"role_id":          r.RoleID,
+		"remote_id":        r.RemoteID,
+		"role_name":        r.RoleName,
+		"priority":         r.Priority,
+		"multi_up":         r.MultiUp,
+		"multi_down":       r.MultiDown,
+		"download_enabled": r.DownloadEnabled,
+		"upload_enabled":   r.UploadEnabled,
+		"created_on":       r.CreatedOn.Format(time.RFC1123Z),
+		"updated_on":       r.UpdatedOn.Format(time.RFC1123Z),
 	}
 }
 
 // Add inserts a user into redis via at the string provided by the userKey function
 // This additionally sets the passkey->user_id mapping
 func (d *Driver) UserAdd(u *store.User) error {
-	pipe := d.client.TxPipeline()
-	pipe.HSet(userKey(u.Passkey), userMap(u))
-	pipe.Set(userIDKey(u.UserID), u.Passkey, 0)
-	if _, err := pipe.Exec(); err != nil {
-		return errors.Wrap(err, "Failed to add user to store")
+	if u.RoleID <= 0 {
+		return consts.ErrInvalidRole
+	}
+	id, err := d.nextUserID()
+	if err != nil {
+		return err
+	}
+	u.CreatedOn = util.Now()
+	u.UpdatedOn = util.Now()
+	u.UserID = id
+	if err := d.client.HSet(userKey(u.Passkey), userMap(u)).Err(); err != nil {
+		return err
+	}
+	if err2 := d.client.Set(userIDKey(u.UserID), u.Passkey, 0).Err(); err2 != nil {
+		return errors.Wrap(err2, "Failed to add user to store")
 	}
 	return nil
 }
@@ -158,11 +265,15 @@ func (d *Driver) UserGetByPasskey(passkey string) (*store.User, error) {
 	}
 	user.Passkey = v["passkey"]
 	user.UserID = util.StringToUInt32(v["user_id"], 0)
+	user.RoleID = util.StringToUInt32(v["role_id"], 0)
+	user.RemoteID = util.StringToUInt64(v["remote_id"], 0)
 	user.Downloaded = util.StringToUInt64(v["downloaded"], 0)
 	user.Uploaded = util.StringToUInt64(v["uploaded"], 0)
 	user.Announces = util.StringToUInt32(v["announces"], 0)
 	user.DownloadEnabled = util.StringToBool(v["download_enabled"], false)
 	user.IsDeleted = util.StringToBool(v["is_deleted"], false)
+	user.CreatedOn = util.StringToTime(v["created_on"])
+	user.UpdatedOn = util.StringToTime(v["updated_on"])
 	if !user.Valid() {
 		return nil, consts.ErrInvalidState
 	}

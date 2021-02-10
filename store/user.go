@@ -67,7 +67,7 @@ type Role struct {
 	DownloadEnabled bool      `json:"download_enabled" db:"download_enabled"`
 	UploadEnabled   bool      `json:"upload_enabled" db:"upload_enabled"`
 	CreatedOn       time.Time `json:"created_on" db:"created_on"`
-	UpdateOn        time.Time `json:"updated_on" db:"updated_on"`
+	UpdatedOn       time.Time `json:"updated_on" db:"updated_on"`
 }
 
 func (r Role) Log() *log.Entry {

@@ -14,7 +14,7 @@ import (
 )
 
 func TestTorrentDriver(t *testing.T) {
-	db, err := pgx.Connect(context.Background(), makeDSN(config.TorrentStore))
+	db, err := pgx.Connect(context.Background(), makeDSN(config.Store))
 	if err != nil {
 		t.Skipf("failed to connect to postgres torrent store: %s", err.Error())
 		return

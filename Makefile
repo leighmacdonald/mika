@@ -48,7 +48,9 @@ docker_run: image_latest
 	@docker-compose run --rm mika
 
 mysql_schema:
-	mysqldump -u mika -pmika mika -d --skip-add-drop-table --skip-dump-date -r store/mysql/schema.sql --skip-set-charset
+	@mysqldump -u mika -pmika mika -d --skip-add-drop-table --skip-dump-date -r store/mysql/schema.sql --skip-set-charset
+	@sed -i 's/^CREATE TABLE/CREATE TABLE IF NOT EXISTS/g' store/mysql/schema.sql
+	echo "Generated schema: store/mysql/schema.sql"
 
 protoc:
 	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative \

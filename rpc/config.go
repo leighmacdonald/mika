@@ -47,8 +47,11 @@ func renderWhiteList(wl []*store.WhiteListClient, title string) {
 	t.Render()
 }
 
-func (s *MikaService) ConfigUpdate(_ context.Context, params *pb.ConfigUpdateParams) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ConfigUpdate not implemented")
+func (s *MikaService) ConfigAll(context.Context, *emptypb.Empty) (*pb.ConfigAllResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConfigAll not implemented")
+}
+func (s *MikaService) ConfigSave(context.Context, *pb.ConfigSaveParams) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConfigSave not implemented")
 }
 
 func (s *MikaService) WhiteListAdd(_ context.Context, params *pb.WhiteList) (*emptypb.Empty, error) {
@@ -73,13 +76,10 @@ func (s *MikaService) WhiteListDelete(_ context.Context, params *pb.WhiteListDel
 	return &emptypb.Empty{}, nil
 }
 
-func (s *MikaService) WhiteListAll(_ *emptypb.Empty, stream pb.Mika_WhiteListAllServer) error {
-	var err error
+func (s *MikaService) WhiteListAll(context.Context, *emptypb.Empty) (*pb.WhiteListAllResponse, error) {
+	var wl []*pb.WhiteList
 	for _, wlc := range tracker.WhiteList() {
-		err = stream.Send(WhiteListToPB(wlc))
-		if err != nil {
-			return status.Errorf(codes.Internal, "failed fetching client whitelist")
-		}
+		wl = append(wl, WhiteListToPB(wlc))
 	}
-	return nil
+	return &pb.WhiteListAllResponse{Whitelists: wl}, nil
 }

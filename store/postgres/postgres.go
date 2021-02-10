@@ -9,6 +9,7 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -23,6 +24,12 @@ type Driver struct {
 	db  *pgx.Conn
 	ctx context.Context
 }
+
+func (d *Driver) TorrentSave(torrent *store.Torrent) error {
+	return nil
+}
+
+func (d *Driver) Migrate() error { return nil }
 
 func (d *Driver) Users() (store.Users, error) {
 	panic("implement me")
@@ -40,7 +47,7 @@ func (d *Driver) Roles() (store.Roles, error) {
 	panic("implement me")
 }
 
-func (d *Driver) RoleByID(role *store.Role, roleID uint32) error {
+func (d *Driver) RoleByID(roleID uint32) (*store.Role, error) {
 	panic("implement me")
 }
 
@@ -77,7 +84,7 @@ func (d *Driver) UserSave(user *store.User) error {
 }
 
 // Sync batch updates the backing store with the new UserStats provided
-func (d *Driver) UserSync(batch map[string]store.UserStats) error {
+func (d *Driver) UserSync(batch []*store.User) error {
 	const txName = "userSync"
 	const q = `
 		UPDATE 
@@ -133,7 +140,7 @@ func (d *Driver) UserAdd(user *store.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (d *Driver) UserGetByPasskey(user *store.User, passkey string) error {
+func (d *Driver) UserGetByPasskey(passkey string) (*store.User, error) {
 	const q = `
 		SELECT 
 		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
@@ -143,16 +150,17 @@ func (d *Driver) UserGetByPasskey(user *store.User, passkey string) error {
 		    passkey = $1`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
+	var user store.User
 	err := d.db.QueryRow(c, q, passkey).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
 		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
-		return errors.Wrap(err, "Failed to fetch user by passkey")
+		return nil, errors.Wrap(err, "Failed to fetch user by passkey")
 	}
-	return nil
+	return &user, nil
 }
 
 // GetByID returns a user matching the userId
-func (d *Driver) UserGetByID(user *store.User, userID uint32) error {
+func (d *Driver) UserGetByID(userID uint32) (*store.User, error) {
 	const q = `
 		SELECT 
 		    user_id, passkey, download_enabled, is_deleted, downloaded, uploaded, announces 
@@ -162,12 +170,13 @@ func (d *Driver) UserGetByID(user *store.User, userID uint32) error {
 		    user_id = $1`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
+	var user store.User
 	err := d.db.QueryRow(c, q, userID).Scan(&user.UserID, &user.Passkey, &user.DownloadEnabled, &user.IsDeleted,
 		&user.Downloaded, &user.Uploaded, &user.Announces)
 	if err != nil {
-		return errors.Wrap(err, "Failed to fetch user by user_id")
+		return nil, errors.Wrap(err, "Failed to fetch user by user_id")
 	}
-	return nil
+	return &user, nil
 }
 
 // Delete removes a user from the backing store
@@ -217,7 +226,7 @@ func (d *Driver) TorrentUpdate(torrent *store.Torrent) error {
 
 // Sync batch updates the backing store with the new TorrentStats provided
 // TODO test cases
-func (d *Driver) TorrentSync(batch map[store.InfoHash]store.TorrentStats) error {
+func (d *Driver) TorrentSync(batch []*store.Torrent) error {
 	const txName = "torrentSync"
 	const q = `
 		UPDATE 
@@ -244,12 +253,12 @@ func (d *Driver) TorrentSync(batch map[store.InfoHash]store.TorrentStats) error 
 		return errors.Wrap(err, "postgres.Store.Sync Failed to being transaction")
 	}
 
-	for ih, stats := range batch {
-		if _, err := tx.Exec(c, txName, stats.Seeders, stats.Leechers, stats.Snatches,
-			stats.Downloaded, stats.Uploaded, stats.Announces, ih.Bytes()); err != nil {
-			return errors.Wrapf(err, "postgres.Store.Sync failed to Exec tx")
-		}
-	}
+	//for ih, stats := range batch {
+	//	if _, err := tx.Exec(c, txName, stats.Seeders, stats.Leechers, stats.Snatches,
+	//		stats.Downloaded, stats.Uploaded, stats.Announces, ih.Bytes()); err != nil {
+	//		return errors.Wrapf(err, "postgres.Store.Sync failed to Exec tx")
+	//	}
+	//}
 	if err := tx.Commit(c); err != nil {
 		return errors.Wrapf(err, "postgres.Store.Sync failed to commit tx")
 	}
@@ -301,7 +310,7 @@ func (d *Driver) TorrentDelete(ih store.InfoHash, dropRow bool) error {
 }
 
 // TorrentGet returns a torrent for the hash provided
-func (d *Driver) TorrentGet(t *store.Torrent, ih store.InfoHash, deletedOk bool) error {
+func (d *Driver) TorrentGet(ih store.InfoHash, deletedOk bool) (*store.Torrent, error) {
 	const q = `
 		SELECT 
 			info_hash::bytea, total_uploaded, total_downloaded, total_completed, 
@@ -312,6 +321,7 @@ func (d *Driver) TorrentGet(t *store.Torrent, ih store.InfoHash, deletedOk bool)
 		    info_hash = $1 AND is_deleted = false`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
+	var t store.Torrent
 	var b []byte
 	err := d.db.QueryRow(c, q, ih.Bytes()).Scan(
 		&b, // TODO implement pgx custom types to map automatically
@@ -330,14 +340,14 @@ func (d *Driver) TorrentGet(t *store.Torrent, ih store.InfoHash, deletedOk bool)
 	copy(t.InfoHash[:], b)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			return consts.ErrInvalidInfoHash
+			return nil, consts.ErrInvalidInfoHash
 		}
-		return err
+		return nil, err
 	}
 	if t.IsDeleted && !deletedOk {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
-	return nil
+	return &t, nil
 }
 
 // Close will close the underlying postgres database connection
@@ -348,7 +358,7 @@ func (d *Driver) Close() error {
 }
 
 // WhiteListDelete removes a client from the global whitelist
-func (d *Driver) WhiteListDelete(client store.WhiteListClient) error {
+func (d *Driver) WhiteListDelete(client *store.WhiteListClient) error {
 	const q = `DELETE FROM whitelist WHERE client_prefix = $1`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
@@ -363,7 +373,7 @@ func (d *Driver) WhiteListDelete(client store.WhiteListClient) error {
 }
 
 // WhiteListAdd will insert a new client prefix into the allowed clients list
-func (d *Driver) WhiteListAdd(client store.WhiteListClient) error {
+func (d *Driver) WhiteListAdd(client *store.WhiteListClient) error {
 	const q = `INSERT INTO whitelist (client_prefix, client_name) VALUES ($1, $2)`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
@@ -378,8 +388,8 @@ func (d *Driver) WhiteListAdd(client store.WhiteListClient) error {
 }
 
 // WhiteListGetAll fetches all known whitelisted clients
-func (d *Driver) WhiteListGetAll() ([]store.WhiteListClient, error) {
-	var wl []store.WhiteListClient
+func (d *Driver) WhiteListGetAll() ([]*store.WhiteListClient, error) {
+	var wl []*store.WhiteListClient
 	const q = `SELECT client_prefix, client_name FROM whitelist`
 	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
 	defer cancel()
@@ -394,7 +404,7 @@ func (d *Driver) WhiteListGetAll() ([]store.WhiteListClient, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to fetch client whitelist")
 		}
-		wl = append(wl, client)
+		wl = append(wl, &client)
 	}
 	return wl, nil
 }
@@ -409,9 +419,9 @@ func (d *Driver) Reap() []store.PeerHash {
 	// NOW() - INTERVAL '15 minutes'
 	var peerHashes []store.PeerHash
 	const q = `DELETE FROM peers WHERE announce_last < $1`
-	c, cancel := context.WithDeadline(d.ctx, time.Now().Add(5*time.Second))
+	c, cancel := context.WithDeadline(d.ctx, util.Now().Add(5*time.Second))
 	defer cancel()
-	rows, err := d.db.Exec(c, q, time.Now().Add(-(15 * time.Minute)))
+	rows, err := d.db.Exec(c, q, util.Now().Add(-(15 * time.Minute)))
 	if err != nil {
 		log.Errorf("failed to reap peers: %s", err.Error())
 		return nil
@@ -424,7 +434,7 @@ func (d *Driver) Reap() []store.PeerHash {
 
 type driverInit struct{}
 
-// New initialize a TorrentStore implementation using the postgres backing store
+// New initialize a Store implementation using the postgres backing store
 func (td driverInit) New(cfg config.StoreConfig) (store.Store, error) {
 	db, err := pgx.Connect(context.Background(), cfg.DSN())
 	if err != nil {

@@ -44,6 +44,11 @@ type Users map[string]*User
 // Roles is a map of roles by role_id
 type Roles map[uint32]*Role
 
+// Remove removes a users from a Users slice
+func (r Roles) Get(roleID uint32) *Role {
+	return r[roleID]
+}
+
 // WhiteList is a map of whitelisted clients by 8 chars of client prefix
 type WhiteList map[string]*WhiteListClient
 

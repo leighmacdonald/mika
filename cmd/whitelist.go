@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"io"
 )
 
 var (
@@ -61,22 +60,14 @@ var whiteListListCmd = &cobra.Command{
 	Short: "List known roles",
 	Long:  `List known roles`,
 	Run: func(cmd *cobra.Command, args []string) {
-		stream, err := cl.WhiteListAll(context.Background(), &emptypb.Empty{})
+		resp, err := cl.WhiteListAll(context.Background(), &emptypb.Empty{})
 		if err != nil {
 			log.Fatalf("Failed to fetch wlc: %v", err)
 			return
 		}
 		var wlc []*store.WhiteListClient
-		for {
-			in, err := stream.Recv()
-			if err == io.EOF {
-				// read done.
-				break
-			}
-			if err != nil {
-				log.Fatalf("Failed to receive a note : %v", err)
-			}
-			wlc = append(wlc, rpc.PBToWhiteList(in))
+		for _, wlr := range resp.Whitelists {
+			wlc = append(wlc, rpc.PBToWhiteList(wlr))
 		}
 		renderWhitelist(wlc, "List of all whitelisted clients")
 	},

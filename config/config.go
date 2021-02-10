@@ -16,20 +16,58 @@ import (
 )
 
 var (
-	General      generalConfig
-	Tracker      trackerConfig
-	API          rpcConfig
-	TorrentStore StoreConfig
-	PeerStore    StoreConfig
-	UserStore    StoreConfig
-	GeoDB        geoDBConfig
+	General = generalConfig{
+		RunMode:   "",
+		LogLevel:  "",
+		LogColour: false,
+	}
+	Tracker = trackerConfig{
+		Public:                        false,
+		Listen:                        "0.0.0.0:34000",
+		TLS:                           false,
+		IPv6:                          false,
+		IPv6Only:                      false,
+		AutoRegister:                  false,
+		ReaperInterval:                "90s",
+		ReaperIntervalParsed:          90 * time.Second,
+		AnnounceInterval:              "30s",
+		AnnounceIntervalParsed:        30 * time.Second,
+		AnnounceIntervalMinimum:       "10s",
+		AnnounceIntervalMinimumParsed: 10 * time.Second,
+		HNRThreshold:                  "1d",
+		HNRThresholdParsed:            24 * time.Hour,
+		BatchUpdateInterval:           "30s",
+		BatchUpdateIntervalParsed:     30 * time.Second,
+		AllowNonRoutable:              true,
+		AllowClientIP:                 false,
+		MaxPeers:                      50,
+	}
+	API = rpcConfig{
+		Listen: "localhost:34001",
+		TLS:    false,
+		Key:    "",
+	}
+	Store = StoreConfig{
+		Type:       "memory",
+		Host:       "",
+		Port:       0,
+		User:       "",
+		Password:   "",
+		Database:   "",
+		Properties: "",
+	}
+	GeoDB = geoDBConfig{
+		Path:    "",
+		APIKey:  "",
+		Enabled: false,
+	}
 )
 
 type fullConfig struct {
 	General generalConfig `mapstructure:"general"`
 	Tracker trackerConfig `mapstructure:"tracker"`
 	API     rpcConfig     `mapstructure:"api"`
-	Stores  storeConfigs  `mapstructure:"stores"`
+	Store   StoreConfig   `mapstructure:"store"`
 	GeoDB   geoDBConfig   `mapstructure:"geodb"`
 }
 
@@ -43,12 +81,6 @@ type generalConfig struct {
 	// LogColour toggles between colourised console output
 	// true|false
 	LogColour bool `mapstructure:"log_colour"`
-}
-
-type storeConfigs struct {
-	Torrent StoreConfig `mapstructure:"torrent"`
-	Peers   StoreConfig `mapstructure:"peers"`
-	Users   StoreConfig `mapstructure:"users"`
 }
 
 type trackerConfig struct {
@@ -104,12 +136,6 @@ type rpcConfig struct {
 	// APITLS enables TLS1.3 on the admin interface.
 	// true|false
 	TLS bool `mapstructure:"tls"`
-	// APIIPv6 enables ipv6 for the admin API
-	// true|false
-	IPv6 bool `mapstructure:"ipv6"`
-	// APIIPv6Only disabled ipv4 to the admin interface
-	// true|false
-	IPv6Only bool `mapstructure:"ipv6_only"`
 	// APIKey Basic key authentication token for API calls
 	Key string `mapstructure:"key"`
 }
@@ -137,8 +163,6 @@ type StoreConfig struct {
 	// Properties will append a string of query args to the DSN
 	// Format: arg1=foo&arg2=bar
 	Properties string `mapstructure:"properties"`
-	// Cache enabled the in-memory cache
-	Cache bool `mapstructure:"cache"`
 }
 
 type geoDBConfig struct {
@@ -196,43 +220,41 @@ func Read(cfgFile string) error {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		log.Debugf("Using config file: %s", viper.ConfigFileUsed())
-		full := fullConfig{}
-		if err := viper.Unmarshal(&full); err != nil {
-			return errors.Wrapf(err, "Failed to parse config")
-		}
-		durations := []struct {
-			target *time.Duration
-			value  string
-		}{
-			{&full.Tracker.AnnounceIntervalMinimumParsed, full.Tracker.AnnounceIntervalMinimum},
-			{&full.Tracker.AnnounceIntervalParsed, full.Tracker.AnnounceInterval},
-			{&full.Tracker.BatchUpdateIntervalParsed, full.Tracker.BatchUpdateInterval},
-			{&full.Tracker.HNRThresholdParsed, full.Tracker.HNRThreshold},
-			{&full.Tracker.ReaperIntervalParsed, full.Tracker.ReaperInterval},
-		}
-		for _, dur := range durations {
-			if err := setDuration(dur.target, dur.value); err != nil {
-				return errors.Wrapf(err, "Failed to parse time duration")
-			}
-		}
-		if full.API.Key == "" {
-			return errors.New("api.key cannot be empty")
-		}
-		General = full.General
-		Tracker = full.Tracker
-		API = full.API
-		GeoDB = full.GeoDB
-		TorrentStore = full.Stores.Torrent
-		PeerStore = full.Stores.Peers
-		UserStore = full.Stores.Users
-
-		setupLogger(General.LogLevel, General.LogColour)
-		gin.SetMode(General.RunMode)
-		return nil
+	if err := viper.ReadInConfig(); err != nil {
+		return errors.Wrap(err, consts.ErrInvalidConfig.Error())
 	}
-	return consts.ErrInvalidConfig
+	log.Debugf("Using config file: %s", viper.ConfigFileUsed())
+	full := fullConfig{}
+	if err := viper.Unmarshal(&full); err != nil {
+		return errors.Wrapf(err, "Failed to parse config")
+	}
+	durations := []struct {
+		target *time.Duration
+		value  string
+	}{
+		{&full.Tracker.AnnounceIntervalMinimumParsed, full.Tracker.AnnounceIntervalMinimum},
+		{&full.Tracker.AnnounceIntervalParsed, full.Tracker.AnnounceInterval},
+		{&full.Tracker.BatchUpdateIntervalParsed, full.Tracker.BatchUpdateInterval},
+		{&full.Tracker.HNRThresholdParsed, full.Tracker.HNRThreshold},
+		{&full.Tracker.ReaperIntervalParsed, full.Tracker.ReaperInterval},
+	}
+	for _, dur := range durations {
+		if err := setDuration(dur.target, dur.value); err != nil {
+			return errors.Wrapf(err, "Failed to parse time duration")
+		}
+	}
+	if full.API.Key == "" {
+		return errors.New("api.key cannot be empty")
+	}
+	General = full.General
+	Tracker = full.Tracker
+	API = full.API
+	GeoDB = full.GeoDB
+	Store = full.Store
+
+	setupLogger(General.LogLevel, General.LogColour)
+	gin.SetMode(General.RunMode)
+	return nil
 }
 
 func setupLogger(levelStr string, colour bool) {

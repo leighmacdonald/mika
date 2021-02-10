@@ -42,7 +42,7 @@ func init() {
 }
 
 func Init() {
-	ts, err := store.NewStore(config.TorrentStore)
+	ts, err := store.NewStore(config.Store)
 	if err != nil {
 		log.Fatalf("Failed to setup torrent store: %s", err)
 	}
@@ -60,7 +60,11 @@ func Init() {
 	}
 	geodb = newGeodb
 
-	_ = LoadWhitelist()
+	if err := Migrate(); err != nil {
+		log.Fatalf("Failed to perform migration: %v", err)
+	}
+
+	whitelist = loadWhitelist()
 	roles = loadRoles()
 	users = loadUsers()
 	torrents = loadTorrents()
@@ -68,6 +72,21 @@ func Init() {
 
 func mapRoleToUser(u *store.User) {
 	u.Role = roles[u.RoleID]
+}
+
+// loadWhitelist will read the client white list from the tracker store and
+// load it into memory for quick lookups.
+func loadWhitelist() store.WhiteList {
+	newWhitelist := make(store.WhiteList)
+	wl, err4 := db.WhiteListGetAll()
+	if err4 != nil {
+		log.Warn("whitelist empty, all clients are allowed")
+	} else {
+		for _, cw := range wl {
+			newWhitelist[cw.ClientPrefix] = cw
+		}
+	}
+	return newWhitelist
 }
 
 func loadRoles() store.Roles {
@@ -199,7 +218,7 @@ func StatWorker(ctx context.Context) {
 //	if err != nil {
 //		return nil, err
 //	}
-//	if err := tracker.LoadWhitelist(); err != nil {
+//	if err := tracker.loadWhitelist(); err != nil {
 //		return nil, err
 //	}
 //	for i := 0; i < userCount; i++ {
@@ -216,6 +235,10 @@ func StatWorker(ctx context.Context) {
 //	}
 //	return tracker, nil
 //}
+
+func Migrate() error {
+	return db.Migrate()
+}
 
 func ClientWhitelisted(peerID store.PeerID) bool {
 	whitelistMu.RLock()
@@ -250,24 +273,6 @@ func WhiteListDelete(wl *store.WhiteListClient) error {
 	return nil
 }
 
-// LoadWhitelist will read the client white list from the tracker store and
-// load it into memory for quick lookups.
-func LoadWhitelist() error {
-	newWhitelist := make(store.WhiteList)
-	wl, err4 := db.WhiteListGetAll()
-	if err4 != nil {
-		log.Warnf("whitelist empty, all clients are allowed")
-	} else {
-		for _, cw := range wl {
-			newWhitelist[cw.ClientPrefix] = cw
-		}
-	}
-	whitelistMu.Lock()
-	whitelist = newWhitelist
-	whitelistMu.Unlock()
-	return nil
-}
-
 func WhiteList() store.WhiteList {
 	return whitelist
 }
@@ -277,8 +282,8 @@ func Torrents() store.Torrents {
 }
 
 func TorrentAdd(torrent *store.Torrent) error {
-	torrent.CreatedOn = time.Now()
-	torrent.UpdatedOn = time.Now()
+	torrent.CreatedOn = util.Now()
+	torrent.UpdatedOn = util.Now()
 	if err := db.TorrentAdd(torrent); err != nil {
 		return errors.Wrapf(err, "Failed to add torrent")
 	}

@@ -286,22 +286,23 @@ func (x *RoleAddParams) GetMultiDown() float64 {
 	return 0
 }
 
-type RoleUpdateParams struct {
+type RoleSetParams struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	RoleName        string  `protobuf:"bytes,2,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
-	RemoteId        uint64  `protobuf:"varint,3,opt,name=remote_id,json=remoteId,proto3" json:"remote_id,omitempty"`
-	Priority        uint32  `protobuf:"varint,4,opt,name=priority,proto3" json:"priority,omitempty"`
-	DownloadEnabled bool    `protobuf:"varint,5,opt,name=download_enabled,json=downloadEnabled,proto3" json:"download_enabled,omitempty"`
-	UploadEnabled   bool    `protobuf:"varint,6,opt,name=upload_enabled,json=uploadEnabled,proto3" json:"upload_enabled,omitempty"`
-	MultiUp         float64 `protobuf:"fixed64,7,opt,name=multi_up,json=multiUp,proto3" json:"multi_up,omitempty"`
-	MultiDown       float64 `protobuf:"fixed64,8,opt,name=multi_down,json=multiDown,proto3" json:"multi_down,omitempty"`
+	UpdatedKeys     []string `protobuf:"bytes,1,rep,name=updated_keys,json=updatedKeys,proto3" json:"updated_keys,omitempty"`
+	RoleName        string   `protobuf:"bytes,2,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	RemoteId        uint64   `protobuf:"varint,3,opt,name=remote_id,json=remoteId,proto3" json:"remote_id,omitempty"`
+	Priority        int32    `protobuf:"varint,4,opt,name=priority,proto3" json:"priority,omitempty"`
+	DownloadEnabled bool     `protobuf:"varint,5,opt,name=download_enabled,json=downloadEnabled,proto3" json:"download_enabled,omitempty"`
+	UploadEnabled   bool     `protobuf:"varint,6,opt,name=upload_enabled,json=uploadEnabled,proto3" json:"upload_enabled,omitempty"`
+	MultiUp         float64  `protobuf:"fixed64,7,opt,name=multi_up,json=multiUp,proto3" json:"multi_up,omitempty"`
+	MultiDown       float64  `protobuf:"fixed64,8,opt,name=multi_down,json=multiDown,proto3" json:"multi_down,omitempty"`
 }
 
-func (x *RoleUpdateParams) Reset() {
-	*x = RoleUpdateParams{}
+func (x *RoleSetParams) Reset() {
+	*x = RoleSetParams{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_proto_role_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -309,13 +310,13 @@ func (x *RoleUpdateParams) Reset() {
 	}
 }
 
-func (x *RoleUpdateParams) String() string {
+func (x *RoleSetParams) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RoleUpdateParams) ProtoMessage() {}
+func (*RoleSetParams) ProtoMessage() {}
 
-func (x *RoleUpdateParams) ProtoReflect() protoreflect.Message {
+func (x *RoleSetParams) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_role_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -327,54 +328,61 @@ func (x *RoleUpdateParams) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RoleUpdateParams.ProtoReflect.Descriptor instead.
-func (*RoleUpdateParams) Descriptor() ([]byte, []int) {
+// Deprecated: Use RoleSetParams.ProtoReflect.Descriptor instead.
+func (*RoleSetParams) Descriptor() ([]byte, []int) {
 	return file_proto_role_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *RoleUpdateParams) GetRoleName() string {
+func (x *RoleSetParams) GetUpdatedKeys() []string {
+	if x != nil {
+		return x.UpdatedKeys
+	}
+	return nil
+}
+
+func (x *RoleSetParams) GetRoleName() string {
 	if x != nil {
 		return x.RoleName
 	}
 	return ""
 }
 
-func (x *RoleUpdateParams) GetRemoteId() uint64 {
+func (x *RoleSetParams) GetRemoteId() uint64 {
 	if x != nil {
 		return x.RemoteId
 	}
 	return 0
 }
 
-func (x *RoleUpdateParams) GetPriority() uint32 {
+func (x *RoleSetParams) GetPriority() int32 {
 	if x != nil {
 		return x.Priority
 	}
 	return 0
 }
 
-func (x *RoleUpdateParams) GetDownloadEnabled() bool {
+func (x *RoleSetParams) GetDownloadEnabled() bool {
 	if x != nil {
 		return x.DownloadEnabled
 	}
 	return false
 }
 
-func (x *RoleUpdateParams) GetUploadEnabled() bool {
+func (x *RoleSetParams) GetUploadEnabled() bool {
 	if x != nil {
 		return x.UploadEnabled
 	}
 	return false
 }
 
-func (x *RoleUpdateParams) GetMultiUp() float64 {
+func (x *RoleSetParams) GetMultiUp() float64 {
 	if x != nil {
 		return x.MultiUp
 	}
 	return 0
 }
 
-func (x *RoleUpdateParams) GetMultiDown() float64 {
+func (x *RoleSetParams) GetMultiDown() float64 {
 	if x != nil {
 		return x.MultiDown
 	}
@@ -424,13 +432,15 @@ var file_proto_role_proto_rawDesc = []byte{
 	0x0a, 0x08, 0x6d, 0x75, 0x6c, 0x74, 0x69, 0x5f, 0x75, 0x70, 0x18, 0x07, 0x20, 0x01, 0x28, 0x01,
 	0x52, 0x07, 0x6d, 0x75, 0x6c, 0x74, 0x69, 0x55, 0x70, 0x12, 0x1d, 0x0a, 0x0a, 0x6d, 0x75, 0x6c,
 	0x74, 0x69, 0x5f, 0x64, 0x6f, 0x77, 0x6e, 0x18, 0x08, 0x20, 0x01, 0x28, 0x01, 0x52, 0x09, 0x6d,
-	0x75, 0x6c, 0x74, 0x69, 0x44, 0x6f, 0x77, 0x6e, 0x22, 0xf4, 0x01, 0x0a, 0x10, 0x52, 0x6f, 0x6c,
-	0x65, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x1b, 0x0a,
+	0x75, 0x6c, 0x74, 0x69, 0x44, 0x6f, 0x77, 0x6e, 0x22, 0x94, 0x02, 0x0a, 0x0d, 0x52, 0x6f, 0x6c,
+	0x65, 0x53, 0x65, 0x74, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x21, 0x0a, 0x0c, 0x75, 0x70,
+	0x64, 0x61, 0x74, 0x65, 0x64, 0x5f, 0x6b, 0x65, 0x79, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09,
+	0x52, 0x0b, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x4b, 0x65, 0x79, 0x73, 0x12, 0x1b, 0x0a,
 	0x09, 0x72, 0x6f, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x08, 0x72, 0x6f, 0x6c, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x72, 0x65,
 	0x6d, 0x6f, 0x74, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x08, 0x72,
 	0x65, 0x6d, 0x6f, 0x74, 0x65, 0x49, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x70, 0x72, 0x69, 0x6f, 0x72,
-	0x69, 0x74, 0x79, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x08, 0x70, 0x72, 0x69, 0x6f, 0x72,
+	0x69, 0x74, 0x79, 0x18, 0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x08, 0x70, 0x72, 0x69, 0x6f, 0x72,
 	0x69, 0x74, 0x79, 0x12, 0x29, 0x0a, 0x10, 0x64, 0x6f, 0x77, 0x6e, 0x6c, 0x6f, 0x61, 0x64, 0x5f,
 	0x65, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0f, 0x64,
 	0x6f, 0x77, 0x6e, 0x6c, 0x6f, 0x61, 0x64, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x12, 0x25,
@@ -459,11 +469,11 @@ func file_proto_role_proto_rawDescGZIP() []byte {
 
 var file_proto_role_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_proto_role_proto_goTypes = []interface{}{
-	(*Role)(nil),             // 0: mika.Role
-	(*RoleID)(nil),           // 1: mika.RoleID
-	(*RoleAddParams)(nil),    // 2: mika.RoleAddParams
-	(*RoleUpdateParams)(nil), // 3: mika.RoleUpdateParams
-	(*TimeMeta)(nil),         // 4: mika.TimeMeta
+	(*Role)(nil),          // 0: mika.Role
+	(*RoleID)(nil),        // 1: mika.RoleID
+	(*RoleAddParams)(nil), // 2: mika.RoleAddParams
+	(*RoleSetParams)(nil), // 3: mika.RoleSetParams
+	(*TimeMeta)(nil),      // 4: mika.TimeMeta
 }
 var file_proto_role_proto_depIdxs = []int32{
 	4, // 0: mika.Role.time:type_name -> mika.TimeMeta
@@ -518,7 +528,7 @@ func file_proto_role_proto_init() {
 			}
 		}
 		file_proto_role_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RoleUpdateParams); i {
+			switch v := v.(*RoleSetParams); i {
 			case 0:
 				return &v.state
 			case 1:

@@ -15,8 +15,18 @@ import (
 )
 
 var (
-	roleAddParam = &pb.RoleAddParams{}
-	roleDelParam = &pb.RoleID{}
+	roleAddParam  = &pb.RoleAddParams{}
+	roleDelParam  = &pb.RoleID{}
+	roleSetParams = &pb.RoleSetParams{
+		UpdatedKeys:     nil,
+		RoleName:        "",
+		RemoteId:        0,
+		Priority:        0,
+		DownloadEnabled: false,
+		UploadEnabled:   false,
+		MultiUp:         0,
+		MultiDown:       0,
+	}
 )
 
 func defaultTable(title string) table.Writer {
@@ -135,11 +145,39 @@ var roleDeleteCmd = &cobra.Command{
 	},
 }
 
+// roleSetCmd can be used to delete roles
+var roleSetCmd = &cobra.Command{
+	Use:   "set",
+	Short: "Update parameters for a role",
+	Long:  `Update parameters for a role`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) != 1 {
+			log.Fatalf("Expected 1 paramter, got %d", len(args))
+		}
+
+		for _, flag := range cmd.Flags().Args() {
+			f := cmd.Flag(flag)
+			if f.Changed {
+				roleSetParams.UpdatedKeys = append(roleSetParams.UpdatedKeys, f.Name)
+			}
+		}
+		return
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(roleCmd)
 	roleCmd.AddCommand(roleListCmd)
 	roleCmd.AddCommand(roleAddCmd)
 	roleCmd.AddCommand(roleDeleteCmd)
+	roleCmd.AddCommand(roleSetCmd)
+
+	roleSetCmd.Flags().StringVarP(&roleSetParams.RoleName, "name", "n", "", "Name of the role")
+	roleSetCmd.Flags().Int32VarP(&roleSetParams.Priority, "priority", "p", 0, "Role Priority")
+	roleSetCmd.Flags().BoolVarP(&roleSetParams.DownloadEnabled, "download_enabled", "D", true, "Downloading enabled")
+	roleSetCmd.Flags().BoolVarP(&roleSetParams.UploadEnabled, "upload_enabled", "U", true, "Uploading enabled")
+	roleSetCmd.Flags().Float64VarP(&roleSetParams.MultiDown, "multi_down", "d", 1.0, "Download multiplier")
+	roleSetCmd.Flags().Float64VarP(&roleSetParams.MultiUp, "multi_up", "u", 1.0, "Upload multiplier")
 
 	roleDeleteCmd.Flags().StringVarP(&roleDelParam.RoleName, "name", "n", "", "Name of the role")
 	roleDeleteCmd.Flags().Uint32VarP(&roleDelParam.RoleId, "id", "i", 0, "Role ID")

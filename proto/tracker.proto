@@ -11,6 +11,10 @@ message InfoHashParam {
   string info_hash_hex = 2;
 }
 
+message TorrentSet {
+  repeated Torrent torrents = 1;
+}
+
 message Torrent {
   bytes info_hash = 1;
   uint32 snatches = 2;
@@ -46,4 +50,10 @@ message TorrentUpdateParams {
   string reason = 4;
   string multi_up = 5;
   string multi_dn = 6;
+}
+
+message TorrentTopParams {
+  int32 limit = 1;
+  bool desc = 2;
+  int32 duration = 3;
 }

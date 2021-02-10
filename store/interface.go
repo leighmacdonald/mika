@@ -40,21 +40,23 @@ func AddDriver(name string, driver Driver) {
 // To disable a user they MUST be deleted from the active user cache
 type Store interface {
 	Users() (Users, error)
-	// Add will add a new user to the backing store
+	// UserAdd will add a new user to the backing store
 	UserAdd(u *User) error
-	// GetByPasskey returns a user matching the passkey
-	UserGetByPasskey(user *User, passkey string) error
-	// GetByID returns a user matching the userId
-	UserGetByID(user *User, userID uint32) error
-	// Delete removes a user from the backing store
+	// UserGetByPasskey returns a user matching the passkey
+	UserGetByPasskey(passkey string) (*User, error)
+	// UserGetByID returns a user matching the userId
+	UserGetByID(userID uint32) (*User, error)
+	// UserDelete removes a user from the backing store
 	UserDelete(user *User) error
-	// Update is used to change a known user
+	// UserSave is used to change a known user
 	UserSave(user *User) error
+	// Close will cleanup and close the underlying storage driver if necessary
+	UserSync(b []*User) error
 
 	// Roles fetches all known groups
 	Roles() (Roles, error)
 	// Roles fetches all known groups
-	RoleByID(role *Role, roleID uint32) error
+	RoleByID(roleID uint32) (*Role, error)
 	// RoleAdd adds a new role to the system
 	RoleAdd(role *Role) error
 	// RoleDelete permanently deletes a role from the system
@@ -62,19 +64,17 @@ type Store interface {
 	// RoleSave commits the role to persistent store
 	RoleSave(role *Role) error
 
-	// Close will cleanup and close the underlying storage driver if necessary
-	UserSync(b []*User) error
-
+	// Torrents returns all torrents in the store
 	Torrents() (Torrents, error)
-	// Add adds a new torrent to the backing store
+	// TorrentAdd adds a new torrent to the backing store
 	TorrentAdd(t *Torrent) error
-	// Delete will mark a torrent as deleted in the backing store.
+	// TorrentDelete will mark a torrent as deleted in the backing store.
 	// If dropRow is true, it will permanently remove the torrent from the store
 	TorrentDelete(ih InfoHash, dropRow bool) error
-	// Get returns the Torrent matching the infohash
-	TorrentGet(torrent *Torrent, hash InfoHash, deletedOk bool) error
-	// Update will update certain parameters within the torrent
-	TorrentUpdate(torrent *Torrent) error
+	// TorrentGet returns the Torrent matching the infohash
+	TorrentGet(hash InfoHash, deletedOk bool) (*Torrent, error)
+	// TorrentSave will update certain parameters within the torrent
+	TorrentSave(torrent *Torrent) error
 	// TorrentSync batch updates the backing store with the new TorrentStats provided
 	TorrentSync(b []*Torrent) error
 
@@ -84,6 +84,9 @@ type Store interface {
 	WhiteListAdd(client *WhiteListClient) error
 	// WhiteListGetAll fetches all known whitelisted clients
 	WhiteListGetAll() ([]*WhiteListClient, error)
+
+	// Migrate
+	Migrate() error
 
 	// Conn returns the underlying connection, if any
 	Conn() interface{}

@@ -53,3 +53,8 @@ func FindFile(p string) string {
 	}
 	return p
 }
+
+func Now() time.Time {
+	// TODO configure local or utc tz
+	return time.Now().UTC()
+}

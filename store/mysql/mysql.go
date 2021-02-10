@@ -7,11 +7,15 @@ import (
 	"context"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/leighmacdonald/golib"
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/consts"
 	"github.com/leighmacdonald/mika/store"
+	"github.com/leighmacdonald/mika/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"path"
 	"time"
 )
 
@@ -25,6 +29,18 @@ const ErrNoResults = "sql: no rows in result set"
 // Driver is the MariaDB backed store.Store implementation
 type Driver struct {
 	db *sqlx.DB
+}
+
+func (s *Driver) Migrate() error {
+	schemaFile := golib.FindFile(path.Join("store", "mysql", "schema.sql"), path.Join("mika"))
+	body, err := ioutil.ReadFile(schemaFile)
+	if err != nil {
+		return errors.Wrap(err, "failed to read schema.sql")
+	}
+	if _, err := s.db.Exec(string(body)); err != nil {
+		return errors.Wrap(err, "failed to execute migrate query")
+	}
+	return nil
 }
 
 func (s *Driver) Users() (store.Users, error) {
@@ -62,31 +78,46 @@ func (s *Driver) Torrents() (store.Torrents, error) {
 
 func (s *Driver) RoleSave(role *store.Role) error {
 	const q = `
-		UPDATE role 
-		SET download_enabled = :download_enabled, upload_enabled = :upload_enabled, 
+		INSERT INTO role (
+            remote_id, role_name, priority, multi_up, multi_down, 
+		    download_enabled, upload_enabled, created_on, updated_on) 
+		VALUES 
+		    (:remote_id, :role_name, :priority, :multi_up, :multi_down, 
+		    :download_enabled, :upload_enabled, :created_on, :updated_on)
+		ON DUPLICATE KEY UPDATE 
+			remote_id = :remote_id, download_enabled = :download_enabled, upload_enabled = :upload_enabled, 
 		    multi_down = :multi_down, multi_up = :multi_up, 
 		    priority = :priority, role_name = :role_name
-		WHERE role_id = ?`
-	if _, err := s.db.NamedExec(q, role); err != nil {
+		`
+	res, err := s.db.NamedExec(q, role)
+	if err != nil {
 		return errors.Wrap(err, "Failed to save role")
+	}
+	if role.RoleID == 0 {
+		id, err := res.LastInsertId()
+		if err != nil {
+			return errors.Wrap(err, "Failed to get insert id")
+		}
+		role.RoleID = uint32(id)
 	}
 	return nil
 }
 
-func (s *Driver) RoleByID(role *store.Role, roleID uint32) error {
+func (s *Driver) RoleByID(roleID uint32) (*store.Role, error) {
 	const q = `
 		SELECT 
        		role_id, role_name, priority, multi_up, multi_down, 
        		download_enabled, upload_enabled, created_on, updated_on 
 		FROM role 
 		WHERE role_id = ?`
-	if err := s.db.Get(role, q, roleID); err != nil {
+	var role store.Role
+	if err := s.db.Get(&role, q, roleID); err != nil {
 		if err.Error() == ErrNoResults {
-			return consts.ErrInvalidRole
+			return nil, consts.ErrInvalidRole
 		}
-		return errors.Wrap(err, "Could not query user by passkey")
+		return nil, errors.Wrap(err, "Could not query user by passkey")
 	}
-	return nil
+	return &role, nil
 }
 
 func (s *Driver) RoleAdd(role *store.Role) error {
@@ -170,11 +201,13 @@ func (s *Driver) UserAdd(user *store.User) error {
 	if user.RoleID == 0 {
 		return errors.New("Must supply at least 1 role")
 	}
-	const q = `INSERT INTO user
-    (passkey, download_enabled, is_deleted, downloaded, uploaded, announces, role_id, remote_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
-	res, err2 := s.db.Exec(q, user.Passkey, user.DownloadEnabled,
-		user.IsDeleted, user.Downloaded, user.Uploaded, user.Announces, user.RoleID, user.RemoteID)
+	const q = `
+		INSERT INTO user
+    		(role_id, remote_id, is_deleted, downloaded, uploaded, announces, passkey, 
+     		download_enabled, created_on, updated_on)
+    	VALUES (:role_id, :remote_id, :is_deleted, :downloaded, :uploaded, :announces, :passkey, 
+     		:download_enabled, :created_on, :updated_on);`
+	res, err2 := s.db.NamedExec(q, user)
 	if err2 != nil {
 		return errors.Wrap(err2, "Failed to add user to store")
 	}
@@ -183,8 +216,8 @@ func (s *Driver) UserAdd(user *store.User) error {
 		return errors.Wrap(err3, "Failed to get role id")
 	}
 	user.UserID = uint32(i)
-	r := &store.Role{}
-	if err := s.RoleByID(r, user.RoleID); err != nil {
+	r, err := s.RoleByID(user.RoleID)
+	if err != nil {
 		return errors.Wrap(err, "Failed to load role")
 	}
 	user.Role = r
@@ -195,7 +228,7 @@ func (s *Driver) UserAdd(user *store.User) error {
 // The errors returned for this method should be very generic and not reveal any info
 // that could possibly help attackers gain any insight. All error cases MUST
 // return ErrUnauthorized.
-func (s *Driver) UserGetByPasskey(user *store.User, passkey string) error {
+func (s *Driver) UserGetByPasskey(passkey string) (*store.User, error) {
 	const q = `
 		SELECT 
 		    u.user_id,
@@ -208,22 +241,23 @@ func (s *Driver) UserGetByPasskey(user *store.User, passkey string) error {
 			u.role_id
 		FROM user u
 		WHERE u.passkey = ?;`
-	if err := s.db.Get(user, q, passkey); err != nil {
+	var user store.User
+	if err := s.db.Get(&user, q, passkey); err != nil {
 		if err.Error() == ErrNoResults {
-			return consts.ErrInvalidUser
+			return nil, consts.ErrInvalidUser
 		}
-		return errors.Wrap(err, "Could not query user by passkey")
+		return nil, errors.Wrap(err, "Could not query user by passkey")
 	}
-	r := &store.Role{}
-	if err := s.RoleByID(r, user.RoleID); err != nil {
-		return errors.Wrap(err, "Failed to load role")
+	r, err := s.RoleByID(user.RoleID)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to load role")
 	}
 	user.Role = r
-	return nil
+	return &user, nil
 }
 
 // GetByID returns a user matching the userId
-func (s *Driver) UserGetByID(user *store.User, userID uint32) error {
+func (s *Driver) UserGetByID(userID uint32) (*store.User, error) {
 	const q = `
 		SELECT 
 		    u.user_id,
@@ -236,18 +270,19 @@ func (s *Driver) UserGetByID(user *store.User, userID uint32) error {
 			u.role_id
     	FROM user u
     	WHERE u.user_id = ?`
-	if err := s.db.Get(user, q, userID); err != nil {
+	var user store.User
+	if err := s.db.Get(&user, q, userID); err != nil {
 		if err.Error() == ErrNoResults {
-			return consts.ErrInvalidUser
+			return nil, consts.ErrInvalidUser
 		}
-		return errors.Wrap(err, "Could not query user by user_id")
+		return nil, errors.Wrap(err, "Could not query user by user_id")
 	}
-	r := &store.Role{}
-	if err := s.RoleByID(r, user.RoleID); err != nil {
-		return errors.Wrap(err, "Failed to load role")
+	r, err := s.RoleByID(user.RoleID)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to load role")
 	}
 	user.Role = r
-	return nil
+	return &user, nil
 }
 
 // Delete removes a user from the backing store
@@ -291,7 +326,7 @@ func (s *Driver) Name() string {
 	return driverName
 }
 
-func (s *Driver) TorrentUpdate(torrent *store.Torrent) error {
+func (s *Driver) TorrentSave(torrent *store.Torrent) error {
 	const q = `
 		UPDATE 
 		    torrent 
@@ -403,7 +438,7 @@ func (s *Driver) WhiteListGetAll() ([]*store.WhiteListClient, error) {
 }
 
 // Get returns a torrent for the hash provided
-func (s *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk bool) error {
+func (s *Driver) TorrentGet(hash store.InfoHash, deletedOk bool) (*store.Torrent, error) {
 	const q = `
 		SELECT 
 			info_hash,
@@ -422,22 +457,23 @@ func (s *Driver) TorrentGet(t *store.Torrent, hash store.InfoHash, deletedOk boo
     	    torrent
     	WHERE 
     	    is_deleted = ? AND info_hash = ?`
-	err := s.db.Get(t, q, deletedOk, hash.Bytes())
+	var t store.Torrent
+	err := s.db.Get(&t, q, deletedOk, hash.Bytes())
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
-			return consts.ErrInvalidInfoHash
+			return nil, consts.ErrInvalidInfoHash
 		}
-		return err
+		return nil, err
 	}
 	if t.IsDeleted && !deletedOk {
-		return consts.ErrInvalidInfoHash
+		return nil, consts.ErrInvalidInfoHash
 	}
-	return nil
+	return &t, nil
 }
 
 // Add inserts a new torrent into the backing store
 func (s *Driver) TorrentAdd(t *store.Torrent) error {
-	t.CreatedOn = time.Now()
+	t.CreatedOn = util.Now()
 	t.UpdatedOn = t.CreatedOn
 	const q = `
 		INSERT INTO torrent (info_hash, multi_up, multi_dn, title, created_on, updated_on) 

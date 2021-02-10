@@ -75,7 +75,7 @@ type Peer struct {
 	// Clients reported bytes left of the download
 	Left uint32 `db:"total_left" redis:"total_left" json:"total_left"`
 	// Total active swarm participation time
-	TotalTime uint32 `db:"total_time" redis:"total_time" json:"total_time"`
+	TotalTime time.Duration `db:"total_time" redis:"total_time" json:"total_time"`
 	// Current speed up, bytes/sec
 	SpeedUP uint32 `db:"speed_up" redis:"speed_up" json:"speed_up"`
 	// Current speed dn, bytes/sec
@@ -97,7 +97,6 @@ type Peer struct {
 	AnnounceFirst time.Time `db:"announce_first" redis:"announce_first" json:"announce_first"`
 	// Peer id, reported by client. Must have white-listed prefix
 	PeerID      PeerID      `db:"peer_id" redis:"peer_id" json:"peer_id"`
-	InfoHash    InfoHash    `db:"info_hash" redis:"info_hash" json:"info_hash"`
 	Location    geo.LatLong `db:"location" redis:"location" json:"location"`
 	CountryCode string      `db:"country_code" json:"country_code"`
 	ASN         uint32      `db:"asn" json:"asn"`
@@ -110,7 +109,6 @@ type Peer struct {
 	//UpdatedOn time.Time `db:"updated_on" redis:"updated_on" json:"updated_on"`
 	CryptoLevel consts.CryptoLevel `db:"crypto_level" json:"crypto_level"`
 	Paused      bool
-	User        *User
 }
 
 // Expired checks if the peer last lost contact with us
@@ -225,12 +223,11 @@ func NewPeer(userID uint32, peerID PeerID, ip net.IP, port uint16) *Peer {
 	return &Peer{
 		IP:            ip,
 		Port:          port,
-		AnnounceLast:  time.Now(),
-		AnnounceFirst: time.Now(),
+		AnnounceLast:  util.Now(),
+		AnnounceFirst: util.Now(),
 		PeerID:        peerID,
 		Location:      geo.LatLong{Latitude: 0, Longitude: 0},
 		UserID:        userID,
-		User:          nil,
 		Paused:        false,
 	}
 }

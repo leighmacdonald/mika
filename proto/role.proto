@@ -33,10 +33,11 @@ message RoleAddParams {
   double multi_down = 8;
 }
 
-message RoleUpdateParams {
+message RoleSetParams {
+  repeated string updated_keys = 1;
   string role_name = 2;
   uint64 remote_id = 3;
-  uint32 priority = 4;
+  int32 priority = 4;
   bool download_enabled = 5;
   bool upload_enabled = 6;
   double multi_up = 7;

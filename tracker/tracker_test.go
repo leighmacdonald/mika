@@ -108,6 +108,7 @@ type sr struct {
 func TestMain(m *testing.M) {
 	config.General.RunMode = "test"
 	config.Tracker.AllowNonRoutable = false
+	config.Tracker.AllowClientIP = true
 	Init()
 	if err := seedTestTracker(); err != nil {
 		log.Errorf("Failed to seed tracker for test: %v", err)

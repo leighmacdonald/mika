@@ -26,8 +26,8 @@ func TestBitTorrentHandler_Scrape(t *testing.T) {
 		v, err := bencode.NewDecoder(w.Body).Decode()
 		require.NoError(t, err, "Failed to decode scrape: (%d)", i)
 		d := v.(bencode.Dict)
-		require.Equal(t, int64(1), d[testTorrents[0].InfoHash.String()].(bencode.Dict)["complete"].(int64))
-		require.Equal(t, int64(1), d[testTorrents[0].InfoHash.String()].(bencode.Dict)["incomplete"].(int64))
-		require.Equal(t, int64(2), d[testTorrents[0].InfoHash.String()].(bencode.Dict)["downloaded"].(int64))
+		require.Equal(t, int64(2), d[testTorrents[0].InfoHash.String()].(bencode.Dict)["complete"].(int64))
+		require.Equal(t, int64(0), d[testTorrents[0].InfoHash.String()].(bencode.Dict)["incomplete"].(int64))
+		require.Equal(t, int64(1), d[testTorrents[0].InfoHash.String()].(bencode.Dict)["downloaded"].(int64))
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"github.com/leighmacdonald/mika/config"
 	"github.com/leighmacdonald/mika/store"
 	"github.com/leighmacdonald/mika/util"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -27,26 +26,21 @@ func execSchema(db *sqlx.DB, schemaPath string) {
 		panic("Cannot read schema file")
 	}
 	db.MustExec(string(b))
-	//for _, stmt := range strings.Split(string(b), "-- STMT") {
-	//	if !strings.HasPrefix(stmt, "-- ") && strings.Contains(stmt, ";") {
-	//		log.Debugf("SQL: %s", stmt)
-	//		db.MustExec(string(b))
-	//	}
-	//}
 }
 
 func TestMain(m *testing.M) {
-	if err := config.Read("mika_testing_mysql"); err != nil {
-		log.Info("Skipping database tests, failed to find config: mika_testing.yaml")
+	config.General.RunMode = "test"
+	config.Store.Type = driverName
+	config.Store.User = "mika"
+	config.Store.Password = "mika"
+	config.Store.Database = "mika"
+	config.Store.Host = "localhost"
+	config.Store.Port = 3307
+	config.Store.Properties = "parseTime=true&multiStatements=true"
+	db, err := sqlx.Connect(driverName, config.Store.DSN())
+	if err != nil {
 		os.Exit(0)
-		return
 	}
-	if config.General.RunMode != "test" {
-		log.Info("Skipping database tests, not running in testing mode")
-		os.Exit(0)
-		return
-	}
-	db := sqlx.MustConnect(driverName, config.Store.DSN())
 	execSchema(db, schemaDrop)
 	execSchema(db, schemaCreate)
 	defer execSchema(db, schemaDrop)

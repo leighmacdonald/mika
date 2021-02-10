@@ -60,6 +60,10 @@ func Init() {
 	}
 	geodb = newGeodb
 
+	if err := Migrate(); err != nil {
+		log.Fatalf("Failed to perform migration: %v", err)
+	}
+
 	whitelist = loadWhitelist()
 	roles = loadRoles()
 	users = loadUsers()
@@ -76,7 +80,7 @@ func loadWhitelist() store.WhiteList {
 	newWhitelist := make(store.WhiteList)
 	wl, err4 := db.WhiteListGetAll()
 	if err4 != nil {
-		log.Fatalf("whitelist empty, all clients are allowed")
+		log.Warn("whitelist empty, all clients are allowed")
 	} else {
 		for _, cw := range wl {
 			newWhitelist[cw.ClientPrefix] = cw

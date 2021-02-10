@@ -15,9 +15,6 @@ var migrateCmd = &cobra.Command{
 	Long:  `migrate`,
 	Run: func(cmd *cobra.Command, args []string) {
 		tracker.Init()
-		if err := tracker.Migrate(); err != nil {
-			log.Fatalf("Failed to perform migration: %v", err)
-		}
 		if len(tracker.RoleAll()) == 0 {
 			role := store.Role{
 				RoleName:        "admin",

@@ -145,8 +145,7 @@ func TestStore(t *testing.T, s Store) {
 	fetchedRoles, err := s.Roles()
 	require.NoError(t, err, "failed to fetch roles")
 	require.Equal(t, len(roles), len(fetchedRoles))
-
-	require.NoError(t, s.RoleDelete(fetchedRoles[3].RoleID))
+	require.NoError(t, s.RoleDelete(roles[3].RoleID))
 	fetchedRolesDeleted, err := s.Roles()
 	require.NoError(t, err, "failed to fetch roles")
 	require.Equal(t, len(roles)-1, len(fetchedRolesDeleted))
@@ -187,6 +186,7 @@ func TestStore(t *testing.T, s Store) {
 	//require.Equal(t, uint32(10)+users[0].Announces, updatedUser.Announces)
 
 	newUser := GenerateTestUser()
+	newUser.RoleID = roles[0].RoleID
 	require.NoError(t, s.UserAdd(&newUser))
 	fetchedNewUser, err := s.UserGetByID(newUser.UserID)
 	require.NoError(t, err)

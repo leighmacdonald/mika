@@ -110,14 +110,14 @@ func (s *Driver) RoleByID(roleID uint32) (*store.Role, error) {
        		download_enabled, upload_enabled, created_on, updated_on 
 		FROM role 
 		WHERE role_id = ?`
-	var role *store.Role
-	if err := s.db.Get(role, q, roleID); err != nil {
+	var role store.Role
+	if err := s.db.Get(&role, q, roleID); err != nil {
 		if err.Error() == ErrNoResults {
 			return nil, consts.ErrInvalidRole
 		}
 		return nil, errors.Wrap(err, "Could not query user by passkey")
 	}
-	return role, nil
+	return &role, nil
 }
 
 func (s *Driver) RoleAdd(role *store.Role) error {

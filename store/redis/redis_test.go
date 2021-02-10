@@ -13,7 +13,12 @@ import (
 func TestRedisTorrentStore(t *testing.T) {
 	ts, e := store.NewStore(config.Store)
 	require.NoError(t, e, e)
-	setupDB(t, ts.Conn().(*redis.Client))
+	conn := ts.Conn().(*redis.Client)
+	if err := conn.Ping().Err(); err != nil {
+		t.Skip("Redis test skipped, cannot ping server")
+		return
+	}
+	setupDB(t, conn)
 	store.TestStore(t, ts)
 }
 

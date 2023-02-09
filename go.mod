@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/anacrolix/torrent v1.22.0
 	github.com/chihaya/bencode v0.0.0-20160403015629-641906563e26
-	github.com/gin-gonic/gin v1.6.3
+	github.com/gin-gonic/gin v1.7.7
 	github.com/gizak/termui/v3 v3.1.0
 	github.com/go-redis/redis/v7 v7.2.0
 	github.com/go-sql-driver/mysql v1.5.0

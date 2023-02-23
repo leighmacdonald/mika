@@ -36,7 +36,7 @@ require (
 	github.com/spf13/viper v1.6.3
 	github.com/stretchr/testify v1.6.1
 	github.com/toorop/gin-logrus v0.0.0-20190701131413-6c374ad36b67
-	golang.org/x/text v0.3.5 // indirect
+	golang.org/x/text v0.3.8 // indirect
 	google.golang.org/genproto v0.0.0-20210126160654-44e461bb6506 // indirect
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
